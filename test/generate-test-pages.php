@@ -32,7 +32,7 @@ $fitness_config = array(
     'fonts' => array( 'heading' => 'Poppins', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'cta_final', 'footer' ),
+    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'newsletter', 'cta_final', 'footer' ),
     'hero' => array(
         'badge' => 'New Year, New You — 50% Off First Month',
         'eyebrow' => 'TRANSFORM YOUR BODY',
@@ -113,6 +113,13 @@ $fitness_config = array(
                 ),
             ),
         ),
+    ),
+    'newsletter' => array(
+        'variant' => 'inline',
+        'headline' => 'Get Workout Tips & Special Offers',
+        'description' => 'Join 5,000+ fitness enthusiasts who get our weekly newsletter.',
+        'cta_text' => 'Subscribe Free',
+        'cta_url' => '#',
     ),
     'cta_final' => array(
         'headline' => 'Ready to Transform Your Life?',
@@ -353,11 +360,12 @@ $restaurant_config = array(
         'image' => 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=800',
     ),
     'features' => array(
+        'variant' => 'image_cards',
         'eyebrow' => 'THE EXPERIENCE', 'headline' => 'What Makes Us Different',
         'items' => array(
-            array( 'icon' => array( 'value' => 'fas fa-leaf', 'library' => 'fa-solid' ), 'title' => 'Locally Sourced', 'desc' => '90% of our ingredients come from farms within 100 miles. We know our farmers by name and visit them monthly.', 'accent' => '#059669' ),
-            array( 'icon' => array( 'value' => 'fas fa-hand-sparkles', 'library' => 'fa-solid' ), 'title' => 'Made Fresh Daily', 'desc' => 'Every pasta, sauce, and bread is made in-house each morning. No freezers, no shortcuts, no exceptions.', 'accent' => '#B91C1C' ),
-            array( 'icon' => array( 'value' => 'fas fa-wine-glass-alt', 'library' => 'fa-solid' ), 'title' => '200+ Italian Wines', 'desc' => 'Our sommelier curates a rotating selection from every region of Italy, with 30 options by the glass.', 'accent' => '#7C3AED' ),
+            array( 'title' => 'Locally Sourced', 'desc' => '90% of our ingredients come from farms within 100 miles. We know our farmers by name and visit them monthly.', 'image' => 'https://images.pexels.com/photos/2252584/pexels-photo-2252584.jpeg?auto=compress&cs=tinysrgb&w=600' ),
+            array( 'title' => 'Made Fresh Daily', 'desc' => 'Every pasta, sauce, and bread is made in-house each morning. No freezers, no shortcuts, no exceptions.', 'image' => 'https://images.pexels.com/photos/4252137/pexels-photo-4252137.jpeg?auto=compress&cs=tinysrgb&w=600' ),
+            array( 'title' => '200+ Italian Wines', 'desc' => 'Our sommelier curates a rotating selection from every region of Italy, with 30 options by the glass.', 'image' => 'https://images.pexels.com/photos/2702805/pexels-photo-2702805.jpeg?auto=compress&cs=tinysrgb&w=600' ),
         ),
     ),
     'steps' => array(

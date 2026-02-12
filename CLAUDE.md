@@ -74,6 +74,9 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
 | features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
+| features | `image_cards` | `build_features_image_cards` | Image on top of each card |
+| newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
+| newsletter | `inline` | `build_newsletter_inline` | Gradient bar with headline + button |
 | results | _(default)_ | `build_results` | Dark gradient with counter cards |
 | results | `bars` | `build_results_bars` | Light bg with animated progress bars |
 | team | _(default)_ | `build_team` | Photo + name + role + bio + social cards |
@@ -83,7 +86,6 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
-| newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 
 Config example:

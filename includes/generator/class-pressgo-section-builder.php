@@ -713,6 +713,62 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 4d. Features Image Cards (image on top of each card)
+	// ──────────────────────────────────────────────
+
+	public static function build_features_image_cards( $cfg ) {
+		$c = $cfg['colors'];
+		$f = $cfg['features'];
+
+		$feature_cols = array();
+		foreach ( $f['items'] as $item ) {
+			$img_url = isset( $item['image'] ) ? $item['image'] : '';
+
+			$widgets = array();
+			if ( $img_url ) {
+				$widgets[] = PressGo_Widget_Helpers::image_w( $img_url, $item['title'],
+					null, 0, false, 'center' );
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			}
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h4', 'left',
+				$c['text_dark'], 20, '700' );
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $item['desc'], 'left',
+				$c['text_muted'], 15 );
+
+			$r = (string) $cfg['layout']['card_radius'];
+			$feature_cols[] = PressGo_Element_Factory::col( $widgets, array(
+				'background_background' => 'classic',
+				'background_color'      => $c['white'],
+				'border_radius'         => array(
+					'unit' => 'px', 'top' => $r, 'right' => $r,
+					'bottom' => $r, 'left' => $r, 'isLinked' => true,
+				),
+				'border_border'         => 'solid',
+				'border_width'          => array(
+					'unit' => 'px', 'top' => '1', 'right' => '1',
+					'bottom' => '1', 'left' => '1', 'isLinked' => true,
+				),
+				'border_color'          => $c['border'],
+				'_box_shadow_box_shadow_type' => 'yes',
+				'_box_shadow_box_shadow'      => $cfg['layout']['card_shadow'],
+				'padding'               => array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '24', 'left' => '0', 'isLinked' => false,
+				),
+				'_element_custom_width' => array( 'unit' => '%', 'size' => 100 ),
+			) );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
+			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $feature_cols, 24 ) ) ),
+			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 5. Steps
 	// ──────────────────────────────────────────────
 
@@ -2123,6 +2179,46 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::outer( $cfg,
 			array( PressGo_Element_Factory::row( $cfg, array( $card_col ), 0 ) ),
 			$c['light_bg'], null, 60, 60 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 17b. Newsletter Inline (headline left, button right — compact)
+	// ──────────────────────────────────────────────
+
+	public static function build_newsletter_inline( $cfg ) {
+		$c  = $cfg['colors'];
+		$nl = $cfg['newsletter'];
+
+		$left = array(
+			PressGo_Widget_Helpers::heading_w( $cfg,
+				isset( $nl['headline'] ) ? $nl['headline'] : 'Stay in the Loop',
+				'h3', 'left', $c['white'], 28, '800', -0.5, 1.3, null, 22 ),
+		);
+		if ( ! empty( $nl['description'] ) ) {
+			$left[] = PressGo_Widget_Helpers::spacer_w( 8 );
+			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $nl['description'], 'left',
+				'rgba(255,255,255,0.7)', 15 );
+		}
+
+		$right = array(
+			PressGo_Widget_Helpers::btn_w( $cfg,
+				isset( $nl['cta_text'] ) ? $nl['cta_text'] : 'Subscribe',
+				isset( $nl['cta_url'] ) ? $nl['cta_url'] : '#',
+				$c['white'], $c['primary'], null,
+				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'right' ),
+		);
+
+		$left_col = PressGo_Element_Factory::col( $left, array(
+			'vertical_align' => 'middle',
+		) );
+		$right_col = PressGo_Element_Factory::col( $right, array(
+			'vertical_align' => 'middle',
+		) );
+
+		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );
+
+		return PressGo_Element_Factory::outer( $cfg, array( $row ),
+			null, array( $c['primary'], '#0052D9', 135 ), 48, 48 );
 	}
 
 	// ──────────────────────────────────────────────

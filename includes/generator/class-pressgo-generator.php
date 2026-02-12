@@ -49,10 +49,12 @@ class PressGo_Generator {
 		'cta_final.card'                => 'build_cta_final_card',
 		'cta_final.image'               => 'build_cta_final_image',
 		'features.minimal'              => 'build_features_minimal',
+		'features.image_cards'          => 'build_features_image_cards',
 		'testimonials.grid'             => 'build_testimonials_grid',
 		'faq.split'                     => 'build_faq_split',
 		'team.compact'                  => 'build_team_compact',
 		'results.bars'                  => 'build_results_bars',
+		'newsletter.inline'             => 'build_newsletter_inline',
 	);
 
 	/**
