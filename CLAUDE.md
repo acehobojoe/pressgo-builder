@@ -83,6 +83,8 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | team | `compact` | `build_team_compact` | Small photos, name + role only, no cards |
 | cta_final | `image` | `build_cta_final_image` | Background image with dark overlay |
 | pricing | _(default)_ | `build_pricing` | 2-4 column plan cards with feature lists |
+| pricing | `compact` | `build_pricing_compact` | Left-aligned cards, smaller price, bordered highlight |
+| stats | `inline` | `build_stats_inline` | Minimal horizontal counter row with dividers |
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |

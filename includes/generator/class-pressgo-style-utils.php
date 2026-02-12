@@ -40,6 +40,7 @@ class PressGo_Style_Utils {
 		$layout = $cfg['layout'];
 		$r      = (string) $layout['card_radius'];
 		$shadow = $layout['card_shadow'];
+		$mob    = (string) max( 16, $pad - 8 );
 
 		return array(
 			'background_background'          => 'classic',
@@ -51,6 +52,10 @@ class PressGo_Style_Utils {
 			'padding'                        => array(
 				'unit' => 'px', 'top' => (string) $pad, 'right' => (string) $pad,
 				'bottom' => (string) $pad, 'left' => (string) $pad, 'isLinked' => true,
+			),
+			'padding_mobile'                 => array(
+				'unit' => 'px', 'top' => $mob, 'right' => $mob,
+				'bottom' => $mob, 'left' => $mob, 'isLinked' => true,
 			),
 			'border_border'                  => 'solid',
 			'border_width'                   => array(

@@ -140,6 +140,35 @@ html {
     transition: width 1.5s ease-out;
 }
 
+/* Logo bar grayscale → color on hover */
+.elementor-widget-image .elementor-image img[src*='logoipsum'],
+.elementor-widget-image .elementor-image img[src*='logo'] {
+    filter: grayscale(100%) opacity(0.5);
+    transition: filter 0.4s ease, transform 0.4s ease;
+}
+.elementor-widget-image:hover .elementor-image img[src*='logoipsum'],
+.elementor-widget-image:hover .elementor-image img[src*='logo'] {
+    filter: grayscale(0%) opacity(1);
+}
+
+/* Star rating smooth hover */
+.elementor-star-rating {
+    transition: transform 0.2s ease;
+}
+
+/* Pricing card scale on hover */
+.elementor-inner-section .elementor-column[style*='border-top: 3px'] {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Mobile typography scale */
+@media (max-width: 767px) {
+    .elementor-widget-heading .elementor-heading-title {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+}
+
 @media (hover: none) {
     .elementor-button:hover,
     .elementor-inner-section .elementor-column > .elementor-widget-wrap:hover,

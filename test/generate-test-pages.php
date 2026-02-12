@@ -349,7 +349,15 @@ $restaurant_config = array(
     'fonts' => array( 'heading' => 'Playfair Display', 'body' => 'Lato' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 12, 'button_radius' => 8,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'features', 'steps', 'gallery', 'team', 'testimonials', 'faq', 'map', 'cta_final', 'footer' ),
+    'sections' => array( 'hero', 'stats', 'features', 'steps', 'gallery', 'team', 'testimonials', 'faq', 'map', 'cta_final', 'footer' ),
+    'stats' => array(
+        'variant' => 'inline',
+        'items' => array(
+            array( 'icon' => array( 'value' => 'fas fa-star', 'library' => 'fa-solid' ), 'value' => '4.9', 'label' => 'Google Rating' ),
+            array( 'icon' => array( 'value' => 'fas fa-utensils', 'library' => 'fa-solid' ), 'value' => '12', 'label' => 'Years Serving Austin' ),
+            array( 'icon' => array( 'value' => 'fas fa-wine-glass-alt', 'library' => 'fa-solid' ), 'value' => '200+', 'label' => 'Italian Wines' ),
+        ),
+    ),
     'hero' => array(
         'variant' => 'image',
         'eyebrow' => 'EST. 2012 · AUSTIN, TEXAS',
@@ -574,6 +582,7 @@ $reviewboost_config = array(
         ),
     ),
     'pricing' => array(
+        'variant' => 'compact',
         'eyebrow' => 'PRICING', 'headline' => 'Plans That Grow With You',
         'subheadline' => 'Start with a 14-day free trial on any plan. No credit card required.',
         'plans' => array(
