@@ -810,14 +810,29 @@ class PressGo_Section_Builder {
 		$fonts = $cfg['fonts'];
 		$img   = isset( $ce['image'] ) ? $ce['image'] : '';
 
-		// Build benefit checkmarks as HTML.
-		$checks_html = '';
+		// Build benefit checklist with icon-list widget.
+		$icon_list_items = array();
 		foreach ( $ce['benefits'] as $b ) {
-			$checks_html .= '<div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;">'
-				. '<span style="color:' . $c['accent'] . '; font-size:18px; line-height:1.5;">&#10003;</span>'
-				. '<span style="color:' . $c['text_dark'] . '; font-size:16px; line-height:1.6; font-weight:500;">' . $b . '</span>'
-				. '</div>';
+			$icon_list_items[] = array(
+				'text'          => $b,
+				'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+				'link'          => array( 'url' => '' ),
+			);
 		}
+
+		$icon_list = PressGo_Element_Factory::widget( 'icon-list', array(
+			'icon_list'                    => $icon_list_items,
+			'icon_color'                   => $c['accent'],
+			'text_color'                   => $c['text_dark'],
+			'icon_size'                    => array( 'unit' => 'px', 'size' => 18, 'sizes' => array() ),
+			'text_indent'                  => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+			'space_between'                => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'typography_typography'        => 'custom',
+			'typography_font_family'       => $fonts['body'],
+			'typography_font_size'         => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'typography_font_weight'       => '500',
+			'typography_line_height'       => array( 'unit' => 'em', 'size' => 1.6, 'sizes' => array() ),
+		) );
 
 		$left = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $ce['eyebrow'], 'h6', 'left', $c['primary'],
@@ -828,7 +843,7 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 			PressGo_Widget_Helpers::text_w( $cfg, $ce['description'], 'left', $c['text_muted'], 16 ),
 			PressGo_Widget_Helpers::spacer_w( 20 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $checks_html, 'left', null, 16 ),
+			$icon_list,
 			PressGo_Widget_Helpers::spacer_w( 24 ),
 			PressGo_Widget_Helpers::btn_w( $cfg, $ce['cta']['text'],
 				isset( $ce['cta']['url'] ) ? $ce['cta']['url'] : '#',
@@ -892,9 +907,7 @@ class PressGo_Section_Builder {
 
 			$testimonial_cols[] = PressGo_Element_Factory::col(
 				array(
-					PressGo_Widget_Helpers::text_w( $cfg,
-						'<span style="color: ' . $c['gold'] . '; font-size: 18px; letter-spacing: 2px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>',
-						'left', null, 18 ),
+					PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'left' ),
 					PressGo_Widget_Helpers::spacer_w( 12 ),
 					PressGo_Widget_Helpers::text_w( $cfg,
 						'<em style="line-height: 1.7;">&ldquo;' . $item['quote'] . '&rdquo;</em>',
@@ -961,9 +974,7 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
 
 		// Stars.
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-			'<span style="color:' . $c['gold'] . '; font-size:20px; letter-spacing:3px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>',
-			'center', null, 20 );
+		$children[] = PressGo_Widget_Helpers::star_rating_w( 5, 20, $c['gold'], 'center' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 
 		// Author info.
@@ -985,9 +996,7 @@ class PressGo_Section_Builder {
 
 				$mini_cols[] = PressGo_Element_Factory::col(
 					array(
-						PressGo_Widget_Helpers::text_w( $cfg,
-							'<span style="color:' . $c['gold'] . '; font-size:14px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>',
-							'left', null, 14 ),
+						PressGo_Widget_Helpers::star_rating_w( 5, 12, $c['gold'], 'left' ),
 						PressGo_Widget_Helpers::spacer_w( 8 ),
 						PressGo_Widget_Helpers::text_w( $cfg,
 							'<em>&ldquo;' . ( strlen( $item['quote'] ) > 100
@@ -1144,6 +1153,14 @@ class PressGo_Section_Builder {
 				'center', null, 14 );
 		}
 
+		// Social icons if provided.
+		if ( ! empty( $ct['social_icons'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$children[] = PressGo_Widget_Helpers::social_icons_w(
+				$ct['social_icons'], 16, 'custom', 'rgba(255,255,255,0.5)', 'circle', 'center', 12
+			);
+		}
+
 		// Determine top divider color based on whether blog section precedes this.
 		$sections  = isset( $cfg['sections'] ) ? $cfg['sections'] : array();
 		$top_color = in_array( 'blog', $sections, true ) ? $c['white'] : $c['light_bg'];
@@ -1186,6 +1203,14 @@ class PressGo_Section_Builder {
 				'center', null, 13 );
 		}
 
+		// Social icons if provided.
+		if ( ! empty( $ct['social_icons'] ) ) {
+			$card_children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$card_children[] = PressGo_Widget_Helpers::social_icons_w(
+				$ct['social_icons'], 14, 'custom', $c['text_muted'], 'circle', 'center', 10
+			);
+		}
+
 		$r = (string) $cfg['layout']['card_radius'];
 
 		$card_col = PressGo_Element_Factory::col( $card_children, array(
@@ -1218,19 +1243,56 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
-	// 12. Disclaimer
+	// 12. Map
+	// ──────────────────────────────────────────────
+
+	public static function build_map( $cfg ) {
+		$c   = $cfg['colors'];
+		$map = $cfg['map'];
+
+		$children = array();
+
+		// Optional section header.
+		if ( ! empty( $map['eyebrow'] ) || ! empty( $map['headline'] ) ) {
+			$header = PressGo_Style_Utils::section_header( $cfg,
+				isset( $map['eyebrow'] ) ? $map['eyebrow'] : '',
+				isset( $map['headline'] ) ? $map['headline'] : '' );
+			$children = array_merge( $children, $header );
+		}
+
+		$address = isset( $map['address'] ) ? $map['address'] : '';
+		$height  = isset( $map['height'] ) ? (int) $map['height'] : 400;
+		$zoom    = isset( $map['zoom'] ) ? (int) $map['zoom'] : 14;
+
+		$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom );
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 60, 60 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 13. Disclaimer
 	// ──────────────────────────────────────────────
 
 	public static function build_disclaimer( $cfg ) {
 		$c    = $cfg['colors'];
 		$text = $cfg['disclaimer'];
 
-		return PressGo_Element_Factory::outer( $cfg,
-			array(
-				PressGo_Widget_Helpers::text_w( $cfg,
-					'<p style="text-align: center; font-size: 13px; color: #9CA3AF;">' . $text . '</p>',
-					'center', '#9CA3AF', 13 ),
-			),
+		$children = array(
+			PressGo_Widget_Helpers::text_w( $cfg,
+				'<p style="text-align: center; font-size: 13px; color: #9CA3AF;">' . $text . '</p>',
+				'center', '#9CA3AF', 13 ),
+		);
+
+		// Social icons in footer if provided at top-level config.
+		if ( ! empty( $cfg['social_icons'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			$children[] = PressGo_Widget_Helpers::social_icons_w(
+				$cfg['social_icons'], 12, 'custom', '#9CA3AF', 'circle', 'center', 8
+			);
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 40, 40 );
 	}
 }

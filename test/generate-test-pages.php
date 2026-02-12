@@ -176,6 +176,12 @@ $saas_config = array(
         'description' => "Join 10,000+ teams who upgraded their workflow. Free forever for small teams.",
         'cta' => array( 'text' => 'Get Started Free', 'url' => '#', 'icon' => array( 'value' => 'fas fa-rocket', 'library' => 'fa-solid' ) ),
         'trust_line' => 'No credit card required',
+        'social_icons' => array(
+            array( 'icon' => 'fab fa-twitter', 'url' => '#' ),
+            array( 'icon' => 'fab fa-github', 'url' => '#' ),
+            array( 'icon' => 'fab fa-linkedin-in', 'url' => '#' ),
+            array( 'icon' => 'fab fa-youtube', 'url' => '#' ),
+        ),
     ),
 );
 
@@ -191,7 +197,12 @@ $restaurant_config = array(
     'fonts' => array( 'heading' => 'Playfair Display', 'body' => 'Lato' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 12, 'button_radius' => 8,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'features', 'steps', 'testimonials', 'faq', 'cta_final' ),
+    'sections' => array( 'hero', 'features', 'steps', 'testimonials', 'faq', 'map', 'cta_final', 'disclaimer' ),
+    'social_icons' => array(
+        array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+        array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
+        array( 'icon' => 'fab fa-yelp', 'url' => '#' ),
+    ),
     'hero' => array(
         'variant' => 'image',
         'eyebrow' => 'EST. 2012 · AUSTIN, TEXAS',
@@ -235,13 +246,26 @@ $restaurant_config = array(
             array( 'q' => 'What are your hours?', 'a' => 'Tuesday–Thursday 5pm–10pm, Friday–Saturday 5pm–11pm, Sunday 4pm–9pm. Closed Mondays.' ),
         ),
     ),
+    'map' => array(
+        'eyebrow' => 'FIND US',
+        'headline' => 'Visit Trattoria Roma',
+        'address' => '1500 South Congress Ave, Austin, TX 78704',
+        'height' => 400,
+        'zoom' => 15,
+    ),
     'cta_final' => array(
         'variant' => 'card',
         'headline' => 'Your Table Awaits',
         'description' => "Experience Austin's finest Italian dining. Walk-ins welcome, but reservations are recommended.",
         'cta' => array( 'text' => 'Make a Reservation', 'url' => '#', 'icon' => array( 'value' => 'fas fa-calendar-check', 'library' => 'fa-solid' ) ),
         'trust_line' => "OpenTable 2025 Diners' Choice Award",
+        'social_icons' => array(
+            array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+            array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
+            array( 'icon' => 'fab fa-yelp', 'url' => '#' ),
+        ),
     ),
+    'disclaimer' => 'Trattoria Roma · 1500 South Congress Ave, Austin, TX · (512) 555-0142 · Tue–Sun',
 );
 
 // ── Page 4: ReviewBoost ──
@@ -349,6 +373,11 @@ $reviewboost_config = array(
         'description' => "Join 500+ businesses that trust ReviewBoost to grow their online reputation. Start your free trial today.",
         'cta' => array( 'text' => 'Start Free — No Card Required', 'url' => '#', 'icon' => array( 'value' => 'fas fa-arrow-right', 'library' => 'fa-solid' ) ),
         'trust_line' => '14-day free trial · No credit card · Cancel anytime',
+        'social_icons' => array(
+            array( 'icon' => 'fab fa-twitter', 'url' => '#' ),
+            array( 'icon' => 'fab fa-linkedin-in', 'url' => '#' ),
+            array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
+        ),
     ),
 );
 

@@ -24,6 +24,7 @@ class PressGo_Generator {
 		'faq'              => 'build_faq',
 		'blog'             => 'build_blog',
 		'cta_final'        => 'build_cta_final',
+		'map'              => 'build_map',
 		'disclaimer'       => 'build_disclaimer',
 	);
 

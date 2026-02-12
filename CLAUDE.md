@@ -31,7 +31,7 @@ Browser → admin-ajax (WordPress)
 
 ## Generator Architecture
 - `PressGo_Element_Factory` — Core primitives: `eid()`, `widget()`, `outer()`, `row()`, `col()`
-- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`
+- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`, `icon_box_w()`, `image_box_w()`, `star_rating_w()`, `social_icons_w()`, `testimonial_w()`, `video_w()`, `google_map_w()`
 - `PressGo_Style_Utils` — `hex_to_rgba()`, `hex_to_rgb()`, `card_style()`, `section_header()`
 - `PressGo_Section_Builder` — Section builders with layout variants
 - `PressGo_Generator` — Orchestrator with variant routing
@@ -69,6 +69,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | steps | `compact` | `build_steps_compact` | Numbered pill badges with divider |
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
+| map | _(default)_ | `build_map` | Google Maps embed with optional header |
 
 Config example:
 ```php
@@ -80,8 +81,8 @@ Config example:
 ),
 ```
 
-### Section Types (12)
-hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, cta_final, disclaimer
+### Section Types (13)
+hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, cta_final, map, disclaimer
 
 ## Critical Elementor Rules
 1. **Use section/column layout** — NOT container (`elType: 'container'` doesn't render via `update_post_meta`)
