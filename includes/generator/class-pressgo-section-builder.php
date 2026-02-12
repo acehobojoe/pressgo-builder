@@ -753,10 +753,9 @@ class PressGo_Section_Builder {
 				'_box_shadow_box_shadow_type' => 'yes',
 				'_box_shadow_box_shadow'      => $cfg['layout']['card_shadow'],
 				'padding'               => array(
-					'unit' => 'px', 'top' => '0', 'right' => '0',
-					'bottom' => '24', 'left' => '0', 'isLinked' => false,
+					'unit' => 'px', 'top' => '0', 'right' => '24',
+					'bottom' => '28', 'left' => '24', 'isLinked' => false,
 				),
-				'_element_custom_width' => array( 'unit' => '%', 'size' => 100 ),
 			) );
 		}
 
@@ -2074,6 +2073,125 @@ class PressGo_Section_Builder {
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['dark_bg'], null, 60, 40 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 15b. Footer Light (white background variant)
+	// ──────────────────────────────────────────────
+
+	public static function build_footer_light( $cfg ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$ft    = $cfg['footer'];
+
+		$cols = array();
+
+		// Brand column.
+		$brand_widgets = array();
+		if ( ! empty( $ft['brand']['name'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $ft['brand']['name'], 'h4', 'left',
+				$c['text_dark'], 22, '800' );
+			$brand_widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+		}
+		if ( ! empty( $ft['brand']['description'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $ft['brand']['description'], 'left',
+				$c['text_muted'], 14 );
+		}
+		if ( ! empty( $ft['social_icons'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$brand_widgets[] = PressGo_Widget_Helpers::social_icons_w(
+				$ft['social_icons'], 14, 'custom', $c['text_muted'], 'circle', 'left', 8
+			);
+		}
+		$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
+			'padding' => array(
+				'unit' => 'px', 'top' => '0', 'right' => '40',
+				'bottom' => '0', 'left' => '0', 'isLinked' => false,
+			),
+		) );
+
+		// Link columns.
+		$link_columns = isset( $ft['columns'] ) ? $ft['columns'] : array();
+		foreach ( $link_columns as $lc ) {
+			$col_widgets = array();
+			$col_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $lc['title'], 'h6', 'left',
+				$c['text_dark'], 14, '700' );
+			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+
+			$links_html = '';
+			foreach ( $lc['links'] as $link ) {
+				$url = isset( $link['url'] ) ? $link['url'] : '#';
+				$links_html .= '<div style="margin-bottom:8px;">'
+					. '<a href="' . esc_url( $url ) . '" style="color:' . $c['text_muted'] . '; '
+					. 'text-decoration:none; font-size:14px;">'
+					. esc_html( $link['text'] ) . '</a></div>';
+			}
+			$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $links_html, 'left',
+				$c['text_muted'], 14 );
+
+			$cols[] = PressGo_Element_Factory::col( $col_widgets );
+		}
+
+		// Contact column with icon-list.
+		if ( ! empty( $ft['contact'] ) ) {
+			$contact_widgets = array();
+			$contact_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, 'Contact', 'h6', 'left',
+				$c['text_dark'], 14, '700' );
+			$contact_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+
+			$contact_items = array();
+			if ( ! empty( $ft['contact']['email'] ) ) {
+				$contact_items[] = array(
+					'text'          => $ft['contact']['email'],
+					'selected_icon' => array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => 'mailto:' . $ft['contact']['email'] ),
+				);
+			}
+			if ( ! empty( $ft['contact']['phone'] ) ) {
+				$contact_items[] = array(
+					'text'          => $ft['contact']['phone'],
+					'selected_icon' => array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+			if ( ! empty( $ft['contact']['address'] ) ) {
+				$contact_items[] = array(
+					'text'          => $ft['contact']['address'],
+					'selected_icon' => array( 'value' => 'fas fa-map-marker-alt', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+
+			if ( count( $contact_items ) > 0 ) {
+				$contact_widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
+					'icon_list'                    => $contact_items,
+					'icon_color'                   => $c['primary'],
+					'text_color'                   => $c['text_muted'],
+					'icon_size'                    => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+					'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
+					'space_between'                => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+					'typography_typography'         => 'custom',
+					'typography_font_family'        => $fonts['body'],
+					'typography_font_size'          => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+					'typography_font_weight'        => '400',
+				) );
+			}
+
+			$cols[] = PressGo_Element_Factory::col( $contact_widgets );
+		}
+
+		$children = array( PressGo_Element_Factory::row( $cfg, $cols, 24 ) );
+
+		if ( ! empty( $ft['copyright'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+			$children[] = PressGo_Widget_Helpers::divider_w();
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ft['copyright'], 'center',
+				$c['text_muted'], 13 );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['light_bg'], null, 60, 40 );
 	}
 
 	// ──────────────────────────────────────────────

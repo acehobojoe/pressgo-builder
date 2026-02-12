@@ -87,6 +87,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
+| footer | `light` | `build_footer_light` | White/light bg footer with colored icons |
 
 Config example:
 ```php

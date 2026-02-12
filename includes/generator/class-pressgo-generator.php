@@ -55,6 +55,7 @@ class PressGo_Generator {
 		'team.compact'                  => 'build_team_compact',
 		'results.bars'                  => 'build_results_bars',
 		'newsletter.inline'             => 'build_newsletter_inline',
+		'footer.light'                  => 'build_footer_light',
 	);
 
 	/**

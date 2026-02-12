@@ -128,6 +128,7 @@ $fitness_config = array(
         'trust_line' => 'No credit card required',
     ),
     'footer' => array(
+        'variant' => 'light',
         'brand' => array(
             'name' => 'FitStudio',
             'description' => "Austin's top-rated fitness studio. Personal training, group classes, and nutrition coaching.",
