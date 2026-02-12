@@ -203,4 +203,207 @@ class PressGo_Widget_Helpers {
 			'weight' => array( 'unit' => 'px', 'size' => 1, 'sizes' => array() ),
 		) );
 	}
+
+	/**
+	 * Icon Box widget — icon + title + description in a single widget.
+	 * Replaces separate icon_w + heading_w + text_w combo.
+	 */
+	public static function icon_box_w( $cfg, $icon, $title, $desc, $icon_color = null,
+									   $position = 'top', $view = 'stacked', $shape = 'circle',
+									   $secondary_color = null, $align = 'center' ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+
+		if ( null === $icon_color ) {
+			$icon_color = $c['primary'];
+		}
+		if ( null === $secondary_color ) {
+			$secondary_color = PressGo_Style_Utils::hex_to_rgba( $icon_color, 0.1 );
+		}
+
+		$s = array(
+			'selected_icon'  => is_array( $icon ) ? $icon : array( 'value' => $icon, 'library' => 'fa-solid' ),
+			'title_text'     => $title,
+			'description_text' => $desc,
+			'position'       => $position,
+			'text_align'     => $align,
+			'view'           => $view,
+			'primary_color'  => $icon_color,
+			'title_size'     => 'h4',
+			'icon_size'      => array( 'unit' => 'px', 'size' => 28, 'sizes' => array() ),
+			'icon_space'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
+			'title_color'    => $c['text_dark'],
+			'description_color' => $c['text_muted'],
+			'title_typography_typography'       => 'custom',
+			'title_typography_font_family'     => $fonts['heading'],
+			'title_typography_font_weight'     => '700',
+			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
+			'title_typography_line_height'     => array( 'unit' => 'em', 'size' => 1.3, 'sizes' => array() ),
+			'description_typography_typography' => 'custom',
+			'description_typography_font_family' => $fonts['body'],
+			'description_typography_font_size' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'description_typography_line_height' => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+		);
+
+		if ( in_array( $view, array( 'stacked', 'framed' ), true ) ) {
+			$s['shape'] = $shape;
+			$s['secondary_color'] = $secondary_color;
+		}
+
+		return PressGo_Element_Factory::widget( 'icon-box', $s );
+	}
+
+	/**
+	 * Image Box widget — image + title + description in a single widget.
+	 */
+	public static function image_box_w( $cfg, $img_url, $title, $desc, $align = 'center',
+										$img_size = 300, $position = 'top' ) {
+		$fonts = $cfg['fonts'];
+		$c     = $cfg['colors'];
+
+		return PressGo_Element_Factory::widget( 'image-box', array(
+			'image'          => array( 'url' => $img_url, 'id' => '', 'alt' => $title ),
+			'title_text'     => $title,
+			'description_text' => $desc,
+			'position'       => $position,
+			'text_align'     => $align,
+			'title_size'     => 'h4',
+			'image_size'     => array( 'unit' => 'px', 'size' => $img_size, 'sizes' => array() ),
+			'image_space'    => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
+			'title_color'    => $c['text_dark'],
+			'description_color' => $c['text_muted'],
+			'title_typography_typography'       => 'custom',
+			'title_typography_font_family'     => $fonts['heading'],
+			'title_typography_font_weight'     => '700',
+			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
+			'description_typography_typography' => 'custom',
+			'description_typography_font_family' => $fonts['body'],
+			'description_typography_font_size' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'description_typography_line_height' => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+		) );
+	}
+
+	/**
+	 * Star Rating widget — proper Elementor star rating.
+	 */
+	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left' ) {
+		return PressGo_Element_Factory::widget( 'star-rating', array(
+			'rating'     => $rating,
+			'star_style' => 'star_fontawesome',
+			'icon_size'  => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
+			'icon_space' => array( 'unit' => 'px', 'size' => 2, 'sizes' => array() ),
+			'stars_color' => $color,
+			'align'      => $align,
+		) );
+	}
+
+	/**
+	 * Social Icons widget — social media icon links.
+	 */
+	public static function social_icons_w( $icons, $size = 14, $color = 'custom',
+										   $primary_color = null, $shape = 'circle',
+										   $align = 'center', $spacing = 10 ) {
+		$icon_list = array();
+		foreach ( $icons as $item ) {
+			$icon_list[] = array(
+				'social_icon'     => is_array( $item['icon'] )
+					? $item['icon']
+					: array( 'value' => $item['icon'], 'library' => 'fa-brands' ),
+				'link'            => array( 'url' => isset( $item['url'] ) ? $item['url'] : '#', 'is_external' => true ),
+				'item_icon_color' => isset( $item['color'] ) ? $item['color'] : '',
+				'_id'             => PressGo_Element_Factory::eid(),
+			);
+		}
+
+		$s = array(
+			'social_icon_list' => $icon_list,
+			'icon_size'        => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
+			'icon_color'       => $color,
+			'shape'            => $shape,
+			'align'            => $align,
+			'icon_spacing'     => array( 'unit' => 'px', 'size' => $spacing, 'sizes' => array() ),
+		);
+
+		if ( $primary_color ) {
+			$s['icon_primary_color'] = $primary_color;
+		}
+
+		return PressGo_Element_Factory::widget( 'social-icons', $s );
+	}
+
+	/**
+	 * Testimonial widget — built-in Elementor testimonial (avatar + quote + name/role).
+	 */
+	public static function testimonial_w( $cfg, $quote, $name, $role, $image_url = '',
+										  $align = 'center' ) {
+		$fonts = $cfg['fonts'];
+		$c     = $cfg['colors'];
+
+		$s = array(
+			'testimonial_content'   => $quote,
+			'testimonial_name'      => $name,
+			'testimonial_job'       => $role,
+			'testimonial_alignment' => $align,
+			'content_content_color' => $c['text_dark'],
+			'name_text_color'       => $c['text_dark'],
+			'job_text_color'        => $c['text_muted'],
+			'content_typography_typography'     => 'custom',
+			'content_typography_font_family'   => $fonts['body'],
+			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+			'content_typography_font_style'    => 'italic',
+			'name_typography_typography'        => 'custom',
+			'name_typography_font_family'      => $fonts['heading'],
+			'name_typography_font_weight'      => '700',
+			'name_typography_font_size'        => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'job_typography_typography'         => 'custom',
+			'job_typography_font_family'       => $fonts['body'],
+			'job_typography_font_size'         => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+		);
+
+		if ( $image_url ) {
+			$s['testimonial_image'] = array( 'url' => $image_url, 'id' => '', 'alt' => $name );
+			$s['image_size']        = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
+		}
+
+		return PressGo_Element_Factory::widget( 'testimonial', $s );
+	}
+
+	/**
+	 * Video widget — YouTube, Vimeo, or self-hosted.
+	 */
+	public static function video_w( $url, $overlay_img = '', $border_radius = 12 ) {
+		$s = array(
+			'youtube_url'        => $url,
+			'show_image_overlay' => $overlay_img ? 'yes' : '',
+			'aspect_ratio'       => '169',
+		);
+
+		if ( $overlay_img ) {
+			$s['image_overlay'] = array( 'url' => $overlay_img, 'id' => '' );
+		}
+
+		if ( $border_radius > 0 ) {
+			$r = (string) $border_radius;
+			$s['_border_radius'] = array(
+				'unit' => 'px', 'top' => $r, 'right' => $r,
+				'bottom' => $r, 'left' => $r, 'isLinked' => true,
+			);
+		}
+
+		return PressGo_Element_Factory::widget( 'video', $s );
+	}
+
+	/**
+	 * Google Maps widget.
+	 */
+	public static function google_map_w( $address, $height = 400, $zoom = 14 ) {
+		return PressGo_Element_Factory::widget( 'google_maps', array(
+			'address' => $address,
+			'height'  => array( 'unit' => 'px', 'size' => $height, 'sizes' => array() ),
+			'zoom'    => array( 'unit' => 'px', 'size' => $zoom, 'sizes' => array() ),
+		) );
+	}
 }

@@ -478,16 +478,10 @@ class PressGo_Section_Builder {
 
 			$feature_cols[] = PressGo_Element_Factory::col(
 				array(
-					PressGo_Widget_Helpers::icon_w(
-						$item['icon'],
-						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ),
-						28, 'stacked', 'circle', $accent
-					),
-					PressGo_Widget_Helpers::spacer_w( 16 ),
-					PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h3', 'left',
-						$c['text_dark'], 22, '700', -0.3 ),
-					PressGo_Widget_Helpers::spacer_w( 8 ),
-					PressGo_Widget_Helpers::text_w( $cfg, $item['desc'], 'left', $c['text_muted'], 15 ),
+					PressGo_Widget_Helpers::icon_box_w( $cfg,
+						$item['icon'], $item['title'], $item['desc'],
+						$accent, 'top', 'stacked', 'circle',
+						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
 				),
 				$style
 			);
