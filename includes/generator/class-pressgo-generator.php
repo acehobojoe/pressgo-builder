@@ -40,6 +40,7 @@ class PressGo_Generator {
 	private static $variants = array(
 		'hero.split'                    => 'build_hero_split',
 		'hero.image'                    => 'build_hero_image',
+		'hero.video'                    => 'build_hero_video',
 		'stats.dark'                    => 'build_stats_dark',
 		'features.alternating'          => 'build_features_alternating',
 		'steps.compact'                 => 'build_steps_compact',
@@ -48,6 +49,8 @@ class PressGo_Generator {
 		'cta_final.card'                => 'build_cta_final_card',
 		'cta_final.image'               => 'build_cta_final_image',
 		'features.minimal'              => 'build_features_minimal',
+		'testimonials.grid'             => 'build_testimonials_grid',
+		'faq.split'                     => 'build_faq_split',
 	);
 
 	/**

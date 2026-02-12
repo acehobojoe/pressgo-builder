@@ -31,7 +31,7 @@ Browser → admin-ajax (WordPress)
 
 ## Generator Architecture
 - `PressGo_Element_Factory` — Core primitives: `eid()`, `widget()`, `outer()`, `row()`, `col()`
-- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`, `icon_box_w()`, `image_box_w()`, `star_rating_w()`, `social_icons_w()`, `testimonial_w()`, `video_w()`, `google_map_w()`
+- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`, `icon_box_w()`, `image_box_w()`, `star_rating_w()`, `social_icons_w()`, `testimonial_w()`, `video_w()`, `counter_w()`, `google_map_w()`
 - `PressGo_Style_Utils` — `hex_to_rgba()`, `hex_to_rgb()`, `card_style()`, `section_header()`
 - `PressGo_Section_Builder` — Section builders with layout variants
 - `PressGo_Generator` — Orchestrator with variant routing
@@ -57,16 +57,20 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | hero | _(default)_ | `build_hero` | Centered text on dark gradient |
 | hero | `split` | `build_hero_split` | Text-left + image-right on light bg |
 | hero | `image` | `build_hero_image` | Full background image with dark overlay |
+| hero | `video` | `build_hero_video` | Centered text + video embed on light bg |
 | features | _(default)_ | `build_features` | 3-column card grid with accent borders |
 | features | `alternating` | `build_features_alternating` | Alternating text/image rows |
 | testimonials | _(default)_ | `build_testimonials` | 3-column cards with star ratings |
 | testimonials | `featured` | `build_testimonials_featured` | Single large quote + small cards |
+| testimonials | `grid` | `build_testimonials_grid` | 2-column card grid with avatars |
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
 | stats | `dark` | `build_stats_dark` | Dark gradient bg with colored counters |
 | steps | _(default)_ | `build_steps` | Numbered circles on light bg cards |
 | steps | `compact` | `build_steps_compact` | Numbered pill badges with divider |
+| faq | _(default)_ | `build_faq` | Centered toggle accordion |
+| faq | `split` | `build_faq_split` | Header left, accordion right |
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
 | features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |

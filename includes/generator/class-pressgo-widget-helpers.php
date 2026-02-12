@@ -397,6 +397,39 @@ class PressGo_Widget_Helpers {
 	}
 
 	/**
+	 * Counter widget — animated number counter.
+	 */
+	public static function counter_w( $cfg, $number, $suffix = '', $prefix = '',
+									   $title = '', $color = null, $number_size = 48,
+									   $title_size = 15, $align = 'center' ) {
+		$fonts = $cfg['fonts'];
+		$c     = $cfg['colors'];
+
+		$s = array(
+			'starting_number' => 0,
+			'ending_number'   => is_numeric( str_replace( array( ',', '.' ), '', $number ) ) ? $number : 0,
+			'suffix'          => $suffix,
+			'prefix'          => $prefix,
+			'title'           => $title,
+			'duration'        => 2000,
+			'align'           => $align,
+			'number_color'    => $color ? $color : $c['text_dark'],
+			'title_color'     => $c['text_muted'],
+			'typography_typography'          => 'custom',
+			'typography_font_family'         => $fonts['heading'],
+			'typography_font_weight'         => '800',
+			'typography_font_size'           => array( 'unit' => 'px', 'size' => $number_size, 'sizes' => array() ),
+			'typography_line_height'         => array( 'unit' => 'em', 'size' => 1.1, 'sizes' => array() ),
+			'title_typography_typography'     => 'custom',
+			'title_typography_font_family'   => $fonts['body'],
+			'title_typography_font_size'     => array( 'unit' => 'px', 'size' => $title_size, 'sizes' => array() ),
+			'title_typography_font_weight'   => '500',
+		);
+
+		return PressGo_Element_Factory::widget( 'counter', $s );
+	}
+
+	/**
 	 * Google Maps widget.
 	 */
 	public static function google_map_w( $address, $height = 400, $zoom = 14 ) {

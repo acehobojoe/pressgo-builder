@@ -32,7 +32,7 @@ $fitness_config = array(
     'fonts' => array( 'heading' => 'Poppins', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'cta_final' ),
+    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'cta_final', 'footer' ),
     'hero' => array(
         'badge' => 'New Year, New You — 50% Off First Month',
         'eyebrow' => 'TRANSFORM YOUR BODY',
@@ -66,11 +66,13 @@ $fitness_config = array(
         ),
     ),
     'testimonials' => array(
+        'variant' => 'grid',
         'eyebrow' => 'MEMBER STORIES', 'headline' => 'Real People. Real Results.',
         'items' => array(
             array( 'name' => 'Sarah M.', 'role' => 'Lost 35 lbs in 6 months', 'quote' => "I've tried every gym in Austin. This is the first place where the trainers actually care about your progress. Down 35 pounds and feeling incredible." ),
             array( 'name' => 'David K.', 'role' => 'Marathon finisher', 'quote' => 'The group classes pushed me beyond what I thought was possible. I went from couch potato to finishing my first marathon.' ),
             array( 'name' => 'Lisa R.', 'role' => 'Member for 3 years', 'quote' => 'The nutrition coaching was a game-changer. I finally understand how to eat for my body and my energy levels are through the roof.' ),
+            array( 'name' => 'Alex P.', 'role' => 'Lost 50 lbs', 'quote' => 'The combo of personal training and nutrition coaching changed my life. My trainer adjusted my program every month based on real results.' ),
         ),
     ),
     'faq' => array(
@@ -117,6 +119,37 @@ $fitness_config = array(
         'description' => "Join 2,500+ members who chose to invest in themselves. Your first week is on us.",
         'cta' => array( 'text' => 'Claim Your Free Trial', 'url' => '#', 'icon' => array( 'value' => 'fas fa-arrow-right', 'library' => 'fa-solid' ) ),
         'trust_line' => 'No credit card required',
+    ),
+    'footer' => array(
+        'brand' => array(
+            'name' => 'FitStudio',
+            'description' => "Austin's top-rated fitness studio. Personal training, group classes, and nutrition coaching.",
+        ),
+        'columns' => array(
+            array( 'title' => 'Programs', 'links' => array(
+                array( 'text' => 'Personal Training', 'url' => '#' ),
+                array( 'text' => 'Group Classes', 'url' => '#' ),
+                array( 'text' => 'Nutrition Coaching', 'url' => '#' ),
+                array( 'text' => 'Corporate Wellness', 'url' => '#' ),
+            ) ),
+            array( 'title' => 'Info', 'links' => array(
+                array( 'text' => 'Schedule', 'url' => '#' ),
+                array( 'text' => 'Membership', 'url' => '#' ),
+                array( 'text' => 'About Us', 'url' => '#' ),
+                array( 'text' => 'Blog', 'url' => '#' ),
+            ) ),
+        ),
+        'contact' => array(
+            'phone' => '(512) 555-0199',
+            'email' => 'hello@fitstudio.com',
+            'address' => '2400 S Lamar Blvd, Austin, TX',
+        ),
+        'social_icons' => array(
+            array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+            array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
+            array( 'icon' => 'fab fa-youtube', 'url' => '#' ),
+        ),
+        'copyright' => '© 2026 FitStudio. All rights reserved.',
     ),
 );
 
@@ -202,7 +235,10 @@ $saas_config = array(
         ),
     ),
     'faq' => array(
+        'variant' => 'split',
         'eyebrow' => 'FAQ', 'headline' => 'Common Questions',
+        'description' => "Everything you need to know about ShipFast. Can't find what you're looking for? Reach out to our support team.",
+        'cta' => array( 'text' => 'Contact Support', 'url' => '#' ),
         'items' => array(
             array( 'q' => 'How does the AI prioritization work?', 'a' => 'Our AI analyzes your task deadlines, dependencies, team workload, and historical velocity to rank tasks by urgency and impact.' ),
             array( 'q' => 'Can I import from Jira / Asana / Trello?', 'a' => 'Yes — one-click import from all major PM tools. Most teams are fully migrated in under an hour.' ),

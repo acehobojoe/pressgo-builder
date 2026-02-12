@@ -306,6 +306,92 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 1d. Hero Video (centered text + video embed below)
+	// ──────────────────────────────────────────────
+
+	public static function build_hero_video( $cfg ) {
+		$c    = $cfg['colors'];
+		$h    = $cfg['hero'];
+		$cta1 = $h['cta_primary'];
+		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+
+		$children = array();
+
+		if ( ! empty( $h['badge'] ) ) {
+			$badge_html = '<span style="display:inline-block; padding:8px 20px; '
+				. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.08 ) . '; '
+				. 'border-radius:50px; font-size:13px; color:' . $c['primary'] . '; '
+				. 'font-weight:600; letter-spacing:0.5px;">'
+				. $h['badge'] . '</span>';
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $badge_html, 'center', null, 13 );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+		}
+
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'center',
+			$c['primary'], 12, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+			$c['text_dark'], 52, '800', -1.5, 1.15, null, 32 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			$c['text_muted'], 18 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
+
+		// CTA buttons.
+		$btn_cols = array(
+			PressGo_Element_Factory::col( array(
+				PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+					isset( $cta1['url'] ) ? $cta1['url'] : '#',
+					$c['primary'], $c['white'], null,
+					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'right' ),
+			) ),
+		);
+		if ( $cta2 ) {
+			$btn_cols[] = PressGo_Element_Factory::col( array(
+				PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+					isset( $cta2['url'] ) ? $cta2['url'] : '#',
+					'transparent', $c['text_dark'], $c['border'], null, 'left' ),
+			) );
+		}
+		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 12 );
+
+		if ( ! empty( $h['trust_line'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							$c['text_muted'], 13 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$children[] = $trust_row;
+		}
+
+		// Video embed below the CTA.
+		if ( ! empty( $h['video'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 40 );
+			$overlay = isset( $h['image'] ) ? $h['image'] : '';
+			$children[] = PressGo_Widget_Helpers::video_w( $h['video'], $overlay,
+				(int) $cfg['layout']['card_radius'] );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['light_bg'], null, 80, 80,
+			array(
+				'shape_divider_bottom'          => 'curve',
+				'shape_divider_bottom_color'    => $c['white'],
+				'shape_divider_bottom_negative' => 'yes',
+				'shape_divider_bottom_height'   => array( 'unit' => 'px', 'size' => 50, 'sizes' => array() ),
+			)
+		);
+	}
+
+	// ──────────────────────────────────────────────
 	// 2. Stats
 	// ──────────────────────────────────────────────
 
@@ -730,15 +816,41 @@ class PressGo_Section_Builder {
 		$r = $cfg['results'];
 
 		$metric_cols = array();
+		$fonts = $cfg['fonts'];
 		foreach ( $r['metrics'] as $item ) {
+			// Parse prefix/number/suffix from value strings like "40%", "3x", "4.7".
+			$val    = $item['value'];
+			$prefix = '';
+			$suffix = '';
+			$number = 0;
+			if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $val, $m ) ) {
+				$prefix = $m[1];
+				$number = (int) $m[2];
+				$suffix = $m[3];
+			}
+
+			$counter = PressGo_Element_Factory::widget( 'counter', array(
+				'starting_number'        => 0,
+				'ending_number'          => $number,
+				'prefix'                 => $prefix,
+				'suffix'                 => $suffix,
+				'duration'               => 2000,
+				'title'                  => $item['label'],
+				'number_color'           => $item['color'],
+				'title_color'            => 'rgba(255,255,255,0.6)',
+				'typography_typography'          => 'custom',
+				'typography_font_family'         => $fonts['heading'],
+				'typography_font_weight'         => '800',
+				'typography_font_size'           => array( 'unit' => 'px', 'size' => 48, 'sizes' => array() ),
+				'typography_letter_spacing'      => array( 'unit' => 'px', 'size' => -1, 'sizes' => array() ),
+				'title_typography_typography'     => 'custom',
+				'title_typography_font_family'   => $fonts['body'],
+				'title_typography_font_weight'   => '500',
+				'title_typography_font_size'     => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			) );
+
 			$metric_cols[] = PressGo_Element_Factory::col(
-				array(
-					PressGo_Widget_Helpers::heading_w( $cfg, $item['value'], 'h3', 'center',
-						$item['color'], 48, '800', -1 ),
-					PressGo_Widget_Helpers::spacer_w( 4 ),
-					PressGo_Widget_Helpers::heading_w( $cfg, $item['label'], 'p', 'center',
-						'rgba(255,255,255,0.6)', 14, '500' ),
-				),
+				array( $counter ),
 				array(
 					'flex_align_items'       => 'center',
 					'background_background'  => 'classic',
@@ -1088,6 +1200,70 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 8c. Testimonials Grid (2-column cards with testimonial widget)
+	// ──────────────────────────────────────────────
+
+	public static function build_testimonials_grid( $cfg ) {
+		$c = $cfg['colors'];
+		$t = $cfg['testimonials'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $t['eyebrow'], $t['headline'],
+			isset( $t['subheadline'] ) ? $t['subheadline'] : null );
+
+		$items   = $t['items'];
+		$columns = count( $items ) <= 2 ? count( $items ) : 2;
+
+		// Build rows of testimonial cards.
+		$rows     = array();
+		$row_cols = array();
+		foreach ( $items as $idx => $item ) {
+			$card_widgets = array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
+				PressGo_Widget_Helpers::spacer_w( 12 ),
+				PressGo_Widget_Helpers::text_w( $cfg,
+					'<em>&ldquo;' . $item['quote'] . '&rdquo;</em>',
+					'left', $c['text_dark'], 15 ),
+				PressGo_Widget_Helpers::spacer_w( 16 ),
+			);
+
+			// Author with colored initial avatar.
+			$avatar_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B' );
+			$initial       = strtoupper( substr( $item['name'], 0, 1 ) );
+			$avatar_color  = $avatar_colors[ $idx % count( $avatar_colors ) ];
+
+			$card_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'<div style="display:inline-flex; align-items:center; gap:10px;">'
+				. '<span style="display:inline-flex; align-items:center; justify-content:center; '
+				. 'width:36px; height:36px; border-radius:50%; '
+				. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
+				. 'color:' . $avatar_color . '; font-weight:700; font-size:14px;">'
+				. $initial . '</span>'
+				. '<div>'
+				. '<strong style="font-size:14px; color:' . $c['text_dark'] . ';">' . $item['name'] . '</strong>'
+				. '<div style="font-size:12px; color:' . $c['text_muted'] . ';">' . $item['role'] . '</div>'
+				. '</div>'
+				. '</div>',
+				'left', null, 14 );
+
+			$row_cols[] = PressGo_Element_Factory::col( $card_widgets,
+				PressGo_Style_Utils::card_style( $cfg, 24 ) );
+
+			// Every N columns, create a row.
+			if ( count( $row_cols ) === $columns || $idx === count( $items ) - 1 ) {
+				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 20 );
+				if ( $idx < count( $items ) - 1 ) {
+					$rows[] = PressGo_Widget_Helpers::spacer_w( 20 );
+				}
+				$row_cols = array();
+			}
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, $rows ),
+			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 9. FAQ
 	// ──────────────────────────────────────────────
 
@@ -1123,6 +1299,77 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::outer( $cfg,
 			array_merge( $header, array( $toggle ) ),
 			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 9b. FAQ Split (header left, accordion right)
+	// ──────────────────────────────────────────────
+
+	public static function build_faq_split( $cfg ) {
+		$c     = $cfg['colors'];
+		$f     = $cfg['faq'];
+		$fonts = $cfg['fonts'];
+
+		// Left column: eyebrow, headline, description.
+		$left = array(
+			PressGo_Widget_Helpers::heading_w( $cfg, $f['eyebrow'], 'h6', 'left',
+				$c['primary'], 13, '600', 4, null, 'uppercase' ),
+			PressGo_Widget_Helpers::spacer_w( 12 ),
+			PressGo_Widget_Helpers::heading_w( $cfg, $f['headline'], 'h2', 'left',
+				$c['text_dark'], 38, '800', -1, 1.2, null, 26 ),
+		);
+
+		if ( ! empty( $f['description'] ) ) {
+			$left[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $f['description'], 'left',
+				$c['text_muted'], 16 );
+		}
+
+		if ( ! empty( $f['cta'] ) ) {
+			$left[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$left[] = PressGo_Widget_Helpers::btn_w( $cfg, $f['cta']['text'],
+				isset( $f['cta']['url'] ) ? $f['cta']['url'] : '#',
+				$c['primary'], $c['white'], null, null, 'left' );
+		}
+
+		$left_col = PressGo_Element_Factory::col( $left, array(
+			'vertical_align' => 'top',
+			'padding'        => array(
+				'unit' => 'px', 'top' => '0', 'right' => '40',
+				'bottom' => '0', 'left' => '0', 'isLinked' => false,
+			),
+		) );
+
+		// Right column: toggle accordion.
+		$tabs = array();
+		foreach ( $f['items'] as $item ) {
+			$tabs[] = array( 'tab_title' => $item['q'], 'tab_content' => $item['a'] );
+		}
+
+		$toggle = PressGo_Element_Factory::widget( 'toggle', array(
+			'tabs'                             => $tabs,
+			'border_color'                     => $c['border'],
+			'title_color'                      => $c['text_dark'],
+			'tab_active_color'                 => $c['primary'],
+			'title_typography_typography'       => 'custom',
+			'title_typography_font_family'     => $fonts['heading'],
+			'title_typography_font_weight'     => '600',
+			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'content_typography_typography'     => 'custom',
+			'content_typography_font_family'   => $fonts['body'],
+			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+			'content_color'                    => $c['text_muted'],
+			'space_between'                    => 0,
+			'toggle_icon_align'                => 'right',
+		) );
+
+		$right_col = PressGo_Element_Factory::col( array( $toggle ) );
+
+		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );
+
+		return PressGo_Element_Factory::outer( $cfg, array( $row ),
+			$c['white'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1488,7 +1735,7 @@ class PressGo_Section_Builder {
 				$alt = isset( $logo['alt'] ) ? $logo['alt'] : '';
 				$logo_cols[] = PressGo_Element_Factory::col(
 					array(
-						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, null, 0, false, 'center' ),
+						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, 140, 0, false, 'center' ),
 					),
 					array(
 						'vertical_align' => 'middle',
@@ -1521,10 +1768,10 @@ class PressGo_Section_Builder {
 		foreach ( $tm['members'] as $member ) {
 			$widgets = array();
 
-			// Photo.
+			// Photo — circular crop.
 			if ( ! empty( $member['photo'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
-					$member['name'], null, 200, false, 'center' );
+					$member['name'], 150, 999, false, 'center' );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
 			}
 
@@ -1618,31 +1865,51 @@ class PressGo_Section_Builder {
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
 		}
 
-		// Contact column.
+		// Contact column — uses icon-list for proper icons.
 		if ( ! empty( $ft['contact'] ) ) {
 			$contact_widgets = array();
 			$contact_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, 'Contact', 'h6', 'left',
 				$c['white'], 14, '700' );
 			$contact_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
-			$contact_html = '';
+			$contact_items = array();
 			if ( ! empty( $ft['contact']['email'] ) ) {
-				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
-					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9993;</span>'
-					. $ft['contact']['email'] . '</div>';
+				$contact_items[] = array(
+					'text'          => $ft['contact']['email'],
+					'selected_icon' => array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => 'mailto:' . $ft['contact']['email'] ),
+				);
 			}
 			if ( ! empty( $ft['contact']['phone'] ) ) {
-				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
-					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9742;</span>'
-					. $ft['contact']['phone'] . '</div>';
+				$contact_items[] = array(
+					'text'          => $ft['contact']['phone'],
+					'selected_icon' => array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
 			}
 			if ( ! empty( $ft['contact']['address'] ) ) {
-				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
-					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9906;</span>'
-					. $ft['contact']['address'] . '</div>';
+				$contact_items[] = array(
+					'text'          => $ft['contact']['address'],
+					'selected_icon' => array( 'value' => 'fas fa-map-marker-alt', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
 			}
-			$contact_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $contact_html, 'left',
-				'rgba(255,255,255,0.5)', 14 );
+
+			if ( count( $contact_items ) > 0 ) {
+				$contact_widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
+					'icon_list'                    => $contact_items,
+					'icon_color'                   => 'rgba(255,255,255,0.3)',
+					'text_color'                   => 'rgba(255,255,255,0.5)',
+					'text_color_hover'             => 'rgba(255,255,255,0.7)',
+					'icon_size'                    => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+					'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
+					'space_between'                => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+					'typography_typography'         => 'custom',
+					'typography_font_family'        => $fonts['body'],
+					'typography_font_size'          => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+					'typography_font_weight'        => '400',
+				) );
+			}
 
 			$cols[] = PressGo_Element_Factory::col( $contact_widgets );
 		}
