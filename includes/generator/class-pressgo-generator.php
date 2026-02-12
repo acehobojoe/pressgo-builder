@@ -23,8 +23,12 @@ class PressGo_Generator {
 		'testimonials'     => 'build_testimonials',
 		'faq'              => 'build_faq',
 		'blog'             => 'build_blog',
+		'pricing'          => 'build_pricing',
 		'cta_final'        => 'build_cta_final',
+		'logo_bar'         => 'build_logo_bar',
+		'team'             => 'build_team',
 		'map'              => 'build_map',
+		'footer'           => 'build_footer',
 		'disclaimer'       => 'build_disclaimer',
 	);
 

@@ -68,13 +68,22 @@ class PressGo_Section_Builder {
 
 		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
 
-		// Trust line.
+		// Trust line with star-rating widget.
 		if ( ! empty( $h['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="color: ' . $c['gold'] . '; font-size: 18px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>&nbsp;&nbsp;'
-				. '<span style="color: rgba(255,255,255,0.5); font-size: 14px;">' . $h['trust_line'] . '</span>',
-				'center', null, 14 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							'rgba(255,255,255,0.5)', 14 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$children[] = $trust_row;
 		}
 
 		// Parse primary color for radial overlay.
@@ -151,10 +160,19 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$left[] = PressGo_Widget_Helpers::spacer_w( 20 );
-			$left[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="color: ' . $c['gold'] . '; font-size: 16px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>&nbsp;&nbsp;'
-				. '<span style="color: ' . $c['text_muted'] . '; font-size: 13px;">' . $h['trust_line'] . '</span>',
-				'left', null, 13 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							$c['text_muted'], 13 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$left[] = $trust_row;
 		}
 
 		// Right column: image.
@@ -243,10 +261,19 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="color: ' . $c['gold'] . '; font-size: 18px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>&nbsp;&nbsp;'
-				. '<span style="color: rgba(255,255,255,0.6); font-size: 14px;">' . $h['trust_line'] . '</span>',
-				'center', null, 14 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							'rgba(255,255,255,0.6)', 14 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$children[] = $trust_row;
 		}
 
 		// Build section with background image + dark overlay.
@@ -1243,7 +1270,321 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
-	// 12. Map
+	// 12. Pricing
+	// ──────────────────────────────────────────────
+
+	public static function build_pricing( $cfg ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$p     = $cfg['pricing'];
+		$plans = $p['plans'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $p['eyebrow'], $p['headline'],
+			isset( $p['subheadline'] ) ? $p['subheadline'] : null );
+
+		$plan_cols = array();
+		foreach ( $plans as $plan ) {
+			$highlighted = ! empty( $plan['highlighted'] );
+
+			$widgets = array();
+
+			// "Most Popular" badge.
+			if ( ! empty( $plan['badge'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+					'<span style="display:inline-block; padding:4px 14px; border-radius:20px; '
+					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 ) . '; '
+					. 'color:' . $c['primary'] . '; font-size:12px; font-weight:700; '
+					. 'letter-spacing:0.5px; text-transform:uppercase;">' . $plan['badge'] . '</span>',
+					'center', null, 12 );
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			} else {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+			}
+
+			// Plan name.
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['name'], 'h4', 'center',
+				$c['text_dark'], 20, '700' );
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+
+			// Price.
+			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'<span style="font-size:48px; font-weight:800; color:' . $c['text_dark'] . '; '
+				. 'font-family:' . $fonts['heading'] . '; letter-spacing:-2px; line-height:1;">'
+				. $plan['price'] . '</span>'
+				. '<span style="font-size:16px; color:' . $c['text_muted'] . '; font-weight:500;">'
+				. $period . '</span>',
+				'center', null, 48 );
+
+			// Description.
+			if ( ! empty( $plan['description'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $plan['description'], 'center',
+					$c['text_muted'], 14 );
+			}
+
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$widgets[] = PressGo_Widget_Helpers::divider_w();
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+
+			// Feature list with checkmarks.
+			$features = isset( $plan['features'] ) ? $plan['features'] : array();
+			$icon_items = array();
+			foreach ( $features as $feat ) {
+				$icon_items[] = array(
+					'text'          => $feat,
+					'selected_icon' => array( 'value' => 'fas fa-check', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+			$widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
+				'icon_list'                    => $icon_items,
+				'icon_color'                   => $highlighted ? $c['primary'] : $c['accent'],
+				'text_color'                   => $c['text_dark'],
+				'icon_size'                    => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+				'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
+				'space_between'                => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+				'typography_typography'        => 'custom',
+				'typography_font_family'       => $fonts['body'],
+				'typography_font_size'         => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+				'typography_font_weight'       => '500',
+			) );
+
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 20 );
+
+			// CTA button.
+			$cta = isset( $plan['cta'] ) ? $plan['cta'] : array( 'text' => 'Get Started', 'url' => '#' );
+			if ( $highlighted ) {
+				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
+					isset( $cta['url'] ) ? $cta['url'] : '#',
+					$c['primary'], $c['white'], null, null, 'center' );
+			} else {
+				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
+					isset( $cta['url'] ) ? $cta['url'] : '#',
+					'transparent', $c['primary'], $c['primary'], null, 'center' );
+			}
+
+			// Card styling.
+			$style = PressGo_Style_Utils::card_style( $cfg, 32 );
+			if ( $highlighted ) {
+				$style['border_width'] = array(
+					'unit' => 'px', 'top' => '3', 'right' => '1',
+					'bottom' => '1', 'left' => '1', 'isLinked' => false,
+				);
+				$style['border_color'] = $c['primary'];
+				// Extra shadow for highlighted plan.
+				$style['_box_shadow_box_shadow'] = array(
+					'horizontal' => 0, 'vertical' => 8, 'blur' => 32,
+					'spread' => -4, 'color' => 'rgba(0,0,0,0.12)',
+				);
+			}
+
+			$plan_cols[] = PressGo_Element_Factory::col( $widgets, $style );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24 ) ) ),
+			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 13. Logo Bar
+	// ──────────────────────────────────────────────
+
+	public static function build_logo_bar( $cfg ) {
+		$c  = $cfg['colors'];
+		$lb = $cfg['logo_bar'];
+
+		$children = array();
+		if ( ! empty( $lb['headline'] ) ) {
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $lb['headline'], 'h6', 'center',
+				$c['text_muted'], 13, '500' );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+		}
+
+		$logos = isset( $lb['logos'] ) ? $lb['logos'] : array();
+		if ( count( $logos ) > 0 ) {
+			$logo_cols = array();
+			foreach ( $logos as $logo ) {
+				$alt = isset( $logo['alt'] ) ? $logo['alt'] : '';
+				$logo_cols[] = PressGo_Element_Factory::col(
+					array(
+						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, null, 0, false, 'center' ),
+					),
+					array(
+						'vertical_align' => 'middle',
+						'padding'        => array(
+							'unit' => 'px', 'top' => '10', 'right' => '16',
+							'bottom' => '10', 'left' => '16', 'isLinked' => false,
+						),
+					)
+				);
+			}
+			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20 );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 40, 40 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 14. Team
+	// ──────────────────────────────────────────────
+
+	public static function build_team( $cfg ) {
+		$c  = $cfg['colors'];
+		$tm = $cfg['team'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $tm['eyebrow'], $tm['headline'],
+			isset( $tm['subheadline'] ) ? $tm['subheadline'] : null );
+
+		$member_cols = array();
+		foreach ( $tm['members'] as $member ) {
+			$widgets = array();
+
+			// Photo.
+			if ( ! empty( $member['photo'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
+					$member['name'], null, 200, false, 'center' );
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			}
+
+			// Name.
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $member['name'], 'h4', 'center',
+				$c['text_dark'], 20, '700' );
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 4 );
+
+			// Role.
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $member['role'], 'center',
+				$c['primary'], 14 );
+
+			// Bio.
+			if ( ! empty( $member['bio'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $member['bio'], 'center',
+					$c['text_muted'], 14 );
+			}
+
+			// Social icons.
+			if ( ! empty( $member['social'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+				$widgets[] = PressGo_Widget_Helpers::social_icons_w(
+					$member['social'], 12, 'custom', $c['text_muted'], 'circle', 'center', 8
+				);
+			}
+
+			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
+			$member_cols[] = PressGo_Element_Factory::col( $widgets, $style );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $member_cols, 24 ) ) ),
+			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 15. Footer
+	// ──────────────────────────────────────────────
+
+	public static function build_footer( $cfg ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$ft    = $cfg['footer'];
+
+		$cols = array();
+
+		// Brand column (wider).
+		$brand_widgets = array();
+		if ( ! empty( $ft['brand']['name'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $ft['brand']['name'], 'h4', 'left',
+				$c['white'], 22, '800' );
+			$brand_widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+		}
+		if ( ! empty( $ft['brand']['description'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $ft['brand']['description'], 'left',
+				'rgba(255,255,255,0.5)', 14 );
+		}
+		if ( ! empty( $ft['social_icons'] ) ) {
+			$brand_widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$brand_widgets[] = PressGo_Widget_Helpers::social_icons_w(
+				$ft['social_icons'], 14, 'custom', 'rgba(255,255,255,0.4)', 'circle', 'left', 8
+			);
+		}
+		$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
+			'padding' => array(
+				'unit' => 'px', 'top' => '0', 'right' => '40',
+				'bottom' => '0', 'left' => '0', 'isLinked' => false,
+			),
+		) );
+
+		// Link columns.
+		$link_columns = isset( $ft['columns'] ) ? $ft['columns'] : array();
+		foreach ( $link_columns as $lc ) {
+			$col_widgets = array();
+			$col_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $lc['title'], 'h6', 'left',
+				$c['white'], 14, '700' );
+			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+
+			$links_html = '';
+			foreach ( $lc['links'] as $link ) {
+				$url = isset( $link['url'] ) ? $link['url'] : '#';
+				$links_html .= '<div style="margin-bottom:8px;">'
+					. '<a href="' . esc_url( $url ) . '" style="color:rgba(255,255,255,0.5); '
+					. 'text-decoration:none; font-size:14px; transition:color 0.2s;">'
+					. esc_html( $link['text'] ) . '</a></div>';
+			}
+			$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $links_html, 'left',
+				'rgba(255,255,255,0.5)', 14 );
+
+			$cols[] = PressGo_Element_Factory::col( $col_widgets );
+		}
+
+		// Contact column.
+		if ( ! empty( $ft['contact'] ) ) {
+			$contact_widgets = array();
+			$contact_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, 'Contact', 'h6', 'left',
+				$c['white'], 14, '700' );
+			$contact_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+
+			$contact_html = '';
+			if ( ! empty( $ft['contact']['email'] ) ) {
+				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
+					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9993;</span>'
+					. $ft['contact']['email'] . '</div>';
+			}
+			if ( ! empty( $ft['contact']['phone'] ) ) {
+				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
+					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9742;</span>'
+					. $ft['contact']['phone'] . '</div>';
+			}
+			if ( ! empty( $ft['contact']['address'] ) ) {
+				$contact_html .= '<div style="margin-bottom:8px; color:rgba(255,255,255,0.5); font-size:14px;">'
+					. '<span style="color:rgba(255,255,255,0.3); margin-right:6px;">&#9906;</span>'
+					. $ft['contact']['address'] . '</div>';
+			}
+			$contact_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $contact_html, 'left',
+				'rgba(255,255,255,0.5)', 14 );
+
+			$cols[] = PressGo_Element_Factory::col( $contact_widgets );
+		}
+
+		$children = array( PressGo_Element_Factory::row( $cfg, $cols, 24 ) );
+
+		// Copyright bar.
+		if ( ! empty( $ft['copyright'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+			$children[] = PressGo_Widget_Helpers::divider_w( 'rgba(255,255,255,0.1)' );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ft['copyright'], 'center',
+				'rgba(255,255,255,0.3)', 13 );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['dark_bg'], null, 60, 40 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 16. Map
 	// ──────────────────────────────────────────────
 
 	public static function build_map( $cfg ) {

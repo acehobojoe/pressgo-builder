@@ -32,7 +32,7 @@ $fitness_config = array(
     'fonts' => array( 'heading' => 'Poppins', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'stats', 'features', 'steps', 'testimonials', 'faq', 'cta_final' ),
+    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'cta_final' ),
     'hero' => array(
         'badge' => 'New Year, New You — 50% Off First Month',
         'eyebrow' => 'TRANSFORM YOUR BODY',
@@ -80,6 +80,37 @@ $fitness_config = array(
             array( 'q' => 'Can I freeze my membership?', 'a' => 'Yes, you can freeze your membership for up to 3 months per year at no additional cost. Just let our front desk know.' ),
         ),
     ),
+    'team' => array(
+        'eyebrow' => 'YOUR COACHES', 'headline' => 'Meet the Team',
+        'members' => array(
+            array(
+                'name' => 'Jake Martinez', 'role' => 'Head Trainer, CSCS',
+                'photo' => 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => '12+ years in strength & conditioning. Former D1 athlete turned coach.',
+                'social' => array(
+                    array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+                    array( 'icon' => 'fab fa-linkedin-in', 'url' => '#' ),
+                ),
+            ),
+            array(
+                'name' => 'Priya Patel', 'role' => 'Yoga & Mobility',
+                'photo' => 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => 'RYT-500 certified. Specializes in flow yoga, injury recovery, and mindfulness.',
+                'social' => array(
+                    array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+                ),
+            ),
+            array(
+                'name' => 'Marcus Thompson', 'role' => 'Nutrition Coach, RD',
+                'photo' => 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => 'Registered dietitian helping members build sustainable eating habits since 2018.',
+                'social' => array(
+                    array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
+                    array( 'icon' => 'fab fa-twitter', 'url' => '#' ),
+                ),
+            ),
+        ),
+    ),
     'cta_final' => array(
         'headline' => 'Ready to Transform Your Life?',
         'description' => "Join 2,500+ members who chose to invest in themselves. Your first week is on us.",
@@ -100,7 +131,7 @@ $saas_config = array(
     'fonts' => array( 'heading' => 'Inter', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'social_proof', 'features', 'results', 'competitive_edge', 'testimonials', 'faq', 'cta_final' ),
+    'sections' => array( 'hero', 'logo_bar', 'features', 'pricing', 'results', 'competitive_edge', 'testimonials', 'faq', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'split',
         'badge' => 'Now with AI-powered task prioritization',
@@ -112,9 +143,16 @@ $saas_config = array(
         'trust_line' => 'Trusted by 10,000+ teams worldwide',
         'image' => 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=800',
     ),
-    'social_proof' => array(
-        'headline' => 'Trusted by teams at companies like',
-        'categories' => array( 'Startups', 'SaaS', 'Agencies', 'Enterprise', 'E-commerce', 'Fintech', 'Healthcare' ),
+    'logo_bar' => array(
+        'headline' => 'Trusted by 10,000+ teams at companies like',
+        'logos' => array(
+            array( 'url' => 'https://img.logoipsum.com/243.svg', 'alt' => 'Company 1' ),
+            array( 'url' => 'https://img.logoipsum.com/244.svg', 'alt' => 'Company 2' ),
+            array( 'url' => 'https://img.logoipsum.com/245.svg', 'alt' => 'Company 3' ),
+            array( 'url' => 'https://img.logoipsum.com/247.svg', 'alt' => 'Company 4' ),
+            array( 'url' => 'https://img.logoipsum.com/248.svg', 'alt' => 'Company 5' ),
+            array( 'url' => 'https://img.logoipsum.com/249.svg', 'alt' => 'Company 6' ),
+        ),
     ),
     'features' => array(
         'variant' => 'alternating',
@@ -171,17 +209,79 @@ $saas_config = array(
             array( 'q' => 'Is my data secure?', 'a' => "We're SOC 2 Type II certified, encrypt all data at rest and in transit, and offer SSO + SAML on business plans." ),
         ),
     ),
+    'pricing' => array(
+        'eyebrow' => 'PRICING', 'headline' => 'Simple, Transparent Pricing',
+        'subheadline' => 'Start free and upgrade when you need more. No hidden fees, no surprises.',
+        'plans' => array(
+            array(
+                'name' => 'Free',
+                'price' => '$0',
+                'period' => '/forever',
+                'description' => 'For small teams just getting started',
+                'features' => array( 'Up to 10 users', 'Unlimited projects', 'Basic AI features', 'Core integrations', 'Community support' ),
+                'cta' => array( 'text' => 'Get Started', 'url' => '#' ),
+            ),
+            array(
+                'name' => 'Pro',
+                'price' => '$12',
+                'period' => '/user/mo',
+                'badge' => 'Most Popular',
+                'description' => 'For growing teams that need more power',
+                'features' => array( 'Unlimited users', 'Advanced AI prioritization', 'Custom dashboards', 'All integrations', 'Priority support', 'API access' ),
+                'cta' => array( 'text' => 'Start Free Trial', 'url' => '#' ),
+                'highlighted' => true,
+            ),
+            array(
+                'name' => 'Enterprise',
+                'price' => '$29',
+                'period' => '/user/mo',
+                'description' => 'For organizations that need security & scale',
+                'features' => array( 'Everything in Pro', 'SSO / SAML', 'SOC 2 compliance', 'Dedicated CSM', 'Custom contracts', 'SLA guarantee' ),
+                'cta' => array( 'text' => 'Contact Sales', 'url' => '#' ),
+            ),
+        ),
+    ),
     'cta_final' => array(
         'headline' => 'Start Shipping Faster Today',
         'description' => "Join 10,000+ teams who upgraded their workflow. Free forever for small teams.",
         'cta' => array( 'text' => 'Get Started Free', 'url' => '#', 'icon' => array( 'value' => 'fas fa-rocket', 'library' => 'fa-solid' ) ),
         'trust_line' => 'No credit card required',
+    ),
+    'footer' => array(
+        'brand' => array(
+            'name' => 'ShipFast',
+            'description' => 'The project management tool that gets out of your way. Built for teams who ship.',
+        ),
+        'columns' => array(
+            array( 'title' => 'Product', 'links' => array(
+                array( 'text' => 'Features', 'url' => '#' ),
+                array( 'text' => 'Pricing', 'url' => '#pricing' ),
+                array( 'text' => 'Integrations', 'url' => '#' ),
+                array( 'text' => 'Changelog', 'url' => '#' ),
+            ) ),
+            array( 'title' => 'Company', 'links' => array(
+                array( 'text' => 'About', 'url' => '#' ),
+                array( 'text' => 'Blog', 'url' => '#' ),
+                array( 'text' => 'Careers', 'url' => '#' ),
+                array( 'text' => 'Press', 'url' => '#' ),
+            ) ),
+            array( 'title' => 'Resources', 'links' => array(
+                array( 'text' => 'Documentation', 'url' => '#' ),
+                array( 'text' => 'API Reference', 'url' => '#' ),
+                array( 'text' => 'Status Page', 'url' => '#' ),
+                array( 'text' => 'Help Center', 'url' => '#' ),
+            ) ),
+        ),
+        'contact' => array(
+            'email' => 'hello@shipfast.app',
+        ),
         'social_icons' => array(
             array( 'icon' => 'fab fa-twitter', 'url' => '#' ),
             array( 'icon' => 'fab fa-github', 'url' => '#' ),
             array( 'icon' => 'fab fa-linkedin-in', 'url' => '#' ),
             array( 'icon' => 'fab fa-youtube', 'url' => '#' ),
         ),
+        'copyright' => '© 2026 ShipFast, Inc. All rights reserved. · Privacy · Terms',
     ),
 );
 
@@ -197,12 +297,7 @@ $restaurant_config = array(
     'fonts' => array( 'heading' => 'Playfair Display', 'body' => 'Lato' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 12, 'button_radius' => 8,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'features', 'steps', 'testimonials', 'faq', 'map', 'cta_final', 'disclaimer' ),
-    'social_icons' => array(
-        array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
-        array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
-        array( 'icon' => 'fab fa-yelp', 'url' => '#' ),
-    ),
+    'sections' => array( 'hero', 'features', 'steps', 'team', 'testimonials', 'faq', 'map', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'image',
         'eyebrow' => 'EST. 2012 · AUSTIN, TEXAS',
@@ -253,19 +348,64 @@ $restaurant_config = array(
         'height' => 400,
         'zoom' => 15,
     ),
+    'team' => array(
+        'eyebrow' => 'OUR KITCHEN', 'headline' => 'Meet the People Behind the Plates',
+        'members' => array(
+            array(
+                'name' => 'Chef Giovanni Bianchi', 'role' => 'Executive Chef',
+                'photo' => 'https://images.pexels.com/photos/887827/pexels-photo-887827.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => 'Born in Bologna, trained in Michelin kitchens across Italy. Brought his grandmother\'s recipes to Austin in 2012.',
+            ),
+            array(
+                'name' => 'Sofia Marchetti', 'role' => 'Pastry Chef',
+                'photo' => 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => 'CIA graduate specializing in Italian desserts. Her tiramisu was featured in Bon Appétit.',
+            ),
+            array(
+                'name' => 'Daniel Torres', 'role' => 'Sommelier',
+                'photo' => 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'bio' => 'Certified sommelier with deep expertise in Italian wines. Curates our 200+ bottle list.',
+            ),
+        ),
+    ),
     'cta_final' => array(
         'variant' => 'card',
         'headline' => 'Your Table Awaits',
         'description' => "Experience Austin's finest Italian dining. Walk-ins welcome, but reservations are recommended.",
         'cta' => array( 'text' => 'Make a Reservation', 'url' => '#', 'icon' => array( 'value' => 'fas fa-calendar-check', 'library' => 'fa-solid' ) ),
         'trust_line' => "OpenTable 2025 Diners' Choice Award",
+    ),
+    'footer' => array(
+        'brand' => array(
+            'name' => 'Trattoria Roma',
+            'description' => 'Farm-to-table Italian dining in the heart of Austin. Est. 2012.',
+        ),
+        'columns' => array(
+            array( 'title' => 'Hours', 'links' => array(
+                array( 'text' => 'Tue–Thu: 5pm–10pm', 'url' => '' ),
+                array( 'text' => 'Fri–Sat: 5pm–11pm', 'url' => '' ),
+                array( 'text' => 'Sunday: 4pm–9pm', 'url' => '' ),
+                array( 'text' => 'Monday: Closed', 'url' => '' ),
+            ) ),
+            array( 'title' => 'Quick Links', 'links' => array(
+                array( 'text' => 'Menu', 'url' => '#menu' ),
+                array( 'text' => 'Reservations', 'url' => '#' ),
+                array( 'text' => 'Private Dining', 'url' => '#' ),
+                array( 'text' => 'Gift Cards', 'url' => '#' ),
+            ) ),
+        ),
+        'contact' => array(
+            'phone' => '(512) 555-0142',
+            'email' => 'hello@trattoriaroma.com',
+            'address' => '1500 S Congress Ave, Austin, TX',
+        ),
         'social_icons' => array(
             array( 'icon' => 'fab fa-instagram', 'url' => '#' ),
             array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
             array( 'icon' => 'fab fa-yelp', 'url' => '#' ),
         ),
+        'copyright' => '© 2026 Trattoria Roma. All rights reserved.',
     ),
-    'disclaimer' => 'Trattoria Roma · 1500 South Congress Ave, Austin, TX · (512) 555-0142 · Tue–Sun',
 );
 
 // ── Page 4: ReviewBoost ──
@@ -280,7 +420,7 @@ $reviewboost_config = array(
     'fonts' => array( 'heading' => 'Inter', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 12, 'button_radius' => 8,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'stats', 'social_proof', 'features', 'steps', 'results', 'competitive_edge', 'testimonials', 'faq', 'cta_final' ),
+    'sections' => array( 'hero', 'stats', 'social_proof', 'features', 'steps', 'results', 'competitive_edge', 'testimonials', 'pricing', 'faq', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'split',
         'badge' => 'Trusted by 2,000+ local businesses',
@@ -367,17 +507,74 @@ $reviewboost_config = array(
             array( 'q' => 'What if I get a negative review?', 'a' => "Our smart routing catches unhappy customers before they post publicly. You'll get alerted privately so you can resolve the issue first." ),
         ),
     ),
+    'pricing' => array(
+        'eyebrow' => 'PRICING', 'headline' => 'Plans That Grow With You',
+        'subheadline' => 'Start with a 14-day free trial on any plan. No credit card required.',
+        'plans' => array(
+            array(
+                'name' => 'Starter',
+                'price' => '$49',
+                'period' => '/mo',
+                'description' => 'For single-location businesses',
+                'features' => array( '1 location', '100 review requests/mo', 'Google & Yelp', 'Email requests', 'Basic dashboard' ),
+                'cta' => array( 'text' => 'Start Free Trial', 'url' => '#' ),
+            ),
+            array(
+                'name' => 'Growth',
+                'price' => '$99',
+                'period' => '/mo',
+                'badge' => 'Best Value',
+                'description' => 'For businesses ready to scale',
+                'features' => array( 'Up to 5 locations', 'Unlimited requests', 'All 20+ platforms', 'SMS + Email', 'Smart routing', 'Analytics dashboard' ),
+                'cta' => array( 'text' => 'Start Free Trial', 'url' => '#' ),
+                'highlighted' => true,
+            ),
+            array(
+                'name' => 'Agency',
+                'price' => '$249',
+                'period' => '/mo',
+                'description' => 'For agencies managing multiple clients',
+                'features' => array( 'Unlimited locations', 'White-label reports', 'Client dashboard', 'API access', 'Dedicated support', 'Custom integrations' ),
+                'cta' => array( 'text' => 'Contact Sales', 'url' => '#' ),
+            ),
+        ),
+    ),
     'cta_final' => array(
         'variant' => 'card',
         'headline' => 'Ready to Get More Reviews?',
         'description' => "Join 500+ businesses that trust ReviewBoost to grow their online reputation. Start your free trial today.",
         'cta' => array( 'text' => 'Start Free — No Card Required', 'url' => '#', 'icon' => array( 'value' => 'fas fa-arrow-right', 'library' => 'fa-solid' ) ),
         'trust_line' => '14-day free trial · No credit card · Cancel anytime',
+    ),
+    'footer' => array(
+        'brand' => array(
+            'name' => 'ReviewBoost',
+            'description' => 'The simplest way to collect, manage, and showcase customer reviews.',
+        ),
+        'columns' => array(
+            array( 'title' => 'Product', 'links' => array(
+                array( 'text' => 'Features', 'url' => '#' ),
+                array( 'text' => 'Pricing', 'url' => '#pricing' ),
+                array( 'text' => 'Integrations', 'url' => '#' ),
+                array( 'text' => 'Case Studies', 'url' => '#' ),
+            ) ),
+            array( 'title' => 'Support', 'links' => array(
+                array( 'text' => 'Help Center', 'url' => '#' ),
+                array( 'text' => 'API Docs', 'url' => '#' ),
+                array( 'text' => 'Contact Us', 'url' => '#' ),
+                array( 'text' => 'Status Page', 'url' => '#' ),
+            ) ),
+        ),
+        'contact' => array(
+            'email' => 'support@reviewboost.io',
+            'phone' => '(800) 555-REVIEW',
+        ),
         'social_icons' => array(
             array( 'icon' => 'fab fa-twitter', 'url' => '#' ),
             array( 'icon' => 'fab fa-linkedin-in', 'url' => '#' ),
             array( 'icon' => 'fab fa-facebook-f', 'url' => '#' ),
         ),
+        'copyright' => '© 2026 ReviewBoost, Inc. All rights reserved. · Privacy Policy · Terms of Service',
     ),
 );
 

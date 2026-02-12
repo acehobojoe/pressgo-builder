@@ -197,9 +197,9 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Divider widget.
 	 */
-	public static function divider_w() {
+	public static function divider_w( $color = 'rgba(0,0,0,0.08)' ) {
 		return PressGo_Element_Factory::widget( 'divider', array(
-			'color'  => 'rgba(0,0,0,0.08)',
+			'color'  => $color,
 			'weight' => array( 'unit' => 'px', 'size' => 1, 'sizes' => array() ),
 		) );
 	}
