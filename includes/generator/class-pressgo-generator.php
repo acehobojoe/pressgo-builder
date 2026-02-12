@@ -51,6 +51,8 @@ class PressGo_Generator {
 		'features.minimal'              => 'build_features_minimal',
 		'testimonials.grid'             => 'build_testimonials_grid',
 		'faq.split'                     => 'build_faq_split',
+		'team.compact'                  => 'build_team_compact',
+		'results.bars'                  => 'build_results_bars',
 	);
 
 	/**

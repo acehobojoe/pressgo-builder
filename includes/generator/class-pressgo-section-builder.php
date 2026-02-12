@@ -552,14 +552,19 @@ class PressGo_Section_Builder {
 		$categories = isset( $sp['categories'] ) ? $sp['categories'] : array();
 		$headline   = isset( $sp['headline'] ) ? $sp['headline'] : 'Trusted by businesses in 50+ industries';
 
+		$pill_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B', '#10B981', '#EF4444' );
+
 		$pills = array();
-		foreach ( $categories as $cat ) {
-			$pills[] = '<span style="display:inline-block; padding:6px 16px; margin:4px; '
-				. 'background:' . $c['white'] . '; border-radius:20px; font-size:13px; '
-				. 'color:' . $c['text_muted'] . '; font-weight:500; '
-				. 'box-shadow:0 1px 4px rgba(0,0,0,0.06);">' . esc_html( $cat ) . '</span>';
+		foreach ( $categories as $idx => $cat ) {
+			$dot_color = $pill_colors[ $idx % count( $pill_colors ) ];
+			$pills[] = '<span style="display:inline-flex; align-items:center; gap:6px; padding:8px 18px; margin:4px; '
+				. 'background:' . $c['white'] . '; border-radius:24px; font-size:13px; '
+				. 'color:' . $c['text_dark'] . '; font-weight:500; '
+				. 'border:1px solid ' . $c['border'] . ';">'
+				. '<span style="width:8px; height:8px; border-radius:50%; background:' . $dot_color . '; flex-shrink:0;"></span>'
+				. esc_html( $cat ) . '</span>';
 		}
-		$pills_html = implode( '&nbsp;&nbsp;', $pills );
+		$pills_html = implode( ' ', $pills );
 
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $headline, 'h6', 'center', $c['text_muted'], 13, '500' ),
@@ -567,7 +572,7 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::text_w( $cfg, $pills_html, 'center', null, 13 ),
 		);
 
-		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 20 );
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 24 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -904,6 +909,45 @@ class PressGo_Section_Builder {
 				'shape_divider_bottom_height'  => array( 'unit' => 'px', 'size' => 60, 'sizes' => array() ),
 			)
 		);
+	}
+
+	// ──────────────────────────────────────────────
+	// 6b. Results Bars (progress bars instead of number cards)
+	// ──────────────────────────────────────────────
+
+	public static function build_results_bars( $cfg ) {
+		$c = $cfg['colors'];
+		$r = $cfg['results'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $r['eyebrow'], $r['headline'],
+			isset( $r['description'] ) ? $r['description'] : null );
+
+		$bar_widgets = array();
+		foreach ( $r['metrics'] as $item ) {
+			$color   = isset( $item['color'] ) ? $item['color'] : $c['primary'];
+			$percent = (int) preg_replace( '/[^0-9]/', '', $item['value'] );
+			if ( $percent > 100 ) {
+				$percent = 100;
+			}
+
+			$bar_widgets[] = PressGo_Widget_Helpers::progress_bar_w( $cfg,
+				$item['label'] . ' — ' . $item['value'],
+				$percent, $color );
+			$bar_widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+		}
+
+		$children = array_merge( $header, $bar_widgets );
+
+		if ( ! empty( $r['cta'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = PressGo_Widget_Helpers::btn_w( $cfg, $r['cta']['text'],
+				isset( $r['cta']['url'] ) ? $r['cta']['url'] : '#',
+				$c['primary'], $c['white'], null,
+				isset( $r['cta']['icon'] ) ? $r['cta']['icon'] : null, 'center' );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1806,6 +1850,53 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::outer( $cfg,
 			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $member_cols, 24 ) ) ),
 			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 14b. Team Compact (photo + name + role only, no bio)
+	// ──────────────────────────────────────────────
+
+	public static function build_team_compact( $cfg ) {
+		$c  = $cfg['colors'];
+		$tm = $cfg['team'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $tm['eyebrow'], $tm['headline'],
+			isset( $tm['subheadline'] ) ? $tm['subheadline'] : null );
+
+		$member_cols = array();
+		foreach ( $tm['members'] as $member ) {
+			$widgets = array();
+
+			if ( ! empty( $member['photo'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
+					$member['name'], 120, 999, false, 'center' );
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			}
+
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $member['name'], 'h5', 'center',
+				$c['text_dark'], 17, '700' );
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 2 );
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $member['role'], 'center',
+				$c['primary'], 13 );
+
+			if ( ! empty( $member['social'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+				$widgets[] = PressGo_Widget_Helpers::social_icons_w(
+					$member['social'], 10, 'custom', $c['text_muted'], 'circle', 'center', 6
+				);
+			}
+
+			$member_cols[] = PressGo_Element_Factory::col( $widgets, array(
+				'padding' => array(
+					'unit' => 'px', 'top' => '20', 'right' => '16',
+					'bottom' => '20', 'left' => '16', 'isLinked' => false,
+				),
+			) );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $member_cols, 20 ) ) ),
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────

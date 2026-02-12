@@ -397,6 +397,43 @@ class PressGo_Widget_Helpers {
 	}
 
 	/**
+	 * Progress bar widget — animated percentage bar.
+	 */
+	public static function progress_bar_w( $cfg, $title, $percent, $color = null,
+										   $inner_text = '', $inner_text_type = 'percent' ) {
+		$fonts = $cfg['fonts'];
+		$c     = $cfg['colors'];
+
+		if ( null === $color ) {
+			$color = $c['primary'];
+		}
+
+		return PressGo_Element_Factory::widget( 'progress', array(
+			'title'                        => $title,
+			'percent'                      => array( 'unit' => '%', 'size' => $percent, 'sizes' => array() ),
+			'progress_type'                => '',
+			'display_percentage'           => 'yes',
+			'inner_text'                   => $inner_text,
+			'bar_color'                    => $color,
+			'bar_bg_color'                 => PressGo_Style_Utils::hex_to_rgba( $color, 0.1 ),
+			'title_color'                  => $c['text_dark'],
+			'bar_inline_color'             => $c['white'],
+			'bar_border_radius'            => array(
+				'unit' => 'px', 'top' => '8', 'right' => '8',
+				'bottom' => '8', 'left' => '8', 'isLinked' => true,
+			),
+			'inner_bar_border_radius'      => array(
+				'unit' => 'px', 'top' => '8', 'right' => '8',
+				'bottom' => '8', 'left' => '8', 'isLinked' => true,
+			),
+			'title_typography_typography'   => 'custom',
+			'title_typography_font_family'  => $fonts['body'],
+			'title_typography_font_weight'  => '600',
+			'title_typography_font_size'    => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+		) );
+	}
+
+	/**
 	 * Counter widget — animated number counter.
 	 */
 	public static function counter_w( $cfg, $number, $suffix = '', $prefix = '',
