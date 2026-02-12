@@ -58,6 +58,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | hero | `split` | `build_hero_split` | Text-left + image-right on light bg |
 | hero | `image` | `build_hero_image` | Full background image with dark overlay |
 | hero | `video` | `build_hero_video` | Centered text + video embed on light bg |
+| hero | `gradient` | `build_hero_gradient` | Colorful gradient bg with waves divider |
 | features | _(default)_ | `build_features` | 3-column card grid with accent borders |
 | features | `alternating` | `build_features_alternating` | Alternating text/image rows |
 | testimonials | _(default)_ | `build_testimonials` | 3-column cards with star ratings |

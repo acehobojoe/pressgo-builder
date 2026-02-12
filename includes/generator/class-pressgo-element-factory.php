@@ -152,9 +152,11 @@ class PressGo_Element_Factory {
 			}
 		}
 
+		$mob_gap = max( 10, intdiv( $gap, 2 ) );
 		$s = array(
-			'gap'            => 'custom',
-			'gap_columns_custom' => array( 'unit' => 'px', 'size' => $gap, 'sizes' => array() ),
+			'gap'                    => 'custom',
+			'gap_columns_custom'     => array( 'unit' => 'px', 'size' => $gap, 'sizes' => array() ),
+			'gap_columns_custom_mobile' => array( 'unit' => 'px', 'size' => $mob_gap, 'sizes' => array() ),
 		);
 
 		if ( $extra ) {

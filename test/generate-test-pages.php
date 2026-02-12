@@ -34,6 +34,7 @@ $fitness_config = array(
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
     'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'newsletter', 'cta_final', 'footer' ),
     'hero' => array(
+        'variant' => 'gradient',
         'badge' => 'New Year, New You — 50% Off First Month',
         'eyebrow' => 'TRANSFORM YOUR BODY',
         'headline' => 'Get Fit. Get Strong. Get Results.',

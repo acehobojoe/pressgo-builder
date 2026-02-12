@@ -392,6 +392,97 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 1e. Hero Gradient (colorful gradient bg, no image)
+	// ──────────────────────────────────────────────
+
+	public static function build_hero_gradient( $cfg ) {
+		$c    = $cfg['colors'];
+		$h    = $cfg['hero'];
+		$cta1 = $h['cta_primary'];
+		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+
+		$children = array();
+
+		if ( ! empty( $h['badge'] ) ) {
+			$badge_html = '<span style="display:inline-block; padding:8px 20px; '
+				. 'background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); '
+				. 'border-radius:50px; font-size:13px; color:rgba(255,255,255,0.9); '
+				. 'font-weight:500; letter-spacing:0.5px; backdrop-filter:blur(4px);">'
+				. $h['badge'] . '</span>';
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $badge_html, 'center', null, 13 );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+		}
+
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'center',
+			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+			$c['white'], 58, '800', -2, 1.1, null, 34 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			'rgba(255,255,255,0.8)', 19 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+
+		// CTA buttons.
+		$btn_cols = array(
+			PressGo_Element_Factory::col(
+				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+					isset( $cta1['url'] ) ? $cta1['url'] : '#',
+					$c['white'], $c['text_dark'], null,
+					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
+				array( 'vertical_align' => 'middle' )
+			),
+		);
+		if ( $cta2 ) {
+			$btn_cols[] = PressGo_Element_Factory::col(
+				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+					isset( $cta2['url'] ) ? $cta2['url'] : '#',
+					'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' ) ),
+				array( 'vertical_align' => 'middle' )
+			);
+		}
+		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
+
+		if ( ! empty( $h['trust_line'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							'rgba(255,255,255,0.5)', 14 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$children[] = $trust_row;
+		}
+
+		// Colorful gradient using primary + a contrasting color.
+		$rgb = PressGo_Style_Utils::hex_to_rgb( $c['primary'] );
+		$gradient_b = isset( $c['accent'] ) ? $c['accent'] : '#8B5CF6';
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			null, array( $c['primary'], $gradient_b, 135 ),
+			160, 140,
+			array(
+				'background_overlay_background'        => 'gradient',
+				'background_overlay_color'             => 'rgba(0,0,0,0.2)',
+				'background_overlay_color_b'           => 'rgba(0,0,0,0)',
+				'background_overlay_gradient_type'     => 'radial',
+				'background_overlay_gradient_position'  => 'top right',
+				'background_overlay_color_stop'        => array( 'unit' => '%', 'size' => 0, 'sizes' => array() ),
+				'background_overlay_color_b_stop'      => array( 'unit' => '%', 'size' => 80, 'sizes' => array() ),
+				'shape_divider_bottom'                 => 'waves',
+				'shape_divider_bottom_color'           => $c['light_bg'],
+				'shape_divider_bottom_height'          => array( 'unit' => 'px', 'size' => 80, 'sizes' => array() ),
+			)
+		);
+	}
+
+	// ──────────────────────────────────────────────
 	// 2. Stats
 	// ──────────────────────────────────────────────
 
@@ -1214,15 +1305,22 @@ class PressGo_Section_Builder {
 			);
 			$style['border_color'] = $c['primary'];
 
-			// Build colored initial avatar.
+			// Build avatar — use photo if available, otherwise colored initial.
 			$initial      = strtoupper( substr( $item['name'], 0, 1 ) );
 			$avatar_color = $avatar_colors[ $idx % count( $avatar_colors ) ];
+
+			if ( ! empty( $item['photo'] ) ) {
+				$avatar_part = '<img src="' . esc_url( $item['photo'] ) . '" alt="' . esc_attr( $item['name'] ) . '" '
+					. 'style="width:40px; height:40px; border-radius:50%; object-fit:cover;">';
+			} else {
+				$avatar_part = '<span style="display:inline-flex; align-items:center; justify-content:center; '
+					. 'width:40px; height:40px; border-radius:50%; '
+					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
+					. 'color:' . $avatar_color . '; font-weight:700; font-size:16px;">'
+					. $initial . '</span>';
+			}
 			$avatar_html  = '<div style="display:inline-flex; align-items:center; gap:12px;">'
-				. '<span style="display:inline-flex; align-items:center; justify-content:center; '
-				. 'width:40px; height:40px; border-radius:50%; '
-				. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
-				. 'color:' . $avatar_color . '; font-weight:700; font-size:16px;">'
-				. $initial . '</span>'
+				. $avatar_part
 				. '<div><strong style="color:' . $c['text_dark'] . '; font-size:15px;">' . $item['name'] . '</strong>'
 				. '<br><span style="color:' . $c['text_muted'] . '; font-size:13px;">' . $item['role'] . '</span></div>'
 				. '</div>';
@@ -1373,18 +1471,25 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::spacer_w( 16 ),
 			);
 
-			// Author with colored initial avatar.
+			// Author with photo or colored initial avatar.
 			$avatar_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B' );
 			$initial       = strtoupper( substr( $item['name'], 0, 1 ) );
 			$avatar_color  = $avatar_colors[ $idx % count( $avatar_colors ) ];
 
+			if ( ! empty( $item['photo'] ) ) {
+				$avatar_part = '<img src="' . esc_url( $item['photo'] ) . '" alt="' . esc_attr( $item['name'] ) . '" '
+					. 'style="width:36px; height:36px; border-radius:50%; object-fit:cover;">';
+			} else {
+				$avatar_part = '<span style="display:inline-flex; align-items:center; justify-content:center; '
+					. 'width:36px; height:36px; border-radius:50%; '
+					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
+					. 'color:' . $avatar_color . '; font-weight:700; font-size:14px;">'
+					. $initial . '</span>';
+			}
+
 			$card_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
 				'<div style="display:inline-flex; align-items:center; gap:10px;">'
-				. '<span style="display:inline-flex; align-items:center; justify-content:center; '
-				. 'width:36px; height:36px; border-radius:50%; '
-				. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
-				. 'color:' . $avatar_color . '; font-weight:700; font-size:14px;">'
-				. $initial . '</span>'
+				. $avatar_part
 				. '<div>'
 				. '<strong style="font-size:14px; color:' . $c['text_dark'] . ';">' . $item['name'] . '</strong>'
 				. '<div style="font-size:12px; color:' . $c['text_muted'] . ';">' . $item['role'] . '</div>'

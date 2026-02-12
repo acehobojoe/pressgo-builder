@@ -41,6 +41,7 @@ class PressGo_Generator {
 		'hero.split'                    => 'build_hero_split',
 		'hero.image'                    => 'build_hero_image',
 		'hero.video'                    => 'build_hero_video',
+		'hero.gradient'                 => 'build_hero_gradient',
 		'stats.dark'                    => 'build_stats_dark',
 		'features.alternating'          => 'build_features_alternating',
 		'steps.compact'                 => 'build_steps_compact',
