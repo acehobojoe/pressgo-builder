@@ -49,6 +49,7 @@ $fitness_config = array(
         array( 'icon' => array( 'value' => 'fas fa-star', 'library' => 'fa-solid' ), 'value' => '4.9', 'label' => 'Google Rating' ),
     ),
     'features' => array(
+        'variant' => 'minimal',
         'eyebrow' => 'WHY CHOOSE US', 'headline' => 'Everything You Need Under One Roof',
         'items' => array(
             array( 'icon' => array( 'value' => 'fas fa-heartbeat', 'library' => 'fa-solid' ), 'title' => 'Personal Training', 'desc' => 'One-on-one sessions with certified trainers who build custom programs around your goals, schedule, and fitness level.', 'accent' => '#FF6B35' ),
@@ -131,7 +132,7 @@ $saas_config = array(
     'fonts' => array( 'heading' => 'Inter', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'logo_bar', 'features', 'pricing', 'results', 'competitive_edge', 'testimonials', 'faq', 'cta_final', 'footer' ),
+    'sections' => array( 'hero', 'logo_bar', 'features', 'pricing', 'results', 'competitive_edge', 'testimonials', 'faq', 'newsletter', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'split',
         'badge' => 'Now with AI-powered task prioritization',
@@ -208,6 +209,13 @@ $saas_config = array(
             array( 'q' => "What's included in the free plan?", 'a' => 'Up to 10 users, unlimited projects, basic AI features, and all core integrations. No time limit.' ),
             array( 'q' => 'Is my data secure?', 'a' => "We're SOC 2 Type II certified, encrypt all data at rest and in transit, and offer SSO + SAML on business plans." ),
         ),
+    ),
+    'newsletter' => array(
+        'headline' => 'Get Product Updates',
+        'description' => 'Join 5,000+ product leaders who get our weekly newsletter on shipping faster, team productivity, and AI in project management.',
+        'cta_text' => 'Subscribe to Newsletter',
+        'cta_url' => '#',
+        'note' => 'No spam, ever. Unsubscribe anytime.',
     ),
     'pricing' => array(
         'eyebrow' => 'PRICING', 'headline' => 'Simple, Transparent Pricing',
@@ -297,7 +305,7 @@ $restaurant_config = array(
     'fonts' => array( 'heading' => 'Playfair Display', 'body' => 'Lato' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 12, 'button_radius' => 8,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'features', 'steps', 'team', 'testimonials', 'faq', 'map', 'cta_final', 'footer' ),
+    'sections' => array( 'hero', 'features', 'steps', 'gallery', 'team', 'testimonials', 'faq', 'map', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'image',
         'eyebrow' => 'EST. 2012 · AUSTIN, TEXAS',
@@ -348,6 +356,18 @@ $restaurant_config = array(
         'height' => 400,
         'zoom' => 15,
     ),
+    'gallery' => array(
+        'eyebrow' => 'FROM OUR KITCHEN', 'headline' => 'A Taste of What Awaits',
+        'columns' => 3,
+        'images' => array(
+            array( 'url' => 'https://images.pexels.com/photos/1437267/pexels-photo-1437267.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Fresh pasta' ),
+            array( 'url' => 'https://images.pexels.com/photos/2641886/pexels-photo-2641886.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Bruschetta' ),
+            array( 'url' => 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Spaghetti' ),
+            array( 'url' => 'https://images.pexels.com/photos/1460872/pexels-photo-1460872.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Wine glass' ),
+            array( 'url' => 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Tiramisu' ),
+            array( 'url' => 'https://images.pexels.com/photos/3535383/pexels-photo-3535383.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Restaurant interior' ),
+        ),
+    ),
     'team' => array(
         'eyebrow' => 'OUR KITCHEN', 'headline' => 'Meet the People Behind the Plates',
         'members' => array(
@@ -369,11 +389,12 @@ $restaurant_config = array(
         ),
     ),
     'cta_final' => array(
-        'variant' => 'card',
+        'variant' => 'image',
         'headline' => 'Your Table Awaits',
         'description' => "Experience Austin's finest Italian dining. Walk-ins welcome, but reservations are recommended.",
         'cta' => array( 'text' => 'Make a Reservation', 'url' => '#', 'icon' => array( 'value' => 'fas fa-calendar-check', 'library' => 'fa-solid' ) ),
         'trust_line' => "OpenTable 2025 Diners' Choice Award",
+        'image' => 'https://images.pexels.com/photos/67468/pexels-photo-67468.jpeg?auto=compress&cs=tinysrgb&w=1200',
     ),
     'footer' => array(
         'brand' => array(

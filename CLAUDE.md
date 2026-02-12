@@ -69,10 +69,14 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | steps | `compact` | `build_steps_compact` | Numbered pill badges with divider |
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
+| features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
+| cta_final | `image` | `build_cta_final_image` | Background image with dark overlay |
 | pricing | _(default)_ | `build_pricing` | 2-4 column plan cards with feature lists |
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | team | _(default)_ | `build_team` | Photo + name + role + bio + social cards |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
+| gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
+| newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 
 Config example:
@@ -85,8 +89,8 @@ Config example:
 ),
 ```
 
-### Section Types (17)
-hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, cta_final, map, footer, disclaimer
+### Section Types (19)
+hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, gallery, newsletter, cta_final, map, footer, disclaimer
 
 ## Critical Elementor Rules
 1. **Use section/column layout** — NOT container (`elType: 'container'` doesn't render via `update_post_meta`)

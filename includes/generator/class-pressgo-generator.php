@@ -27,6 +27,8 @@ class PressGo_Generator {
 		'cta_final'        => 'build_cta_final',
 		'logo_bar'         => 'build_logo_bar',
 		'team'             => 'build_team',
+		'gallery'          => 'build_gallery',
+		'newsletter'       => 'build_newsletter',
 		'map'              => 'build_map',
 		'footer'           => 'build_footer',
 		'disclaimer'       => 'build_disclaimer',
@@ -44,6 +46,8 @@ class PressGo_Generator {
 		'testimonials.featured'         => 'build_testimonials_featured',
 		'competitive_edge.image'        => 'build_competitive_edge_image',
 		'cta_final.card'                => 'build_cta_final_card',
+		'cta_final.image'               => 'build_cta_final_image',
+		'features.minimal'              => 'build_features_minimal',
 	);
 
 	/**

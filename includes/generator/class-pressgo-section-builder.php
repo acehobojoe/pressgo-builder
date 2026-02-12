@@ -586,6 +586,42 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 4c. Features Minimal (no cards, clean icon + text)
+	// ──────────────────────────────────────────────
+
+	public static function build_features_minimal( $cfg ) {
+		$c = $cfg['colors'];
+		$f = $cfg['features'];
+
+		$feature_cols = array();
+		foreach ( $f['items'] as $item ) {
+			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+
+			$feature_cols[] = PressGo_Element_Factory::col(
+				array(
+					PressGo_Widget_Helpers::icon_box_w( $cfg,
+						$item['icon'], $item['title'], $item['desc'],
+						$accent, 'left', 'default', 'circle',
+						null, 'left' ),
+				),
+				array(
+					'padding' => array(
+						'unit' => 'px', 'top' => '16', 'right' => '20',
+						'bottom' => '16', 'left' => '0', 'isLinked' => false,
+					),
+				)
+			);
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
+			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $feature_cols, 40 ) ) ),
+			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 5. Steps
 	// ──────────────────────────────────────────────
 
@@ -1270,6 +1306,49 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 11c. CTA Final Image (background image with dark overlay)
+	// ──────────────────────────────────────────────
+
+	public static function build_cta_final_image( $cfg ) {
+		$c   = $cfg['colors'];
+		$ct  = $cfg['cta_final'];
+		$img = isset( $ct['image'] ) ? $ct['image'] : '';
+
+		$children = array(
+			PressGo_Widget_Helpers::heading_w( $cfg, $ct['headline'], 'h2', 'center',
+				$c['white'], 44, '800', -1, 1.2, null, 28 ),
+			PressGo_Widget_Helpers::spacer_w( 16 ),
+			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
+				'rgba(255,255,255,0.8)', 18 ),
+			PressGo_Widget_Helpers::spacer_w( 28 ),
+			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
+				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
+				$c['accent'], $c['white'], null,
+				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
+		);
+
+		if ( ! empty( $ct['trust_line'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'<span style="font-size:14px; color:rgba(255,255,255,0.5);">' . $ct['trust_line'] . '</span>',
+				'center', null, 14 );
+		}
+
+		$extra = array();
+		if ( $img ) {
+			$extra['background_background']        = 'classic';
+			$extra['background_image']             = array( 'url' => $img, 'id' => '', 'size' => '' );
+			$extra['background_position']          = 'center center';
+			$extra['background_size']              = 'cover';
+			$extra['background_overlay_background'] = 'classic';
+			$extra['background_overlay_color']     = 'rgba(0,0,0,0.7)';
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['dark_bg'], null, 100, 100, $extra );
+	}
+
+	// ──────────────────────────────────────────────
 	// 12. Pricing
 	// ──────────────────────────────────────────────
 
@@ -1584,7 +1663,112 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
-	// 16. Map
+	// 16. Gallery
+	// ──────────────────────────────────────────────
+
+	public static function build_gallery( $cfg ) {
+		$c  = $cfg['colors'];
+		$gl = $cfg['gallery'];
+
+		$header = array();
+		if ( ! empty( $gl['eyebrow'] ) || ! empty( $gl['headline'] ) ) {
+			$header = PressGo_Style_Utils::section_header( $cfg,
+				isset( $gl['eyebrow'] ) ? $gl['eyebrow'] : '',
+				isset( $gl['headline'] ) ? $gl['headline'] : '',
+				isset( $gl['subheadline'] ) ? $gl['subheadline'] : null );
+		}
+
+		$images  = isset( $gl['images'] ) ? $gl['images'] : array();
+		$columns = isset( $gl['columns'] ) ? $gl['columns'] : 3;
+
+		// Build image gallery using Elementor's gallery widget.
+		$gallery_items = array();
+		foreach ( $images as $img ) {
+			$gallery_items[] = array(
+				'url' => is_array( $img ) ? $img['url'] : $img,
+				'id'  => '',
+				'alt' => is_array( $img ) && isset( $img['alt'] ) ? $img['alt'] : '',
+			);
+		}
+
+		$gallery = PressGo_Element_Factory::widget( 'image-gallery', array(
+			'wp_gallery'         => $gallery_items,
+			'gallery_columns'    => (string) $columns,
+			'gallery_link'       => 'file',
+			'gallery_rand'       => '',
+			'open_lightbox'      => 'yes',
+		) );
+
+		$children = array_merge( $header, array( $gallery ) );
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 60, 60 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 17. Newsletter
+	// ──────────────────────────────────────────────
+
+	public static function build_newsletter( $cfg ) {
+		$c  = $cfg['colors'];
+		$nl = $cfg['newsletter'];
+
+		$children = array(
+			PressGo_Widget_Helpers::heading_w( $cfg,
+				isset( $nl['headline'] ) ? $nl['headline'] : 'Stay in the Loop',
+				'h3', 'center', $c['text_dark'], 32, '800', -0.5, 1.3, null, 24 ),
+			PressGo_Widget_Helpers::spacer_w( 8 ),
+			PressGo_Widget_Helpers::text_w( $cfg,
+				isset( $nl['description'] ) ? $nl['description'] : 'Get the latest updates delivered to your inbox.',
+				'center', $c['text_muted'], 16 ),
+			PressGo_Widget_Helpers::spacer_w( 24 ),
+			PressGo_Widget_Helpers::btn_w( $cfg,
+				isset( $nl['cta_text'] ) ? $nl['cta_text'] : 'Subscribe',
+				isset( $nl['cta_url'] ) ? $nl['cta_url'] : '#',
+				$c['primary'], $c['white'], null,
+				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'center' ),
+		);
+
+		if ( ! empty( $nl['note'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $nl['note'], 'center',
+				$c['text_muted'], 13 );
+		}
+
+		$r = (string) $cfg['layout']['card_radius'];
+
+		// Centered card.
+		$card_col = PressGo_Element_Factory::col( $children, array(
+			'background_background' => 'classic',
+			'background_color'      => $c['white'],
+			'border_radius'         => array(
+				'unit' => 'px', 'top' => $r, 'right' => $r,
+				'bottom' => $r, 'left' => $r, 'isLinked' => true,
+			),
+			'border_border'         => 'solid',
+			'border_width'          => array(
+				'unit' => 'px', 'top' => '1', 'right' => '1',
+				'bottom' => '1', 'left' => '1', 'isLinked' => true,
+			),
+			'border_color'          => $c['border'],
+			'_box_shadow_box_shadow_type' => 'yes',
+			'_box_shadow_box_shadow'      => array(
+				'horizontal' => 0, 'vertical' => 4, 'blur' => 24,
+				'spread' => -2, 'color' => 'rgba(0,0,0,0.06)',
+			),
+			'padding'               => array(
+				'unit' => 'px', 'top' => '48', 'right' => '48',
+				'bottom' => '48', 'left' => '48', 'isLinked' => true,
+			),
+		) );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array( PressGo_Element_Factory::row( $cfg, array( $card_col ), 0 ) ),
+			$c['light_bg'], null, 60, 60 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 18. Map
 	// ──────────────────────────────────────────────
 
 	public static function build_map( $cfg ) {
