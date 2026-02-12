@@ -84,7 +84,9 @@ class PressGo_Config_Validator {
 		if ( ! isset( $config['sections'] ) || empty( $config['sections'] ) ) {
 			// Auto-detect sections from config keys.
 			$known_sections = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
-				'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'cta_final', 'disclaimer' );
+				'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
+				'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final', 'footer',
+				'disclaimer' );
 			$detected = array();
 			foreach ( $known_sections as $s ) {
 				if ( isset( $config[ $s ] ) ) {
@@ -110,6 +112,30 @@ class PressGo_Config_Validator {
 			}
 			if ( ! isset( $config['hero']['cta_primary']['text'] ) ) {
 				return new WP_Error( 'invalid_hero_cta', 'Hero CTA missing text.' );
+			}
+		}
+
+		// Fill in defaults for sections that need them.
+		$section_defaults = array(
+			'features'         => array( 'eyebrow' => 'FEATURES', 'headline' => 'Features', 'items' => array() ),
+			'testimonials'     => array( 'eyebrow' => 'TESTIMONIALS', 'headline' => 'Testimonials', 'items' => array() ),
+			'steps'            => array( 'eyebrow' => 'HOW IT WORKS', 'headline' => 'How It Works', 'items' => array() ),
+			'faq'              => array( 'eyebrow' => 'FAQ', 'headline' => 'Frequently Asked Questions', 'items' => array() ),
+			'competitive_edge' => array( 'eyebrow' => 'WHY US', 'headline' => 'Why Choose Us', 'benefits' => array() ),
+			'pricing'          => array( 'eyebrow' => 'PRICING', 'headline' => 'Pricing', 'plans' => array() ),
+			'team'             => array( 'eyebrow' => 'OUR TEAM', 'headline' => 'Meet the Team', 'members' => array() ),
+			'gallery'          => array( 'images' => array(), 'columns' => 3 ),
+			'newsletter'       => array( 'headline' => 'Stay in the Loop' ),
+			'cta_final'        => array( 'headline' => 'Get Started', 'description' => '', 'cta' => array( 'text' => 'Get Started', 'url' => '#' ) ),
+		);
+
+		foreach ( $section_defaults as $section => $defaults ) {
+			if ( isset( $config[ $section ] ) && is_array( $config[ $section ] ) ) {
+				foreach ( $defaults as $key => $default ) {
+					if ( ! isset( $config[ $section ][ $key ] ) ) {
+						$config[ $section ][ $key ] = $default;
+					}
+				}
 			}
 		}
 

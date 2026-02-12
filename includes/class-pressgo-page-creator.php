@@ -71,23 +71,50 @@ class PressGo_Page_Creator {
 /* PressGo Generated Styles */
 
 /* Button hover effects */
-.elementor-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    transition: all 0.3s ease;
-}
 .elementor-button {
     transition: all 0.3s ease;
 }
+.elementor-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
 
-/* Card hover */
-.elementor-column > .elementor-widget-wrap {
+/* Card hover lift */
+.elementor-inner-section .elementor-column > .elementor-widget-wrap {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.elementor-inner-section .elementor-column > .elementor-widget-wrap:hover {
+    transform: translateY(-4px);
+}
+
+/* Image hover zoom */
+.elementor-widget-image .elementor-image img {
+    transition: transform 0.4s ease;
+}
+.elementor-widget-image:hover .elementor-image img {
+    transform: scale(1.03);
+}
+
+/* Gallery image hover */
+.elementor-widget-image-gallery .gallery-item img {
+    transition: transform 0.4s ease, filter 0.4s ease;
+    border-radius: " . (int) $config['layout']['card_radius'] . "px;
+}
+.elementor-widget-image-gallery .gallery-item:hover img {
+    transform: scale(1.05);
 }
 
 /* FAQ toggle styling */
 .elementor-toggle .elementor-tab-title {
     transition: color 0.2s ease;
+}
+.elementor-toggle .elementor-tab-title:hover {
+    color: {$primary} !important;
+}
+
+/* Footer link hover */
+.elementor-widget-icon-list a:hover .elementor-icon-list-text {
+    color: rgba(255,255,255,0.8) !important;
 }
 
 /* Smooth scroll */
@@ -95,8 +122,32 @@ html {
     scroll-behavior: smooth;
 }
 
+/* Icon box hover */
+.elementor-widget-icon-box {
+    transition: transform 0.3s ease;
+}
+.elementor-widget-icon-box:hover {
+    transform: translateY(-2px);
+}
+
+/* Counter animation smoothing */
+.elementor-counter-number-wrapper {
+    letter-spacing: -1px;
+}
+
+/* Progress bar animation */
+.elementor-progress-bar {
+    transition: width 1.5s ease-out;
+}
+
 @media (hover: none) {
-    .elementor-button:hover {
+    .elementor-button:hover,
+    .elementor-inner-section .elementor-column > .elementor-widget-wrap:hover,
+    .elementor-widget-icon-box:hover {
+        transform: none;
+    }
+    .elementor-widget-image:hover .elementor-image img,
+    .elementor-widget-image-gallery .gallery-item:hover img {
         transform: none;
     }
 }";
