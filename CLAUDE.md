@@ -76,6 +76,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
 | features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
 | features | `image_cards` | `build_features_image_cards` | Image on top of each card |
+| features | `grid` | `build_features_grid` | 2-column card grid for 4+ features |
 | newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
 | newsletter | `inline` | `build_newsletter_inline` | Gradient bar with headline + button |
 | results | _(default)_ | `build_results` | Dark gradient with counter cards |

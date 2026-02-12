@@ -521,12 +521,14 @@ $reviewboost_config = array(
         'categories' => array( 'Restaurants', 'Dentists', 'Salons', 'Auto Repair', 'Lawyers', 'Contractors', 'Realtors', 'Veterinarians' ),
     ),
     'features' => array(
+        'variant' => 'grid',
         'eyebrow' => 'PLATFORM', 'headline' => 'Everything You Need to Win at Reviews',
         'subheadline' => 'From automated requests to smart routing, we handle the complexity so you can focus on your customers.',
         'items' => array(
             array( 'icon' => array( 'value' => 'fas fa-paper-plane', 'library' => 'fa-solid' ), 'title' => 'Automated Review Requests', 'desc' => 'Send SMS and email review requests automatically after each visit. Smart timing gets 3x more responses.', 'accent' => '#046BD2' ),
             array( 'icon' => array( 'value' => 'fas fa-route', 'library' => 'fa-solid' ), 'title' => 'Smart Review Routing', 'desc' => 'Happy customers go to Google. Unhappy ones come to you first. Protect your reputation automatically.', 'accent' => '#00B418' ),
             array( 'icon' => array( 'value' => 'fas fa-chart-bar', 'library' => 'fa-solid' ), 'title' => 'Analytics Dashboard', 'desc' => 'Track review volume, sentiment trends, and response rates. See which locations and staff drive the best reviews.', 'accent' => '#8B5CF6' ),
+            array( 'icon' => array( 'value' => 'fas fa-code', 'library' => 'fa-solid' ), 'title' => 'Widget & API', 'desc' => 'Embed your best reviews on your website with our widget. Or use our API to build custom review experiences.', 'accent' => '#F59E0B' ),
         ),
     ),
     'steps' => array(

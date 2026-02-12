@@ -907,6 +907,48 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 4e. Features Grid (2-column card grid for 4+ features)
+	// ──────────────────────────────────────────────
+
+	public static function build_features_grid( $cfg ) {
+		$c = $cfg['colors'];
+		$f = $cfg['features'];
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
+			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
+
+		$items    = $f['items'];
+		$rows     = array();
+		$row_cols = array();
+		foreach ( $items as $idx => $item ) {
+			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+
+			$widgets = array(
+				PressGo_Widget_Helpers::icon_box_w( $cfg,
+					$item['icon'], $item['title'], $item['desc'],
+					$accent, 'left', 'stacked', 'circle',
+					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
+			);
+
+			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
+			$row_cols[] = PressGo_Element_Factory::col( $widgets, $style );
+
+			// 2 items per row.
+			if ( count( $row_cols ) === 2 || $idx === count( $items ) - 1 ) {
+				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 24 );
+				if ( $idx < count( $items ) - 1 ) {
+					$rows[] = PressGo_Widget_Helpers::spacer_w( 24 );
+				}
+				$row_cols = array();
+			}
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, $rows ),
+			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 5. Steps
 	// ──────────────────────────────────────────────
 

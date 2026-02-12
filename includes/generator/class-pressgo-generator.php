@@ -51,6 +51,7 @@ class PressGo_Generator {
 		'cta_final.image'               => 'build_cta_final_image',
 		'features.minimal'              => 'build_features_minimal',
 		'features.image_cards'          => 'build_features_image_cards',
+		'features.grid'                 => 'build_features_grid',
 		'testimonials.grid'             => 'build_testimonials_grid',
 		'faq.split'                     => 'build_faq_split',
 		'team.compact'                  => 'build_team_compact',
@@ -96,6 +97,14 @@ class PressGo_Generator {
 			$result = PressGo_Section_Builder::$method( $cfg );
 
 			if ( null !== $result ) {
+				// Auto-inject section anchor ID for smooth scrolling.
+				$anchor = str_replace( '_', '-', $name );
+				if ( isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && isset( $cfg[ $name ]['anchor'] ) ) {
+					$anchor = $cfg[ $name ]['anchor'];
+				}
+				if ( ! isset( $result['settings']['_element_id'] ) ) {
+					$result['settings']['_element_id'] = $anchor;
+				}
 				$page[] = $result;
 			}
 		}
