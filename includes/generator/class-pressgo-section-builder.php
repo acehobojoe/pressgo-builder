@@ -2627,6 +2627,10 @@ class PressGo_Section_Builder {
 				'unit' => 'px', 'top' => '0', 'right' => '40',
 				'bottom' => '0', 'left' => '0', 'isLinked' => false,
 			),
+			'padding_mobile' => array(
+				'unit' => 'px', 'top' => '0', 'right' => '0',
+				'bottom' => '20', 'left' => '0', 'isLinked' => false,
+			),
 		) );
 
 		// Link columns.
@@ -2693,6 +2697,7 @@ class PressGo_Section_Builder {
 					'typography_typography'         => 'custom',
 					'typography_font_family'        => $fonts['body'],
 					'typography_font_size'          => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+					'typography_font_size_mobile'   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
 					'typography_font_weight'        => '400',
 				) );
 			}
@@ -2747,6 +2752,10 @@ class PressGo_Section_Builder {
 			'padding' => array(
 				'unit' => 'px', 'top' => '0', 'right' => '40',
 				'bottom' => '0', 'left' => '0', 'isLinked' => false,
+			),
+			'padding_mobile' => array(
+				'unit' => 'px', 'top' => '0', 'right' => '0',
+				'bottom' => '20', 'left' => '0', 'isLinked' => false,
 			),
 		) );
 
@@ -2813,6 +2822,7 @@ class PressGo_Section_Builder {
 					'typography_typography'         => 'custom',
 					'typography_font_family'        => $fonts['body'],
 					'typography_font_size'          => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+					'typography_font_size_mobile'   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
 					'typography_font_weight'        => '400',
 				) );
 			}
@@ -3048,11 +3058,12 @@ class PressGo_Section_Builder {
 			$children = array_merge( $children, $header );
 		}
 
-		$address = isset( $map['address'] ) ? $map['address'] : '';
-		$height  = isset( $map['height'] ) ? (int) $map['height'] : 400;
-		$zoom    = isset( $map['zoom'] ) ? (int) $map['zoom'] : 14;
+		$address      = isset( $map['address'] ) ? $map['address'] : '';
+		$height       = isset( $map['height'] ) ? (int) $map['height'] : 400;
+		$zoom         = isset( $map['zoom'] ) ? (int) $map['zoom'] : 14;
+		$height_mob   = max( 200, intdiv( $height * 5, 8 ) );
 
-		$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom );
+		$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom, $height_mob );
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 60, 60 );

@@ -558,11 +558,15 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Google Maps widget.
 	 */
-	public static function google_map_w( $address, $height = 400, $zoom = 14 ) {
-		return PressGo_Element_Factory::widget( 'google_maps', array(
+	public static function google_map_w( $address, $height = 400, $zoom = 14, $height_mobile = null ) {
+		$s = array(
 			'address' => $address,
 			'height'  => array( 'unit' => 'px', 'size' => $height, 'sizes' => array() ),
 			'zoom'    => array( 'unit' => 'px', 'size' => $zoom, 'sizes' => array() ),
-		) );
+		);
+		if ( $height_mobile ) {
+			$s['height_mobile'] = array( 'unit' => 'px', 'size' => $height_mobile, 'sizes' => array() );
+		}
+		return PressGo_Element_Factory::widget( 'google_maps', $s );
 	}
 }
