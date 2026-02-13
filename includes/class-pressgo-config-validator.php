@@ -121,12 +121,15 @@ class PressGo_Config_Validator {
 			'testimonials'     => array( 'eyebrow' => 'TESTIMONIALS', 'headline' => 'Testimonials', 'items' => array() ),
 			'steps'            => array( 'eyebrow' => 'HOW IT WORKS', 'headline' => 'How It Works', 'items' => array() ),
 			'faq'              => array( 'eyebrow' => 'FAQ', 'headline' => 'Frequently Asked Questions', 'items' => array() ),
-			'competitive_edge' => array( 'eyebrow' => 'WHY US', 'headline' => 'Why Choose Us', 'benefits' => array() ),
+			'competitive_edge' => array( 'eyebrow' => 'WHY US', 'headline' => 'Why Choose Us', 'description' => '', 'benefits' => array(), 'cta' => array( 'text' => 'Learn More', 'url' => '#' ) ),
 			'pricing'          => array( 'eyebrow' => 'PRICING', 'headline' => 'Pricing', 'plans' => array() ),
 			'team'             => array( 'eyebrow' => 'OUR TEAM', 'headline' => 'Meet the Team', 'members' => array() ),
 			'gallery'          => array( 'images' => array(), 'columns' => 3 ),
 			'newsletter'       => array( 'headline' => 'Stay in the Loop' ),
+			'results'          => array( 'eyebrow' => 'RESULTS', 'headline' => 'Results', 'metrics' => array() ),
+			'logo_bar'         => array( 'headline' => 'Trusted by leading companies', 'logos' => array() ),
 			'cta_final'        => array( 'headline' => 'Get Started', 'description' => '', 'cta' => array( 'text' => 'Get Started', 'url' => '#' ) ),
+			'footer'           => array( 'brand' => array(), 'columns' => array(), 'contact' => array() ),
 		);
 
 		foreach ( $section_defaults as $section => $defaults ) {

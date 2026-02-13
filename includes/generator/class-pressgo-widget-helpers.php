@@ -108,6 +108,11 @@ class PressGo_Widget_Helpers {
 				'unit' => 'px', 'top' => '14', 'right' => '32',
 				'bottom' => '14', 'left' => '32', 'isLinked' => false,
 			),
+			'text_padding_mobile'      => array(
+				'unit' => 'px', 'top' => '12', 'right' => '24',
+				'bottom' => '12', 'left' => '24', 'isLinked' => false,
+			),
+			'typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 		);
 
 		if ( $bg ) {
