@@ -62,6 +62,8 @@ class PressGo_Generator {
 		'pricing.compact'               => 'build_pricing_compact',
 		'competitive_edge.cards'        => 'build_competitive_edge_cards',
 		'steps.timeline'                => 'build_steps_timeline',
+		'testimonials.minimal'          => 'build_testimonials_minimal',
+		'gallery.cards'                 => 'build_gallery_cards',
 	);
 
 	/**

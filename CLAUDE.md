@@ -67,6 +67,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
+| testimonials | `minimal` | `build_testimonials_minimal` | Centered quotes with dividers, no cards |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
 | stats | `dark` | `build_stats_dark` | Dark gradient bg with colored counters |
 | steps | _(default)_ | `build_steps` | Numbered circles on light bg cards |
@@ -92,6 +93,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
+| gallery | `cards` | `build_gallery_cards` | 2-col image cards with optional captions |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 | footer | `light` | `build_footer_light` | White/light bg footer with colored icons |
 

@@ -389,6 +389,7 @@ $restaurant_config = array(
         ),
     ),
     'testimonials' => array(
+        'variant' => 'minimal',
         'eyebrow' => 'REVIEWS', 'headline' => 'What Our Guests Say',
         'items' => array(
             array( 'name' => 'Robert T.', 'role' => 'Google Review', 'quote' => "Best Italian food I've had outside of Italy. The hand-made pappardelle with wild boar ragu is life-changing." ),
@@ -413,15 +414,16 @@ $restaurant_config = array(
         'zoom' => 15,
     ),
     'gallery' => array(
+        'variant' => 'cards',
         'eyebrow' => 'FROM OUR KITCHEN', 'headline' => 'A Taste of What Awaits',
         'columns' => 3,
         'images' => array(
-            array( 'url' => 'https://images.pexels.com/photos/1437267/pexels-photo-1437267.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Fresh pasta' ),
-            array( 'url' => 'https://images.pexels.com/photos/2641886/pexels-photo-2641886.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Bruschetta' ),
-            array( 'url' => 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Spaghetti' ),
-            array( 'url' => 'https://images.pexels.com/photos/1460872/pexels-photo-1460872.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Wine glass' ),
-            array( 'url' => 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Tiramisu' ),
-            array( 'url' => 'https://images.pexels.com/photos/3535383/pexels-photo-3535383.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Restaurant interior' ),
+            array( 'url' => 'https://images.pexels.com/photos/1437267/pexels-photo-1437267.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Fresh pasta', 'caption' => 'Hand-made Pappardelle' ),
+            array( 'url' => 'https://images.pexels.com/photos/2641886/pexels-photo-2641886.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Bruschetta', 'caption' => 'Bruschetta al Pomodoro' ),
+            array( 'url' => 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Spaghetti', 'caption' => 'Spaghetti alle Vongole' ),
+            array( 'url' => 'https://images.pexels.com/photos/1460872/pexels-photo-1460872.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Wine glass', 'caption' => 'Tuscan Reserve Wine' ),
+            array( 'url' => 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Tiramisu', 'caption' => 'Classic Tiramisu' ),
+            array( 'url' => 'https://images.pexels.com/photos/3535383/pexels-photo-3535383.jpeg?auto=compress&cs=tinysrgb&w=600', 'alt' => 'Restaurant interior', 'caption' => 'Our Dining Room' ),
         ),
     ),
     'team' => array(

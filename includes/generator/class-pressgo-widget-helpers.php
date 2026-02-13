@@ -450,6 +450,8 @@ class PressGo_Widget_Helpers {
 		$fonts = $cfg['fonts'];
 		$c     = $cfg['colors'];
 
+		$mob_size = max( 28, intdiv( $number_size * 3, 4 ) );
+
 		$s = array(
 			'starting_number' => 0,
 			'ending_number'   => is_numeric( str_replace( array( ',', '.' ), '', $number ) ) ? $number : 0,
@@ -464,6 +466,7 @@ class PressGo_Widget_Helpers {
 			'typography_font_family'         => $fonts['heading'],
 			'typography_font_weight'         => '800',
 			'typography_font_size'           => array( 'unit' => 'px', 'size' => $number_size, 'sizes' => array() ),
+			'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => $mob_size, 'sizes' => array() ),
 			'typography_line_height'         => array( 'unit' => 'em', 'size' => 1.1, 'sizes' => array() ),
 			'title_typography_typography'     => 'custom',
 			'title_typography_font_family'   => $fonts['body'],

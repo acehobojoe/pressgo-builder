@@ -43,7 +43,7 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
 			$c['white'], 56, '800', -1.5, 1.15, null, 32, 44 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18 );
+		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons.
@@ -138,7 +138,7 @@ class PressGo_Section_Builder {
 		$left[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'left',
 			$c['text_dark'], 48, '800', -1.5, 1.15, null, 30, 40 );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $c['text_muted'], 17 );
+		$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $c['text_muted'], 17, 15 );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 24 );
 
 		// Buttons row.
@@ -236,7 +236,7 @@ class PressGo_Section_Builder {
 			$c['white'], 60, '800', -1.5, 1.1, null, 34, 46 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			'rgba(255,255,255,0.8)', 19 );
+			'rgba(255,255,255,0.8)', 19, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
 		// CTA buttons.
@@ -334,7 +334,7 @@ class PressGo_Section_Builder {
 			$c['text_dark'], 52, '800', -1.5, 1.15, null, 32, 42 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			$c['text_muted'], 18 );
+			$c['text_muted'], 18, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons.
@@ -420,7 +420,7 @@ class PressGo_Section_Builder {
 			$c['white'], 58, '800', -2, 1.1, null, 34, 46 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			'rgba(255,255,255,0.8)', 19 );
+			'rgba(255,255,255,0.8)', 19, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
 		// CTA buttons.
@@ -1688,6 +1688,56 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 8d. Testimonials Minimal (single centered quote, no cards)
+	// ──────────────────────────────────────────────
+
+	public static function build_testimonials_minimal( $cfg ) {
+		$c = $cfg['colors'];
+		$t = $cfg['testimonials'];
+
+		$children = array();
+
+		// Section eyebrow and headline.
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $t['eyebrow'], 'h6', 'center',
+			$c['primary'], 13, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 12 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $t['headline'], 'h2', 'center',
+			$c['text_dark'], 42, '800', -1, 1.2, null, 28, 36 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 40 );
+
+		// Display each testimonial as a centered quote block.
+		foreach ( $t['items'] as $idx => $item ) {
+			// Large opening quote mark.
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'<div style="font-size:48px; line-height:1; color:'
+				. PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.2 ) . ';">&ldquo;</div>',
+				'center', null, 48 );
+
+			// Quote text — larger, centered, italic.
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'<em style="font-size:20px; line-height:1.8;">' . $item['quote'] . '</em>',
+				'center', $c['text_dark'], 20, 17 );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+
+			// Author name and role.
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['name'], 'h5', 'center',
+				$c['text_dark'], 16, '700' );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $item['role'], 'center',
+				$c['text_muted'], 14 );
+
+			// Divider between quotes (except last).
+			if ( $idx < count( $t['items'] ) - 1 ) {
+				$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+				$children[] = PressGo_Widget_Helpers::divider_w( $c['border'] );
+				$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+			}
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 9. FAQ
 	// ──────────────────────────────────────────────
 
@@ -2671,6 +2721,57 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 16b. Gallery Cards (individual image cards in 2-col grid)
+	// ──────────────────────────────────────────────
+
+	public static function build_gallery_cards( $cfg ) {
+		$c  = $cfg['colors'];
+		$gl = $cfg['gallery'];
+
+		$header = array();
+		if ( ! empty( $gl['eyebrow'] ) || ! empty( $gl['headline'] ) ) {
+			$header = PressGo_Style_Utils::section_header( $cfg,
+				isset( $gl['eyebrow'] ) ? $gl['eyebrow'] : '',
+				isset( $gl['headline'] ) ? $gl['headline'] : '',
+				isset( $gl['subheadline'] ) ? $gl['subheadline'] : null );
+		}
+
+		$images = isset( $gl['images'] ) ? $gl['images'] : array();
+		$radius = (int) $cfg['layout']['card_radius'];
+
+		// Build rows of 2 image cards with captions.
+		$rows     = array();
+		$row_cols = array();
+		foreach ( $images as $idx => $img ) {
+			$url = is_array( $img ) ? $img['url'] : $img;
+			$alt = is_array( $img ) && isset( $img['alt'] ) ? $img['alt'] : '';
+
+			$widgets = array(
+				PressGo_Widget_Helpers::image_w( $url, $alt, null, $radius, true ),
+			);
+			if ( is_array( $img ) && ! empty( $img['caption'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $img['caption'], 'center',
+					$c['text_muted'], 13 );
+			}
+
+			$row_cols[] = PressGo_Element_Factory::col( $widgets );
+
+			if ( count( $row_cols ) === 2 || $idx === count( $images ) - 1 ) {
+				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 20 );
+				if ( $idx < count( $images ) - 1 ) {
+					$rows[] = PressGo_Widget_Helpers::spacer_w( 20 );
+				}
+				$row_cols = array();
+			}
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, $rows ),
+			$c['light_bg'], null, 60, 60 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 17. Newsletter
 	// ──────────────────────────────────────────────
 
@@ -2806,15 +2907,19 @@ class PressGo_Section_Builder {
 
 	public static function build_disclaimer( $cfg ) {
 		$c    = $cfg['colors'];
-		$text = $cfg['disclaimer'];
+		$text = isset( $cfg['disclaimer'] ) ? $cfg['disclaimer'] : '';
+
+		if ( empty( $text ) ) {
+			return null;
+		}
 
 		$children = array(
-			PressGo_Widget_Helpers::text_w( $cfg,
-				'<p style="text-align: center; font-size: 13px; color: #9CA3AF;">' . $text . '</p>',
-				'center', '#9CA3AF', 13 ),
+			PressGo_Widget_Helpers::divider_w( $c['border'] ),
+			PressGo_Widget_Helpers::spacer_w( 20 ),
+			PressGo_Widget_Helpers::text_w( $cfg, $text, 'center', '#9CA3AF', 12, 11 ),
 		);
 
-		// Social icons in footer if provided at top-level config.
+		// Social icons if provided at top-level config.
 		if ( ! empty( $cfg['social_icons'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			$children[] = PressGo_Widget_Helpers::social_icons_w(
@@ -2823,6 +2928,6 @@ class PressGo_Section_Builder {
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
-			$c['white'], null, 40, 40 );
+			$c['white'], null, 0, 32 );
 	}
 }

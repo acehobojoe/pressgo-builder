@@ -163,10 +163,12 @@ class PressGo_Element_Factory {
 			}
 		}
 
+		$tab_gap = max( 12, intdiv( $gap * 3, 4 ) );
 		$mob_gap = max( 10, intdiv( $gap, 2 ) );
 		$s = array(
-			'gap'                    => 'custom',
-			'gap_columns_custom'     => array( 'unit' => 'px', 'size' => $gap, 'sizes' => array() ),
+			'gap'                       => 'custom',
+			'gap_columns_custom'        => array( 'unit' => 'px', 'size' => $gap, 'sizes' => array() ),
+			'gap_columns_custom_tablet' => array( 'unit' => 'px', 'size' => $tab_gap, 'sizes' => array() ),
 			'gap_columns_custom_mobile' => array( 'unit' => 'px', 'size' => $mob_gap, 'sizes' => array() ),
 		);
 
