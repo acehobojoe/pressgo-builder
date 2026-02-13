@@ -59,6 +59,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | hero | `image` | `build_hero_image` | Full background image with dark overlay |
 | hero | `video` | `build_hero_video` | Centered text + video embed on light bg |
 | hero | `gradient` | `build_hero_gradient` | Colorful gradient bg with waves divider |
+| hero | `minimal` | `build_hero_minimal` | Clean white bg, centered text, no gradient |
 | features | _(default)_ | `build_features` | 3-column card grid with accent borders |
 | features | `alternating` | `build_features_alternating` | Alternating text/image rows |
 | testimonials | _(default)_ | `build_testimonials` | 3-column cards with star ratings |
@@ -91,6 +92,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | pricing | `compact` | `build_pricing_compact` | Left-aligned cards, smaller price, bordered highlight |
 | stats | `inline` | `build_stats_inline` | Minimal horizontal counter row with dividers |
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
+| logo_bar | `dark` | `build_logo_bar_dark` | Dark bg logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
 | gallery | `cards` | `build_gallery_cards` | 2-col image cards with optional captions |

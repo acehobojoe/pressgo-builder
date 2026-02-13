@@ -112,6 +112,14 @@ class PressGo_Widget_Helpers {
 
 		if ( $bg ) {
 			$s['background_color'] = $bg;
+			// Auto-generate hover color (darken by 10%) unless transparent.
+			if ( 'transparent' !== $bg && '#' === substr( $bg, 0, 1 ) ) {
+				$rgb = PressGo_Style_Utils::hex_to_rgb( $bg );
+				$hover_r = max( 0, $rgb['r'] - 20 );
+				$hover_g = max( 0, $rgb['g'] - 20 );
+				$hover_b = max( 0, $rgb['b'] - 20 );
+				$s['button_background_hover_color'] = sprintf( '#%02X%02X%02X', $hover_r, $hover_g, $hover_b );
+			}
 		}
 		if ( $text_color ) {
 			$s['button_text_color'] = $text_color;
@@ -123,6 +131,12 @@ class PressGo_Widget_Helpers {
 				'bottom' => '2', 'left' => '2', 'isLinked' => true,
 			);
 			$s['border_color'] = $border_color;
+			// Darken border on hover too.
+			if ( '#' === substr( $border_color, 0, 1 ) ) {
+				$brgb = PressGo_Style_Utils::hex_to_rgb( $border_color );
+				$s['hover_border_color'] = sprintf( '#%02X%02X%02X',
+					max( 0, $brgb['r'] - 30 ), max( 0, $brgb['g'] - 30 ), max( 0, $brgb['b'] - 30 ) );
+			}
 		}
 		if ( $icon ) {
 			$s['selected_icon'] = is_array( $icon ) ? $icon : array( 'value' => $icon, 'library' => 'fa-solid' );

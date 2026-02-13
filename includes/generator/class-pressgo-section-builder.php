@@ -483,6 +483,83 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 1f. Hero Minimal (clean light bg, text-only)
+	// ──────────────────────────────────────────────
+
+	public static function build_hero_minimal( $cfg ) {
+		$c    = $cfg['colors'];
+		$h    = $cfg['hero'];
+		$cta1 = $h['cta_primary'];
+		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+
+		$children = array();
+
+		// Optional badge pill.
+		if ( ! empty( $h['badge'] ) ) {
+			$badge_html = '<span style="display:inline-block; padding:8px 20px; '
+				. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.08 ) . '; '
+				. 'border-radius:50px; font-size:13px; color:' . $c['primary'] . '; '
+				. 'font-weight:600; letter-spacing:0.5px;">'
+				. $h['badge'] . '</span>';
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $badge_html, 'center', null, 13 );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+		}
+
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'center',
+			$c['primary'], 13, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+			$c['text_dark'], 54, '800', -1.5, 1.15, null, 32, 44 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			$c['text_muted'], 18, 15 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
+
+		// CTA buttons.
+		$btn_cols = array(
+			PressGo_Element_Factory::col(
+				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+					isset( $cta1['url'] ) ? $cta1['url'] : '#',
+					$c['primary'], $c['white'], null,
+					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
+				array( 'vertical_align' => 'middle' )
+			),
+		);
+
+		if ( $cta2 ) {
+			$btn_cols[] = PressGo_Element_Factory::col(
+				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+					isset( $cta2['url'] ) ? $cta2['url'] : '#',
+					'transparent', $c['text_dark'], $c['border'], null, 'center' ) ),
+				array( 'vertical_align' => 'middle' )
+			);
+		}
+
+		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
+
+		// Trust line.
+		if ( ! empty( $h['trust_line'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
+			$trust_row = PressGo_Element_Factory::row( $cfg,
+				array(
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+					PressGo_Element_Factory::col(
+						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+							$c['text_muted'], 14 ) ),
+						array( 'vertical_align' => 'middle' )
+					),
+				), 8 );
+			$children[] = $trust_row;
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 140, 120 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 2. Stats
 	// ──────────────────────────────────────────────
 
@@ -2333,6 +2410,46 @@ class PressGo_Section_Builder {
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 40, 40 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 13b. Logo Bar Dark (dark bg variant)
+	// ──────────────────────────────────────────────
+
+	public static function build_logo_bar_dark( $cfg ) {
+		$c  = $cfg['colors'];
+		$lb = $cfg['logo_bar'];
+
+		$children = array();
+		if ( ! empty( $lb['headline'] ) ) {
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $lb['headline'], 'h6', 'center',
+				'rgba(255,255,255,0.4)', 13, '500' );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+		}
+
+		$logos = isset( $lb['logos'] ) ? $lb['logos'] : array();
+		if ( count( $logos ) > 0 ) {
+			$logo_cols = array();
+			foreach ( $logos as $logo ) {
+				$alt = isset( $logo['alt'] ) ? $logo['alt'] : '';
+				$logo_cols[] = PressGo_Element_Factory::col(
+					array(
+						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, 140, 0, false, 'center' ),
+					),
+					array(
+						'vertical_align' => 'middle',
+						'padding'        => array(
+							'unit' => 'px', 'top' => '10', 'right' => '16',
+							'bottom' => '10', 'left' => '16', 'isLinked' => false,
+						),
+					)
+				);
+			}
+			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20 );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['dark_bg'], null, 40, 40 );
 	}
 
 	// ──────────────────────────────────────────────
