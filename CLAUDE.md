@@ -31,7 +31,7 @@ Browser → admin-ajax (WordPress)
 
 ## Generator Architecture
 - `PressGo_Element_Factory` — Core primitives: `eid()`, `widget()`, `outer()`, `row()`, `col()`
-- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`, `icon_box_w()`, `image_box_w()`, `star_rating_w()`, `social_icons_w()`, `testimonial_w()`, `video_w()`, `counter_w()`, `progress_bar_w()`, `google_map_w()`
+- `PressGo_Widget_Helpers` — `heading_w()`, `text_w()`, `btn_w()`, `badge_w()`, `spacer_w()`, `icon_w()`, `image_w()`, `divider_w()`, `icon_box_w()`, `image_box_w()`, `star_rating_w()`, `social_icons_w()`, `testimonial_w()`, `video_w()`, `counter_w()`, `progress_bar_w()`, `google_map_w()`
 - `PressGo_Style_Utils` — `hex_to_rgba()`, `hex_to_rgb()`, `card_style()`, `section_header()`
 - `PressGo_Section_Builder` — Section builders with layout variants
 - `PressGo_Generator` — Orchestrator with variant routing
@@ -111,8 +111,18 @@ Config example:
 ),
 ```
 
-### Section Types (19)
+### Section Types (19 types, 48 builder methods)
 hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, gallery, newsletter, cta_final, map, footer, disclaimer
+
+## Responsive / Mobile
+- **Section padding**: `outer()` auto-calculates tablet (3/4) and mobile (1/2, min 40px) padding
+- **Row gaps**: `row()` auto-calculates tablet (3/4) and mobile (1/2) column gaps
+- **Spacers**: `spacer_w()` auto-sets mobile to 2/3 desktop (min 8px) for spacers >= 24px
+- **Widget mobile params**: `heading_w($align_mobile)`, `text_w($line_height, $align_mobile)`, `btn_w($align_mobile)` — use for split layouts that stack on mobile
+- **Split layout pattern**: On mobile, 2-column layouts stack vertically. Add `align_mobile='center'` to headings/text/buttons in the left column, and add `padding_mobile` reset to columns with desktop-only right padding
+- **Font size suffixes**: `typography_font_size_mobile`, `typography_font_size_tablet` on any widget
+- **Counter sizes**: auto-calculated tablet (7/8) and mobile (3/4) from desktop size
+- **Map height**: `google_map_w($height_mobile)` — auto-calculated as 5/8 desktop (min 200px)
 
 ## Critical Elementor Rules
 1. **Use section/column layout** — NOT container (`elType: 'container'` doesn't render via `update_post_meta`)
