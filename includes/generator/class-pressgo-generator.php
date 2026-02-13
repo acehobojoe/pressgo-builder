@@ -60,6 +60,8 @@ class PressGo_Generator {
 		'footer.light'                  => 'build_footer_light',
 		'stats.inline'                  => 'build_stats_inline',
 		'pricing.compact'               => 'build_pricing_compact',
+		'competitive_edge.cards'        => 'build_competitive_edge_cards',
+		'steps.timeline'                => 'build_steps_timeline',
 	);
 
 	/**

@@ -83,10 +83,10 @@ class PressGo_Style_Utils {
 			13, '600', 4, null, 'uppercase' );
 		$elements[] = PressGo_Widget_Helpers::spacer_w( 12 );
 		$elements[] = PressGo_Widget_Helpers::heading_w( $cfg, $headline, 'h2', 'center', $headline_color,
-			42, '800', -1, 1.2, null, 28 );
+			42, '800', -1, 1.2, null, 28, 36 );
 		if ( $subheadline ) {
 			$elements[] = PressGo_Widget_Helpers::spacer_w( 12 );
-			$elements[] = PressGo_Widget_Helpers::text_w( $cfg, $subheadline, 'center', $sub_color, 17 );
+			$elements[] = PressGo_Widget_Helpers::text_w( $cfg, $subheadline, 'center', $sub_color, 17, 15 );
 		}
 		$elements[] = PressGo_Widget_Helpers::spacer_w( 32 );
 

@@ -15,7 +15,8 @@ class PressGo_Widget_Helpers {
 	 */
 	public static function heading_w( $cfg, $text, $tag = 'h2', $align = 'left', $color = null,
 									   $size = null, $weight = '700', $letter_spacing = null,
-									   $line_height = null, $transform = null, $size_mobile = null ) {
+									   $line_height = null, $transform = null, $size_mobile = null,
+									   $size_tablet = null ) {
 		$fonts = $cfg['fonts'];
 		$s     = array(
 			'title'                    => $text,
@@ -31,6 +32,9 @@ class PressGo_Widget_Helpers {
 		}
 		if ( $size ) {
 			$s['typography_font_size'] = array( 'unit' => 'px', 'size' => $size, 'sizes' => array() );
+		}
+		if ( $size_tablet ) {
+			$s['typography_font_size_tablet'] = array( 'unit' => 'px', 'size' => $size_tablet, 'sizes' => array() );
 		}
 		if ( $size_mobile ) {
 			$s['typography_font_size_mobile'] = array( 'unit' => 'px', 'size' => $size_mobile, 'sizes' => array() );
@@ -51,7 +55,8 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Text editor widget.
 	 */
-	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16 ) {
+	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16,
+								   $size_mobile = null ) {
 		$fonts = $cfg['fonts'];
 		$s     = array(
 			'editor'                   => $html,
@@ -65,6 +70,9 @@ class PressGo_Widget_Helpers {
 
 		if ( $color ) {
 			$s['text_color'] = $color;
+		}
+		if ( $size_mobile ) {
+			$s['typography_font_size_mobile'] = array( 'unit' => 'px', 'size' => $size_mobile, 'sizes' => array() );
 		}
 
 		return PressGo_Element_Factory::widget( 'text-editor', $s );

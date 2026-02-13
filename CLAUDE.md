@@ -66,10 +66,12 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | testimonials | `grid` | `build_testimonials_grid` | 2-column card grid with avatars |
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
+| competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
 | stats | `dark` | `build_stats_dark` | Dark gradient bg with colored counters |
 | steps | _(default)_ | `build_steps` | Numbered circles on light bg cards |
 | steps | `compact` | `build_steps_compact` | Numbered pill badges with divider |
+| steps | `timeline` | `build_steps_timeline` | Vertical timeline with connecting line |
 | faq | _(default)_ | `build_faq` | Centered toggle accordion |
 | faq | `split` | `build_faq_split` | Header left, accordion right |
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |

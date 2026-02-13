@@ -41,6 +41,9 @@ class PressGo_Element_Factory {
 								   $pad_top = 100, $pad_bot = 100, $extra = null ) {
 		$layout = $cfg['layout'];
 
+		$tab_top = (string) max( 50, intdiv( $pad_top * 3, 4 ) );
+		$tab_bot = (string) max( 50, intdiv( $pad_bot * 3, 4 ) );
+
 		$s = array(
 			'padding'        => array(
 				'unit'     => 'px',
@@ -48,6 +51,14 @@ class PressGo_Element_Factory {
 				'right'    => '30',
 				'bottom'   => (string) $pad_bot,
 				'left'     => '30',
+				'isLinked' => false,
+			),
+			'padding_tablet' => array(
+				'unit'     => 'px',
+				'top'      => $tab_top,
+				'right'    => '24',
+				'bottom'   => $tab_bot,
+				'left'     => '24',
 				'isLinked' => false,
 			),
 			'padding_mobile' => array(

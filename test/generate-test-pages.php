@@ -59,6 +59,7 @@ $fitness_config = array(
         ),
     ),
     'steps' => array(
+        'variant' => 'timeline',
         'eyebrow' => 'HOW IT WORKS', 'headline' => 'Your Journey Starts Here', 'anchor' => 'how-it-works',
         'items' => array(
             array( 'num' => '01', 'title' => 'Book Your Free Trial', 'desc' => 'Sign up online and pick a class or training session that fits your schedule.' ),
@@ -222,6 +223,7 @@ $saas_config = array(
         'cta' => array( 'text' => 'See Case Studies', 'url' => '#' ),
     ),
     'competitive_edge' => array(
+        'variant' => 'cards',
         'eyebrow' => 'WHY US', 'headline' => 'Not Just Another PM Tool',
         'description' => "We built this because we were tired of tools that create more work than they eliminate.",
         'cta' => array( 'text' => 'Compare Plans', 'url' => '#pricing' ),
