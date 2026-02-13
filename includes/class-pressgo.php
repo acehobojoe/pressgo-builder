@@ -50,6 +50,12 @@ class PressGo {
 			$rest_api = new PressGo_Rest_API();
 			$rest_api->init();
 		}
+
+		// Register WP-CLI commands.
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-cli.php';
+			WP_CLI::add_command( 'pressgo', 'PressGo_CLI' );
+		}
 	}
 
 	/**
