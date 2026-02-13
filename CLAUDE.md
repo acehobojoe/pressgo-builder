@@ -144,10 +144,16 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 
 ## Brain / Knowledge Base
 - Located at `/opt/pressgo-ops/brain.json` on the server
-- Also at `brain.json` in the plugin root
-- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules
+- Also at `brain.json` in the plugin root (v3.0)
+- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules, complete section_variants (all 48 builders)
 - Derived from analysis of 588 Elementor template kits (10,624 JSON files) at `/opt/elementor-builder/templates/`
 - Key insight: `image` is the #2 most used widget (3,732 uses) — pages need images
+
+## Config Schema
+- `config-schema.json` in plugin root — complete specification of the config dict the AI must produce
+- Documents all 19 section types, all variant options, every required/optional field with types and examples
+- Includes: variant pairing guide (dark_hero_flow, light_hero_flow, visual_heavy, minimal), industry recommendations (8 verticals), common FontAwesome icons, full example config
+- This is the "instruction manual" for server-side Claude — if it has this file, it can generate valid configs without any prior context
 
 ## Image APIs (from old pressgo.app)
 - **Pexels API** — `PEXELS_API_KEY` env var, `https://api.pexels.com/v1/search`
