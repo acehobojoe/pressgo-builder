@@ -16,7 +16,7 @@ class PressGo_Widget_Helpers {
 	public static function heading_w( $cfg, $text, $tag = 'h2', $align = 'left', $color = null,
 									   $size = null, $weight = '700', $letter_spacing = null,
 									   $line_height = null, $transform = null, $size_mobile = null,
-									   $size_tablet = null ) {
+									   $size_tablet = null, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
 		$s     = array(
 			'title'                    => $text,
@@ -48,6 +48,9 @@ class PressGo_Widget_Helpers {
 		if ( $transform ) {
 			$s['typography_text_transform'] = $transform;
 		}
+		if ( $align_mobile ) {
+			$s['align_mobile'] = $align_mobile;
+		}
 
 		return PressGo_Element_Factory::widget( 'heading', $s );
 	}
@@ -56,7 +59,7 @@ class PressGo_Widget_Helpers {
 	 * Text editor widget.
 	 */
 	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16,
-								   $size_mobile = null ) {
+								   $size_mobile = null, $line_height = 1.7, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
 		$s     = array(
 			'editor'                   => $html,
@@ -65,7 +68,7 @@ class PressGo_Widget_Helpers {
 			'typography_font_family'   => $fonts['body'],
 			'typography_font_size'     => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
 			'typography_font_weight'   => '400',
-			'typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+			'typography_line_height'   => array( 'unit' => 'em', 'size' => $line_height, 'sizes' => array() ),
 		);
 
 		if ( $color ) {
@@ -73,6 +76,9 @@ class PressGo_Widget_Helpers {
 		}
 		if ( $size_mobile ) {
 			$s['typography_font_size_mobile'] = array( 'unit' => 'px', 'size' => $size_mobile, 'sizes' => array() );
+		}
+		if ( $align_mobile ) {
+			$s['align_mobile'] = $align_mobile;
 		}
 
 		return PressGo_Element_Factory::widget( 'text-editor', $s );
@@ -82,7 +88,8 @@ class PressGo_Widget_Helpers {
 	 * Button widget.
 	 */
 	public static function btn_w( $cfg, $text, $url = '#', $bg = null, $text_color = null,
-								   $border_color = null, $icon = null, $align = '' ) {
+								   $border_color = null, $icon = null, $align = '',
+								   $align_mobile = null ) {
 		$c      = $cfg['colors'];
 		$layout = $cfg['layout'];
 		$fonts  = $cfg['fonts'];
@@ -151,8 +158,38 @@ class PressGo_Widget_Helpers {
 		if ( $align ) {
 			$s['align'] = $align;
 		}
+		if ( $align_mobile ) {
+			$s['align_mobile'] = $align_mobile;
+		}
 
 		return PressGo_Element_Factory::widget( 'button', $s );
+	}
+
+	/**
+	 * Badge/pill widget — inline styled pill commonly used in hero sections.
+	 *
+	 * @param string $style 'dark' for dark hero backgrounds, 'light' for light backgrounds.
+	 */
+	public static function badge_w( $cfg, $text, $style = 'dark', $align = 'center' ) {
+		$c = $cfg['colors'];
+
+		if ( 'light' === $style ) {
+			$bg    = PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.08 );
+			$color = $c['primary'];
+			$border = 'transparent';
+		} else {
+			$bg    = 'rgba(255,255,255,0.1)';
+			$color = 'rgba(255,255,255,0.8)';
+			$border = 'rgba(255,255,255,0.15)';
+		}
+
+		$html = '<span style="display:inline-block; padding:8px 20px; '
+			. 'background:' . $bg . '; border:1px solid ' . $border . '; '
+			. 'border-radius:50px; font-size:13px; color:' . $color . '; '
+			. 'font-weight:600; letter-spacing:0.5px;">'
+			. $text . '</span>';
+
+		return self::text_w( $cfg, $html, $align, null, 13 );
 	}
 
 	/**
@@ -230,11 +267,16 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Divider widget.
 	 */
-	public static function divider_w( $color = 'rgba(0,0,0,0.08)' ) {
-		return PressGo_Element_Factory::widget( 'divider', array(
+	public static function divider_w( $color = 'rgba(0,0,0,0.08)', $width = 100, $align = 'center' ) {
+		$s = array(
 			'color'  => $color,
 			'weight' => array( 'unit' => 'px', 'size' => 1, 'sizes' => array() ),
-		) );
+		);
+		if ( $width < 100 ) {
+			$s['width'] = array( 'unit' => '%', 'size' => $width, 'sizes' => array() );
+			$s['align']  = $align;
+		}
+		return PressGo_Element_Factory::widget( 'divider', $s );
 	}
 
 	/**
@@ -273,10 +315,12 @@ class PressGo_Widget_Helpers {
 			'title_typography_font_family'     => $fonts['heading'],
 			'title_typography_font_weight'     => '700',
 			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
+			'title_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 18, 'sizes' => array() ),
 			'title_typography_line_height'     => array( 'unit' => 'em', 'size' => 1.3, 'sizes' => array() ),
 			'description_typography_typography' => 'custom',
 			'description_typography_font_family' => $fonts['body'],
 			'description_typography_font_size' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'description_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'description_typography_line_height' => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 		);
 
@@ -313,9 +357,11 @@ class PressGo_Widget_Helpers {
 			'title_typography_font_family'     => $fonts['heading'],
 			'title_typography_font_weight'     => '700',
 			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
+			'title_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 18, 'sizes' => array() ),
 			'description_typography_typography' => 'custom',
 			'description_typography_font_family' => $fonts['body'],
 			'description_typography_font_size' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'description_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'description_typography_line_height' => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 		) );
 	}
@@ -477,6 +523,7 @@ class PressGo_Widget_Helpers {
 		$fonts = $cfg['fonts'];
 		$c     = $cfg['colors'];
 
+		$tab_size = max( 32, intdiv( $number_size * 7, 8 ) );
 		$mob_size = max( 28, intdiv( $number_size * 3, 4 ) );
 
 		$s = array(
@@ -493,6 +540,7 @@ class PressGo_Widget_Helpers {
 			'typography_font_family'         => $fonts['heading'],
 			'typography_font_weight'         => '800',
 			'typography_font_size'           => array( 'unit' => 'px', 'size' => $number_size, 'sizes' => array() ),
+			'typography_font_size_tablet'    => array( 'unit' => 'px', 'size' => $tab_size, 'sizes' => array() ),
 			'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => $mob_size, 'sizes' => array() ),
 			'typography_line_height'         => array( 'unit' => 'em', 'size' => 1.1, 'sizes' => array() ),
 			'title_typography_typography'     => 'custom',

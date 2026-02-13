@@ -69,6 +69,8 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
 | testimonials | `minimal` | `build_testimonials_minimal` | Centered quotes with dividers, no cards |
+| social_proof | _(default)_ | `build_social_proof` | Industry pill badges on light bg |
+| social_proof | `dark` | `build_social_proof_dark` | Industry pill badges on dark bg |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
 | stats | `dark` | `build_stats_dark` | Dark gradient bg with colored counters |
 | steps | _(default)_ | `build_steps` | Numbered circles on light bg cards |

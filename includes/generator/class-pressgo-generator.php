@@ -66,6 +66,7 @@ class PressGo_Generator {
 		'testimonials.minimal'          => 'build_testimonials_minimal',
 		'gallery.cards'                 => 'build_gallery_cards',
 		'logo_bar.dark'                 => 'build_logo_bar_dark',
+		'social_proof.dark'             => 'build_social_proof_dark',
 	);
 
 	/**
