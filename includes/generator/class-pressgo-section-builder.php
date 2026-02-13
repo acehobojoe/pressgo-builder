@@ -1399,6 +1399,7 @@ class PressGo_Section_Builder {
 								'typography_typography'        => 'custom',
 								'typography_font_family'       => $fonts['body'],
 								'typography_font_size'         => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+								'typography_font_size_mobile'  => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 								'typography_font_weight'       => '500',
 								'typography_line_height'       => array( 'unit' => 'em', 'size' => 1.6, 'sizes' => array() ),
 							) ),
@@ -1443,6 +1444,7 @@ class PressGo_Section_Builder {
 			'typography_typography'        => 'custom',
 			'typography_font_family'       => $fonts['body'],
 			'typography_font_size'         => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'typography_font_size_mobile'  => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'typography_font_weight'       => '500',
 			'typography_line_height'       => array( 'unit' => 'em', 'size' => 1.6, 'sizes' => array() ),
 		) );
@@ -1865,9 +1867,11 @@ class PressGo_Section_Builder {
 			'title_typography_font_family'     => $fonts['heading'],
 			'title_typography_font_weight'     => '600',
 			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 17, 'sizes' => array() ),
+			'title_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 			'content_typography_typography'     => 'custom',
 			'content_typography_font_family'   => $fonts['body'],
 			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 			'content_color'                    => $c['text_muted'],
 			'space_between'                    => 0,
@@ -1938,9 +1942,11 @@ class PressGo_Section_Builder {
 			'title_typography_font_family'     => $fonts['heading'],
 			'title_typography_font_weight'     => '600',
 			'title_typography_font_size'       => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'title_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 			'content_typography_typography'     => 'custom',
 			'content_typography_font_family'   => $fonts['body'],
 			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 			'content_color'                    => $c['text_muted'],
 			'space_between'                    => 0,
@@ -2256,12 +2262,13 @@ class PressGo_Section_Builder {
 				'typography_typography'        => 'custom',
 				'typography_font_family'       => $fonts['body'],
 				'typography_font_size'         => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+				'typography_font_size_mobile'  => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 				'typography_font_weight'       => '500',
 			) );
 
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 20 );
 
-			// CTA button.
+			// CTA button — full width on all screens.
 			$cta = isset( $plan['cta'] ) ? $plan['cta'] : array( 'text' => 'Get Started', 'url' => '#' );
 			if ( $highlighted ) {
 				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
@@ -2368,6 +2375,7 @@ class PressGo_Section_Builder {
 					'typography_typography'        => 'custom',
 					'typography_font_family'       => $fonts['body'],
 					'typography_font_size'         => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+					'typography_font_size_mobile'  => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
 					'typography_font_weight'       => '500',
 				) );
 			}

@@ -433,12 +433,14 @@ class PressGo_Widget_Helpers {
 			'content_typography_typography'     => 'custom',
 			'content_typography_font_family'   => $fonts['body'],
 			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 			'content_typography_font_style'    => 'italic',
 			'name_typography_typography'        => 'custom',
 			'name_typography_font_family'      => $fonts['heading'],
 			'name_typography_font_weight'      => '700',
 			'name_typography_font_size'        => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'name_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'job_typography_typography'         => 'custom',
 			'job_typography_font_family'       => $fonts['body'],
 			'job_typography_font_size'         => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
@@ -511,6 +513,7 @@ class PressGo_Widget_Helpers {
 			'title_typography_font_family'  => $fonts['body'],
 			'title_typography_font_weight'  => '600',
 			'title_typography_font_size'    => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'title_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
 		) );
 	}
 
