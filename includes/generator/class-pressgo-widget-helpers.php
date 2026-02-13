@@ -154,9 +154,15 @@ class PressGo_Widget_Helpers {
 	 * Spacer widget.
 	 */
 	public static function spacer_w( $px = 30 ) {
-		return PressGo_Element_Factory::widget( 'spacer', array(
+		$mob = max( 8, intdiv( $px * 2, 3 ) );
+		$s   = array(
 			'space' => array( 'unit' => 'px', 'size' => $px, 'sizes' => array() ),
-		) );
+		);
+		// Only add mobile override for spacers large enough to matter.
+		if ( $px >= 24 ) {
+			$s['space_mobile'] = array( 'unit' => 'px', 'size' => $mob, 'sizes' => array() );
+		}
+		return PressGo_Element_Factory::widget( 'spacer', $s );
 	}
 
 	/**
@@ -256,6 +262,7 @@ class PressGo_Widget_Helpers {
 			'icon_space'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
 			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 			'title_color'    => $c['text_dark'],
+			'title_color_hover' => $icon_color,
 			'description_color' => $c['text_muted'],
 			'title_typography_typography'       => 'custom',
 			'title_typography_font_family'     => $fonts['heading'],
@@ -295,6 +302,7 @@ class PressGo_Widget_Helpers {
 			'image_space'    => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
 			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 			'title_color'    => $c['text_dark'],
+			'title_color_hover' => $c['primary'],
 			'description_color' => $c['text_muted'],
 			'title_typography_typography'       => 'custom',
 			'title_typography_font_family'     => $fonts['heading'],

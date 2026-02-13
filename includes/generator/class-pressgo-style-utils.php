@@ -65,6 +65,11 @@ class PressGo_Style_Utils {
 			'border_color'                   => $c['border'],
 			'_box_shadow_box_shadow_type'    => 'yes',
 			'_box_shadow_box_shadow'         => $shadow,
+			'_box_shadow_box_shadow_hover_type' => 'yes',
+			'_box_shadow_box_shadow_hover'   => array(
+				'horizontal' => 0, 'vertical' => 8, 'blur' => 32,
+				'spread' => -4, 'color' => 'rgba(0,0,0,0.12)',
+			),
 		);
 	}
 
