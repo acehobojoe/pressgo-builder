@@ -1,7 +1,7 @@
 <?php
 /**
  * Core Elementor primitives: eid(), widget(), outer(), row(), col().
- * Uses legacy section/column layout for maximum compatibility.
+ * Uses flexbox container layout (Elementor 3.6+).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,21 +31,31 @@ class PressGo_Element_Factory {
 	}
 
 	/**
-	 * Top-level section wrapper. Wraps all children in a single 100% column.
+	 * Top-level container (replaces section + column wrapper).
 	 *
-	 * section (isInner=false)
-	 *   └─ column (_column_size=100)
-	 *        └─ ...children (widgets or inner sections)
+	 * container (direction: column, boxed content)
+	 *   ├─ widget
+	 *   └─ container (row)
+	 *        ├─ container (col)
+	 *        └─ container (col)
 	 */
 	public static function outer( $cfg, $children, $bg_color = null, $bg_gradient = null,
 								   $pad_top = 100, $pad_bot = 100, $extra = null ) {
-		$layout = $cfg['layout'];
-
 		$tab_top = (string) max( 50, intdiv( $pad_top * 3, 4 ) );
 		$tab_bot = (string) max( 50, intdiv( $pad_bot * 3, 4 ) );
 
 		$s = array(
-			'padding'        => array(
+			'container_type'   => 'flex',
+			'content_width'    => 'boxed',
+			'boxed_width'      => array(
+				'unit' => 'px', 'size' => $cfg['layout']['boxed_width'], 'sizes' => array(),
+			),
+			'flex_direction'   => 'column',
+			'flex_align_items' => 'stretch',
+			'flex_gap'         => array(
+				'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+			),
+			'padding'          => array(
 				'unit'     => 'px',
 				'top'      => (string) $pad_top,
 				'right'    => '30',
@@ -53,7 +63,7 @@ class PressGo_Element_Factory {
 				'left'     => '30',
 				'isLinked' => false,
 			),
-			'padding_tablet' => array(
+			'padding_tablet'   => array(
 				'unit'     => 'px',
 				'top'      => $tab_top,
 				'right'    => '24',
@@ -61,7 +71,7 @@ class PressGo_Element_Factory {
 				'left'     => '24',
 				'isLinked' => false,
 			),
-			'padding_mobile' => array(
+			'padding_mobile'   => array(
 				'unit'     => 'px',
 				'top'      => (string) max( 40, intdiv( $pad_top, 2 ) ),
 				'right'    => '20',
@@ -77,146 +87,145 @@ class PressGo_Element_Factory {
 		}
 
 		if ( $bg_gradient ) {
-			$angle                           = isset( $bg_gradient[2] ) ? $bg_gradient[2] : 135;
-			$s['background_background']      = 'gradient';
-			$s['background_color']           = $bg_gradient[0];
-			$s['background_color_b']         = $bg_gradient[1];
-			$s['background_color_stop']      = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
-			$s['background_color_b_stop']    = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
-			$s['background_gradient_angle']  = array( 'unit' => 'deg', 'size' => $angle, 'sizes' => array() );
-			$s['background_gradient_type']   = 'linear';
+			$angle                          = isset( $bg_gradient[2] ) ? $bg_gradient[2] : 135;
+			$s['background_background']     = 'gradient';
+			$s['background_color']          = $bg_gradient[0];
+			$s['background_color_b']        = $bg_gradient[1];
+			$s['background_color_stop']     = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
+			$s['background_color_b_stop']   = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+			$s['background_gradient_angle'] = array( 'unit' => 'deg', 'size' => $angle, 'sizes' => array() );
+			$s['background_gradient_type']  = 'linear';
 		}
 
 		if ( $extra ) {
-			// Strip flex-only settings that are invalid for legacy section/column layout.
-			unset(
-				$extra['flex_justify_content'],
-				$extra['flex_align_items'],
-				$extra['flex_direction'],
-				$extra['flex_wrap'],
-				$extra['flex_gap'],
-				$extra['content_width'],
-				$extra['_element_width']
-			);
 			$s = array_merge( $s, $extra );
 		}
 
-		// Wrap children: any child that is a section (from row()) stays as inner section.
-		// Widgets get placed directly in the column.
-		$column = array(
-			'id'       => self::eid(),
-			'elType'   => 'column',
-			'settings' => array(
-				'_column_size' => 100,
-				'_inline_size' => null,
-			),
-			'elements' => $children,
-			'isInner'  => false,
-		);
-
 		return array(
 			'id'       => self::eid(),
-			'elType'   => 'section',
+			'elType'   => 'container',
 			'settings' => $s,
-			'elements' => array( $column ),
+			'elements' => $children,
 			'isInner'  => false,
 		);
 	}
 
 	/**
-	 * Row = inner section with N columns. Auto-calculates column widths.
+	 * Row = inner container with N child containers. Auto-calculates widths.
 	 *
-	 * section (isInner=true)
-	 *   ├─ column (_column_size=X)
-	 *   ├─ column (_column_size=X)
-	 *   └─ column (_column_size=X)
+	 * container (direction: row, stacks on mobile)
+	 *   ├─ container (width: 50%)
+	 *   └─ container (width: 50%)
 	 */
 	public static function row( $cfg, $children, $gap = 24, $extra = null ) {
-		$n = count( $children );
-
-		// Calculate column size percentages
+		$n   = count( $children );
 		$pct = $n > 0 ? round( 100 / $n, 3 ) : 100;
 
-		// Ensure each child is a column
-		$columns = array();
+		$processed = array();
 		foreach ( $children as $ch ) {
-			if ( isset( $ch['elType'] ) && 'column' === $ch['elType'] ) {
-				// Already a column (from col()), set width
-				if ( ! isset( $ch['settings']['_inline_size'] ) || null === $ch['settings']['_inline_size'] ) {
-					$ch['settings']['_inline_size'] = $pct;
+			if ( isset( $ch['elType'] ) && 'container' === $ch['elType'] ) {
+				// Already a container from col() — set width if not explicitly set.
+				if ( ! isset( $ch['settings']['width'] ) ) {
+					$ch['settings']['width'] = array(
+						'unit' => '%', 'size' => $pct, 'sizes' => array(),
+					);
 				}
-				$ch['settings']['_column_size'] = round( $pct );
-				$ch['isInner'] = true;
-				$columns[] = $ch;
+				if ( ! isset( $ch['settings']['width_mobile'] ) ) {
+					$ch['settings']['width_mobile'] = array(
+						'unit' => '%', 'size' => 100, 'sizes' => array(),
+					);
+				}
+				$processed[] = $ch;
 			} else {
-				// It's a widget or something else — wrap in a column
-				$columns[] = array(
+				// Wrap bare widget in a container.
+				$processed[] = array(
 					'id'       => self::eid(),
-					'elType'   => 'column',
+					'elType'   => 'container',
 					'settings' => array(
-						'_column_size' => round( $pct ),
-						'_inline_size' => $pct,
+						'container_type' => 'flex',
+						'content_width'  => 'full',
+						'flex_direction' => 'column',
+						'flex_gap'       => array(
+							'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+						),
+						'width'          => array(
+							'unit' => '%', 'size' => $pct, 'sizes' => array(),
+						),
+						'width_mobile'   => array(
+							'unit' => '%', 'size' => 100, 'sizes' => array(),
+						),
 					),
 					'elements' => array( $ch ),
-					'isInner'  => true,
+					'isInner'  => false,
 				);
 			}
 		}
 
 		$tab_gap = max( 12, intdiv( $gap * 3, 4 ) );
 		$mob_gap = max( 10, intdiv( $gap, 2 ) );
+
 		$s = array(
-			'gap'                       => 'custom',
-			'gap_columns_custom'        => array( 'unit' => 'px', 'size' => $gap, 'sizes' => array() ),
-			'gap_columns_custom_tablet' => array( 'unit' => 'px', 'size' => $tab_gap, 'sizes' => array() ),
-			'gap_columns_custom_mobile' => array( 'unit' => 'px', 'size' => $mob_gap, 'sizes' => array() ),
+			'container_type'        => 'flex',
+			'content_width'         => 'full',
+			'flex_direction'        => 'row',
+			'flex_direction_mobile' => 'column',
+			'flex_wrap'             => 'wrap',
+			'flex_align_items'      => 'stretch',
+			'flex_gap'              => array(
+				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap,
+				'isLinked' => true,
+			),
+			'flex_gap_tablet'       => array(
+				'unit' => 'px', 'column' => (string) $tab_gap, 'row' => (string) $tab_gap,
+				'isLinked' => true,
+			),
+			'flex_gap_mobile'       => array(
+				'unit' => 'px', 'column' => (string) $mob_gap, 'row' => (string) $mob_gap,
+				'isLinked' => true,
+			),
 		);
 
 		if ( $extra ) {
-			// Strip flex-only settings that are invalid for legacy section/column layout.
-			unset(
-				$extra['flex_justify_content'],
-				$extra['flex_align_items'],
-				$extra['flex_direction'],
-				$extra['flex_wrap'],
-				$extra['flex_gap'],
-				$extra['content_width'],
-				$extra['_element_width']
-			);
 			$s = array_merge( $s, $extra );
 		}
 
 		return array(
 			'id'       => self::eid(),
-			'elType'   => 'section',
+			'elType'   => 'container',
 			'settings' => $s,
-			'elements' => $columns,
-			'isInner'  => true,
+			'elements' => $processed,
+			'isInner'  => false,
 		);
 	}
 
 	/**
-	 * Column element. Holds widgets.
+	 * Column container. Holds widgets vertically.
 	 */
 	public static function col( $widgets, $extra = null ) {
 		$s = array(
-			'_column_size' => 100,
-			'_inline_size' => null,
+			'container_type' => 'flex',
+			'content_width'  => 'full',
+			'flex_direction' => 'column',
+			'flex_gap'       => array(
+				'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+			),
 		);
 
 		if ( $extra ) {
-			// Translate container-style settings to column settings
 			$mapped = array();
 			foreach ( $extra as $key => $val ) {
-				// Map flex settings to column equivalents
-				if ( 'flex_align_items' === $key ) {
-					$mapped['vertical_align'] = self::map_flex_align( $val );
-				} elseif ( 'flex_align_self' === $key ) {
-					// Skip — not applicable to columns
-				} elseif ( '_element_width' === $key ) {
-					// Skip — use _column_size/_inline_size
-				} elseif ( 'content_width' === $key ) {
-					// Skip
+				if ( 'vertical_align' === $key ) {
+					// Map column vertical_align to flex justify_content.
+					$mapped['flex_justify_content'] = self::map_vertical_align( $val );
+				} elseif ( '_column_size' === $key ) {
+					// Skip — width is set by row().
+				} elseif ( '_inline_size' === $key ) {
+					// Map to container width.
+					if ( null !== $val ) {
+						$mapped['width'] = array(
+							'unit' => '%', 'size' => (float) $val, 'sizes' => array(),
+						);
+					}
 				} else {
 					$mapped[ $key ] = $val;
 				}
@@ -226,23 +235,22 @@ class PressGo_Element_Factory {
 
 		return array(
 			'id'       => self::eid(),
-			'elType'   => 'column',
+			'elType'   => 'container',
 			'settings' => $s,
 			'elements' => $widgets,
-			'isInner'  => true,
+			'isInner'  => false,
 		);
 	}
 
 	/**
-	 * Map flex alignment values to column vertical_align values.
+	 * Map column vertical_align to container flex justify_content.
 	 */
-	private static function map_flex_align( $flex_val ) {
+	private static function map_vertical_align( $va ) {
 		$map = array(
-			'flex-start' => 'top',
-			'center'     => 'middle',
-			'flex-end'   => 'bottom',
-			'stretch'    => 'top',
+			'top'    => 'flex-start',
+			'middle' => 'center',
+			'bottom' => 'flex-end',
 		);
-		return isset( $map[ $flex_val ] ) ? $map[ $flex_val ] : 'top';
+		return isset( $map[ $va ] ) ? $map[ $va ] : 'flex-start';
 	}
 }

@@ -36,17 +36,16 @@ Browser → admin-ajax (WordPress)
 - `PressGo_Section_Builder` — Section builders with layout variants
 - `PressGo_Generator` — Orchestrator with variant routing
 
-### Layout System: Legacy Section/Column
-Uses `section > column > widget` hierarchy (NOT container/flex). This is required for programmatic insertion via `update_post_meta`.
+### Layout System: Flexbox Containers
+Uses `container` elements with flexbox layout (Elementor 3.6+). All layout primitives are containers with different flex configurations.
 ```
-section (isInner=false)
-  └─ column (_column_size=100)
-       ├─ widget (heading, text-editor, button, image, etc.)
-       └─ section (isInner=true)  ← inner section = "row"
-            ├─ column (_column_size=50)
-            │    └─ widget
-            └─ column (_column_size=50)
-                 └─ widget
+container (direction: column, content_width: boxed)  ← outer()
+  ├─ widget (heading, text-editor, button, image, etc.)
+  └─ container (direction: row, stacks on mobile)    ← row()
+       ├─ container (width: 50%)                     ← col()
+       │    └─ widget
+       └─ container (width: 50%)                     ← col()
+            └─ widget
 ```
 
 ### Layout Variants
@@ -125,22 +124,22 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 - **Map height**: `google_map_w($height_mobile)` — auto-calculated as 5/8 desktop (min 200px)
 
 ## Critical Elementor Rules
-1. **Use section/column layout** — NOT container (`elType: 'container'` doesn't render via `update_post_meta`)
+1. **Use flexbox containers** — `elType: 'container'` with `container_type: 'flex'`. All primitives (outer/row/col) are containers.
 2. **NEVER use `_animation`** — causes `elementor-invisible` class, content disappears
 3. **Icon format must be** `array('value' => 'fas fa-name', 'library' => 'fa-solid')` — value MUST be string, never nested array
-4. **Strip flex settings** from section/row extras — `flex_justify_content`, `flex_align_items`, etc. are container-only
-5. **Don't set `layout: full_width`** on sections — breaks rendering
+4. **Container flex settings** — `outer()`: direction column + boxed content. `row()`: direction row + stacks on mobile. `col()`: direction column + width set by row.
+5. **Set `flex_gap: 0`** on outer/col containers — spacing is handled by spacer widgets, not flex gap
 6. **Flush caches** after page creation (`wp_elementor flush-css`)
 7. **Toggle widget (FAQ) is Free**, accordion is Pro-only
 8. **Posts widget requires Pro** — check `defined('ELEMENTOR_PRO_VERSION')`
-9. **Max nesting: 3 levels** — section → column → inner-section → column → widget
+9. **Container nesting is unlimited** — containers can nest freely (no 3-level limit like sections)
 10. **Elementor data storage** — `update_post_meta($id, '_elementor_data', wp_slash(wp_json_encode($elements)))`
 
 ## Image Support
 - `image_w($url, $alt, $width, $radius, $shadow, $align)` creates Elementor image widgets
 - Images referenced by URL (from Pexels/Unsplash) — no upload needed
 - Image widget key format: `'image' => array('url' => $url, 'id' => '', 'alt' => $alt)`
-- Background images on sections: set `background_image`, `background_position`, `background_size` in section settings
+- Background images on containers: set `background_image`, `background_position`, `background_size` in container settings
 
 ## Brain / Knowledge Base
 - Located at `/opt/pressgo-ops/brain.json` on the server
