@@ -42,12 +42,12 @@ class PressGo_Prompt_Builder {
 		) );
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'prompt_fetch_error', 'Could not fetch system prompt: ' . $response->get_error_message() );
+			return new WP_Error( 'prompt_fetch_error', 'Could not connect to PressGo config server (wp.pressgo.app). Your hosting may block outgoing HTTPS requests. Error: ' . $response->get_error_message() );
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		if ( $status >= 400 ) {
-			return new WP_Error( 'prompt_fetch_error', 'Prompt server returned HTTP ' . $status );
+			return new WP_Error( 'prompt_fetch_error', 'PressGo config server returned HTTP ' . $status . '. Please try again or contact support.' );
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );

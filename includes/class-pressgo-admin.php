@@ -95,15 +95,17 @@ class PressGo_Admin {
 	public function render_model_field() {
 		$value = get_option( 'pressgo_model', 'claude-sonnet-4-5-20250929' );
 		$models = array(
-			'claude-sonnet-4-5-20250929' => 'Claude Sonnet 4.5 (Recommended)',
-			'claude-opus-4-6'            => 'Claude Opus 4.6 (Most capable)',
-			'claude-haiku-4-5-20251001'  => 'Claude Haiku 4.5 (Fastest)',
+			'claude-sonnet-4-5-20250929'  => 'Claude Sonnet 4.5 (Recommended)',
+			'claude-opus-4-6'             => 'Claude Opus 4.6 (Most capable)',
+			'claude-haiku-4-5-20251001'   => 'Claude Haiku 4.5 (Fastest)',
+			'claude-3-5-sonnet-20241022'  => 'Claude 3.5 Sonnet (Older, widely available)',
 		);
 		echo '<select id="pressgo_model" name="pressgo_model">';
 		foreach ( $models as $id => $label ) {
 			echo '<option value="' . esc_attr( $id ) . '"' . selected( $value, $id, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select>';
+		echo '<p class="description">If you get API errors, try switching to a different model.</p>';
 	}
 
 	public function enqueue_assets( $hook ) {

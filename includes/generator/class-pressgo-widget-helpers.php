@@ -326,7 +326,9 @@ class PressGo_Widget_Helpers {
 
 		if ( in_array( $view, array( 'stacked', 'framed' ), true ) ) {
 			$s['shape'] = $shape;
-			$s['secondary_color'] = $secondary_color;
+			// For stacked/framed: primary = background shape, secondary = icon glyph.
+			$s['primary_color']   = $secondary_color;
+			$s['secondary_color'] = $icon_color;
 		}
 
 		return PressGo_Element_Factory::widget( 'icon-box', $s );

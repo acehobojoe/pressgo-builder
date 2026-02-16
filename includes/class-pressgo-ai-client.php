@@ -53,6 +53,7 @@ class PressGo_AI_Client {
 		}
 
 		$accumulated_text = '';
+		$raw_response     = '';
 		$current_phase    = 'analyzing';
 		$sections_found   = array();
 
@@ -71,7 +72,10 @@ class PressGo_AI_Client {
 			CURLOPT_RETURNTRANSFER => false,
 			CURLOPT_TIMEOUT        => 120,
 			CURLOPT_CONNECTTIMEOUT => 10,
-			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$current_phase, &$sections_found, $callback ) {
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback ) {
+				// Always capture raw response for error handling.
+				$raw_response .= $data;
+
 				$lines = explode( "\n", $data );
 				foreach ( $lines as $line ) {
 					$line = trim( $line );
@@ -123,15 +127,27 @@ class PressGo_AI_Client {
 		// phpcs:enable WordPress.WP.AlternativeFunctions
 
 		if ( false === $result && $curl_err ) {
-			return new WP_Error( 'curl_error', 'Connection failed: ' . $curl_err );
+			return new WP_Error( 'curl_error', 'Could not connect to Claude API (api.anthropic.com). Error: ' . $curl_err );
 		}
 
 		if ( $http_code >= 400 ) {
-			// Try to parse error from accumulated text.
-			$error_data = json_decode( $accumulated_text, true );
-			$error_msg  = 'API error (HTTP ' . $http_code . ')';
+			// Parse error from raw response (non-SSE error bodies aren't captured by the stream parser).
+			$error_data = json_decode( $raw_response, true );
+			$error_msg  = '';
 			if ( $error_data && isset( $error_data['error']['message'] ) ) {
 				$error_msg = $error_data['error']['message'];
+			}
+			if ( empty( $error_msg ) ) {
+				$error_msg = 'API error (HTTP ' . $http_code . ')';
+			}
+			if ( 401 === $http_code ) {
+				$error_msg .= ' — Please check your API key in PressGo Settings.';
+			} elseif ( 429 === $http_code ) {
+				$error_msg .= ' — Rate limited. Please wait a moment and try again.';
+			} elseif ( 403 === $http_code ) {
+				$error_msg .= ' — Your API key may not have access to this model. Try switching to a different model in PressGo Settings.';
+			} elseif ( 400 === $http_code ) {
+				$error_msg .= ' — The request was rejected. Try switching to a different model in PressGo Settings, or contact support.';
 			}
 			return new WP_Error( 'api_error', $error_msg );
 		}

@@ -32,7 +32,7 @@ $fitness_config = array(
     'fonts' => array( 'heading' => 'Poppins', 'body' => 'Inter' ),
     'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10,
         'card_shadow' => array( 'horizontal' => 0, 'vertical' => 2, 'blur' => 16, 'spread' => 0, 'color' => 'rgba(0,0,0,0.06)' ) ),
-    'sections' => array( 'hero', 'stats', 'features', 'steps', 'team', 'testimonials', 'faq', 'newsletter', 'cta_final', 'footer' ),
+    'sections' => array( 'hero', 'stats', 'features', 'steps', 'testimonials', 'pricing', 'faq', 'cta_final', 'footer' ),
     'hero' => array(
         'variant' => 'gradient',
         'badge' => 'New Year, New You — 50% Off First Month',
@@ -50,12 +50,27 @@ $fitness_config = array(
         array( 'icon' => array( 'value' => 'fas fa-star', 'library' => 'fa-solid' ), 'value' => '4.9', 'label' => 'Google Rating' ),
     ),
     'features' => array(
-        'variant' => 'minimal',
         'eyebrow' => 'WHY CHOOSE US', 'headline' => 'Everything You Need Under One Roof',
+        'subheadline' => 'State-of-the-art equipment and personalized coaching designed to push your limits.',
         'items' => array(
             array( 'icon' => array( 'value' => 'fas fa-heartbeat', 'library' => 'fa-solid' ), 'title' => 'Personal Training', 'desc' => 'One-on-one sessions with certified trainers who build custom programs around your goals, schedule, and fitness level.', 'accent' => '#FF6B35' ),
             array( 'icon' => array( 'value' => 'fas fa-users', 'library' => 'fa-solid' ), 'title' => 'Group Classes', 'desc' => 'From HIIT to yoga, spin to boxing — 85+ weekly classes designed to challenge and motivate you.', 'accent' => '#10B981' ),
             array( 'icon' => array( 'value' => 'fas fa-apple-alt', 'library' => 'fa-solid' ), 'title' => 'Nutrition Coaching', 'desc' => 'Work with our dietitians to create sustainable meal plans that fuel your workouts and accelerate results.', 'accent' => '#6366F1' ),
+        ),
+    ),
+    'pricing' => array(
+        'eyebrow' => 'MEMBERSHIP', 'headline' => 'Find Your Perfect Plan',
+        'subheadline' => 'Flexible pricing that fits your goals and budget. Cancel anytime.',
+        'plans' => array(
+            array( 'name' => 'Basic', 'price' => '$49', 'period' => '/month', 'description' => 'Perfect for getting started.',
+                'features' => array( 'Unlimited group classes', 'Locker room access', 'Fitness assessment', 'Mobile app access' ),
+                'cta' => array( 'text' => 'Get Started', 'url' => '#' ), 'highlighted' => false ),
+            array( 'name' => 'Pro', 'price' => '$89', 'period' => '/month', 'description' => 'Most popular for serious results.', 'badge' => 'Most Popular',
+                'features' => array( 'Everything in Basic', '4 personal training sessions', 'Nutrition coaching', 'Priority class booking', 'Towel service' ),
+                'cta' => array( 'text' => 'Start Free Trial', 'url' => '#' ), 'highlighted' => true ),
+            array( 'name' => 'Elite', 'price' => '$149', 'period' => '/month', 'description' => 'The ultimate fitness experience.',
+                'features' => array( 'Everything in Pro', 'Unlimited personal training', 'Recovery suite access', 'Guest passes', 'VIP events' ),
+                'cta' => array( 'text' => 'Get Started', 'url' => '#' ), 'highlighted' => false ),
         ),
     ),
     'steps' => array(

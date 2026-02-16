@@ -11,6 +11,62 @@ class PressGo_Rest_API {
 
 	public function init() {
 		add_action( 'wp_ajax_pressgo_generate_stream', array( $this, 'handle_stream' ) );
+		add_action( 'wp_ajax_pressgo_test_connection', array( $this, 'handle_test_connection' ) );
+	}
+
+	/**
+	 * Test connectivity to prompt server and Claude API.
+	 */
+	public function handle_test_connection() {
+		check_ajax_referer( 'pressgo_test', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized.' ) );
+		}
+
+		$results = array();
+
+		// Step 1: Test prompt server.
+		$prompt = PressGo_Prompt_Builder::build_system_prompt();
+		if ( is_wp_error( $prompt ) ) {
+			wp_send_json_error( array( 'message' => 'PressGo config server: ' . $prompt->get_error_message() ) );
+		}
+		$results[] = 'Config server OK';
+
+		// Step 2: Test Claude API key with minimal request.
+		$api_key = PressGo_Admin::get_api_key();
+		if ( empty( $api_key ) ) {
+			wp_send_json_error( array( 'message' => 'Config server OK, but no Claude API key configured.' ) );
+		}
+
+		$response = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+			'timeout' => 15,
+			'headers' => array(
+				'Content-Type'      => 'application/json',
+				'x-api-key'         => $api_key,
+				'anthropic-version' => '2023-06-01',
+			),
+			'body'    => wp_json_encode( array(
+				'model'      => PressGo_Admin::get_model(),
+				'max_tokens' => 5,
+				'messages'   => array(
+					array( 'role' => 'user', 'content' => 'Reply with just the word OK.' ),
+				),
+			) ),
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( array( 'message' => 'Config server OK. Claude API connection failed: ' . $response->get_error_message() ) );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		if ( $status >= 400 ) {
+			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$msg  = isset( $body['error']['message'] ) ? $body['error']['message'] : 'HTTP ' . $status;
+			wp_send_json_error( array( 'message' => 'Config server OK. Claude API error: ' . $msg ) );
+		}
+
+		wp_send_json_success( array( 'message' => 'All connections OK! Config server and Claude API are working.' ) );
 	}
 
 	/**

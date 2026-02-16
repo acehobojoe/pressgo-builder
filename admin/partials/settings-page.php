@@ -14,6 +14,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 		?>
 	</form>
 
+	<div class="pressgo-settings-test" style="margin-top: 20px;">
+		<h3>Connection Test</h3>
+		<p>Verify your API key and server connectivity.</p>
+		<button type="button" id="pressgo-test-connection" class="button button-secondary">Test Connection</button>
+		<span id="pressgo-test-result" style="margin-left: 12px;"></span>
+	</div>
+	<script>
+	document.getElementById('pressgo-test-connection').addEventListener('click', function() {
+		var btn = this;
+		var result = document.getElementById('pressgo-test-result');
+		btn.disabled = true;
+		btn.textContent = 'Testing...';
+		result.innerHTML = '';
+		fetch(ajaxurl + '?action=pressgo_test_connection&nonce=<?php echo esc_js( wp_create_nonce( 'pressgo_test' ) ); ?>')
+			.then(function(r) { return r.json(); })
+			.then(function(data) {
+				if (data.success) {
+					result.innerHTML = '<span style="color:#00a32a;">&#10003; ' + data.data.message + '</span>';
+				} else {
+					result.innerHTML = '<span style="color:#d63638;">&#10007; ' + data.data.message + '</span>';
+				}
+			})
+			.catch(function(err) {
+				result.innerHTML = '<span style="color:#d63638;">&#10007; Request failed: ' + err.message + '</span>';
+			})
+			.finally(function() {
+				btn.disabled = false;
+				btn.textContent = 'Test Connection';
+			});
+	});
+	</script>
+
 	<div class="pressgo-settings-info">
 		<h3>About PressGo</h3>
 		<p>PressGo uses Claude AI to generate professional Elementor landing pages from text descriptions or screenshots.</p>
