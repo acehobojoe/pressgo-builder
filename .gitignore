@@ -17,5 +17,12 @@ Thumbs.db
 # Screenshots (generated, large)
 test/screenshots/
 
+# Prompt engineering / IP
+brain.json
+brain-widget-schemas.json
+config-schema.json
+includes/prompts/system-prompt.txt
+includes/prompts/config-schema.json
+
 # Environment
 .env
