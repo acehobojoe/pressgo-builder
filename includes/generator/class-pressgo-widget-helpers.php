@@ -390,11 +390,20 @@ class PressGo_Widget_Helpers {
 										   $align = 'center', $spacing = 10 ) {
 		$icon_list = array();
 		foreach ( $icons as $item ) {
+			// Support both 'icon' key and 'social_icon' key (Elementor native format).
+			$icon_value = null;
+			if ( isset( $item['social_icon'] ) ) {
+				$icon_value = is_array( $item['social_icon'] ) ? $item['social_icon'] : array( 'value' => $item['social_icon'], 'library' => 'fa-brands' );
+			} elseif ( isset( $item['icon'] ) ) {
+				$icon_value = is_array( $item['icon'] ) ? $item['icon'] : array( 'value' => $item['icon'], 'library' => 'fa-brands' );
+			} else {
+				continue; // Skip items without any icon.
+			}
+			$link_data = isset( $item['link'] ) ? $item['link'] : array();
+			$link_url  = is_array( $link_data ) && isset( $link_data['url'] ) ? $link_data['url'] : ( isset( $item['url'] ) ? $item['url'] : '#' );
 			$icon_list[] = array(
-				'social_icon'     => is_array( $item['icon'] )
-					? $item['icon']
-					: array( 'value' => $item['icon'], 'library' => 'fa-brands' ),
-				'link'            => array( 'url' => isset( $item['url'] ) ? $item['url'] : '#', 'is_external' => true ),
+				'social_icon'     => $icon_value,
+				'link'            => array( 'url' => $link_url, 'is_external' => true ),
 				'item_icon_color' => isset( $item['color'] ) ? $item['color'] : '',
 				'_id'             => PressGo_Element_Factory::eid(),
 			);
