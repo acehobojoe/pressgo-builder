@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, generator
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -123,6 +123,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 1.2.0 =
+* Added automatic update notifications via GitHub releases — future updates appear on the Plugins page
+
 = 1.1.0 =
 * Direct Anthropic API integration — uses your own Claude API key
 * Added 7 new section types: pricing, team, gallery, newsletter, logo bar, map, footer
@@ -137,6 +140,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Adds automatic update notifications — you'll receive future updates directly on the WordPress Plugins page.
 
 = 1.1.0 =
 Major update: direct Claude API integration (bring your own key), 7 new section types, 48 layout variants, and model selection.
