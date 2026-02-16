@@ -11,6 +11,7 @@
 	let promptInput, generateBtn, workspace, activityLog, sectionPreview;
 	let resultActions, editLink, viewLink, newBtn;
 	let imageInput, imageName, imageClear, pageTitleInput;
+	let emptyState;
 	let imageData = null;
 	let imageType = null;
 	let isGenerating = false;
@@ -27,6 +28,13 @@
 		testimonials: 'Testimonials',
 		faq: 'FAQ',
 		blog: 'Blog',
+		pricing: 'Pricing',
+		logo_bar: 'Logo Bar',
+		team: 'Team',
+		gallery: 'Gallery',
+		newsletter: 'Newsletter',
+		map: 'Map',
+		footer: 'Footer',
 		cta_final: 'Final CTA',
 		disclaimer: 'Disclaimer',
 		colors: 'Color Palette',
@@ -44,8 +52,15 @@
 		results: '#0a0f1e',
 		competitive_edge: '#f7f8fc',
 		testimonials: '#ffffff',
+		pricing: '#1E293B',
 		faq: '#f7f8fc',
 		blog: '#ffffff',
+		logo_bar: '#f7f8fc',
+		team: '#ffffff',
+		gallery: '#f7f8fc',
+		newsletter: '#0043B3',
+		map: '#ffffff',
+		footer: '#1a1a2e',
 		cta_final: '#0043B3',
 		disclaimer: '#ffffff',
 	};
@@ -64,6 +79,7 @@
 		imageName = $('#pressgo-image-name');
 		imageClear = $('#pressgo-image-clear');
 		pageTitleInput = $('#pressgo-page-title');
+		emptyState = $('#pressgo-empty-state');
 
 		if (!generateBtn) return;
 
@@ -77,6 +93,16 @@
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
 				startGeneration();
 			}
+		});
+
+		// Example prompt chips.
+		var chips = $$('.pressgo-example-chip');
+		chips.forEach(function (chip) {
+			chip.addEventListener('click', function () {
+				promptInput.value = chip.getAttribute('data-prompt');
+				promptInput.focus();
+				promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			});
 		});
 	}
 
@@ -124,7 +150,8 @@
 		if (isGenerating) return;
 		isGenerating = true;
 
-		// Show workspace, reset.
+		// Show workspace, hide empty state.
+		if (emptyState) emptyState.style.display = 'none';
 		workspace.style.display = 'block';
 		activityLog.innerHTML = '';
 		sectionPreview.innerHTML = '';
@@ -353,6 +380,7 @@
 
 	function resetUI() {
 		workspace.style.display = 'none';
+		if (emptyState) emptyState.style.display = '';
 		activityLog.innerHTML = '';
 		sectionPreview.innerHTML = '';
 		resultActions.style.display = 'none';

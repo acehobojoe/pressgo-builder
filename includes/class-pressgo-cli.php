@@ -17,7 +17,7 @@ class PressGo_CLI {
 	/**
 	 * Generate an Elementor page with full terminal output.
 	 *
-	 * Streams SSE events from server.pressgo.app and prints every step:
+	 * Streams from the Claude API and prints every step:
 	 * thinking, progress, section design, config, validation, Elementor build.
 	 *
 	 * ## OPTIONS
@@ -86,10 +86,10 @@ class PressGo_CLI {
 
 		$api_key = PressGo_Admin::get_api_key();
 		if ( empty( $api_key ) ) {
-			WP_CLI::error( 'PressGo API key not configured. Set it in WP admin → PressGo Settings.' );
+			WP_CLI::error( 'Claude API key not configured. Set it in WP admin → PressGo Settings.' );
 		}
 
-		$this->log( 'mode', 'Streaming from server.pressgo.app' );
+		$this->log( 'mode', 'Streaming from Claude API' );
 		$this->log( 'prompt', $prompt );
 		$this->separator();
 

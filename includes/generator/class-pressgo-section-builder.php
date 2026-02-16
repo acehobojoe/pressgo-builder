@@ -14,6 +14,43 @@ class PressGo_Section_Builder {
 	private static function w() { return 'PressGo_Widget_Helpers'; }
 	private static function s() { return 'PressGo_Style_Utils'; }
 
+	/**
+	 * Pill-shaped button widget for tags/badges (social proof, etc.).
+	 * Uses native Elementor button so each pill is editable without touching HTML.
+	 */
+	private static function pill_button( $cfg, $text, $bg, $text_color, $border_color ) {
+		$fonts = $cfg['fonts'];
+
+		return PressGo_Element_Factory::widget( 'button', array(
+			'text'                     => $text,
+			'link'                     => array( 'url' => '', 'is_external' => false, 'nofollow' => false ),
+			'size'                     => 'xs',
+			'align'                    => 'center',
+			'background_color'         => $bg,
+			'button_text_color'        => $text_color,
+			'button_background_hover_color' => $bg,
+			'hover_color'              => $text_color,
+			'typography_typography'     => 'custom',
+			'typography_font_family'   => $fonts['body'],
+			'typography_font_weight'   => '500',
+			'typography_font_size'     => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+			'border_radius'            => array(
+				'unit' => 'px', 'top' => '24', 'right' => '24',
+				'bottom' => '24', 'left' => '24', 'isLinked' => true,
+			),
+			'text_padding'             => array(
+				'unit' => 'px', 'top' => '8', 'right' => '18',
+				'bottom' => '8', 'left' => '18', 'isLinked' => false,
+			),
+			'border_border'            => 'solid',
+			'border_width'             => array(
+				'unit' => 'px', 'top' => '1', 'right' => '1',
+				'bottom' => '1', 'left' => '1', 'isLinked' => true,
+			),
+			'border_color'             => $border_color,
+		) );
+	}
+
 	// ──────────────────────────────────────────────
 	// 1. Hero
 	// ──────────────────────────────────────────────
@@ -742,25 +779,24 @@ class PressGo_Section_Builder {
 		$categories = isset( $sp['categories'] ) ? $sp['categories'] : array();
 		$headline   = isset( $sp['headline'] ) ? $sp['headline'] : 'Trusted by businesses in 50+ industries';
 
-		$pill_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B', '#10B981', '#EF4444' );
-
-		$pills = array();
-		foreach ( $categories as $idx => $cat ) {
-			$dot_color = $pill_colors[ $idx % count( $pill_colors ) ];
-			$pills[] = '<span style="display:inline-flex; align-items:center; gap:6px; padding:8px 18px; margin:4px; '
-				. 'background:' . $c['white'] . '; border-radius:24px; font-size:13px; '
-				. 'color:' . $c['text_dark'] . '; font-weight:500; '
-				. 'border:1px solid ' . $c['border'] . ';">'
-				. '<span style="width:8px; height:8px; border-radius:50%; background:' . $dot_color . '; flex-shrink:0;"></span>'
-				. esc_html( $cat ) . '</span>';
-		}
-		$pills_html = implode( ' ', $pills );
-
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $headline, 'h6', 'center', $c['text_muted'], 13, '500' ),
 			PressGo_Widget_Helpers::spacer_w( 16 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $pills_html, 'center', null, 13 ),
 		);
+
+		// Build pill buttons in rows (max 4 per row for clean layout).
+		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
+		$chunks  = array_chunk( $categories, $per_row );
+		foreach ( $chunks as $chunk ) {
+			$cols = array();
+			foreach ( $chunk as $cat ) {
+				$cols[] = PressGo_Element_Factory::col(
+					array( self::pill_button( $cfg, $cat, $c['white'], $c['text_dark'], $c['border'] ) ),
+					array( 'vertical_align' => 'middle' )
+				);
+			}
+			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8 );
+		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 24 );
 	}
@@ -779,25 +815,24 @@ class PressGo_Section_Builder {
 		$categories = isset( $sp['categories'] ) ? $sp['categories'] : array();
 		$headline   = isset( $sp['headline'] ) ? $sp['headline'] : 'Trusted by businesses in 50+ industries';
 
-		$pill_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B', '#10B981', '#EF4444' );
-
-		$pills = array();
-		foreach ( $categories as $idx => $cat ) {
-			$dot_color = $pill_colors[ $idx % count( $pill_colors ) ];
-			$pills[] = '<span style="display:inline-flex; align-items:center; gap:6px; padding:8px 18px; margin:4px; '
-				. 'background:rgba(255,255,255,0.06); border-radius:24px; font-size:13px; '
-				. 'color:rgba(255,255,255,0.85); font-weight:500; '
-				. 'border:1px solid rgba(255,255,255,0.1);">'
-				. '<span style="width:8px; height:8px; border-radius:50%; background:' . $dot_color . '; flex-shrink:0;"></span>'
-				. esc_html( $cat ) . '</span>';
-		}
-		$pills_html = implode( ' ', $pills );
-
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $headline, 'h6', 'center', 'rgba(255,255,255,0.5)', 13, '500' ),
 			PressGo_Widget_Helpers::spacer_w( 16 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $pills_html, 'center', null, 13 ),
 		);
+
+		// Build pill buttons in rows (max 4 per row for clean layout).
+		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
+		$chunks  = array_chunk( $categories, $per_row );
+		foreach ( $chunks as $chunk ) {
+			$cols = array();
+			foreach ( $chunk as $cat ) {
+				$cols[] = PressGo_Element_Factory::col(
+					array( self::pill_button( $cfg, $cat, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.1)' ) ),
+					array( 'vertical_align' => 'middle' )
+				);
+			}
+			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8 );
+		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['dark_bg'], null, 0, 24 );
 	}
@@ -1572,7 +1607,6 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$t = $cfg['testimonials'];
 
-		$avatar_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B' );
 		$testimonial_cols = array();
 		foreach ( $t['items'] as $idx => $item ) {
 			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
@@ -1583,37 +1617,14 @@ class PressGo_Section_Builder {
 			);
 			$style['border_color'] = $c['primary'];
 
-			// Build avatar — use photo if available, otherwise colored initial.
-			$initial      = strtoupper( substr( $item['name'], 0, 1 ) );
-			$avatar_color = $avatar_colors[ $idx % count( $avatar_colors ) ];
-
-			if ( ! empty( $item['photo'] ) ) {
-				$avatar_part = '<img src="' . esc_url( $item['photo'] ) . '" alt="' . esc_attr( $item['name'] ) . '" '
-					. 'style="width:40px; height:40px; border-radius:50%; object-fit:cover;">';
-			} else {
-				$avatar_part = '<span style="display:inline-flex; align-items:center; justify-content:center; '
-					. 'width:40px; height:40px; border-radius:50%; '
-					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
-					. 'color:' . $avatar_color . '; font-weight:700; font-size:16px;">'
-					. $initial . '</span>';
-			}
-			$avatar_html  = '<div style="display:inline-flex; align-items:center; gap:12px;">'
-				. $avatar_part
-				. '<div><strong style="color:' . $c['text_dark'] . '; font-size:15px;">' . $item['name'] . '</strong>'
-				. '<br><span style="color:' . $c['text_muted'] . '; font-size:13px;">' . $item['role'] . '</span></div>'
-				. '</div>';
+			$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
 
 			$testimonial_cols[] = PressGo_Element_Factory::col(
 				array(
 					PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'left' ),
 					PressGo_Widget_Helpers::spacer_w( 12 ),
-					PressGo_Widget_Helpers::text_w( $cfg,
-						'<em style="line-height: 1.7;">&ldquo;' . $item['quote'] . '&rdquo;</em>',
-						'left', $c['text_dark'], 15 ),
-					PressGo_Widget_Helpers::spacer_w( 16 ),
-					PressGo_Widget_Helpers::divider_w(),
-					PressGo_Widget_Helpers::spacer_w( 12 ),
-					PressGo_Widget_Helpers::text_w( $cfg, $avatar_html, 'left', null, 15 ),
+					PressGo_Widget_Helpers::testimonial_w( $cfg, $item['quote'],
+						$item['name'], $item['role'], $image_url, 'left' ),
 				),
 				$style
 			);
@@ -1659,16 +1670,14 @@ class PressGo_Section_Builder {
 		$children = array_merge( $children, $header );
 
 		// Large quote mark.
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-			'<span style="font-size:80px; line-height:1; color:'
-			. PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.15 ) . '; font-family:Georgia,serif;">&ldquo;</span>',
-			'center', null, 80 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, "\xe2\x80\x9c", 'h2', 'center',
+			PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.15 ), 80, '400',
+			null, 1.0, null, null, null );
 
-		// Quote text — large and centered.
+		// Quote text — large and centered, italic via <em>.
 		$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-			'<em style="font-size:22px; line-height:1.8; color:' . $c['text_dark'] . ';">'
-			. $featured['quote'] . '</em>',
-			'center', $c['text_dark'], 22 );
+			'<em>' . $featured['quote'] . '</em>',
+			'center', $c['text_dark'], 22, 18, 1.8 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
 
 		// Stars.
@@ -1687,31 +1696,18 @@ class PressGo_Section_Builder {
 		} );
 		if ( count( $remaining ) > 0 ) {
 			$mini_cols = array();
-			$avatar_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B' );
 			foreach ( array_values( $remaining ) as $idx => $item ) {
-				$initial      = strtoupper( substr( $item['name'], 0, 1 ) );
-				$avatar_color = $avatar_colors[ $idx % count( $avatar_colors ) ];
+				$truncated = strlen( $item['quote'] ) > 100
+					? substr( $item['quote'], 0, 100 ) . '...'
+					: $item['quote'];
+				$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
 
 				$mini_cols[] = PressGo_Element_Factory::col(
 					array(
 						PressGo_Widget_Helpers::star_rating_w( 5, 12, $c['gold'], 'left' ),
 						PressGo_Widget_Helpers::spacer_w( 8 ),
-						PressGo_Widget_Helpers::text_w( $cfg,
-							'<em>&ldquo;' . ( strlen( $item['quote'] ) > 100
-								? substr( $item['quote'], 0, 100 ) . '...'
-								: $item['quote'] ) . '&rdquo;</em>',
-							'left', $c['text_muted'], 14 ),
-						PressGo_Widget_Helpers::spacer_w( 12 ),
-						PressGo_Widget_Helpers::text_w( $cfg,
-							'<div style="display:inline-flex; align-items:center; gap:8px;">'
-							. '<span style="display:inline-flex; align-items:center; justify-content:center; '
-							. 'width:32px; height:32px; border-radius:50%; '
-							. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
-							. 'color:' . $avatar_color . '; font-weight:700; font-size:13px;">'
-							. $initial . '</span>'
-							. '<strong style="font-size:13px; color:' . $c['text_dark'] . ';">' . $item['name'] . '</strong>'
-							. '</div>',
-							'left', null, 13 ),
+						PressGo_Widget_Helpers::testimonial_w( $cfg, $truncated,
+							$item['name'], $item['role'], $image_url, 'left' ),
 					),
 					PressGo_Style_Utils::card_style( $cfg, 24 )
 				);
@@ -1740,40 +1736,14 @@ class PressGo_Section_Builder {
 		$rows     = array();
 		$row_cols = array();
 		foreach ( $items as $idx => $item ) {
+			$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
+
 			$card_widgets = array(
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
 				PressGo_Widget_Helpers::spacer_w( 12 ),
-				PressGo_Widget_Helpers::text_w( $cfg,
-					'<em>&ldquo;' . $item['quote'] . '&rdquo;</em>',
-					'left', $c['text_dark'], 15 ),
-				PressGo_Widget_Helpers::spacer_w( 16 ),
+				PressGo_Widget_Helpers::testimonial_w( $cfg, $item['quote'],
+					$item['name'], $item['role'], $image_url, 'left' ),
 			);
-
-			// Author with photo or colored initial avatar.
-			$avatar_colors = array( $c['primary'], $c['accent'], '#8B5CF6', '#EC4899', '#06B6D4', '#F59E0B' );
-			$initial       = strtoupper( substr( $item['name'], 0, 1 ) );
-			$avatar_color  = $avatar_colors[ $idx % count( $avatar_colors ) ];
-
-			if ( ! empty( $item['photo'] ) ) {
-				$avatar_part = '<img src="' . esc_url( $item['photo'] ) . '" alt="' . esc_attr( $item['name'] ) . '" '
-					. 'style="width:36px; height:36px; border-radius:50%; object-fit:cover;">';
-			} else {
-				$avatar_part = '<span style="display:inline-flex; align-items:center; justify-content:center; '
-					. 'width:36px; height:36px; border-radius:50%; '
-					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $avatar_color, 0.12 ) . '; '
-					. 'color:' . $avatar_color . '; font-weight:700; font-size:14px;">'
-					. $initial . '</span>';
-			}
-
-			$card_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<div style="display:inline-flex; align-items:center; gap:10px;">'
-				. $avatar_part
-				. '<div>'
-				. '<strong style="font-size:14px; color:' . $c['text_dark'] . ';">' . $item['name'] . '</strong>'
-				. '<div style="font-size:12px; color:' . $c['text_muted'] . ';">' . $item['role'] . '</div>'
-				. '</div>'
-				. '</div>',
-				'left', null, 14 );
 
 			$row_cols[] = PressGo_Element_Factory::col( $card_widgets,
 				PressGo_Style_Utils::card_style( $cfg, 24 ) );
@@ -1814,15 +1784,14 @@ class PressGo_Section_Builder {
 		// Display each testimonial as a centered quote block.
 		foreach ( $t['items'] as $idx => $item ) {
 			// Large opening quote mark.
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<div style="font-size:48px; line-height:1; color:'
-				. PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.2 ) . ';">&ldquo;</div>',
-				'center', null, 48 );
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, "\xe2\x80\x9c", 'h2', 'center',
+				PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.2 ), 48, '400',
+				null, 1.0 );
 
-			// Quote text — larger, centered, italic.
+			// Quote text — larger, centered, italic via <em>.
 			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<em style="font-size:20px; line-height:1.8;">' . $item['quote'] . '</em>',
-				'center', $c['text_dark'], 20, 17 );
+				'<em>' . $item['quote'] . '</em>',
+				'center', $c['text_dark'], 20, 17, 1.8 );
 			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 
 			// Author name and role.
@@ -2047,9 +2016,8 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $ct['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="font-size: 14px; color: rgba(255,255,255,0.45);">' . $ct['trust_line'] . '</span>',
-				'center', null, 14 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ct['trust_line'],
+				'center', 'rgba(255,255,255,0.45)', 14 );
 		}
 
 		// Social icons if provided.
@@ -2097,9 +2065,8 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $ct['trust_line'] ) ) {
 			$card_children[] = PressGo_Widget_Helpers::spacer_w( 12 );
-			$card_children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="font-size:13px; color:' . $c['text_muted'] . ';">' . $ct['trust_line'] . '</span>',
-				'center', null, 13 );
+			$card_children[] = PressGo_Widget_Helpers::text_w( $cfg, $ct['trust_line'],
+				'center', $c['text_muted'], 13 );
 		}
 
 		// Social icons if provided.
@@ -2165,9 +2132,8 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $ct['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="font-size:14px; color:rgba(255,255,255,0.5);">' . $ct['trust_line'] . '</span>',
-				'center', null, 14 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ct['trust_line'],
+				'center', 'rgba(255,255,255,0.5)', 14 );
 		}
 
 		$extra = array();
@@ -2205,12 +2171,9 @@ class PressGo_Section_Builder {
 
 			// "Most Popular" badge.
 			if ( ! empty( $plan['badge'] ) ) {
-				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					'<span style="display:inline-block; padding:4px 14px; border-radius:20px; '
-					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 ) . '; '
-					. 'color:' . $c['primary'] . '; font-size:12px; font-weight:700; '
-					. 'letter-spacing:0.5px; text-transform:uppercase;">' . $plan['badge'] . '</span>',
-					'center', null, 12 );
+				$widgets[] = self::pill_button( $cfg, strtoupper( $plan['badge'] ),
+					PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 ),
+					$c['primary'], 'transparent' );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			} else {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
@@ -2221,15 +2184,12 @@ class PressGo_Section_Builder {
 				$c['text_dark'], 20, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 
-			// Price.
+			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
-			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="font-size:48px; font-weight:800; color:' . $c['text_dark'] . '; '
-				. 'font-family:' . $fonts['heading'] . '; letter-spacing:-2px; line-height:1;">'
-				. $plan['price'] . '</span>'
-				. '<span style="font-size:16px; color:' . $c['text_muted'] . '; font-weight:500;">'
-				. $period . '</span>',
-				'center', null, 48 );
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'center',
+				$c['text_dark'], 48, '800', -2, 1.0 );
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'center',
+				$c['text_muted'], 16 );
 
 			// Description.
 			if ( ! empty( $plan['description'] ) ) {
@@ -2323,12 +2283,8 @@ class PressGo_Section_Builder {
 
 			// Badge row.
 			if ( ! empty( $plan['badge'] ) ) {
-				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					'<span style="display:inline-block; padding:4px 14px; border-radius:20px; '
-					. 'background:' . $c['primary'] . '; '
-					. 'color:' . $c['white'] . '; font-size:11px; font-weight:700; '
-					. 'letter-spacing:0.5px; text-transform:uppercase;">' . $plan['badge'] . '</span>',
-					'left', null, 11 );
+				$widgets[] = self::pill_button( $cfg, strtoupper( $plan['badge'] ),
+					$c['primary'], $c['white'], $c['primary'] );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			}
 
@@ -2337,14 +2293,12 @@ class PressGo_Section_Builder {
 				$c['text_dark'], 22, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 4 );
 
+			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
-			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-				'<span style="font-size:36px; font-weight:800; color:' . $c['text_dark'] . '; '
-				. 'font-family:' . $fonts['heading'] . '; letter-spacing:-1px; line-height:1;">'
-				. $plan['price'] . '</span>'
-				. '<span style="font-size:14px; color:' . $c['text_muted'] . '; font-weight:500;">'
-				. $period . '</span>',
-				'left', null, 36 );
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'left',
+				$c['text_dark'], 36, '800', -1, 1.0 );
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'left',
+				$c['text_muted'], 14 );
 
 			if ( ! empty( $plan['description'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
@@ -2633,7 +2587,7 @@ class PressGo_Section_Builder {
 			),
 		) );
 
-		// Link columns.
+		// Link columns — one text_w per link for individual editability.
 		$link_columns = isset( $ft['columns'] ) ? $ft['columns'] : array();
 		foreach ( $link_columns as $lc ) {
 			$col_widgets = array();
@@ -2641,16 +2595,10 @@ class PressGo_Section_Builder {
 				$c['white'], 14, '700' );
 			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
-			$links_html = '';
 			foreach ( $lc['links'] as $link ) {
-				$url = isset( $link['url'] ) ? $link['url'] : '#';
-				$links_html .= '<div style="margin-bottom:8px;">'
-					. '<a href="' . esc_url( $url ) . '" style="color:rgba(255,255,255,0.5); '
-					. 'text-decoration:none; font-size:14px; transition:color 0.2s;">'
-					. esc_html( $link['text'] ) . '</a></div>';
+				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+					esc_html( $link['text'] ), 'left', 'rgba(255,255,255,0.5)', 14, null, 1.4 );
 			}
-			$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $links_html, 'left',
-				'rgba(255,255,255,0.5)', 14 );
 
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
 		}
@@ -2759,7 +2707,7 @@ class PressGo_Section_Builder {
 			),
 		) );
 
-		// Link columns.
+		// Link columns — one text_w per link for individual editability.
 		$link_columns = isset( $ft['columns'] ) ? $ft['columns'] : array();
 		foreach ( $link_columns as $lc ) {
 			$col_widgets = array();
@@ -2767,16 +2715,10 @@ class PressGo_Section_Builder {
 				$c['text_dark'], 14, '700' );
 			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
-			$links_html = '';
 			foreach ( $lc['links'] as $link ) {
-				$url = isset( $link['url'] ) ? $link['url'] : '#';
-				$links_html .= '<div style="margin-bottom:8px;">'
-					. '<a href="' . esc_url( $url ) . '" style="color:' . $c['text_muted'] . '; '
-					. 'text-decoration:none; font-size:14px;">'
-					. esc_html( $link['text'] ) . '</a></div>';
+				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+					esc_html( $link['text'] ), 'left', $c['text_muted'], 14, null, 1.4 );
 			}
-			$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $links_html, 'left',
-				$c['text_muted'], 14 );
 
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
 		}

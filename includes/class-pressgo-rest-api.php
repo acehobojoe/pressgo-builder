@@ -17,7 +17,9 @@ class PressGo_Rest_API {
 	 * Emit a single SSE event.
 	 */
 	private function emit( $event_type, $data ) {
-		echo "event: {$event_type}\n";
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SSE protocol requires unescaped event stream format.
+		echo 'event: ' . sanitize_key( $event_type ) . "\n";
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SSE data payload is JSON-encoded via wp_json_encode.
 		echo 'data: ' . wp_json_encode( $data ) . "\n\n";
 		if ( ob_get_level() ) {
 			ob_flush();
@@ -47,7 +49,7 @@ class PressGo_Rest_API {
 
 		// Increase time limit for long-running generation.
 		if ( function_exists( 'set_time_limit' ) ) {
-			set_time_limit( 300 );
+			set_time_limit( 300 ); // phpcs:ignore Generic.PHP.NoSilencedErrors -- required for long-running SSE stream.
 		}
 
 		$prompt     = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
@@ -84,7 +86,7 @@ class PressGo_Rest_API {
 
 		$api_key = PressGo_Admin::get_api_key();
 		if ( empty( $api_key ) ) {
-			$this->emit( 'error', array( 'message' => 'PressGo API key not configured. Please go to PressGo Settings.' ) );
+			$this->emit( 'error', array( 'message' => 'Claude API key not configured. Please go to PressGo Settings.' ) );
 			die();
 		}
 

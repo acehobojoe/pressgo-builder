@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PressGo — WordPress.org Asset Generator</title>
+<style>
+  body { font-family: system-ui; background: #1a1a2e; color: #fff; padding: 40px; }
+  h1 { color: #00b4d8; }
+  .asset { margin: 30px 0; }
+  .asset h3 { color: #90e0ef; margin-bottom: 8px; }
+  .asset p { color: #888; font-size: 13px; margin: 4px 0 12px; }
+  canvas { border: 1px solid #333; display: block; }
+  button { background: #00b4d8; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 8px; font-size: 14px; }
+  button:hover { background: #0096c7; }
+</style>
+</head>
+<body>
+<h1>PressGo — WordPress.org Assets</h1>
+<p>Click each "Download" button to save the PNG. Upload these to your SVN <code>/assets/</code> folder.</p>
+
+<div class="asset">
+  <h3>icon-256x256.png</h3>
+  <p>Plugin icon (also scale down to 128x128)</p>
+  <canvas id="icon256" width="256" height="256"></canvas>
+  <button onclick="download('icon256', 'icon-256x256.png')">Download 256x256</button>
+</div>
+
+<div class="asset">
+  <h3>icon-128x128.png</h3>
+  <canvas id="icon128" width="128" height="128"></canvas>
+  <button onclick="download('icon128', 'icon-128x128.png')">Download 128x128</button>
+</div>
+
+<div class="asset">
+  <h3>banner-1544x500.png</h3>
+  <p>Plugin page banner (retina)</p>
+  <canvas id="banner1544" width="1544" height="500"></canvas>
+  <button onclick="download('banner1544', 'banner-1544x500.png')">Download 1544x500</button>
+</div>
+
+<div class="asset">
+  <h3>banner-772x250.png</h3>
+  <p>Plugin page banner (standard)</p>
+  <canvas id="banner772" width="772" height="250"></canvas>
+  <button onclick="download('banner772', 'banner-772x250.png')">Download 772x250</button>
+</div>
+
+<script>
+function drawIcon(canvasId, size) {
+  const c = document.getElementById(canvasId);
+  const ctx = c.getContext('2d');
+  const s = size / 256; // scale factor
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#0043B3');
+  bg.addColorStop(1, '#0096c7');
+  ctx.fillStyle = bg;
+  roundRect(ctx, 0, 0, size, size, 40 * s);
+  ctx.fill();
+
+  // "P" letterform
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${150 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('P', size / 2, size / 2 - 4 * s);
+
+  // Small "Go" accent
+  ctx.fillStyle = '#00e676';
+  ctx.font = `bold ${44 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('Go', size * 0.55, size * 0.62);
+
+  // Spark/AI accent dots
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.arc(size * 0.82, size * 0.22, 8 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(size * 0.88, size * 0.32, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(size * 0.78, size * 0.15, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBanner(canvasId, w, h) {
+  const c = document.getElementById(canvasId);
+  const ctx = c.getContext('2d');
+  const s = w / 1544;
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, w, 0);
+  bg.addColorStop(0, '#0a1628');
+  bg.addColorStop(0.5, '#0043B3');
+  bg.addColorStop(1, '#0096c7');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Subtle grid pattern
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 40 * s) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let y = 0; y < h; y += 40 * s) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // "PressGo" text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${72 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PressGo', w / 2, h * 0.4);
+
+  // Tagline
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = `${26 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText('AI Page Builder for Elementor', w / 2, h * 0.6);
+
+  // Accent line
+  const lg = ctx.createLinearGradient(w * 0.35, 0, w * 0.65, 0);
+  lg.addColorStop(0, 'transparent');
+  lg.addColorStop(0.5, '#00e676');
+  lg.addColorStop(1, 'transparent');
+  ctx.strokeStyle = lg;
+  ctx.lineWidth = 2 * s;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.35, h * 0.72);
+  ctx.lineTo(w * 0.65, h * 0.72);
+  ctx.stroke();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function download(canvasId, filename) {
+  const c = document.getElementById(canvasId);
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = c.toDataURL('image/png');
+  a.click();
+}
+
+// Draw all assets
+drawIcon('icon256', 256);
+drawIcon('icon128', 128);
+drawBanner('banner1544', 1544, 500);
+drawBanner('banner772', 772, 250);
+</script>
+</body>
+</html>

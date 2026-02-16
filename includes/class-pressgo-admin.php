@@ -56,6 +56,12 @@ class PressGo_Admin {
 			'default'           => '',
 		) );
 
+		register_setting( 'pressgo_settings', 'pressgo_model', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => 'claude-sonnet-4-5-20250929',
+		) );
+
 		add_settings_section(
 			'pressgo_api_section',
 			'API Configuration',
@@ -65,8 +71,16 @@ class PressGo_Admin {
 
 		add_settings_field(
 			'pressgo_api_key',
-			'PressGo API Key',
+			'Claude API Key',
 			array( $this, 'render_api_key_field' ),
+			'pressgo-settings',
+			'pressgo_api_section'
+		);
+
+		add_settings_field(
+			'pressgo_model',
+			'Claude Model',
+			array( $this, 'render_model_field' ),
 			'pressgo-settings',
 			'pressgo_api_section'
 		);
@@ -75,7 +89,21 @@ class PressGo_Admin {
 	public function render_api_key_field() {
 		$value = get_option( 'pressgo_api_key', '' );
 		echo '<input type="password" id="pressgo_api_key" name="pressgo_api_key" value="' . esc_attr( $value ) . '" class="regular-text" autocomplete="off" />';
-		echo '<p class="description">Your PressGo API key. Get one at <a href="https://pressgo.app" target="_blank">pressgo.app</a>.</p>';
+		echo '<p class="description">Your Anthropic API key. Get one at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.</p>';
+	}
+
+	public function render_model_field() {
+		$value = get_option( 'pressgo_model', 'claude-sonnet-4-5-20250929' );
+		$models = array(
+			'claude-sonnet-4-5-20250929' => 'Claude Sonnet 4.5 (Recommended)',
+			'claude-opus-4-6'            => 'Claude Opus 4.6 (Most capable)',
+			'claude-haiku-4-5-20251001'  => 'Claude Haiku 4.5 (Fastest)',
+		);
+		echo '<select id="pressgo_model" name="pressgo_model">';
+		foreach ( $models as $id => $label ) {
+			echo '<option value="' . esc_attr( $id ) . '"' . selected( $value, $id, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
 	}
 
 	public function enqueue_assets( $hook ) {
@@ -117,7 +145,7 @@ class PressGo_Admin {
 		$api_key = self::get_api_key();
 		if ( empty( $api_key ) ) {
 			echo '<div class="wrap"><h1>PressGo</h1>';
-			echo '<div class="notice notice-warning"><p>Please <a href="' . esc_url( admin_url( 'admin.php?page=pressgo-settings' ) ) . '">configure your PressGo API key</a> before generating pages.</p></div>';
+			echo '<div class="notice notice-warning"><p>Please <a href="' . esc_url( admin_url( 'admin.php?page=pressgo-settings' ) ) . '">configure your Claude API key</a> before generating pages.</p></div>';
 			echo '</div>';
 			return;
 		}
@@ -131,5 +159,9 @@ class PressGo_Admin {
 
 	public static function get_api_key() {
 		return get_option( 'pressgo_api_key', '' );
+	}
+
+	public static function get_model() {
+		return get_option( 'pressgo_model', 'claude-sonnet-4-5-20250929' );
 	}
 }

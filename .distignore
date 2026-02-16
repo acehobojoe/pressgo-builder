@@ -1,0 +1,14 @@
+# Files to exclude from the distributed plugin zip.
+.distignore
+.gitignore
+.git
+node_modules
+test
+package.json
+package-lock.json
+CLAUDE.md
+brain.json
+config-schema.json
+includes/prompts/system-prompt.txt
+includes/prompts/config-schema.json
+*.mjs
