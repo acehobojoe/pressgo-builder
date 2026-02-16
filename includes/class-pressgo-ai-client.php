@@ -1,6 +1,12 @@
 <?php
 /**
  * Claude API client with streaming support via curl.
+ *
+ * Supports two backends:
+ *   1. Anthropic API (default) — uses user's own API key from plugin settings
+ *   2. OpenAI-compatible backend — activated by defining PRESSGO_AI_BACKEND_URL,
+ *      PRESSGO_AI_BACKEND_KEY, and optionally PRESSGO_AI_BACKEND_MODEL in wp-config.php.
+ *      This is used for DigitalOcean Gradient AI or similar OpenAI-compatible endpoints.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,10 +18,19 @@ class PressGo_AI_Client {
 	private $api_key;
 	private $model;
 	private $api_url = 'https://api.anthropic.com/v1/messages';
+	private $use_openai_format = false;
 
 	public function __construct( $api_key, $model = null ) {
-		$this->api_key = $api_key;
-		$this->model   = $model ?: PressGo_Admin::get_model();
+		// Check for OpenAI-compatible backend override (e.g. DO Gradient AI).
+		if ( defined( 'PRESSGO_AI_BACKEND_URL' ) && defined( 'PRESSGO_AI_BACKEND_KEY' ) ) {
+			$this->api_url           = PRESSGO_AI_BACKEND_URL;
+			$this->api_key           = PRESSGO_AI_BACKEND_KEY;
+			$this->model             = defined( 'PRESSGO_AI_BACKEND_MODEL' ) ? PRESSGO_AI_BACKEND_MODEL : 'anthropic-claude-sonnet-4-5';
+			$this->use_openai_format = true;
+		} else {
+			$this->api_key = $api_key;
+			$this->model   = $model ?: PressGo_Admin::get_model();
+		}
 	}
 
 	/**
@@ -35,27 +50,51 @@ class PressGo_AI_Client {
 
 		$user_content  = PressGo_Prompt_Builder::build_user_content( $prompt, $image, $image_type );
 
-		$body = array(
-			'model'      => $this->model,
-			'max_tokens' => 8192,
-			'stream'     => true,
-			'system'     => $system_prompt,
-			'messages'   => array(
-				array(
-					'role'    => 'user',
-					'content' => $user_content,
+		// Build request body — different format for Anthropic vs OpenAI-compatible.
+		if ( $this->use_openai_format ) {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'stream'     => true,
+				'messages'   => array(
+					array( 'role' => 'system', 'content' => $system_prompt ),
+					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
 				),
-			),
-		);
-
-		if ( $callback ) {
-			$callback( 'thinking', array( 'text' => 'Connecting to Claude AI...' ) );
+			);
+			$headers = array(
+				'Content-Type: application/json',
+				'Authorization: Bearer ' . $this->api_key,
+			);
+		} else {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'stream'     => true,
+				'system'     => $system_prompt,
+				'messages'   => array(
+					array(
+						'role'    => 'user',
+						'content' => $user_content,
+					),
+				),
+			);
+			$headers = array(
+				'Content-Type: application/json',
+				'x-api-key: ' . $this->api_key,
+				'anthropic-version: 2023-06-01',
+			);
 		}
 
-		$accumulated_text = '';
-		$raw_response     = '';
-		$current_phase    = 'analyzing';
-		$sections_found   = array();
+		if ( $callback ) {
+			$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
+			$callback( 'thinking', array( 'text' => "Connecting to {$backend} ({$this->model})..." ) );
+		}
+
+		$accumulated_text  = '';
+		$raw_response      = '';
+		$current_phase     = 'analyzing';
+		$sections_found    = array();
+		$use_openai_format = $this->use_openai_format;
 
 		// phpcs:disable WordPress.WP.AlternativeFunctions -- curl is required for SSE streaming;
 		// wp_remote_post() does not support CURLOPT_WRITEFUNCTION for incremental chunk processing.
@@ -64,15 +103,11 @@ class PressGo_AI_Client {
 			CURLOPT_URL            => $this->api_url,
 			CURLOPT_POST           => true,
 			CURLOPT_POSTFIELDS     => wp_json_encode( $body ),
-			CURLOPT_HTTPHEADER     => array(
-				'Content-Type: application/json',
-				'x-api-key: ' . $this->api_key,
-				'anthropic-version: 2023-06-01',
-			),
+			CURLOPT_HTTPHEADER     => $headers,
 			CURLOPT_RETURNTRANSFER => false,
-			CURLOPT_TIMEOUT        => 120,
-			CURLOPT_CONNECTTIMEOUT => 10,
-			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback ) {
+			CURLOPT_TIMEOUT        => 180,
+			CURLOPT_CONNECTTIMEOUT => 15,
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format ) {
 				// Always capture raw response for error handling.
 				$raw_response .= $data;
 
@@ -93,25 +128,41 @@ class PressGo_AI_Client {
 						continue;
 					}
 
-					$type = isset( $event['type'] ) ? $event['type'] : '';
-
-					if ( 'content_block_delta' === $type ) {
-						$delta = isset( $event['delta'] ) ? $event['delta'] : array();
-						if ( isset( $delta['text'] ) ) {
-							$text_chunk = $delta['text'];
-							$accumulated_text .= $text_chunk;
-
-							// Detect phases for progress reporting.
-							$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+					if ( $use_openai_format ) {
+						// OpenAI streaming format: choices[0].delta.content
+						$choices = isset( $event['choices'] ) ? $event['choices'] : array();
+						if ( ! empty( $choices ) ) {
+							$delta   = isset( $choices[0]['delta'] ) ? $choices[0]['delta'] : array();
+							$content = isset( $delta['content'] ) ? $delta['content'] : '';
+							if ( $content ) {
+								$accumulated_text .= $content;
+								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+							}
+							$finish = isset( $choices[0]['finish_reason'] ) ? $choices[0]['finish_reason'] : null;
+							if ( 'stop' === $finish && $callback ) {
+								$callback( 'thinking', array( 'text' => 'Generation complete. Processing...' ) );
+							}
 						}
-					} elseif ( 'message_stop' === $type ) {
-						if ( $callback ) {
-							$callback( 'thinking', array( 'text' => 'Generation complete. Processing...' ) );
-						}
-					} elseif ( 'error' === $type ) {
-						$error_msg = isset( $event['error']['message'] ) ? $event['error']['message'] : 'Unknown API error';
-						if ( $callback ) {
-							$callback( 'error', array( 'message' => $error_msg ) );
+					} else {
+						// Anthropic streaming format.
+						$type = isset( $event['type'] ) ? $event['type'] : '';
+
+						if ( 'content_block_delta' === $type ) {
+							$delta = isset( $event['delta'] ) ? $event['delta'] : array();
+							if ( isset( $delta['text'] ) ) {
+								$text_chunk = $delta['text'];
+								$accumulated_text .= $text_chunk;
+								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+							}
+						} elseif ( 'message_stop' === $type ) {
+							if ( $callback ) {
+								$callback( 'thinking', array( 'text' => 'Generation complete. Processing...' ) );
+							}
+						} elseif ( 'error' === $type ) {
+							$error_msg = isset( $event['error']['message'] ) ? $event['error']['message'] : 'Unknown API error';
+							if ( $callback ) {
+								$callback( 'error', array( 'message' => $error_msg ) );
+							}
 						}
 					}
 				}
@@ -188,25 +239,42 @@ class PressGo_AI_Client {
 
 		$user_content  = PressGo_Prompt_Builder::build_user_content( $prompt, $image, $image_type );
 
-		$body = array(
-			'model'      => $this->model,
-			'max_tokens' => 8192,
-			'system'     => $system_prompt,
-			'messages'   => array(
-				array(
-					'role'    => 'user',
-					'content' => $user_content,
+		// Build request — different format for Anthropic vs OpenAI-compatible.
+		if ( $this->use_openai_format ) {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'messages'   => array(
+					array( 'role' => 'system', 'content' => $system_prompt ),
+					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
 				),
-			),
-		);
-
-		$response = wp_remote_post( $this->api_url, array(
-			'timeout' => 120,
-			'headers' => array(
+			);
+			$req_headers = array(
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $this->api_key,
+			);
+		} else {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'system'     => $system_prompt,
+				'messages'   => array(
+					array(
+						'role'    => 'user',
+						'content' => $user_content,
+					),
+				),
+			);
+			$req_headers = array(
 				'Content-Type'      => 'application/json',
 				'x-api-key'         => $this->api_key,
 				'anthropic-version' => '2023-06-01',
-			),
+			);
+		}
+
+		$response = wp_remote_post( $this->api_url, array(
+			'timeout' => 180,
+			'headers' => $req_headers,
 			'body'    => wp_json_encode( $body ),
 		) );
 
@@ -223,7 +291,12 @@ class PressGo_AI_Client {
 		}
 
 		$text = '';
-		if ( isset( $data['content'] ) ) {
+		if ( $this->use_openai_format ) {
+			// OpenAI format: choices[0].message.content
+			if ( isset( $data['choices'][0]['message']['content'] ) ) {
+				$text = $data['choices'][0]['message']['content'];
+			}
+		} elseif ( isset( $data['content'] ) ) {
 			foreach ( $data['content'] as $block ) {
 				if ( 'text' === $block['type'] ) {
 					$text .= $block['text'];
