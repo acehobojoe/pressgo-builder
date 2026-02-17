@@ -1111,6 +1111,10 @@ class PressGo_Section_Builder {
 						'unit' => 'px', 'top' => '36', 'right' => '28',
 						'bottom' => '36', 'left' => '28', 'isLinked' => false,
 					),
+					'padding_mobile'         => array(
+						'unit' => 'px', 'top' => '24', 'right' => '20',
+						'bottom' => '24', 'left' => '20', 'isLinked' => false,
+					),
 				)
 			);
 		}
@@ -1292,6 +1296,10 @@ class PressGo_Section_Builder {
 					'padding'                => array(
 						'unit' => 'px', 'top' => '36', 'right' => '24',
 						'bottom' => '36', 'left' => '24', 'isLinked' => false,
+					),
+					'padding_mobile'         => array(
+						'unit' => 'px', 'top' => '24', 'right' => '16',
+						'bottom' => '24', 'left' => '16', 'isLinked' => false,
 					),
 					'border_border'          => 'solid',
 					'border_width'           => array(
@@ -2107,6 +2115,10 @@ class PressGo_Section_Builder {
 				'unit' => 'px', 'top' => '60', 'right' => '60',
 				'bottom' => '60', 'left' => '60', 'isLinked' => true,
 			),
+			'padding_mobile'         => array(
+				'unit' => 'px', 'top' => '32', 'right' => '24',
+				'bottom' => '32', 'left' => '24', 'isLinked' => false,
+			),
 		) );
 
 		return PressGo_Element_Factory::outer( $cfg,
@@ -2603,7 +2615,7 @@ class PressGo_Section_Builder {
 
 			foreach ( $lc['links'] as $link ) {
 				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					esc_html( $link['text'] ), 'left', 'rgba(255,255,255,0.5)', 14, null, 1.4 );
+					esc_html( $link['text'] ), 'left', 'rgba(255,255,255,0.6)', 14, null, 1.4 );
 			}
 
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
@@ -2642,9 +2654,9 @@ class PressGo_Section_Builder {
 			if ( count( $contact_items ) > 0 ) {
 				$contact_widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
 					'icon_list'                    => $contact_items,
-					'icon_color'                   => 'rgba(255,255,255,0.3)',
-					'text_color'                   => 'rgba(255,255,255,0.5)',
-					'text_color_hover'             => 'rgba(255,255,255,0.7)',
+					'icon_color'                   => 'rgba(255,255,255,0.5)',
+					'text_color'                   => 'rgba(255,255,255,0.6)',
+					'text_color_hover'             => 'rgba(255,255,255,0.8)',
 					'icon_size'                    => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
 					'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 					'space_between'                => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
@@ -2667,7 +2679,7 @@ class PressGo_Section_Builder {
 			$children[] = PressGo_Widget_Helpers::divider_w( 'rgba(255,255,255,0.1)' );
 			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ft['copyright'], 'center',
-				'rgba(255,255,255,0.3)', 13 );
+				'rgba(255,255,255,0.4)', 13 );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -2940,6 +2952,10 @@ class PressGo_Section_Builder {
 			'padding'               => array(
 				'unit' => 'px', 'top' => '48', 'right' => '48',
 				'bottom' => '48', 'left' => '48', 'isLinked' => true,
+			),
+			'padding_mobile'        => array(
+				'unit' => 'px', 'top' => '28', 'right' => '20',
+				'bottom' => '28', 'left' => '20', 'isLinked' => false,
 			),
 		) );
 

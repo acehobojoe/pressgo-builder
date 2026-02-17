@@ -142,6 +142,33 @@ class PressGo_Config_Validator {
 			}
 		}
 
+		// Ensure array fields are actually arrays (protect against AI returning strings).
+		$array_fields = array(
+			'features'     => 'items',
+			'testimonials' => 'items',
+			'steps'        => 'items',
+			'faq'          => 'items',
+			'pricing'      => 'plans',
+			'team'         => 'members',
+			'results'      => 'metrics',
+			'gallery'      => 'images',
+		);
+		foreach ( $array_fields as $section => $field ) {
+			if ( isset( $config[ $section ][ $field ] ) && ! is_array( $config[ $section ][ $field ] ) ) {
+				$config[ $section ][ $field ] = array();
+			}
+		}
+
+		// Ensure CTA objects have required keys.
+		$cta_sections = array( 'hero' => 'cta_primary', 'cta_final' => 'cta' );
+		foreach ( $cta_sections as $section => $cta_key ) {
+			if ( isset( $config[ $section ][ $cta_key ] ) && is_array( $config[ $section ][ $cta_key ] ) ) {
+				if ( ! isset( $config[ $section ][ $cta_key ]['url'] ) ) {
+					$config[ $section ][ $cta_key ]['url'] = '#';
+				}
+			}
+		}
+
 		return $config;
 	}
 

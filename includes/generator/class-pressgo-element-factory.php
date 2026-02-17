@@ -162,7 +162,7 @@ class PressGo_Element_Factory {
 		}
 
 		$tab_gap = max( 12, intdiv( $gap * 3, 4 ) );
-		$mob_gap = max( 10, intdiv( $gap, 2 ) );
+		$mob_gap = max( 16, intdiv( $gap * 2, 3 ) );
 
 		$s = array(
 			'container_type'        => 'flex',
