@@ -79,12 +79,9 @@ class PressGo_Page_Creator {
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
 }
 
-/* Card hover lift */
-.elementor-inner-section .elementor-column > .elementor-widget-wrap {
+/* Card container hover — smooth shadow transition */
+.e-child.e-con {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.elementor-inner-section .elementor-column > .elementor-widget-wrap:hover {
-    transform: translateY(-4px);
 }
 
 /* Image loading — reserve space to prevent layout shift */
@@ -173,8 +170,8 @@ html {
     transition: transform 0.2s ease;
 }
 
-/* Pricing card scale on hover */
-.elementor-inner-section .elementor-column[style*='border-top: 3px'] {
+/* Pricing card highlight border */
+.e-child.e-con[style*='border-top: 3px'] {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -188,7 +185,7 @@ html {
 
 @media (hover: none) {
     .elementor-button:hover,
-    .elementor-inner-section .elementor-column > .elementor-widget-wrap:hover,
+    .e-child.e-con:hover,
     .elementor-widget-icon-box:hover {
         transform: none;
     }
