@@ -12,9 +12,12 @@
 	let resultActions, editLink, viewLink, newBtn;
 	let imageInput, imageName, imageClear, pageTitleInput;
 	let emptyState;
+	let importUrlInput, importConsentInput, importBtn, importPageTitleInput;
+	let generateFields, importFields;
 	let imageData = null;
 	let imageType = null;
 	let isGenerating = false;
+	let currentMode = 'generate';
 
 	// Section display names.
 	const SECTION_NAMES = {
@@ -81,6 +84,14 @@
 		pageTitleInput = $('#pressgo-page-title');
 		emptyState = $('#pressgo-empty-state');
 
+		// Import mode elements.
+		importUrlInput = $('#pressgo-import-url');
+		importConsentInput = $('#pressgo-import-consent');
+		importBtn = $('#pressgo-import-btn');
+		importPageTitleInput = $('#pressgo-import-page-title');
+		generateFields = $('#pressgo-generate-fields');
+		importFields = $('#pressgo-import-fields');
+
 		if (!generateBtn) return;
 
 		generateBtn.addEventListener('click', startGeneration);
@@ -95,15 +106,64 @@
 			}
 		});
 
+		// Import mode events.
+		if (importBtn) {
+			importBtn.addEventListener('click', startImport);
+		}
+		if (importUrlInput) {
+			importUrlInput.addEventListener('keydown', function (e) {
+				if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+					startImport();
+				}
+			});
+		}
+
+		// Mode toggle tabs.
+		var tabs = $$('.pressgo-mode-tab');
+		tabs.forEach(function (tab) {
+			tab.addEventListener('click', function () {
+				if (isGenerating) return;
+				var mode = tab.getAttribute('data-mode');
+				switchMode(mode);
+			});
+		});
+
 		// Example prompt chips.
 		var chips = $$('.pressgo-example-chip');
 		chips.forEach(function (chip) {
 			chip.addEventListener('click', function () {
+				// Switch to generate mode if in import mode.
+				if (currentMode !== 'generate') {
+					switchMode('generate');
+				}
 				promptInput.value = chip.getAttribute('data-prompt');
 				promptInput.focus();
 				promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
 			});
 		});
+	}
+
+	function switchMode(mode) {
+		currentMode = mode;
+
+		// Update tab styles.
+		var tabs = $$('.pressgo-mode-tab');
+		tabs.forEach(function (tab) {
+			if (tab.getAttribute('data-mode') === mode) {
+				tab.classList.add('active');
+			} else {
+				tab.classList.remove('active');
+			}
+		});
+
+		// Toggle field visibility.
+		if (mode === 'generate') {
+			generateFields.style.display = '';
+			importFields.style.display = 'none';
+		} else {
+			generateFields.style.display = 'none';
+			importFields.style.display = '';
+		}
 	}
 
 	function handleImageSelect(e) {
@@ -175,6 +235,62 @@
 		}
 
 		// Use fetch with ReadableStream for SSE via POST.
+		fetch(pressgoData.ajaxUrl, {
+			method: 'POST',
+			body: formData,
+			credentials: 'same-origin',
+		})
+			.then((response) => {
+				if (!response.ok) {
+					throw new Error('HTTP ' + response.status);
+				}
+				return readSSEStream(response.body);
+			})
+			.catch((err) => {
+				addActivity('error', 'Connection failed: ' + err.message);
+				finishGeneration();
+			});
+	}
+
+	function startImport() {
+		const url = importUrlInput.value.trim();
+		if (!url) {
+			importUrlInput.focus();
+			importUrlInput.classList.add('pressgo-shake');
+			setTimeout(() => importUrlInput.classList.remove('pressgo-shake'), 500);
+			return;
+		}
+
+		if (!importConsentInput.checked) {
+			importConsentInput.parentElement.classList.add('pressgo-shake');
+			setTimeout(() => importConsentInput.parentElement.classList.remove('pressgo-shake'), 500);
+			return;
+		}
+
+		if (isGenerating) return;
+		isGenerating = true;
+
+		// Show workspace, hide empty state.
+		if (emptyState) emptyState.style.display = 'none';
+		workspace.style.display = 'block';
+		activityLog.innerHTML = '';
+		sectionPreview.innerHTML = '';
+		resultActions.style.display = 'none';
+		importBtn.disabled = true;
+		importBtn.innerHTML = '<span class="pressgo-spinner"></span> Importing...';
+
+		// Scroll to workspace.
+		workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+		// Build form data.
+		const formData = new FormData();
+		formData.append('action', 'pressgo_import_stream');
+		formData.append('nonce', pressgoData.nonce);
+		formData.append('url', url);
+		formData.append('consent', 'yes');
+		formData.append('page_title', importPageTitleInput.value.trim() || 'Imported Page');
+
+		// Use fetch with ReadableStream for SSE via POST (same as generate).
 		fetch(pressgoData.ajaxUrl, {
 			method: 'POST',
 			body: formData,
@@ -376,6 +492,11 @@
 		generateBtn.disabled = false;
 		generateBtn.innerHTML =
 			'<span class="dashicons dashicons-superhero-alt"></span> Generate Page';
+		if (importBtn) {
+			importBtn.disabled = false;
+			importBtn.innerHTML =
+				'<span class="dashicons dashicons-download"></span> Import Page';
+		}
 	}
 
 	function resetUI() {
@@ -387,7 +508,14 @@
 		promptInput.value = '';
 		pageTitleInput.value = '';
 		clearImage();
-		promptInput.focus();
+		if (importUrlInput) importUrlInput.value = '';
+		if (importConsentInput) importConsentInput.checked = false;
+		if (importPageTitleInput) importPageTitleInput.value = '';
+		if (currentMode === 'generate') {
+			promptInput.focus();
+		} else if (importUrlInput) {
+			importUrlInput.focus();
+		}
 	}
 
 	function isColorDark(hex) {

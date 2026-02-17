@@ -22,27 +22,63 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 	</div>
 
+	<div class="pressgo-mode-tabs">
+		<button type="button" class="pressgo-mode-tab active" data-mode="generate">
+			<span class="dashicons dashicons-superhero-alt"></span> Generate
+		</button>
+		<button type="button" class="pressgo-mode-tab" data-mode="import">
+			<span class="dashicons dashicons-download"></span> Import
+		</button>
+	</div>
+
 	<div class="pressgo-input-panel">
-		<div class="pressgo-input-row">
-			<textarea id="pressgo-prompt" rows="4" placeholder="Describe your landing page... e.g., 'A landing page for a dog grooming business called Pawfect Groom. Modern, friendly, blue and orange colors. Include pricing, testimonials, and a booking CTA.'"></textarea>
+		<!-- Generate mode fields -->
+		<div id="pressgo-generate-fields" class="pressgo-mode-fields">
+			<div class="pressgo-input-row">
+				<textarea id="pressgo-prompt" rows="4" placeholder="Describe your landing page... e.g., 'A landing page for a dog grooming business called Pawfect Groom. Modern, friendly, blue and orange colors. Include pricing, testimonials, and a booking CTA.'"></textarea>
+			</div>
+			<div class="pressgo-controls-row">
+				<div class="pressgo-control-group">
+					<label for="pressgo-image" class="pressgo-upload-btn">
+						<span class="dashicons dashicons-format-image"></span> Upload Image
+						<input type="file" id="pressgo-image" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;" />
+					</label>
+					<span id="pressgo-image-name" class="pressgo-image-name"></span>
+					<button type="button" id="pressgo-image-clear" class="pressgo-image-clear" style="display:none;">&times;</button>
+				</div>
+				<div class="pressgo-control-group">
+					<input type="text" id="pressgo-page-title" placeholder="Page Title (optional)" value="" />
+				</div>
+				<div class="pressgo-control-group pressgo-control-right">
+					<span class="pressgo-shortcut-hint">Ctrl+Enter</span>
+					<button type="button" id="pressgo-generate-btn" class="button button-primary button-hero">
+						<span class="dashicons dashicons-superhero-alt"></span> Generate Page
+					</button>
+				</div>
+			</div>
 		</div>
-		<div class="pressgo-controls-row">
-			<div class="pressgo-control-group">
-				<label for="pressgo-image" class="pressgo-upload-btn">
-					<span class="dashicons dashicons-format-image"></span> Upload Image
-					<input type="file" id="pressgo-image" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;" />
-				</label>
-				<span id="pressgo-image-name" class="pressgo-image-name"></span>
-				<button type="button" id="pressgo-image-clear" class="pressgo-image-clear" style="display:none;">&times;</button>
+
+		<!-- Import mode fields -->
+		<div id="pressgo-import-fields" class="pressgo-mode-fields" style="display: none;">
+			<div class="pressgo-input-row">
+				<input type="url" id="pressgo-import-url" placeholder="https://example.com" />
 			</div>
-			<div class="pressgo-control-group">
-				<input type="text" id="pressgo-page-title" placeholder="Page Title (optional)" value="" />
-			</div>
-			<div class="pressgo-control-group pressgo-control-right">
-				<span class="pressgo-shortcut-hint">Ctrl+Enter</span>
-				<button type="button" id="pressgo-generate-btn" class="button button-primary button-hero">
-					<span class="dashicons dashicons-superhero-alt"></span> Generate Page
-				</button>
+			<div class="pressgo-controls-row">
+				<div class="pressgo-control-group">
+					<label class="pressgo-consent-label">
+						<input type="checkbox" id="pressgo-import-consent" />
+						I confirm I own or have rights to use this content
+					</label>
+				</div>
+				<div class="pressgo-control-group">
+					<input type="text" id="pressgo-import-page-title" placeholder="Page Title (optional)" value="" />
+				</div>
+				<div class="pressgo-control-group pressgo-control-right">
+					<span class="pressgo-shortcut-hint">Ctrl+Enter</span>
+					<button type="button" id="pressgo-import-btn" class="button button-primary button-hero">
+						<span class="dashicons dashicons-download"></span> Import Page
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>

@@ -39,6 +39,51 @@
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* ─── Mode Tabs ─── */
+
+.pressgo-mode-tabs {
+	display: flex;
+	gap: 0;
+	margin-bottom: -1px;
+	position: relative;
+	z-index: 1;
+}
+
+.pressgo-mode-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 20px;
+	border: 1px solid #c3c4c7;
+	border-bottom: 1px solid #c3c4c7;
+	border-radius: 6px 6px 0 0;
+	background: #f6f7f7;
+	font-size: 14px;
+	font-weight: 500;
+	color: #646970;
+	cursor: pointer;
+	transition: all 0.15s;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.pressgo-mode-tab:hover {
+	background: #f0f0f1;
+	color: #1d2327;
+}
+
+.pressgo-mode-tab.active {
+	background: #fff;
+	border-bottom-color: #fff;
+	color: #1d2327;
+	font-weight: 600;
+}
+
+.pressgo-mode-tab .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
 /* ─── Input Panel ─── */
 
 .pressgo-input-panel {
@@ -135,6 +180,66 @@
 	border-radius: 4px;
 	font-size: 14px;
 	width: 280px;
+}
+
+/* ─── Import Mode Fields ─── */
+
+#pressgo-import-url {
+	width: 100%;
+	padding: 12px 16px;
+	font-size: 15px;
+	line-height: 1.6;
+	border: 1px solid #c3c4c7;
+	border-radius: 6px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+	transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#pressgo-import-url:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: none;
+}
+
+.pressgo-consent-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: #50575e;
+	cursor: pointer;
+	user-select: none;
+}
+
+.pressgo-consent-label input[type="checkbox"] {
+	margin: 0;
+}
+
+#pressgo-import-page-title {
+	padding: 6px 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	font-size: 14px;
+	width: 280px;
+}
+
+#pressgo-import-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 15px;
+	padding: 8px 24px;
+}
+
+#pressgo-import-btn .dashicons {
+	font-size: 20px;
+	width: 20px;
+	height: 20px;
+}
+
+#pressgo-import-btn:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
 }
 
 .pressgo-shortcut-hint {

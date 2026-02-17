@@ -224,6 +224,195 @@ class PressGo_AI_Client {
 	}
 
 	/**
+	 * Generate config from pre-built content (for import mode).
+	 *
+	 * Same as generate_config_streaming() but accepts a pre-built user content array
+	 * instead of building one from prompt/image. Used when the content has already been
+	 * assembled by PressGo_Prompt_Builder::build_import_content().
+	 *
+	 * @param array    $user_content Pre-built Claude API content array (image + text).
+	 * @param callable $callback     fn($event_type, $data) — called to emit SSE events.
+	 * @return array|WP_Error Parsed config array, or WP_Error.
+	 */
+	public function generate_config_streaming_import( $user_content, $callback = null ) {
+		$system_prompt = PressGo_Prompt_Builder::build_system_prompt();
+		if ( is_wp_error( $system_prompt ) ) {
+			return $system_prompt;
+		}
+
+		// Append import addendum to system prompt.
+		$system_prompt .= "\n\nIMPORT MODE: You are cloning an existing page from a screenshot. "
+			. "Reproduce it as faithfully as possible. Use extracted text verbatim. "
+			. "Match colors exactly. Preserve section order from the screenshot.";
+
+		// Build request body — different format for Anthropic vs OpenAI-compatible.
+		if ( $this->use_openai_format ) {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'stream'     => true,
+				'messages'   => array(
+					array( 'role' => 'system', 'content' => $system_prompt ),
+					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
+				),
+			);
+			$headers = array(
+				'Content-Type: application/json',
+				'Authorization: Bearer ' . $this->api_key,
+			);
+		} else {
+			$body = array(
+				'model'      => $this->model,
+				'max_tokens' => 8192,
+				'stream'     => true,
+				'system'     => $system_prompt,
+				'messages'   => array(
+					array(
+						'role'    => 'user',
+						'content' => $user_content,
+					),
+				),
+			);
+			$headers = array(
+				'Content-Type: application/json',
+				'x-api-key: ' . $this->api_key,
+				'anthropic-version: 2023-06-01',
+			);
+		}
+
+		if ( $callback ) {
+			$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
+			$callback( 'thinking', array( 'text' => "Analyzing design with {$backend} ({$this->model})..." ) );
+		}
+
+		$accumulated_text  = '';
+		$raw_response      = '';
+		$current_phase     = 'analyzing';
+		$sections_found    = array();
+		$use_openai_format = $this->use_openai_format;
+
+		// phpcs:disable WordPress.WP.AlternativeFunctions -- curl is required for SSE streaming.
+		$ch = curl_init();
+		curl_setopt_array( $ch, array(
+			CURLOPT_URL            => $this->api_url,
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => wp_json_encode( $body ),
+			CURLOPT_HTTPHEADER     => $headers,
+			CURLOPT_RETURNTRANSFER => false,
+			CURLOPT_TIMEOUT        => 180,
+			CURLOPT_CONNECTTIMEOUT => 15,
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format ) {
+				$raw_response .= $data;
+
+				$lines = explode( "\n", $data );
+				foreach ( $lines as $line ) {
+					$line = trim( $line );
+					if ( empty( $line ) || 0 !== strpos( $line, 'data: ' ) ) {
+						continue;
+					}
+
+					$json_str = substr( $line, 6 );
+					if ( '[DONE]' === $json_str ) {
+						continue;
+					}
+
+					$event = json_decode( $json_str, true );
+					if ( ! $event ) {
+						continue;
+					}
+
+					if ( $use_openai_format ) {
+						$choices = isset( $event['choices'] ) ? $event['choices'] : array();
+						if ( ! empty( $choices ) ) {
+							$delta   = isset( $choices[0]['delta'] ) ? $choices[0]['delta'] : array();
+							$content = isset( $delta['content'] ) ? $delta['content'] : '';
+							if ( $content ) {
+								$accumulated_text .= $content;
+								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+							}
+							$finish = isset( $choices[0]['finish_reason'] ) ? $choices[0]['finish_reason'] : null;
+							if ( 'stop' === $finish && $callback ) {
+								$callback( 'thinking', array( 'text' => 'Import complete. Processing...' ) );
+							}
+						}
+					} else {
+						$type = isset( $event['type'] ) ? $event['type'] : '';
+
+						if ( 'content_block_delta' === $type ) {
+							$delta = isset( $event['delta'] ) ? $event['delta'] : array();
+							if ( isset( $delta['text'] ) ) {
+								$accumulated_text .= $delta['text'];
+								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+							}
+						} elseif ( 'message_stop' === $type ) {
+							if ( $callback ) {
+								$callback( 'thinking', array( 'text' => 'Import complete. Processing...' ) );
+							}
+						} elseif ( 'error' === $type ) {
+							$error_msg = isset( $event['error']['message'] ) ? $event['error']['message'] : 'Unknown API error';
+							if ( $callback ) {
+								$callback( 'error', array( 'message' => $error_msg ) );
+							}
+						}
+					}
+				}
+
+				return strlen( $data );
+			},
+		) );
+
+		$result    = curl_exec( $ch );
+		$http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		$curl_err  = curl_error( $ch );
+		curl_close( $ch );
+		// phpcs:enable WordPress.WP.AlternativeFunctions
+
+		if ( false === $result && $curl_err ) {
+			return new WP_Error( 'curl_error', 'Could not connect to Claude API. Error: ' . $curl_err );
+		}
+
+		if ( $http_code >= 400 ) {
+			$error_data = json_decode( $raw_response, true );
+			$error_msg  = '';
+			if ( $error_data && isset( $error_data['error']['message'] ) ) {
+				$error_msg = $error_data['error']['message'];
+			}
+			if ( empty( $error_msg ) ) {
+				$error_msg = 'API error (HTTP ' . $http_code . ')';
+			}
+			if ( 401 === $http_code ) {
+				$error_msg .= ' — Please check your API key in PressGo Settings.';
+			} elseif ( 429 === $http_code ) {
+				$error_msg .= ' — Rate limited. Please wait a moment and try again.';
+			} elseif ( 403 === $http_code ) {
+				$error_msg .= ' — Your API key may not have access to this model. Try switching to a different model in PressGo Settings.';
+			} elseif ( 400 === $http_code ) {
+				$error_msg .= ' — The request was rejected. Try switching to a different model in PressGo Settings, or contact support.';
+			}
+			return new WP_Error( 'api_error', $error_msg );
+		}
+
+		// Parse the accumulated text as JSON config.
+		$config = $this->parse_config_response( $accumulated_text );
+		if ( null === $config ) {
+			return new WP_Error( 'parse_error', 'Failed to parse config JSON from AI response.' );
+		}
+
+		// Emit the config event.
+		if ( $callback ) {
+			$callback( 'config', $config );
+		}
+
+		// Validate.
+		$validated = PressGo_Config_Validator::validate( $config );
+		if ( is_wp_error( $validated ) ) {
+			return $validated;
+		}
+
+		return $validated;
+	}
+
+	/**
 	 * Non-streaming generate (for testing).
 	 *
 	 * @param string      $prompt     User's text prompt.

@@ -39,6 +39,7 @@ class PressGo {
 		// AI + page creation.
 		require_once PRESSGO_PLUGIN_DIR . 'includes/prompts/class-pressgo-prompt-builder.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-ai-client.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-scraper-client.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-config-validator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-page-creator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-updater.php';

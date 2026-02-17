@@ -11,7 +11,116 @@ class PressGo_Rest_API {
 
 	public function init() {
 		add_action( 'wp_ajax_pressgo_generate_stream', array( $this, 'handle_stream' ) );
+		add_action( 'wp_ajax_pressgo_import_stream', array( $this, 'handle_import_stream' ) );
 		add_action( 'wp_ajax_pressgo_test_connection', array( $this, 'handle_test_connection' ) );
+	}
+
+	/**
+	 * Handle the import streaming request — scrape URL then generate via Claude.
+	 */
+	public function handle_import_stream() {
+		check_ajax_referer( 'pressgo_generate', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Unauthorized' );
+		}
+
+		// Set SSE headers.
+		header( 'Content-Type: text/event-stream' );
+		header( 'Cache-Control: no-cache' );
+		header( 'X-Accel-Buffering: no' );
+
+		while ( ob_get_level() ) {
+			ob_end_flush();
+		}
+
+		if ( function_exists( 'set_time_limit' ) ) {
+			set_time_limit( 300 );
+		}
+
+		$url        = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
+		$page_title = isset( $_POST['page_title'] ) ? sanitize_text_field( wp_unslash( $_POST['page_title'] ) ) : 'Imported Page';
+		$consent    = isset( $_POST['consent'] ) ? sanitize_text_field( wp_unslash( $_POST['consent'] ) ) : '';
+
+		if ( empty( $url ) ) {
+			$this->emit( 'error', array( 'message' => 'Please enter a URL to import.' ) );
+			die();
+		}
+
+		if ( 'yes' !== $consent ) {
+			$this->emit( 'error', array( 'message' => 'You must confirm you own or have rights to use this content.' ) );
+			die();
+		}
+
+		$api_key = PressGo_Admin::get_api_key();
+		if ( empty( $api_key ) ) {
+			$this->emit( 'error', array( 'message' => 'Claude API key not configured. Please go to PressGo Settings.' ) );
+			die();
+		}
+
+		if ( ! PressGo::is_elementor_active() ) {
+			$this->emit( 'error', array( 'message' => 'Elementor is not active. Please install and activate Elementor.' ) );
+			die();
+		}
+
+		// Step 1: Scrape the URL.
+		$this->emit( 'thinking', array( 'text' => 'Scanning page...' ) );
+
+		$scrape_result = PressGo_Scraper_Client::scrape( $url );
+		if ( is_wp_error( $scrape_result ) ) {
+			$this->emit( 'error', array( 'message' => $scrape_result->get_error_message() ) );
+			die();
+		}
+
+		$screenshot = $scrape_result['screenshot'];
+		$metadata   = $scrape_result['metadata'];
+
+		$this->emit( 'thinking', array( 'text' => 'Page scanned. Analyzing design...' ) );
+
+		// Step 2: Build import content and stream from Claude.
+		$user_content = PressGo_Prompt_Builder::build_import_content( $screenshot, $metadata );
+
+		$ai_client = new PressGo_AI_Client( $api_key );
+		$self      = $this;
+		$config    = $ai_client->generate_config_streaming_import(
+			$user_content,
+			function ( $event_type, $data ) use ( $self ) {
+				$self->emit( $event_type, $data );
+			}
+		);
+
+		if ( is_wp_error( $config ) ) {
+			$this->emit( 'error', array( 'message' => $config->get_error_message() ) );
+			die();
+		}
+
+		// Generate Elementor JSON.
+		$this->emit( 'progress', array( 'phase' => 'generating', 'detail' => 'Building Elementor layout...' ) );
+		$generator = new PressGo_Generator();
+		$elements  = $generator->generate( $config );
+
+		if ( empty( $elements ) ) {
+			$this->emit( 'error', array( 'message' => 'Generator produced no sections. The page may be too complex to import. Try uploading a screenshot instead.' ) );
+			die();
+		}
+
+		// Create WordPress page.
+		$this->emit( 'progress', array( 'phase' => 'creating_page', 'detail' => 'Creating WordPress page...' ) );
+		$creator = new PressGo_Page_Creator();
+		$post_id = $creator->create_page( $page_title, $elements, $config );
+
+		if ( is_wp_error( $post_id ) ) {
+			$this->emit( 'error', array( 'message' => 'Failed to create page: ' . $post_id->get_error_message() ) );
+			die();
+		}
+
+		$this->emit( 'page_created', array(
+			'post_id'  => $post_id,
+			'edit_url' => admin_url( "post.php?post={$post_id}&action=elementor" ),
+			'view_url' => get_permalink( $post_id ),
+		) );
+
+		die();
 	}
 
 	/**

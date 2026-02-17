@@ -99,4 +99,46 @@ class PressGo_Prompt_Builder {
 
 		return $content;
 	}
+
+	/**
+	 * Build user content for import mode (screenshot + metadata from scraper).
+	 *
+	 * @param string $screenshot_base64 Full-page screenshot as base64 PNG.
+	 * @param array  $metadata          Extracted page metadata (title, texts, colors, etc).
+	 * @return array Claude API content array with image + text instructions.
+	 */
+	public static function build_import_content( $screenshot_base64, $metadata ) {
+		$content = array();
+
+		// Screenshot as vision input.
+		$content[] = array(
+			'type'   => 'image',
+			'source' => array(
+				'type'       => 'base64',
+				'media_type' => 'image/png',
+				'data'       => $screenshot_base64,
+			),
+		);
+
+		// Build import instructions with extracted metadata.
+		$instructions  = "You are CLONING an existing page. The screenshot above shows the exact page to reproduce.\n\n";
+		$instructions .= "CRITICAL RULES FOR IMPORT MODE:\n";
+		$instructions .= "- Reproduce the screenshot as faithfully as possible — match layout, spacing, and visual hierarchy.\n";
+		$instructions .= "- Use the extracted text VERBATIM — do NOT rewrite, improve, or paraphrase any text.\n";
+		$instructions .= "- Match the exact colors from the metadata below.\n";
+		$instructions .= "- Choose section types and variants that most closely match each visual section in the screenshot.\n";
+		$instructions .= "- Use the extracted image URLs directly where they appear in the original.\n";
+		$instructions .= "- Preserve the exact section order from the screenshot.\n";
+		$instructions .= "- When in doubt, prioritize visual fidelity to the screenshot over creativity.\n\n";
+
+		$instructions .= "EXTRACTED PAGE DATA:\n";
+		$instructions .= wp_json_encode( $metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+
+		$content[] = array(
+			'type' => 'text',
+			'text' => $instructions,
+		);
+
+		return $content;
+	}
 }
