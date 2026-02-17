@@ -87,12 +87,29 @@ class PressGo_Page_Creator {
     transform: translateY(-4px);
 }
 
-/* Image hover zoom */
+/* Image loading — reserve space to prevent layout shift */
+.elementor-widget-image .elementor-image {
+    min-height: 40px;
+    background-color: #f3f4f6;
+    border-radius: inherit;
+}
 .elementor-widget-image .elementor-image img {
     transition: transform 0.4s ease;
+    aspect-ratio: auto;
+}
+.elementor-widget-image .elementor-image img[src*='pexels'] {
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    width: 100%;
+    height: auto;
 }
 .elementor-widget-image:hover .elementor-image img {
     transform: scale(1.03);
+}
+/* Hide broken images gracefully */
+.elementor-widget-image .elementor-image img[src=''],
+.elementor-widget-image .elementor-image img:not([src]) {
+    display: none;
 }
 
 /* Gallery image hover */

@@ -221,7 +221,10 @@ class PressGo_Section_Builder {
 			),
 		) );
 		$right_col = PressGo_Element_Factory::col( $right, array(
-			'vertical_align' => 'middle',
+			'vertical_align'    => 'middle',
+			'min_height'        => array( 'unit' => 'px', 'size' => 400, 'sizes' => array() ),
+			'min_height_tablet' => array( 'unit' => 'px', 'size' => 300, 'sizes' => array() ),
+			'min_height_mobile' => array( 'unit' => 'px', 'size' => 250, 'sizes' => array() ),
 		) );
 
 		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );
@@ -1520,7 +1523,10 @@ class PressGo_Section_Builder {
 			),
 		) );
 		$right_col = PressGo_Element_Factory::col( $right, array(
-			'vertical_align' => 'middle',
+			'vertical_align'    => 'middle',
+			'min_height'        => array( 'unit' => 'px', 'size' => 350, 'sizes' => array() ),
+			'min_height_tablet' => array( 'unit' => 'px', 'size' => 280, 'sizes' => array() ),
+			'min_height_mobile' => array( 'unit' => 'px', 'size' => 220, 'sizes' => array() ),
 		) );
 
 		return PressGo_Element_Factory::outer( $cfg,
@@ -2973,7 +2979,9 @@ class PressGo_Section_Builder {
 			'vertical_align' => 'middle',
 		) );
 		$right_col = PressGo_Element_Factory::col( $right, array(
-			'vertical_align' => 'middle',
+			'vertical_align'    => 'middle',
+			'min_height'        => array( 'unit' => 'px', 'size' => 300, 'sizes' => array() ),
+			'min_height_mobile' => array( 'unit' => 'px', 'size' => 200, 'sizes' => array() ),
 		) );
 
 		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );

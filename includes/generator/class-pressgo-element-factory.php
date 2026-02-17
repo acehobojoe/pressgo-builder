@@ -156,7 +156,7 @@ class PressGo_Element_Factory {
 						),
 					),
 					'elements' => array( $ch ),
-					'isInner'  => false,
+					'isInner'  => true,
 				);
 			}
 		}
@@ -169,7 +169,7 @@ class PressGo_Element_Factory {
 			'content_width'         => 'full',
 			'flex_direction'        => 'row',
 			'flex_direction_mobile' => 'column',
-			'flex_wrap'             => 'wrap',
+			'flex_wrap'             => 'nowrap',
 			'flex_align_items'      => 'stretch',
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap,
@@ -194,7 +194,7 @@ class PressGo_Element_Factory {
 			'elType'   => 'container',
 			'settings' => $s,
 			'elements' => $processed,
-			'isInner'  => false,
+			'isInner'  => true,
 		);
 	}
 
@@ -238,7 +238,7 @@ class PressGo_Element_Factory {
 			'elType'   => 'container',
 			'settings' => $s,
 			'elements' => $widgets,
-			'isInner'  => false,
+			'isInner'  => true,
 		);
 	}
 
