@@ -611,6 +611,8 @@ class PressGo_Section_Builder {
 				'typography_font_family'         => $fonts['heading'],
 				'typography_font_weight'         => '800',
 				'typography_font_size'           => array( 'unit' => 'px', 'size' => 36, 'sizes' => array() ),
+				'typography_font_size_tablet'    => array( 'unit' => 'px', 'size' => 32, 'sizes' => array() ),
+				'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => 28, 'sizes' => array() ),
 				'typography_letter_spacing'      => array( 'unit' => 'px', 'size' => -0.5, 'sizes' => array() ),
 				'title_typography_typography'     => 'custom',
 				'title_typography_font_family'   => $fonts['body'],
@@ -697,6 +699,8 @@ class PressGo_Section_Builder {
 				'typography_font_family'         => $fonts['heading'],
 				'typography_font_weight'         => '800',
 				'typography_font_size'           => array( 'unit' => 'px', 'size' => 44, 'sizes' => array() ),
+				'typography_font_size_tablet'    => array( 'unit' => 'px', 'size' => 38, 'sizes' => array() ),
+				'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => 32, 'sizes' => array() ),
 				'typography_letter_spacing'      => array( 'unit' => 'px', 'size' => -1, 'sizes' => array() ),
 				'title_typography_typography'     => 'custom',
 				'title_typography_font_family'   => $fonts['body'],
@@ -710,6 +714,10 @@ class PressGo_Section_Builder {
 					'padding' => array(
 						'unit' => 'px', 'top' => '24', 'right' => '16',
 						'bottom' => '24', 'left' => '16', 'isLinked' => false,
+					),
+					'padding_mobile' => array(
+						'unit' => 'px', 'top' => '16', 'right' => '12',
+						'bottom' => '16', 'left' => '12', 'isLinked' => false,
 					),
 				)
 			);
@@ -787,7 +795,7 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 		);
 
-		// Build pill buttons in rows (max 4 per row for clean layout).
+		// Build pill buttons — wrap on mobile so pills flow naturally.
 		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
 		$chunks  = array_chunk( $categories, $per_row );
 		foreach ( $chunks as $chunk ) {
@@ -795,10 +803,20 @@ class PressGo_Section_Builder {
 			foreach ( $chunk as $cat ) {
 				$cols[] = PressGo_Element_Factory::col(
 					array( self::pill_button( $cfg, $cat, $c['white'], $c['text_dark'], $c['border'] ) ),
-					array( 'vertical_align' => 'middle' )
+					array(
+						'vertical_align' => 'middle',
+						'width_mobile'   => array(
+							'unit' => '%', 'size' => 45, 'sizes' => array(),
+						),
+					)
 				);
 			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8 );
+			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8, array(
+				'flex_direction_mobile' => 'row',
+				'flex_wrap'            => 'wrap',
+				'flex_wrap_mobile'     => 'wrap',
+				'flex_justify_content' => 'center',
+			) );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 24 );
@@ -823,7 +841,7 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 		);
 
-		// Build pill buttons in rows (max 4 per row for clean layout).
+		// Build pill buttons — wrap on mobile so pills flow naturally.
 		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
 		$chunks  = array_chunk( $categories, $per_row );
 		foreach ( $chunks as $chunk ) {
@@ -831,10 +849,20 @@ class PressGo_Section_Builder {
 			foreach ( $chunk as $cat ) {
 				$cols[] = PressGo_Element_Factory::col(
 					array( self::pill_button( $cfg, $cat, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.1)' ) ),
-					array( 'vertical_align' => 'middle' )
+					array(
+						'vertical_align' => 'middle',
+						'width_mobile'   => array(
+							'unit' => '%', 'size' => 45, 'sizes' => array(),
+						),
+					)
 				);
 			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8 );
+			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8, array(
+				'flex_direction_mobile' => 'row',
+				'flex_wrap'            => 'wrap',
+				'flex_wrap_mobile'     => 'wrap',
+				'flex_justify_content' => 'center',
+			) );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['dark_bg'], null, 0, 24 );
@@ -1276,6 +1304,8 @@ class PressGo_Section_Builder {
 				'typography_font_family'         => $fonts['heading'],
 				'typography_font_weight'         => '800',
 				'typography_font_size'           => array( 'unit' => 'px', 'size' => 48, 'sizes' => array() ),
+				'typography_font_size_tablet'    => array( 'unit' => 'px', 'size' => 42, 'sizes' => array() ),
+				'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => 34, 'sizes' => array() ),
 				'typography_letter_spacing'      => array( 'unit' => 'px', 'size' => -1, 'sizes' => array() ),
 				'title_typography_typography'     => 'custom',
 				'title_typography_font_family'   => $fonts['body'],
@@ -2205,7 +2235,7 @@ class PressGo_Section_Builder {
 			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'center',
-				$c['text_dark'], 48, '800', -2, 1.0 );
+				$c['text_dark'], 48, '800', -2, 1.0, null, 34, 40 );
 			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'center',
 				$c['text_muted'], 16 );
 
@@ -2314,7 +2344,7 @@ class PressGo_Section_Builder {
 			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'left',
-				$c['text_dark'], 36, '800', -1, 1.0 );
+				$c['text_dark'], 36, '800', -1, 1.0, null, 28, 32 );
 			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'left',
 				$c['text_muted'], 14 );
 
@@ -2410,14 +2440,27 @@ class PressGo_Section_Builder {
 					),
 					array(
 						'vertical_align' => 'middle',
+						'width_mobile'   => array(
+							'unit' => '%', 'size' => 28, 'sizes' => array(),
+						),
 						'padding'        => array(
 							'unit' => 'px', 'top' => '10', 'right' => '16',
 							'bottom' => '10', 'left' => '16', 'isLinked' => false,
 						),
+						'padding_mobile' => array(
+							'unit' => 'px', 'top' => '8', 'right' => '8',
+							'bottom' => '8', 'left' => '8', 'isLinked' => true,
+						),
 					)
 				);
 			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20 );
+			// Keep row on mobile but wrap so logos flow into 3 columns.
+			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20, array(
+				'flex_direction_mobile' => 'row',
+				'flex_wrap'            => 'wrap',
+				'flex_wrap_mobile'     => 'wrap',
+				'flex_justify_content' => 'center',
+			) );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -2450,14 +2493,27 @@ class PressGo_Section_Builder {
 					),
 					array(
 						'vertical_align' => 'middle',
+						'width_mobile'   => array(
+							'unit' => '%', 'size' => 28, 'sizes' => array(),
+						),
 						'padding'        => array(
 							'unit' => 'px', 'top' => '10', 'right' => '16',
 							'bottom' => '10', 'left' => '16', 'isLinked' => false,
 						),
+						'padding_mobile' => array(
+							'unit' => 'px', 'top' => '8', 'right' => '8',
+							'bottom' => '8', 'left' => '8', 'isLinked' => true,
+						),
 					)
 				);
 			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20 );
+			// Keep row on mobile but wrap so logos flow into 3 columns.
+			$children[] = PressGo_Element_Factory::row( $cfg, $logo_cols, 20, array(
+				'flex_direction_mobile' => 'row',
+				'flex_wrap'            => 'wrap',
+				'flex_wrap_mobile'     => 'wrap',
+				'flex_justify_content' => 'center',
+			) );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
