@@ -115,25 +115,32 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 
 ## Responsive / Mobile
 - **Section padding**: `outer()` auto-calculates tablet (3/4) and mobile (1/2, min 40px) padding
-- **Row gaps**: `row()` auto-calculates tablet (3/4) and mobile (1/2) column gaps
+- **Row gaps**: `row()` auto-calculates tablet (3/4) and mobile (min 16px, 2/3 desktop) column gaps
+- **Row stacking**: `row()` sets `flex_direction_mobile: column` by default — columns stack on mobile. Override with `extra` param for sections that should wrap instead (logo bar, social proof pills)
 - **Spacers**: `spacer_w()` auto-sets mobile to 2/3 desktop (min 8px) for spacers >= 24px
 - **Widget mobile params**: `heading_w($align_mobile)`, `text_w($line_height, $align_mobile)`, `btn_w($align_mobile)` — use for split layouts that stack on mobile
 - **Split layout pattern**: On mobile, 2-column layouts stack vertically. Add `align_mobile='center'` to headings/text/buttons in the left column, and add `padding_mobile` reset to columns with desktop-only right padding
-- **Font size suffixes**: `typography_font_size_mobile`, `typography_font_size_tablet` on any widget
-- **Counter sizes**: auto-calculated tablet (7/8) and mobile (3/4) from desktop size
+- **Font size suffixes**: `typography_font_size_mobile`, `typography_font_size_tablet` on any widget. Always add these for sizes >= 28px.
+- **Counter sizes**: `counter_w()` auto-calculates tablet (7/8) and mobile (3/4) from desktop size. Raw counter widgets must set these manually.
+- **Card padding**: `card_style()` includes `padding_mobile`. If overriding `padding` with `array_merge`, `padding_mobile` is preserved.
 - **Map height**: `google_map_w($height_mobile)` — auto-calculated as 5/8 desktop (min 200px)
+- **Image layout shift**: CSS `aspect-ratio: 3/2` on Pexels images + `min-height` on image columns prevents CLS
+- **Logo bar mobile**: Uses `flex_wrap: wrap` + `flex_direction_mobile: row` + `width_mobile: 28%` so logos wrap into 3 columns instead of stacking
+- **Social proof mobile**: Uses `flex_wrap: wrap` + `flex_direction_mobile: row` + `width_mobile: 45%` so pills wrap into 2 columns
 
 ## Critical Elementor Rules
 1. **Use flexbox containers** — `elType: 'container'` with `container_type: 'flex'`. All primitives (outer/row/col) are containers.
 2. **NEVER use `_animation`** — causes `elementor-invisible` class, content disappears
 3. **Icon format must be** `array('value' => 'fas fa-name', 'library' => 'fa-solid')` — value MUST be string, never nested array
-4. **Container flex settings** — `outer()`: direction column + boxed content. `row()`: direction row + stacks on mobile. `col()`: direction column + width set by row.
+4. **Container flex settings** — `outer()`: direction column + boxed content. `row()`: direction row + `flex_wrap: nowrap` + stacks on mobile. `col()`: direction column + width set by row.
 5. **Set `flex_gap: 0`** on outer/col containers — spacing is handled by spacer widgets, not flex gap
-6. **Flush caches** after page creation (`wp_elementor flush-css`)
-7. **Toggle widget (FAQ) is Free**, accordion is Pro-only
-8. **Posts widget requires Pro** — check `defined('ELEMENTOR_PRO_VERSION')`
-9. **Container nesting is unlimited** — containers can nest freely (no 3-level limit like sections)
-10. **Elementor data storage** — `update_post_meta($id, '_elementor_data', wp_slash(wp_json_encode($elements)))`
+6. **`isInner` is critical** — `outer()` must set `isInner: false` (renders as `e-parent`, gets boxed centering). `row()` and `col()` must set `isInner: true` (renders as `e-child`). Getting this wrong breaks centering and layout.
+7. **Flush caches** after page creation (`wp_elementor flush-css`)
+8. **Toggle widget (FAQ) is Free**, accordion is Pro-only
+9. **Posts widget requires Pro** — check `defined('ELEMENTOR_PRO_VERSION')`
+10. **Container nesting is unlimited** — containers can nest freely (no 3-level limit like sections)
+11. **Elementor data storage** — `update_post_meta($id, '_elementor_data', wp_slash(wp_json_encode($elements)))`
+12. **CSS selectors for containers** — Use `.e-child.e-con` (not `.elementor-inner-section` or `.elementor-column`). Top-level containers get `.e-parent.e-con-boxed`, inner containers get `.e-child.e-con-full`.
 
 ## Image Support
 - `image_w($url, $alt, $width, $radius, $shadow, $align)` creates Elementor image widgets
@@ -179,10 +186,15 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 ## Testing
 - PHP 7.4+ compatible (uses `intdiv()`, no union types, no named args)
 - Works with Elementor Free; blog section requires Pro
-- Config validation fills in missing defaults
+- Config validation fills in missing defaults + type coercion for array fields
 - Sandbox: wp.pressgo.app (DigitalOcean droplet, SSH alias: `digitalocean`)
+- WordPress path on server: `/var/www/wp.pressgo.app/htdocs`
+- Plugin path on server: `/var/www/wp.pressgo.app/htdocs/wp-content/plugins/pressgo-builder/`
 - Screenshot test: `node test/screenshot-test.mjs` (Puppeteer, desktop 1440px + mobile 375px)
-- Test page generator: `wp eval-file /tmp/pressgo-test-pages.php --allow-root`
+- **Batch config test**: `bash test/build-from-configs.sh` — rebuilds 23 test pages from `test/configs/*.json` via SSH
+- **70 test pages** on wp.pressgo.app: 23 from pre-generated configs, 47 from API generation
+- Deploy single file: `scp file.php digitalocean:/var/www/wp.pressgo.app/htdocs/wp-content/plugins/pressgo-builder/path/file.php`
+- Flush CSS after deploy: `ssh digitalocean "cd /var/www/wp.pressgo.app/htdocs && wp elementor flush-css --allow-root"`
 
 ## Settings
 - **PressGo API Key** — authenticates plugin → server.pressgo.app

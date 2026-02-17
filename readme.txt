@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, generator
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -123,6 +123,18 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 1.3.0 =
+* Fixed container centering — pages now render properly centered on all screen sizes
+* Fixed layout shift caused by images loading without reserved dimensions
+* Added responsive font sizes for counters, pricing headings, and large text across all sections
+* Logo bar wraps into 3 columns on mobile instead of stacking single-column
+* Social proof pills wrap into 2 columns on mobile
+* Improved mobile padding on card sections (steps, results, CTA, newsletter)
+* Better footer contrast — increased icon and text opacity for readability
+* Fixed custom CSS selectors for Elementor container layout (hover effects now work)
+* Config validator: added type safety for array fields and CTA URL fallbacks
+* Raised minimum mobile row gap from 10px to 16px for better spacing
+
 = 1.2.0 =
 * Added automatic update notifications via GitHub releases — future updates appear on the Plugins page
 
@@ -140,6 +152,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+Layout and responsive polish — fixes container centering, adds mobile-responsive font sizes, improves logo bar and social proof on small screens.
 
 = 1.2.0 =
 Adds automatic update notifications — you'll receive future updates directly on the WordPress Plugins page.
