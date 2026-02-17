@@ -1,0 +1,97 @@
+{
+  "colors": {
+    "primary": "#E11D48",
+    "dark_bg": "#1C1917",
+    "light_bg": "#FFF1F2",
+    "white": "#FFFFFF",
+    "text_dark": "#1C1917",
+    "text_muted": "#78716C",
+    "accent": "#D4A853"
+  },
+  "fonts": {"heading": "Playfair Display", "body": "Lato"},
+  "layout": {"boxed_width": 1100, "card_radius": 12, "button_radius": 8},
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "LUXURY WELLNESS",
+    "headline": "Your Escape Awaits",
+    "subheadline": "Massages, facials, body wraps, and couples packages. Relaxation lounge and steam room included.",
+    "cta_primary": {"text": "Book Online", "url": "#", "icon": "fas fa-calendar-check"},
+    "cta_secondary": {"text": "View Services", "url": "#features"},
+    "trust_line": "Gift Certificates Available • Couples Packages",
+    "image": "https://images.pexels.com/photos/3822864/pexels-photo-3822864.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "variant": "image_cards",
+    "eyebrow": "SERVICES",
+    "headline": "Indulge & Restore",
+    "items": [
+      {"icon": "fas fa-spa", "title": "Massage Therapy", "desc": "Swedish, deep tissue, hot stone, and prenatal options.", "image": "https://images.pexels.com/photos/3822906/pexels-photo-3822906.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#E11D48"},
+      {"icon": "fas fa-leaf", "title": "Facials & Skincare", "desc": "Customized facials, microdermabrasion, and LED therapy.", "image": "https://images.pexels.com/photos/3993463/pexels-photo-3993463.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#D4A853"},
+      {"icon": "fas fa-heart", "title": "Couples Experiences", "desc": "Side-by-side treatments with champagne and chocolates.", "image": "https://images.pexels.com/photos/3985163/pexels-photo-3985163.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#7C3AED"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "YOUR VISIT",
+    "headline": "The Serenity Experience",
+    "items": [
+      {"num": "1", "title": "Arrive & Unwind", "desc": "Check in, slip into a robe, enjoy the relaxation lounge."},
+      {"num": "2", "title": "Your Treatment", "desc": "Personalized service from our expert therapists."},
+      {"num": "3", "title": "Refresh & Glow", "desc": "Enjoy the steam room, tea lounge, and complimentary treats."}
+    ]
+  },
+  "testimonials": {
+    "variant": "minimal",
+    "eyebrow": "GUESTS",
+    "headline": "What Guests Say",
+    "items": [
+      {"quote": "The most relaxing two hours of my year. I book monthly now. Non-negotiable.", "name": "Lauren Taylor", "role": "Regular Guest"},
+      {"quote": "Bought a couples package as an anniversary gift. We've been back three times since.", "name": "Chris & Megan O'Brien", "role": "Couples Package"},
+      {"quote": "The facial completely transformed my skin. My dermatologist was impressed.", "name": "Aisha Johnson", "role": "Facial Client"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "THE SERENITY DIFFERENCE",
+    "headline": "More Than a Spa Day",
+    "description": "An elevated experience designed for complete rejuvenation.",
+    "benefits": [
+      "Licensed, experienced therapists",
+      "Organic and premium product lines",
+      "Complimentary steam room access",
+      "Relaxation lounge with tea service",
+      "Personalized treatment plans",
+      "Gift certificates available"
+    ],
+    "cta": {"text": "Book Your Visit", "url": "#", "icon": "fas fa-calendar-check"}
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Guest Questions",
+    "items": [
+      {"q": "How early should I arrive?", "a": "We recommend 15 minutes early to enjoy the relaxation lounge and steam room before your treatment."},
+      {"q": "Do you offer gift certificates?", "a": "Yes. Available in any dollar amount or pre-set packages. Purchase online or at our front desk."},
+      {"q": "What's included with treatments?", "a": "All treatments include robe, slippers, relaxation lounge access, steam room, and complimentary tea."},
+      {"q": "Can I book for a group?", "a": "Absolutely. We host bridal parties, birthdays, and corporate groups. Call for group pricing."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Your Relaxation Awaits",
+    "description": "Book online or call to reserve your spa experience.",
+    "cta": {"text": "Book Now", "url": "#", "icon": "fas fa-calendar-check"},
+    "trust_line": "Gift certificates available"
+  },
+  "footer": {
+    "brand": {"name": "Serenity Day Spa", "description": "Luxury spa experiences for mind, body, and soul."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "Massages"}, {"text": "Facials"}, {"text": "Body Wraps"}, {"text": "Couples"}]},
+      {"title": "Info", "links": [{"text": "Gift Certificates"}, {"text": "Group Events"}, {"text": "Hours"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "book@serenityspa.com", "phone": "(555) 555-SPA1"},
+    "copyright": "© 2026 Serenity Day Spa. All rights reserved."
+  }
+}

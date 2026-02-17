@@ -1,0 +1,94 @@
+{
+  "colors": {
+    "primary": "#DC2626",
+    "dark_bg": "#1C1917",
+    "light_bg": "#FEF2F2",
+    "white": "#FFFFFF",
+    "text_dark": "#1C1917",
+    "text_muted": "#78716C",
+    "accent": "#059669"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 8},
+  "sections": ["hero", "features", "stats", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "25-YEAR WARRANTY",
+    "headline": "Roofs Built to Last",
+    "subheadline": "New roofs, storm damage repair, gutter installation. Free inspections. Insurance claim specialists.",
+    "cta_primary": {"text": "Free Inspection", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Call Now", "url": "tel:5551234567"},
+    "trust_line": "Licensed • Insured • 25-Year Warranty",
+    "image": "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "SERVICES",
+    "headline": "Complete Roofing Solutions",
+    "items": [
+      {"icon": "fas fa-home", "title": "New Roof Installation", "desc": "Shingle, metal, tile, and flat roof systems.", "accent": "#DC2626"},
+      {"icon": "fas fa-cloud-rain", "title": "Storm Damage Repair", "desc": "Emergency tarping and full restoration. Insurance help.", "accent": "#2563EB"},
+      {"icon": "fas fa-tint", "title": "Gutters & Drainage", "desc": "Seamless gutters, guards, and downspout systems.", "accent": "#059669"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "5,000+", "label": "Roofs Installed", "icon": "fas fa-hard-hat"},
+      {"value": "25yr", "label": "Warranty", "icon": "fas fa-shield-alt"},
+      {"value": "4.9", "label": "Google Rating", "icon": "fas fa-star"},
+      {"value": "A+", "label": "BBB Rating", "icon": "fas fa-award"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "REVIEWS",
+    "headline": "Homeowners Trust Summit",
+    "items": [
+      {"quote": "Hail destroyed our roof. Summit handled the insurance claim and had a new roof on in 3 days.", "name": "Tom Henderson", "role": "Homeowner"},
+      {"quote": "Got three quotes. Summit wasn't the cheapest but the quality and warranty sold me.", "name": "Patricia Lee", "role": "Homeowner"},
+      {"quote": "Professional crew, clean job site, and they even fixed our damaged gutters for free.", "name": "Mark & Lisa Johnson", "role": "Homeowners"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "WHY SUMMIT",
+    "headline": "The Summit Guarantee",
+    "description": "Quality workmanship backed by the best warranty in the business.",
+    "benefits": [
+      "Free roof inspections",
+      "25-year workmanship warranty",
+      "Insurance claim assistance",
+      "GAF Master Elite certified",
+      "Same-week emergency repairs",
+      "Financing available"
+    ],
+    "cta": {"text": "Get Free Inspection", "url": "#", "icon": "fas fa-arrow-right"}
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Roofing Questions",
+    "items": [
+      {"q": "How long does a roof replacement take?", "a": "Most residential roofs are completed in 1-2 days. Larger or complex roofs may take 3-4 days."},
+      {"q": "Do you help with insurance claims?", "a": "Yes. We document damage, meet with adjusters, and handle the paperwork so you don't have to."},
+      {"q": "What roofing materials do you use?", "a": "GAF Timberline shingles (most popular), metal roofing, clay tile, and flat roof systems."},
+      {"q": "Do you offer financing?", "a": "Yes. 0% interest for 18 months on qualifying installations. Apply in minutes."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Protect Your Home",
+    "description": "Schedule your free roof inspection today.",
+    "cta": {"text": "Free Inspection", "url": "#", "icon": "fas fa-calendar-check"},
+    "trust_line": "No obligation • Licensed & insured"
+  },
+  "footer": {
+    "brand": {"name": "Summit Roofing", "description": "Residential roofing you can trust."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "New Roofs"}, {"text": "Storm Repair"}, {"text": "Gutters"}, {"text": "Inspections"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Reviews"}, {"text": "Gallery"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "info@summitroofing.com", "phone": "(555) 555-ROOF"},
+    "copyright": "© 2026 Summit Roofing Co. All rights reserved."
+  }
+}

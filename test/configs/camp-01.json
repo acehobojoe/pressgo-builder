@@ -1,0 +1,102 @@
+{
+  "colors": {
+    "primary": "#059669",
+    "dark_bg": "#1C1917",
+    "light_bg": "#ECFDF5",
+    "white": "#FFFFFF",
+    "text_dark": "#1C1917",
+    "text_muted": "#78716C",
+    "accent": "#F59E0B"
+  },
+  "fonts": {"heading": "Nunito", "body": "Quicksand"},
+  "layout": {"boxed_width": 1200, "card_radius": 20, "button_radius": 12},
+  "sections": ["hero", "features", "stats", "steps", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "AGES 7-15",
+    "headline": "Adventure Starts Here",
+    "subheadline": "Wilderness skills, arts and crafts, swimming, and archery. Week-long sessions with overnight and day options.",
+    "cta_primary": {"text": "Register Now", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "View Activities", "url": "#features"},
+    "trust_line": "ACA Accredited • 20+ Years Running • Limited Spots",
+    "image": "https://images.pexels.com/photos/6646918/pexels-photo-6646918.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "variant": "grid",
+    "eyebrow": "ACTIVITIES",
+    "headline": "Adventures Every Day",
+    "items": [
+      {"icon": "fas fa-campground", "title": "Wilderness Skills", "desc": "Fire building, orienteering, and nature survival.", "accent": "#059669"},
+      {"icon": "fas fa-swimmer", "title": "Swimming & Water Sports", "desc": "Lake swimming, kayaking, and paddleboarding.", "accent": "#2563EB"},
+      {"icon": "fas fa-bullseye", "title": "Archery & Sports", "desc": "Range time, team games, and friendly competitions.", "accent": "#DC2626"},
+      {"icon": "fas fa-paint-brush", "title": "Arts & Crafts", "desc": "Pottery, tie-dye, woodworking, and creative projects.", "accent": "#F59E0B"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "20+", "label": "Years Running", "icon": "fas fa-campground"},
+      {"value": "5,000+", "label": "Campers Served", "icon": "fas fa-child"},
+      {"value": "50", "label": "Acres of Wilderness", "icon": "fas fa-tree"},
+      {"value": "4.9", "label": "Parent Rating", "icon": "fas fa-star"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "A TYPICAL DAY",
+    "headline": "Camp Life",
+    "items": [
+      {"num": "AM", "title": "Morning Activities", "desc": "Wilderness skills, sports, and swimming before lunch."},
+      {"num": "PM", "title": "Afternoon Adventures", "desc": "Arts, archery, hiking, and free-choice activities."},
+      {"num": "EVE", "title": "Evening Fun", "desc": "Campfire stories, stargazing, and cabin bonding time."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "FAMILIES",
+    "headline": "What Families Say",
+    "items": [
+      {"quote": "My son talks about Trailblazer all year. He's made lifelong friends and gained real confidence.", "name": "Sarah Bennett", "role": "Parent of a 10-year-old"},
+      {"quote": "The counselors are incredible. My daughter felt safe, challenged, and truly herself.", "name": "Michael Chen", "role": "Parent of an 8-year-old"},
+      {"quote": "Third year in a row. Our kids would live here year-round if they could.", "name": "The Rodriguez Family", "role": "Returning Family"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "SESSIONS",
+    "headline": "Choose Your Adventure",
+    "subheadline": "Week-long sessions from June through August.",
+    "plans": [
+      {"name": "Day Camp", "price": "$395", "period": "/week", "description": "Ages 7-10", "features": ["Mon-Fri, 8am-4pm", "All activities included", "Lunch & snacks", "Camp t-shirt"], "cta": {"text": "Register", "url": "#"}},
+      {"name": "Overnight Camp", "price": "$695", "period": "/week", "description": "Ages 10-15", "badge": "MOST POPULAR", "highlighted": true, "features": ["Sun-Sat, full week", "Cabin lodging", "All meals included", "All activities", "Evening programs"], "cta": {"text": "Register", "url": "#"}},
+      {"name": "Leadership Program", "price": "$895", "period": "/2 weeks", "description": "Ages 14-15", "features": ["2-week intensive", "Counselor-in-training", "Leadership workshops", "Community service", "Certificate of completion"], "cta": {"text": "Apply", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Parent Questions",
+    "items": [
+      {"q": "What's the camper-to-counselor ratio?", "a": "4:1 for day camp, 6:1 for overnight. All counselors are trained, background-checked, and first-aid certified."},
+      {"q": "What if my child gets homesick?", "a": "It's normal! Our counselors are trained for it. Most homesickness resolves within 24-48 hours."},
+      {"q": "Are there dietary accommodations?", "a": "Yes. We handle allergies, vegetarian, vegan, kosher, and halal diets with advance notice."},
+      {"q": "What's your refund policy?", "a": "Full refund 30+ days before session. 50% refund 15-29 days. Credit for future sessions within 14 days."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Spots Fill Fast",
+    "description": "Registration is open for Summer 2026. Reserve your camper's spot today.",
+    "cta": {"text": "Register Now", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "ACA accredited • Early bird discount available"
+  },
+  "footer": {
+    "brand": {"name": "Trailblazer Camp", "description": "Summer camp adventures for kids ages 7-15."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-youtube", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Programs", "links": [{"text": "Day Camp"}, {"text": "Overnight"}, {"text": "Leadership"}, {"text": "Family Weekend"}]},
+      {"title": "About", "links": [{"text": "Our Story"}, {"text": "Staff"}, {"text": "Safety"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "info@trailblazercamp.com", "phone": "(555) 444-CAMP"},
+    "copyright": "© 2026 Trailblazer Summer Camp. All rights reserved."
+  }
+}

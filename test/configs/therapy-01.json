@@ -1,0 +1,92 @@
+{
+  "colors": {
+    "primary": "#0D9488",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F0FDFA",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#2563EB"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1100, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "steps", "results", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "EXPERT REHABILITATION",
+    "headline": "Move Better. Live Better.",
+    "subheadline": "Post-surgery rehab, sports injuries, and chronic pain treatment. Insurance accepted. Two convenient locations.",
+    "cta_primary": {"text": "Book Appointment", "url": "#", "icon": "fas fa-calendar-check"},
+    "cta_secondary": {"text": "Our Specialties", "url": "#features"},
+    "trust_line": "Insurance Accepted • Two Locations • Evening Hours",
+    "image": "https://images.pexels.com/photos/3823488/pexels-photo-3823488.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "SPECIALTIES",
+    "headline": "Expert Care for Every Condition",
+    "items": [
+      {"icon": "fas fa-running", "title": "Sports Rehabilitation", "desc": "Get back to your sport faster with targeted recovery programs.", "accent": "#0D9488"},
+      {"icon": "fas fa-procedures", "title": "Post-Surgery Rehab", "desc": "Structured recovery plans for joint replacements and repairs.", "accent": "#2563EB"},
+      {"icon": "fas fa-hand-holding-heart", "title": "Chronic Pain", "desc": "Long-term pain management through movement and manual therapy.", "accent": "#F59E0B"}
+    ]
+  },
+  "steps": {
+    "variant": "timeline",
+    "eyebrow": "YOUR JOURNEY",
+    "headline": "Your Recovery Path",
+    "items": [
+      {"num": "1", "title": "Evaluation", "desc": "Thorough assessment of your condition and movement patterns."},
+      {"num": "2", "title": "Treatment Plan", "desc": "Customized program with clear milestones and timeline."},
+      {"num": "3", "title": "Recover & Thrive", "desc": "Guided rehabilitation until you reach your goals."}
+    ]
+  },
+  "results": {
+    "eyebrow": "OUTCOMES",
+    "headline": "Proven Recovery Results",
+    "description": "Patient outcomes from the past 12 months.",
+    "metrics": [
+      {"value": "94%", "label": "Return to Full Activity", "color": "#0D9488"},
+      {"value": "3x", "label": "Faster Than Average", "color": "#2563EB"},
+      {"value": "4.9", "label": "Patient Satisfaction", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "variant": "featured",
+    "eyebrow": "PATIENT STORIES",
+    "headline": "Real Recovery Stories",
+    "items": [
+      {"quote": "Tore my ACL playing soccer. Dr. Park had me back on the field in 7 months. The recovery plan was aggressive but it worked.", "name": "Jake Morrison", "role": "Competitive Soccer Player"},
+      {"quote": "After knee replacement, I was walking pain-free within 6 weeks. Amazing team.", "name": "Dorothy Evans", "role": "Knee Replacement Patient"},
+      {"quote": "Years of lower back pain, gone. The manual therapy approach changed everything.", "name": "Lisa Hernandez", "role": "Chronic Pain Patient"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Patient Questions",
+    "items": [
+      {"q": "Do I need a doctor's referral?", "a": "Not in most cases. Many insurance plans allow direct access to physical therapy. Call us to verify."},
+      {"q": "What insurance do you accept?", "a": "Most major plans including Blue Cross, Aetna, UnitedHealthcare, Cigna, and Medicare."},
+      {"q": "How long are sessions?", "a": "Initial evaluations are 60 minutes. Follow-up sessions are 45 minutes, one-on-one with your therapist."},
+      {"q": "Do you offer evening hours?", "a": "Yes. Both locations offer appointments until 7pm Monday through Thursday."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Start Your Recovery Today",
+    "description": "Most patients see improvement within the first 3 visits.",
+    "cta": {"text": "Book Appointment", "url": "#", "icon": "fas fa-calendar-check"},
+    "trust_line": "Insurance accepted • Same-week appointments"
+  },
+  "footer": {
+    "brand": {"name": "Recover PT", "description": "Physical therapy and sports rehabilitation."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "Sports Rehab"}, {"text": "Post-Surgery"}, {"text": "Chronic Pain"}, {"text": "Dry Needling"}]},
+      {"title": "Locations", "links": [{"text": "Downtown Clinic"}, {"text": "Westside Office"}, {"text": "Hours"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "info@recoverpt.com", "phone": "(555) 555-HEAL"},
+    "copyright": "© 2026 Recover Physical Therapy. All rights reserved."
+  }
+}

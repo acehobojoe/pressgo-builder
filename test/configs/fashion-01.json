@@ -1,0 +1,110 @@
+{
+  "colors": {
+    "primary": "#1E293B",
+    "dark_bg": "#111827",
+    "light_bg": "#F9FAFB",
+    "white": "#FFFFFF",
+    "text_dark": "#111827",
+    "text_muted": "#6B7280",
+    "accent": "#059669"
+  },
+  "fonts": {
+    "heading": "Playfair Display",
+    "body": "Lato"
+  },
+  "layout": {
+    "boxed_width": 1100,
+    "section_padding": 100,
+    "card_radius": 12,
+    "button_radius": 8
+  },
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "SUSTAINABLE FASHION",
+    "headline": "Wear What Matters",
+    "subheadline": "Timeless designs crafted from organic cotton and recycled materials. Fashion that feels good inside and out.",
+    "cta_primary": {"text": "Shop Collection", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Our Story", "url": "#"},
+    "trust_line": "Free shipping on orders over $75",
+    "image": "https://images.pexels.com/photos/298863/pexels-photo-298863.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "variant": "alternating",
+    "eyebrow": "COLLECTIONS",
+    "headline": "Capsule Wardrobe Essentials",
+    "subheadline": "Fewer pieces, more versatility. Built to last seasons, not weeks.",
+    "items": [
+      {"icon": "fas fa-leaf", "title": "Organic Cotton Basics", "desc": "Tees, tanks, and everyday layers in GOTS-certified organic cotton.", "image": "https://images.pexels.com/photos/298864/pexels-photo-298864.jpeg?auto=compress&cs=tinysrgb&w=800"},
+      {"icon": "fas fa-recycle", "title": "Recycled Denim", "desc": "Classic fits made from 80% post-consumer recycled materials.", "image": "https://images.pexels.com/photos/1005638/pexels-photo-1005638.jpeg?auto=compress&cs=tinysrgb&w=800"},
+      {"icon": "fas fa-gem", "title": "Timeless Outerwear", "desc": "Coats and jackets designed to outlast trends and weather.", "image": "https://images.pexels.com/photos/3965544/pexels-photo-3965544.jpeg?auto=compress&cs=tinysrgb&w=800"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "OUR PROCESS",
+    "headline": "From Fiber to Wardrobe",
+    "items": [
+      {"num": "1", "title": "Source Responsibly", "desc": "Organic and recycled materials from certified suppliers."},
+      {"num": "2", "title": "Craft with Care", "desc": "Small-batch production in fair-wage factories."},
+      {"num": "3", "title": "Ship Sustainably", "desc": "Plastic-free packaging, carbon-neutral delivery."}
+    ]
+  },
+  "testimonials": {
+    "variant": "minimal",
+    "eyebrow": "REVIEWS",
+    "headline": "What Our Community Says",
+    "items": [
+      {"quote": "I replaced half my closet with Thread & Needle basics. Better quality, less clutter.", "name": "Emma Chen", "role": "Loyal Customer"},
+      {"quote": "The organic cotton tee is the softest I've owned. Held up after 50+ washes.", "name": "Priya Sharma", "role": "Fashion Blogger"},
+      {"quote": "Finally a brand that's sustainable without sacrificing style.", "name": "Olivia Martinez", "role": "Capsule Wardrobe Coach"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "WHY THREAD & NEEDLE",
+    "headline": "Fashion With a Conscience",
+    "description": "Every piece is designed to look good and do good.",
+    "benefits": [
+      "100% organic and recycled materials",
+      "Fair-wage certified production",
+      "Carbon-neutral shipping",
+      "60-day free returns",
+      "Repair and recycle program",
+      "Transparent supply chain"
+    ],
+    "cta": {"text": "Shop Now", "url": "#", "icon": "fas fa-arrow-right"}
+  },
+  "faq": {
+    "variant": "split",
+    "eyebrow": "FAQ",
+    "headline": "Good Questions",
+    "description": "Everything you need to know about our materials and practices.",
+    "items": [
+      {"q": "What materials do you use?", "a": "GOTS-certified organic cotton, recycled polyester, and Tencel. Every fabric is traceable to its source."},
+      {"q": "How do sizes run?", "a": "True to size with a relaxed fit. Check our size guide for measurements by style."},
+      {"q": "What's your return policy?", "a": "Free returns within 60 days. Unworn items in original packaging for a full refund."},
+      {"q": "Do you ship internationally?", "a": "Yes — carbon-neutral shipping to 30+ countries. Duties calculated at checkout."}
+    ]
+  },
+  "cta_final": {
+    "variant": "card",
+    "headline": "Build Your Capsule Wardrobe",
+    "description": "Start with the essentials. Add pieces as you need them.",
+    "cta": {"text": "Shop Collection", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free shipping over $75 • 60-day returns"
+  },
+  "footer": {
+    "brand": {"name": "Thread & Needle", "description": "Sustainable fashion for the conscious consumer."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-pinterest-p", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-tiktok", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Shop", "links": [{"text": "New Arrivals"}, {"text": "Basics"}, {"text": "Outerwear"}, {"text": "Sale"}]},
+      {"title": "About", "links": [{"text": "Our Story"}, {"text": "Sustainability"}, {"text": "Supply Chain"}, {"text": "Journal"}]}
+    ],
+    "contact": {"email": "hello@threadandneedle.com"},
+    "copyright": "© 2026 Thread & Needle. All rights reserved."
+  }
+}

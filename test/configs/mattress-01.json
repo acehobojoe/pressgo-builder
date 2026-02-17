@@ -1,0 +1,111 @@
+{
+  "colors": {
+    "primary": "#4F46E5",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F8FAFC",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {
+    "heading": "Outfit",
+    "body": "DM Sans"
+  },
+  "layout": {
+    "boxed_width": 1200,
+    "section_padding": 100,
+    "card_radius": 16,
+    "button_radius": 10
+  },
+  "sections": ["hero", "stats", "features", "results", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "SLEEP BETTER TONIGHT",
+    "headline": "Your Best Sleep Starts Here",
+    "subheadline": "Premium mattresses delivered to your door. 100-night trial, free returns, financing available.",
+    "cta_primary": {"text": "Shop Mattresses", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Take Sleep Quiz", "url": "#"},
+    "trust_line": "Free delivery • 100-night trial • 10-year warranty",
+    "image": "https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "stats": {
+    "items": [
+      {"value": "50,000+", "label": "Happy Sleepers", "icon": "fas fa-bed"},
+      {"value": "100", "label": "Night Trial", "icon": "fas fa-moon"},
+      {"value": "4.8", "label": "Star Rating", "icon": "fas fa-star"},
+      {"value": "10yr", "label": "Warranty", "icon": "fas fa-shield-alt"}
+    ]
+  },
+  "features": {
+    "eyebrow": "WHY DREAMCLOUD",
+    "headline": "Engineered for Deep Sleep",
+    "subheadline": "Three mattress options designed for every sleep style.",
+    "items": [
+      {"icon": "fas fa-cloud", "title": "Memory Foam", "desc": "Body-contouring pressure relief for side sleepers.", "accent": "#4F46E5"},
+      {"icon": "fas fa-layer-group", "title": "Hybrid", "desc": "Foam comfort plus coil support for all positions.", "accent": "#10B981"},
+      {"icon": "fas fa-snowflake", "title": "Cooling Gel", "desc": "Temperature-regulating gel for hot sleepers.", "accent": "#0EA5E9"}
+    ]
+  },
+  "results": {
+    "eyebrow": "SLEEP SCIENCE",
+    "headline": "Wake Up Better",
+    "description": "Clinical results from 1,000 DreamCloud sleepers over 90 days.",
+    "metrics": [
+      {"value": "93%", "label": "Less Tossing & Turning", "color": "#4F46E5"},
+      {"value": "87%", "label": "Reduced Back Pain", "color": "#10B981"},
+      {"value": "2.1hrs", "label": "More Deep Sleep", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "variant": "featured",
+    "eyebrow": "REVIEWS",
+    "headline": "Sleep Stories",
+    "items": [
+      {"quote": "I had chronic back pain for years. Two weeks on DreamCloud and I wake up pain-free every morning. Life-changing.", "name": "Michael Torres", "role": "Verified Buyer"},
+      {"quote": "The hybrid is incredible. Perfect firmness, stays cool all night.", "name": "Jessica Lin", "role": "Verified Buyer"},
+      {"quote": "Returned our $3,000 mattress for this. DreamCloud is better.", "name": "Brandon & Lisa Cole", "role": "Verified Buyers"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "MATTRESSES",
+    "headline": "Find Your Perfect Match",
+    "subheadline": "All sizes available. Financing from $35/month.",
+    "plans": [
+      {"name": "Memory Foam", "price": "$699", "period": " Queen", "description": "Best for side sleepers", "features": ["12\" premium memory foam", "CertiPUR-US certified", "Removable washable cover", "Free delivery & setup"], "cta": {"text": "Shop Now", "url": "#"}},
+      {"name": "Hybrid", "price": "$999", "period": " Queen", "description": "Best for all sleepers", "badge": "BEST SELLER", "highlighted": true, "features": ["14\" foam + pocketed coils", "Edge-to-edge support", "Motion isolation", "Free delivery & setup", "Free pillows included"], "cta": {"text": "Shop Now", "url": "#"}},
+      {"name": "Cooling Gel", "price": "$1,199", "period": " Queen", "description": "Best for hot sleepers", "features": ["14\" gel-infused layers", "Phase-change cooling", "Breathable coil system", "Free delivery & setup", "Free pillows + sheets"], "cta": {"text": "Shop Now", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Sleep Questions Answered",
+    "items": [
+      {"q": "How does the 100-night trial work?", "a": "Sleep on it for 100 nights. If you're not in love, we'll pick it up free and refund every penny."},
+      {"q": "Do you offer financing?", "a": "Yes. 0% APR financing from $35/month through Affirm. Choose at checkout."},
+      {"q": "How is it delivered?", "a": "Compressed in a box, delivered free to your door. Expands to full size in 24-48 hours."},
+      {"q": "What's the warranty?", "a": "10-year full warranty covering defects, sagging over 1 inch, and structural issues."},
+      {"q": "Can I try it in a store?", "a": "We have showrooms in 12 cities. Or take advantage of the risk-free home trial."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Start Your Best Sleep",
+    "description": "100 nights to fall in love — or your money back.",
+    "cta": {"text": "Shop Mattresses", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free delivery • 100-night trial • 10-year warranty"
+  },
+  "footer": {
+    "brand": {"name": "DreamCloud Sleep", "description": "Premium mattresses delivered to your door."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-youtube", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Shop", "links": [{"text": "Memory Foam"}, {"text": "Hybrid"}, {"text": "Cooling Gel"}, {"text": "Pillows & Bedding"}]},
+      {"title": "Support", "links": [{"text": "Sleep Quiz"}, {"text": "Showrooms"}, {"text": "Warranty"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "sleep@dreamcloudsleep.com", "phone": "(888) 555-SLEEP"},
+    "copyright": "© 2026 DreamCloud Sleep. All rights reserved."
+  }
+}

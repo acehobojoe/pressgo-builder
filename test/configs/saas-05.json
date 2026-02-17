@@ -1,0 +1,105 @@
+{
+  "colors": {
+    "primary": "#7C3AED",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F5F3FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Sora", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "social_proof", "features", "steps", "results", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "eyebrow": "AI-POWERED RECRUITING",
+    "headline": "Hire Smarter, Not Harder",
+    "subheadline": "AI screens resumes, schedules interviews, and surfaces top candidates — so you don't have to.",
+    "cta_primary": {"text": "Start Free Trial", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Watch Demo", "url": "#"},
+    "trust_line": "No credit card required • Setup in 5 minutes"
+  },
+  "social_proof": {
+    "variant": "dark",
+    "headline": "Trusted by hiring teams everywhere",
+    "categories": ["Startups", "Tech", "Healthcare", "Finance", "Retail", "Education"]
+  },
+  "features": {
+    "eyebrow": "FEATURES",
+    "headline": "Your Entire Hiring Pipeline",
+    "subheadline": "From job post to offer letter, all in one place.",
+    "items": [
+      {"icon": "fas fa-robot", "title": "AI Resume Screening", "desc": "Instantly rank candidates by skill match and experience.", "accent": "#7C3AED"},
+      {"icon": "fas fa-calendar-check", "title": "Smart Scheduling", "desc": "Automated interview scheduling with calendar sync.", "accent": "#10B981"},
+      {"icon": "fas fa-chart-bar", "title": "Hiring Analytics", "desc": "Track pipeline metrics, time-to-hire, and source ROI.", "accent": "#F59E0B"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "HOW IT WORKS",
+    "headline": "Hire in Three Steps",
+    "items": [
+      {"num": "1", "title": "Post Your Role", "desc": "Create a job listing and define your ideal candidate."},
+      {"num": "2", "title": "AI Screens & Ranks", "desc": "Our AI reviews every application and surfaces the best."},
+      {"num": "3", "title": "Interview & Hire", "desc": "Schedule, evaluate, and send offers — all in HireWise."}
+    ]
+  },
+  "results": {
+    "eyebrow": "RESULTS",
+    "headline": "Measurable Hiring Impact",
+    "description": "Teams using HireWise see dramatic improvements in speed and quality.",
+    "metrics": [
+      {"value": "73%", "label": "Faster Time-to-Hire", "color": "#7C3AED"},
+      {"value": "5x", "label": "More Qualified Candidates", "color": "#10B981"},
+      {"value": "40hrs", "label": "Saved Per Hire", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "TESTIMONIALS",
+    "headline": "Hiring Teams Love HireWise",
+    "items": [
+      {"quote": "Cut our screening time from 3 days to 3 hours. The AI catches candidates we would have missed.", "name": "Rachel Kim", "role": "VP People, ScaleUp Inc"},
+      {"quote": "We hired 12 engineers in 6 weeks. HireWise made the impossible possible.", "name": "Marcus Johnson", "role": "CTO, DevForge"},
+      {"quote": "The analytics alone are worth it. We finally know which channels actually deliver.", "name": "Priya Patel", "role": "Head of Talent, NovaTech"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "headline": "Simple, Transparent Pricing",
+    "subheadline": "Start free. Upgrade when your team grows.",
+    "plans": [
+      {"name": "Starter", "price": "$0", "period": "/mo", "description": "Up to 3 active roles", "features": ["3 job postings", "AI resume screening", "Basic analytics", "Email support"], "cta": {"text": "Start Free", "url": "#"}},
+      {"name": "Growth", "price": "$149", "period": "/mo", "description": "Growing teams", "badge": "POPULAR", "highlighted": true, "features": ["Unlimited postings", "AI screening + ranking", "Interview scheduling", "Advanced analytics", "Priority support"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Enterprise", "price": "Custom", "period": "", "description": "Large organizations", "features": ["Everything in Growth", "SSO & SCIM", "Custom integrations", "Dedicated CSM", "SLA guarantee"], "cta": {"text": "Contact Sales", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "How does the AI screening work?", "a": "Our AI analyzes resumes against your job requirements, scoring candidates on skills, experience, and cultural fit indicators."},
+      {"q": "Does it integrate with our ATS?", "a": "Yes. HireWise integrates with Greenhouse, Lever, Workday, and 30+ other platforms via API."},
+      {"q": "Is candidate data secure?", "a": "SOC 2 Type II certified. All data encrypted at rest and in transit. GDPR compliant."},
+      {"q": "Can we customize the AI criteria?", "a": "Absolutely. Set custom scoring weights, must-have skills, and knockout questions."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Ready to Transform Hiring?",
+    "description": "Join 2,000+ teams hiring smarter with AI.",
+    "cta": {"text": "Start Free Trial", "url": "#pricing", "icon": "fas fa-rocket"},
+    "trust_line": "No credit card required"
+  },
+  "footer": {
+    "brand": {"name": "HireWise", "description": "AI-powered recruiting for modern teams."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Pricing"}, {"text": "Integrations"}, {"text": "API"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Blog"}, {"text": "Careers"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "hello@hirewise.io"},
+    "copyright": "© 2026 HireWise Recruiting. All rights reserved."
+  }
+}

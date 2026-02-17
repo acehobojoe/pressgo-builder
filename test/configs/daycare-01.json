@@ -1,0 +1,95 @@
+{
+  "colors": {
+    "primary": "#F59E0B",
+    "dark_bg": "#1E293B",
+    "light_bg": "#FFFBEB",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Nunito", "body": "Quicksand"},
+  "layout": {"boxed_width": 1100, "card_radius": 20, "button_radius": 12},
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "AGES 6 WEEKS TO 5 YEARS",
+    "headline": "Where Little Minds Grow Big",
+    "subheadline": "STEM curriculum, outdoor playground, organic snacks. State-licensed, nurturing caregivers.",
+    "cta_primary": {"text": "Schedule a Tour", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Our Programs", "url": "#features"},
+    "trust_line": "State Licensed • STEM Curriculum • Now Enrolling",
+    "image": "https://images.pexels.com/photos/6567607/pexels-photo-6567607.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "PROGRAMS",
+    "headline": "Learning Through Play",
+    "items": [
+      {"icon": "fas fa-baby", "title": "Infant Care", "desc": "Nurturing environment for babies 6 weeks to 12 months.", "accent": "#F59E0B"},
+      {"icon": "fas fa-puzzle-piece", "title": "Toddler Program", "desc": "Sensory play, early language, and social skills development.", "accent": "#10B981"},
+      {"icon": "fas fa-graduation-cap", "title": "Pre-K Academy", "desc": "STEM curriculum preparing kids for kindergarten success.", "accent": "#2563EB"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "ENROLLMENT",
+    "headline": "Join Our Family",
+    "items": [
+      {"num": "1", "title": "Schedule a Tour", "desc": "See our classrooms and meet our teachers in person."},
+      {"num": "2", "title": "Complete Enrollment", "desc": "Simple paperwork and flexible start dates."},
+      {"num": "3", "title": "First Day Fun", "desc": "Gradual transition plan for a smooth start."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "PARENTS",
+    "headline": "What Parents Say",
+    "items": [
+      {"quote": "My daughter went from shy to confident in three months. The teachers genuinely care.", "name": "Amanda Torres", "role": "Parent of a 3-year-old"},
+      {"quote": "The daily photos and progress reports give me peace of mind at work.", "name": "David Kim", "role": "Parent of twins"},
+      {"quote": "Organic snacks, outdoor time, STEM activities — everything I wanted in a daycare.", "name": "Sarah Mitchell", "role": "Parent of a 2-year-old"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "WHY SUNSHINE KIDS",
+    "headline": "More Than Just Daycare",
+    "description": "A learning environment designed around your child's growth.",
+    "benefits": [
+      "State licensed and inspected",
+      "STEM-focused curriculum",
+      "Organic, allergen-aware snacks",
+      "Outdoor playground with shade",
+      "Low teacher-to-child ratios",
+      "Daily photo and activity updates"
+    ],
+    "cta": {"text": "Schedule Tour", "url": "#", "icon": "fas fa-calendar-check"}
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Parent Questions",
+    "items": [
+      {"q": "What are your hours?", "a": "Monday through Friday, 6:30am to 6:30pm. Flexible drop-off and pick-up."},
+      {"q": "What's the teacher-to-child ratio?", "a": "Infants: 1:3. Toddlers: 1:5. Pre-K: 1:8. Well below state requirements."},
+      {"q": "Do you accept subsidies?", "a": "Yes. We accept state childcare subsidies and offer sibling discounts."},
+      {"q": "What about allergies?", "a": "Our kitchen is nut-free. We accommodate all dietary restrictions and allergies with advance notice."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Now Enrolling for Fall 2026",
+    "description": "Limited spots available. Schedule your tour today.",
+    "cta": {"text": "Schedule a Tour", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "State licensed • Limited enrollment"
+  },
+  "footer": {
+    "brand": {"name": "Sunshine Kids Academy", "description": "Childcare and early learning for ages 6 weeks to 5 years."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Programs", "links": [{"text": "Infant Care"}, {"text": "Toddlers"}, {"text": "Pre-K"}, {"text": "Summer Camp"}]},
+      {"title": "About", "links": [{"text": "Our Team"}, {"text": "Philosophy"}, {"text": "Tours"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "hello@sunshinekids.com", "phone": "(555) 987-6543", "address": "456 Learning Lane"},
+    "copyright": "© 2026 Sunshine Kids Academy. All rights reserved."
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "colors": {
+    "primary": "#1E40AF",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F0F9FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#059669"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 8},
+  "sections": ["hero", "features", "stats", "steps", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "INDEPENDENT INSURANCE",
+    "headline": "Coverage You Can Count On",
+    "subheadline": "Auto, home, life, and business insurance from top-rated carriers. Compare quotes in minutes. Free policy review.",
+    "cta_primary": {"text": "Get Free Quote", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Free Policy Review", "url": "#"},
+    "trust_line": "Independent Agent • 20+ Carriers • Local Since 2005",
+    "image": "https://images.pexels.com/photos/3760067/pexels-photo-3760067.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "COVERAGE",
+    "headline": "Protection for What Matters",
+    "items": [
+      {"icon": "fas fa-car", "title": "Auto Insurance", "desc": "Liability, collision, comprehensive. Multiple carrier quotes.", "accent": "#1E40AF"},
+      {"icon": "fas fa-home", "title": "Home & Renters", "desc": "Dwelling, contents, liability. Flood and umbrella add-ons.", "accent": "#059669"},
+      {"icon": "fas fa-briefcase", "title": "Business Insurance", "desc": "General liability, workers comp, professional liability.", "accent": "#F59E0B"}
+    ]
+  },
+  "stats": {
+    "items": [
+      {"value": "20+", "label": "Insurance Carriers", "icon": "fas fa-handshake"},
+      {"value": "15,000+", "label": "Policies Written", "icon": "fas fa-file-alt"},
+      {"value": "$480", "label": "Avg Annual Savings", "icon": "fas fa-dollar-sign"},
+      {"value": "4.9", "label": "Google Rating", "icon": "fas fa-star"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "HOW IT WORKS",
+    "headline": "Save in Three Steps",
+    "items": [
+      {"num": "1", "title": "Tell Us About You", "desc": "Quick questionnaire about your coverage needs."},
+      {"num": "2", "title": "We Compare Quotes", "desc": "Rates from 20+ carriers, side by side."},
+      {"num": "3", "title": "You Choose & Save", "desc": "Pick the best coverage at the best price."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CLIENTS",
+    "headline": "Clients Trust TrustShield",
+    "items": [
+      {"quote": "Saved $600/year on auto insurance by switching. Same coverage, better price.", "name": "Brian Martinez", "role": "Auto Insurance Client"},
+      {"quote": "They bundled our home and auto and saved us $1,200. Should have called years ago.", "name": "Karen & Tom Ellis", "role": "Home + Auto Bundle"},
+      {"quote": "After a car accident, they handled the entire claim. We just had to make one call.", "name": "Stephanie Lee", "role": "Claims Experience"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Insurance Questions",
+    "items": [
+      {"q": "Why use an independent agent?", "a": "We compare rates from 20+ carriers to find you the best price. A captive agent can only sell one company's products."},
+      {"q": "How long does a quote take?", "a": "Most quotes take 10-15 minutes over the phone or online. We'll have options same day."},
+      {"q": "Can you help with claims?", "a": "Yes. We advocate for you during the entire claims process. One call to us handles everything."},
+      {"q": "Is the policy review really free?", "a": "100% free, no obligation. We review your current policies and show where you might be overpaying or underinsured."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Stop Overpaying for Insurance",
+    "description": "Get your free quote in minutes. No obligation.",
+    "cta": {"text": "Get Free Quote", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free quotes • 20+ carriers • Local service"
+  },
+  "footer": {
+    "brand": {"name": "TrustShield Insurance", "description": "Independent insurance agency comparing top carriers."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Coverage", "links": [{"text": "Auto"}, {"text": "Home"}, {"text": "Life"}, {"text": "Business"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Reviews"}, {"text": "Claims Help"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "quotes@trustshield.com", "phone": "(555) 555-SAVE"},
+    "copyright": "© 2026 TrustShield Insurance. All rights reserved."
+  }
+}

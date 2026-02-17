@@ -1,0 +1,108 @@
+{
+  "colors": {
+    "primary": "#FF6B35",
+    "dark_bg": "#1C1917",
+    "light_bg": "#FFF7ED",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {
+    "heading": "Outfit",
+    "body": "DM Sans"
+  },
+  "layout": {
+    "boxed_width": 1200,
+    "section_padding": 100,
+    "card_radius": 16,
+    "button_radius": 10
+  },
+  "sections": ["hero", "social_proof", "features", "results", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "NSF CERTIFIED",
+    "headline": "Fuel Your Peak Performance",
+    "subheadline": "Lab-tested sports nutrition trusted by 10,000+ athletes. Subscribe and save 15%.",
+    "cta_primary": {"text": "Shop Now", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Results", "url": "#results"},
+    "trust_line": "Free shipping on orders over $50",
+    "image": "https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "social_proof": {
+    "variant": "dark",
+    "headline": "Trusted by athletes in every sport",
+    "categories": ["CrossFit", "Powerlifting", "MMA", "Running", "Cycling", "Swimming"]
+  },
+  "features": {
+    "eyebrow": "OUR PRODUCTS",
+    "headline": "Science-Backed Formulas",
+    "subheadline": "Every batch third-party tested for purity and potency.",
+    "items": [
+      {"icon": "fas fa-dumbbell", "title": "Whey Protein", "desc": "25g protein per scoop. Zero fillers, grass-fed sourced.", "accent": "#FF6B35"},
+      {"icon": "fas fa-bolt", "title": "Pre-Workout", "desc": "Clean energy with no crash. 200mg caffeine, beta-alanine.", "accent": "#10B981"},
+      {"icon": "fas fa-fire", "title": "BCAAs & Creatine", "desc": "Faster recovery and explosive strength gains.", "accent": "#8B5CF6"}
+    ]
+  },
+  "results": {
+    "eyebrow": "PROVEN RESULTS",
+    "headline": "Numbers Don't Lie",
+    "description": "Real results from real athletes using VitaForce daily.",
+    "metrics": [
+      {"value": "10,000+", "label": "Active Athletes", "color": "#FF6B35"},
+      {"value": "98%", "label": "Purity Rating", "color": "#10B981"},
+      {"value": "4.9", "label": "Average Rating", "color": "#F59E0B"},
+      {"value": "15%", "label": "Subscribe & Save", "color": "#8B5CF6"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "ATHLETE REVIEWS",
+    "headline": "Trusted by Champions",
+    "items": [
+      {"quote": "Switched to VitaForce six months ago. PRs every week since. The protein actually mixes smooth.", "name": "Marcus Rivera", "role": "Competitive Powerlifter"},
+      {"quote": "Best pre-workout I've used. Clean energy, no jitters. My coach noticed the difference.", "name": "Jade Thompson", "role": "CrossFit Athlete"},
+      {"quote": "The subscribe-and-save makes it easy. Quality is consistent batch after batch.", "name": "Ryan Park", "role": "Marathon Runner"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "SHOP",
+    "headline": "Choose Your Stack",
+    "subheadline": "Subscribe and save 15% on every order.",
+    "plans": [
+      {"name": "Starter", "price": "$39", "period": "/mo", "description": "Essential basics", "features": ["Whey Protein (2lb)", "Free shaker bottle", "Free shipping"], "cta": {"text": "Subscribe", "url": "#"}},
+      {"name": "Performance", "price": "$69", "period": "/mo", "description": "Most popular stack", "badge": "BEST VALUE", "highlighted": true, "features": ["Whey Protein (2lb)", "Pre-Workout (30 servings)", "BCAAs (60 servings)", "Free shipping"], "cta": {"text": "Subscribe", "url": "#"}},
+      {"name": "Elite", "price": "$99", "period": "/mo", "description": "Complete stack", "features": ["Whey Protein (5lb)", "Pre-Workout (30 servings)", "BCAAs + Creatine", "Recovery Formula", "Free shipping"], "cta": {"text": "Subscribe", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "Are your products third-party tested?", "a": "Yes. Every batch is NSF certified and tested for banned substances, heavy metals, and label accuracy."},
+      {"q": "Can I cancel my subscription?", "a": "Cancel or pause anytime from your account. No contracts or cancellation fees."},
+      {"q": "How fast is shipping?", "a": "Orders ship within 24 hours. Most US deliveries arrive in 2-3 business days."},
+      {"q": "What flavors are available?", "a": "Chocolate, Vanilla, Unflavored for protein. Fruit Punch and Blue Raspberry for pre-workout."},
+      {"q": "Do you offer a money-back guarantee?", "a": "Yes — 30-day satisfaction guarantee. Full refund if you're not happy with your order."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Ready to Level Up?",
+    "description": "Join 10,000+ athletes fueling their best performance.",
+    "cta": {"text": "Shop Now", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free shipping • 30-day guarantee • NSF certified"
+  },
+  "footer": {
+    "brand": {"name": "VitaForce", "description": "Science-backed sports nutrition for serious athletes."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-tiktok", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-youtube", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Shop", "links": [{"text": "Protein"}, {"text": "Pre-Workout"}, {"text": "BCAAs"}, {"text": "Bundles"}]},
+      {"title": "Company", "links": [{"text": "Our Story"}, {"text": "Lab Results"}, {"text": "Athletes"}, {"text": "Blog"}]}
+    ],
+    "contact": {"email": "support@vitaforce.com"},
+    "copyright": "© 2026 VitaForce Supplements. All rights reserved."
+  }
+}

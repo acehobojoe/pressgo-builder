@@ -1,0 +1,89 @@
+{
+  "colors": {
+    "primary": "#1E40AF",
+    "dark_bg": "#111827",
+    "light_bg": "#F0F9FF",
+    "white": "#FFFFFF",
+    "text_dark": "#111827",
+    "text_muted": "#6B7280",
+    "accent": "#059669"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 8},
+  "sections": ["hero", "features", "stats", "steps", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "LICENSED DOT CARRIER",
+    "headline": "Moving Made Stress-Free",
+    "subheadline": "Local and long-distance moves. Packing, storage, and corporate relocation. Free in-home estimates.",
+    "cta_primary": {"text": "Get Free Estimate", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Our Services", "url": "#features"},
+    "trust_line": "Licensed & Insured • DOT #MC-123456",
+    "image": "https://images.pexels.com/photos/3965548/pexels-photo-3965548.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "SERVICES",
+    "headline": "Full-Service Moving Solutions",
+    "items": [
+      {"icon": "fas fa-home", "title": "Residential Moving", "desc": "Local and long-distance. Studio to 5-bedroom homes.", "accent": "#1E40AF"},
+      {"icon": "fas fa-building", "title": "Corporate Relocation", "desc": "Employee moves, office relocations, project management.", "accent": "#059669"},
+      {"icon": "fas fa-box", "title": "Packing & Storage", "desc": "Professional packing services and climate-controlled storage.", "accent": "#F59E0B"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "15,000+", "label": "Moves Completed", "icon": "fas fa-truck"},
+      {"value": "4.9", "label": "Star Rating", "icon": "fas fa-star"},
+      {"value": "25yrs", "label": "In Business", "icon": "fas fa-award"},
+      {"value": "0", "label": "Claims Last Year", "icon": "fas fa-shield-alt"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "PROCESS",
+    "headline": "Your Move, Simplified",
+    "items": [
+      {"num": "1", "title": "Free In-Home Estimate", "desc": "We survey your home and give a binding price — no surprises."},
+      {"num": "2", "title": "Pack & Load", "desc": "Our crew packs, wraps, and loads everything with care."},
+      {"num": "3", "title": "Deliver & Unpack", "desc": "We deliver on schedule, place furniture, and remove debris."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "REVIEWS",
+    "headline": "Happy Movers",
+    "items": [
+      {"quote": "Moved our 4-bedroom house across the state. Not a single item damaged. Incredible crew.", "name": "Karen Ellis", "role": "Long-Distance Move"},
+      {"quote": "The packing service saved us days of work. Worth every dollar.", "name": "Mike Santos", "role": "Local Move"},
+      {"quote": "Relocated our entire 50-person office over a weekend. Zero downtime Monday morning.", "name": "Jennifer Walsh", "role": "Corporate Move"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Moving Questions",
+    "items": [
+      {"q": "How far in advance should I book?", "a": "2-4 weeks for local moves, 4-6 weeks for long-distance. Summer months book up fast."},
+      {"q": "Is my stuff insured during the move?", "a": "Yes. Basic coverage is included free. Full replacement value coverage available for a small fee."},
+      {"q": "Do you move pianos and hot tubs?", "a": "Yes. We have specialty equipment and trained crews for heavy and delicate items."},
+      {"q": "Can you store my belongings?", "a": "Climate-controlled storage available by the month. Access your unit anytime during business hours."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Ready to Move?",
+    "description": "Get your free in-home estimate today. No obligation.",
+    "cta": {"text": "Get Free Estimate", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Licensed • Insured • BBB A+ Rated"
+  },
+  "footer": {
+    "brand": {"name": "SwiftMove", "description": "Professional moving services since 2001."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "Residential"}, {"text": "Corporate"}, {"text": "Packing"}, {"text": "Storage"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Careers"}, {"text": "Reviews"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "info@swiftmove.com", "phone": "(555) 555-MOVE"},
+    "copyright": "© 2026 SwiftMove Relocation. All rights reserved."
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "colors": {
+    "primary": "#8B5CF6",
+    "dark_bg": "#0F172A",
+    "light_bg": "#FAF5FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Plus Jakarta Sans", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 20, "button_radius": 12},
+  "sections": ["hero", "features", "stats", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "DESIGN FOR AGENCIES",
+    "headline": "Create Stunning Visuals, Fast",
+    "subheadline": "Templates, brand kits, AI image generation, and real-time collaboration. Built for agency teams.",
+    "cta_primary": {"text": "Start Designing Free", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Templates", "url": "#"},
+    "trust_line": "Free plan available • No credit card required",
+    "image": "https://images.pexels.com/photos/3861458/pexels-photo-3861458.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "FEATURES",
+    "headline": "Design Superpowers for Teams",
+    "items": [
+      {"icon": "fas fa-magic", "title": "AI Image Generation", "desc": "Create custom visuals from text prompts in seconds.", "accent": "#8B5CF6"},
+      {"icon": "fas fa-palette", "title": "Brand Kit", "desc": "Lock in logos, colors, and fonts across all designs.", "accent": "#E11D48"},
+      {"icon": "fas fa-users", "title": "Team Collaboration", "desc": "Real-time editing, comments, and approval workflows.", "accent": "#10B981"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "5,000+", "label": "Templates", "icon": "fas fa-th-large"},
+      {"value": "25K+", "label": "Active Teams", "icon": "fas fa-users"},
+      {"value": "10M+", "label": "Designs Created", "icon": "fas fa-image"},
+      {"value": "4.7", "label": "G2 Rating", "icon": "fas fa-star"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "AGENCIES",
+    "headline": "Agencies Love DesignDeck",
+    "items": [
+      {"quote": "Replaced three design tools with DesignDeck. Our team ships twice as fast now.", "name": "Carlos Mendez", "role": "Creative Director, BrandCo"},
+      {"quote": "The AI image generation saves us from stock photo hell. Custom visuals in seconds.", "name": "Ava Chen", "role": "Art Director, Pixel Agency"},
+      {"quote": "Brand kit feature alone is worth it. Clients stay on-brand without us policing every asset.", "name": "Ryan O'Brien", "role": "Founder, Studio Nine"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "headline": "Plans for Every Team",
+    "plans": [
+      {"name": "Free", "price": "$0", "period": "/mo", "description": "Individual designers", "features": ["5 projects", "1,000 templates", "Basic exports", "5GB storage"], "cta": {"text": "Start Free", "url": "#"}},
+      {"name": "Pro", "price": "$19", "period": "/user/mo", "description": "Growing teams", "badge": "POPULAR", "highlighted": true, "features": ["Unlimited projects", "All 5,000+ templates", "AI image generation", "Brand kit", "Unlimited exports"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Agency", "price": "$49", "period": "/user/mo", "description": "Large teams", "features": ["Everything in Pro", "Client workspaces", "Approval workflows", "Custom fonts", "Priority support"], "cta": {"text": "Contact Sales", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "How is this different from Canva?", "a": "DesignDeck is built for agencies — brand kits, client workspaces, approval workflows, and AI generation."},
+      {"q": "Can I import from Figma or Adobe?", "a": "Yes. Import PSD, AI, and Figma files. Export in any format including SVG and PDF."},
+      {"q": "Is there a learning curve?", "a": "If you've used any design tool, you'll feel at home. Templates make it even faster."},
+      {"q": "What does AI image generation cost?", "a": "Included in Pro and Agency plans. Generate unlimited custom images from text prompts."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Design Better. Ship Faster.",
+    "description": "Join 25,000+ teams creating with DesignDeck.",
+    "cta": {"text": "Start Designing Free", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free plan • No credit card required"
+  },
+  "footer": {
+    "brand": {"name": "DesignDeck", "description": "The design tool built for agency teams."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-dribbble", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Templates"}, {"text": "AI Generation"}, {"text": "Brand Kit"}, {"text": "Pricing"}]},
+      {"title": "Resources", "links": [{"text": "Tutorials"}, {"text": "Blog"}, {"text": "Changelog"}, {"text": "Help"}]}
+    ],
+    "contact": {"email": "hello@designdeck.io"},
+    "copyright": "© 2026 DesignDeck. All rights reserved."
+  }
+}

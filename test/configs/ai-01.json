@@ -1,0 +1,95 @@
+{
+  "colors": {
+    "primary": "#6366F1",
+    "dark_bg": "#0F172A",
+    "light_bg": "#EEF2FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Sora", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "social_proof", "features", "results", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "gradient",
+    "eyebrow": "AI WRITING ASSISTANT",
+    "headline": "Write 10x Faster With AI",
+    "subheadline": "Blog posts, ad copy, social media, and SEO content — all in your brand voice. Plagiarism-free guarantee.",
+    "cta_primary": {"text": "Try Free", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Examples", "url": "#"},
+    "trust_line": "Free tier available • No credit card required"
+  },
+  "social_proof": {
+    "variant": "dark",
+    "headline": "Used by marketing teams at 5,000+ companies",
+    "categories": ["Marketing Agencies", "E-commerce", "SaaS", "Media", "Startups", "Enterprise"]
+  },
+  "features": {
+    "eyebrow": "CAPABILITIES",
+    "headline": "AI That Writes Like You",
+    "subheadline": "Train it on your brand voice. Get content that sounds authentically yours.",
+    "items": [
+      {"icon": "fas fa-pen-fancy", "title": "Blog & Articles", "desc": "Full-length posts with SEO optimization built in.", "accent": "#6366F1"},
+      {"icon": "fas fa-ad", "title": "Ad Copy & Social", "desc": "High-converting ads, captions, and email subject lines.", "accent": "#E11D48"},
+      {"icon": "fas fa-fingerprint", "title": "Brand Voice Training", "desc": "Upload samples and WriteGenius matches your tone perfectly.", "accent": "#10B981"}
+    ]
+  },
+  "results": {
+    "eyebrow": "RESULTS",
+    "headline": "Content Teams Ship Faster",
+    "description": "Average improvements reported by WriteGenius customers.",
+    "metrics": [
+      {"value": "10x", "label": "Faster Content Creation", "color": "#6366F1"},
+      {"value": "68%", "label": "Less Editing Needed", "color": "#10B981"},
+      {"value": "0%", "label": "Plagiarism Rate", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CUSTOMERS",
+    "headline": "Marketing Teams Love WriteGenius",
+    "items": [
+      {"quote": "We publish 5x more blog posts now. The AI drafts are so good, editing is minimal.", "name": "Emily Zhang", "role": "Content Lead, GrowthEngine"},
+      {"quote": "Brand voice training is the killer feature. Every piece sounds like our team wrote it.", "name": "James Ward", "role": "CMO, NovaBrand"},
+      {"quote": "Cut our content budget by 60% without sacrificing quality. Game changer.", "name": "Sofia Ramirez", "role": "Marketing Director, ScaleCo"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "headline": "Write More. Spend Less.",
+    "plans": [
+      {"name": "Free", "price": "$0", "period": "/mo", "description": "Try it out", "features": ["5,000 words/month", "Blog & social templates", "Basic tone settings", "1 project"], "cta": {"text": "Start Free", "url": "#"}},
+      {"name": "Pro", "price": "$39", "period": "/mo", "description": "Growing teams", "badge": "POPULAR", "highlighted": true, "features": ["50,000 words/month", "All templates", "Brand voice training", "SEO optimization", "5 team members"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Enterprise", "price": "$149", "period": "/mo", "description": "Large teams", "features": ["Unlimited words", "Everything in Pro", "API access", "Custom models", "Dedicated support"], "cta": {"text": "Contact Sales", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "Is the content plagiarism-free?", "a": "100% original. Every output runs through our plagiarism checker. We guarantee uniqueness."},
+      {"q": "How does brand voice training work?", "a": "Upload 5-10 samples of your existing content. WriteGenius learns your tone, style, and vocabulary."},
+      {"q": "Can it write in other languages?", "a": "Yes. 30+ languages including Spanish, French, German, Japanese, and Portuguese."},
+      {"q": "Does it do SEO optimization?", "a": "Pro plan includes keyword targeting, meta descriptions, and readability scoring."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Start Writing With AI Today",
+    "description": "Join 5,000+ marketing teams creating content faster.",
+    "cta": {"text": "Create Free Account", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free plan • No credit card • Plagiarism-free"
+  },
+  "footer": {
+    "brand": {"name": "WriteGenius", "description": "AI writing assistant for marketing teams."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Templates"}, {"text": "Pricing"}, {"text": "API"}]},
+      {"title": "Resources", "links": [{"text": "Blog"}, {"text": "Examples"}, {"text": "Help Center"}, {"text": "Community"}]}
+    ],
+    "contact": {"email": "hello@writegenius.ai"},
+    "copyright": "© 2026 WriteGenius AI. All rights reserved."
+  }
+}

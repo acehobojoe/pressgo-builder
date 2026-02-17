@@ -1,0 +1,95 @@
+{
+  "colors": {
+    "primary": "#059669",
+    "dark_bg": "#1C1917",
+    "light_bg": "#F0FDF4",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#D4A853"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "DESIGN & BUILD",
+    "headline": "Your Dream Outdoor Space",
+    "subheadline": "Lawn care, hardscaping, irrigation, and outdoor kitchens. Design consultation and seasonal maintenance plans.",
+    "cta_primary": {"text": "Free Consultation", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "View Portfolio", "url": "#"},
+    "trust_line": "Licensed • Insured • Serving the Metro Area",
+    "image": "https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "SERVICES",
+    "headline": "Complete Outdoor Solutions",
+    "items": [
+      {"icon": "fas fa-seedling", "title": "Lawn & Garden", "desc": "Mowing, fertilization, planting, and seasonal cleanup.", "accent": "#059669"},
+      {"icon": "fas fa-layer-group", "title": "Hardscaping", "desc": "Patios, walkways, retaining walls, and fire pits.", "accent": "#D4A853"},
+      {"icon": "fas fa-tint", "title": "Irrigation Systems", "desc": "Smart sprinkler install, repair, and winterization.", "accent": "#2563EB"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "PROCESS",
+    "headline": "From Concept to Reality",
+    "items": [
+      {"num": "1", "title": "Free Consultation", "desc": "We visit your property and discuss your vision."},
+      {"num": "2", "title": "Custom Design", "desc": "3D renderings so you see the result before we start."},
+      {"num": "3", "title": "Build & Maintain", "desc": "Expert installation plus optional maintenance plans."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CLIENTS",
+    "headline": "What Homeowners Say",
+    "items": [
+      {"quote": "They transformed our barren backyard into an oasis. The patio design is stunning.", "name": "Jennifer & Mike Ross", "role": "Homeowners"},
+      {"quote": "Weekly lawn service that actually shows up on time. Our yard has never looked better.", "name": "David Park", "role": "Homeowner"},
+      {"quote": "The outdoor kitchen they built is the centerpiece of every family gathering.", "name": "Maria Sanchez", "role": "Homeowner"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "WHY GREENSCAPE",
+    "headline": "Your Yard Deserves the Best",
+    "description": "Design expertise meets reliable maintenance.",
+    "benefits": [
+      "Licensed landscape architect on staff",
+      "3D design renderings included",
+      "Seasonal maintenance plans",
+      "Native plant specialists",
+      "Smart irrigation systems",
+      "5-year hardscape warranty"
+    ],
+    "cta": {"text": "Get Free Quote", "url": "#", "icon": "fas fa-arrow-right"}
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "How much does a patio cost?", "a": "Depends on size and materials. Budget $15-30/sqft for pavers. We provide detailed quotes after consultation."},
+      {"q": "Do you design before building?", "a": "Yes. Every hardscape project includes a 3D design so you approve the look before we break ground."},
+      {"q": "What about winter?", "a": "We offer snow removal, irrigation winterization, and winter pruning services."},
+      {"q": "Do you maintain what you install?", "a": "Yes. Most clients add our seasonal maintenance plan to protect their investment."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Transform Your Outdoor Space",
+    "description": "Free design consultation. No obligation.",
+    "cta": {"text": "Book Consultation", "url": "#", "icon": "fas fa-calendar-check"},
+    "trust_line": "Licensed • Insured • 5-Year Warranty"
+  },
+  "footer": {
+    "brand": {"name": "GreenScape Design", "description": "Landscaping and outdoor living specialists."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "Lawn Care"}, {"text": "Hardscaping"}, {"text": "Irrigation"}, {"text": "Outdoor Kitchens"}]},
+      {"title": "Company", "links": [{"text": "Portfolio"}, {"text": "About"}, {"text": "Reviews"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "info@greenscapedesign.com", "phone": "(555) 123-LAWN"},
+    "copyright": "© 2026 GreenScape Design. All rights reserved."
+  }
+}

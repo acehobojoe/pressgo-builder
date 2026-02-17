@@ -1,0 +1,101 @@
+{
+  "colors": {
+    "primary": "#2563EB",
+    "dark_bg": "#1C1917",
+    "light_bg": "#F9FAFB",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#6B7280",
+    "accent": "#DC2626"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 8},
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "map", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "24/7 EMERGENCY SERVICE",
+    "headline": "Stay Comfortable Year-Round",
+    "subheadline": "AC installation, furnace repair, duct cleaning, and maintenance plans. Licensed technicians, same-day service.",
+    "cta_primary": {"text": "Schedule Service", "url": "#", "icon": "fas fa-calendar-check"},
+    "cta_secondary": {"text": "Call Now", "url": "tel:5551234567"},
+    "trust_line": "Licensed & Insured • Free Estimates • Financing Available",
+    "image": "https://images.pexels.com/photos/3184451/pexels-photo-3184451.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "OUR SERVICES",
+    "headline": "Heating & Cooling Experts",
+    "items": [
+      {"icon": "fas fa-snowflake", "title": "AC Installation & Repair", "desc": "All brands serviced. Same-day repairs available.", "accent": "#2563EB"},
+      {"icon": "fas fa-fire", "title": "Furnace & Heating", "desc": "Installation, repair, and annual maintenance.", "accent": "#DC2626"},
+      {"icon": "fas fa-wind", "title": "Duct Cleaning", "desc": "Improve air quality and system efficiency.", "accent": "#10B981"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "HOW IT WORKS",
+    "headline": "Service Made Simple",
+    "items": [
+      {"num": "1", "title": "Book Online or Call", "desc": "Schedule at your convenience. Same-day slots available."},
+      {"num": "2", "title": "Expert Diagnosis", "desc": "Licensed technician inspects and explains the issue."},
+      {"num": "3", "title": "Fix & Guarantee", "desc": "Repair completed with parts warranty included."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "REVIEWS",
+    "headline": "Our Customers Trust Us",
+    "items": [
+      {"quote": "AC died on the hottest day of the year. ComfortZone had a tech out in 2 hours. Lifesavers.", "name": "Robert Chen", "role": "Homeowner"},
+      {"quote": "Their maintenance plan caught a cracked heat exchanger before it became dangerous. Worth every penny.", "name": "Maria Gonzalez", "role": "Homeowner"},
+      {"quote": "Fair prices, honest technicians. Only HVAC company I'll ever use.", "name": "James Patterson", "role": "Property Manager"}
+    ]
+  },
+  "competitive_edge": {
+    "variant": "image",
+    "eyebrow": "WHY COMFORTZONE",
+    "headline": "The ComfortZone Difference",
+    "description": "We treat your home like our own.",
+    "benefits": [
+      "24/7 emergency service",
+      "Licensed & insured technicians",
+      "Upfront pricing — no surprises",
+      "All major brands serviced",
+      "Parts & labor warranty",
+      "Financing available"
+    ],
+    "cta": {"text": "Get Free Estimate", "url": "#"},
+    "image": "https://images.pexels.com/photos/3184306/pexels-photo-3184306.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "Do you offer financing?", "a": "Yes. 0% interest for 12 months on new system installations. Apply at your service appointment."},
+      {"q": "How often should I service my HVAC?", "a": "Twice a year — AC tune-up in spring, furnace check in fall. Our maintenance plan covers both."},
+      {"q": "What areas do you serve?", "a": "All areas within 30 miles of downtown. Same-day service for most locations."},
+      {"q": "Are your technicians licensed?", "a": "Every technician is EPA-certified, licensed, insured, and background-checked."}
+    ]
+  },
+  "map": {
+    "headline": "Find Us",
+    "address": "1234 Comfort Lane, Suite 100",
+    "zoom": 13
+  },
+  "cta_final": {
+    "headline": "Need HVAC Service?",
+    "description": "Call now or book online. Same-day appointments available.",
+    "cta": {"text": "Schedule Service", "url": "#", "icon": "fas fa-calendar-check"},
+    "trust_line": "Licensed • Insured • Guaranteed"
+  },
+  "footer": {
+    "brand": {"name": "ComfortZone HVAC", "description": "Heating and cooling services you can trust."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Services", "links": [{"text": "AC Repair"}, {"text": "Furnace Service"}, {"text": "Duct Cleaning"}, {"text": "Maintenance Plans"}]},
+      {"title": "Company", "links": [{"text": "About Us"}, {"text": "Reviews"}, {"text": "Careers"}, {"text": "Service Areas"}]}
+    ],
+    "contact": {"email": "service@comfortzoneac.com", "phone": "(555) 123-4567", "address": "1234 Comfort Lane, Suite 100"},
+    "copyright": "© 2026 ComfortZone HVAC. All rights reserved."
+  }
+}

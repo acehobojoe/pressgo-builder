@@ -1,0 +1,87 @@
+{
+  "colors": {
+    "primary": "#059669",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F0FDF4",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#2563EB"
+  },
+  "fonts": {"heading": "Outfit", "body": "DM Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 20, "button_radius": 12},
+  "sections": ["hero", "stats", "features", "steps", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "gradient",
+    "eyebrow": "PARKING MADE EASY",
+    "headline": "Find a Spot in Seconds",
+    "subheadline": "Real-time parking availability, one-tap reservations, contactless payment. Available in 50+ cities.",
+    "cta_primary": {"text": "Download Free", "url": "#", "icon": "fas fa-mobile-alt"},
+    "cta_secondary": {"text": "See How It Works", "url": "#steps"},
+    "trust_line": "4.8 stars • 500K+ downloads • Free to use"
+  },
+  "stats": {
+    "items": [
+      {"value": "500K+", "label": "Downloads", "icon": "fas fa-download"},
+      {"value": "50+", "label": "Cities", "icon": "fas fa-map-marker-alt"},
+      {"value": "4.8", "label": "App Store Rating", "icon": "fas fa-star"},
+      {"value": "$2.3M", "label": "Saved in Parking Tickets", "icon": "fas fa-dollar-sign"}
+    ]
+  },
+  "features": {
+    "eyebrow": "FEATURES",
+    "headline": "Parking Without the Stress",
+    "items": [
+      {"icon": "fas fa-search-location", "title": "Real-Time Availability", "desc": "See open spots on a live map before you arrive.", "accent": "#059669"},
+      {"icon": "fas fa-credit-card", "title": "Contactless Payment", "desc": "Pay from your phone. No meters, no coins, no tickets.", "accent": "#2563EB"},
+      {"icon": "fas fa-bell", "title": "Expiry Alerts", "desc": "Get notified before your time runs out. Extend remotely.", "accent": "#F59E0B"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "HOW IT WORKS",
+    "headline": "Park in Three Taps",
+    "items": [
+      {"num": "1", "title": "Search", "desc": "Enter your destination. See nearby spots and prices."},
+      {"num": "2", "title": "Reserve", "desc": "Tap to reserve. Your spot is held for 15 minutes."},
+      {"num": "3", "title": "Park & Pay", "desc": "Pull in and pay contactlessly from the app."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "REVIEWS",
+    "headline": "Drivers Love ParkEasy",
+    "items": [
+      {"quote": "I used to circle blocks for 20 minutes. Now I drive straight to my reserved spot.", "name": "Alex Rivera", "role": "Daily Commuter, NYC"},
+      {"quote": "The expiry alerts alone have saved me hundreds in parking tickets.", "name": "Kim Nguyen", "role": "Sales Rep, Chicago"},
+      {"quote": "Game changer for downtown parking. I recommend it to everyone.", "name": "Derek Johnson", "role": "Uber Driver, LA"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Quick Answers",
+    "items": [
+      {"q": "Is ParkEasy free?", "a": "The app is free to download and use. You only pay for the parking you use."},
+      {"q": "Which cities are supported?", "a": "50+ US cities including NYC, LA, Chicago, San Francisco, and more. We add new cities monthly."},
+      {"q": "Can I extend my parking remotely?", "a": "Yes. Extend your session from anywhere in the app. No need to walk back to a meter."},
+      {"q": "What payment methods do you accept?", "a": "All major credit cards, Apple Pay, and Google Pay."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Stop Circling. Start Parking.",
+    "description": "Download ParkEasy free and find your spot today.",
+    "cta": {"text": "Download the App", "url": "#", "icon": "fas fa-download"},
+    "trust_line": "Free on iOS and Android"
+  },
+  "footer": {
+    "brand": {"name": "ParkEasy", "description": "The smartest way to find and pay for parking."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Cities"}, {"text": "For Business"}, {"text": "API"}]},
+      {"title": "Support", "links": [{"text": "Help Center"}, {"text": "Contact"}, {"text": "Privacy"}, {"text": "Terms"}]}
+    ],
+    "contact": {"email": "support@parkeasy.app"},
+    "copyright": "© 2026 ParkEasy App. All rights reserved."
+  }
+}

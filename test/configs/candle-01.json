@@ -1,0 +1,106 @@
+{
+  "colors": {
+    "primary": "#D4A853",
+    "dark_bg": "#1C1917",
+    "light_bg": "#FFFBEB",
+    "white": "#FFFFFF",
+    "text_dark": "#1C1917",
+    "text_muted": "#78716C",
+    "accent": "#B45309"
+  },
+  "fonts": {
+    "heading": "Playfair Display",
+    "body": "Lato"
+  },
+  "layout": {
+    "boxed_width": 1100,
+    "section_padding": 100,
+    "card_radius": 12,
+    "button_radius": 8
+  },
+  "sections": ["hero", "features", "steps", "testimonials", "competitive_edge", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "HANDCRAFTED LUXURY",
+    "headline": "Light Up Every Moment",
+    "subheadline": "Hand-poured soy candles with essential oils and wooden wicks. Crafted in small batches.",
+    "cta_primary": {"text": "Shop Candles", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Gift Sets", "url": "#"},
+    "trust_line": "Free shipping on orders over $50",
+    "image": "https://images.pexels.com/photos/3965555/pexels-photo-3965555.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "variant": "image_cards",
+    "eyebrow": "COLLECTIONS",
+    "headline": "Find Your Signature Scent",
+    "subheadline": "Three collections crafted for every mood and season.",
+    "items": [
+      {"icon": "fas fa-leaf", "title": "Botanical Garden", "desc": "Lavender, eucalyptus, and rosemary blends for calm.", "image": "https://images.pexels.com/photos/3993463/pexels-photo-3993463.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#059669"},
+      {"icon": "fas fa-fire", "title": "Fireside", "desc": "Warm cedar, vanilla, and amber for cozy evenings.", "image": "https://images.pexels.com/photos/3993449/pexels-photo-3993449.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#D4A853"},
+      {"icon": "fas fa-sun", "title": "Coastal Breeze", "desc": "Sea salt, citrus, and white tea for fresh spaces.", "image": "https://images.pexels.com/photos/3993422/pexels-photo-3993422.jpeg?auto=compress&cs=tinysrgb&w=800", "accent": "#0EA5E9"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "OUR CRAFT",
+    "headline": "Made with Intention",
+    "items": [
+      {"num": "1", "title": "Source Pure Ingredients", "desc": "100% soy wax, therapeutic-grade essential oils."},
+      {"num": "2", "title": "Hand-Pour Each Batch", "desc": "Small batches of 50 for consistent quality."},
+      {"num": "3", "title": "Ship with Care", "desc": "Gift-ready packaging, carbon-neutral delivery."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "REVIEWS",
+    "headline": "Customers Love Lumiere",
+    "items": [
+      {"quote": "The wooden wick crackle makes my living room feel like a fireplace. Best candle I've owned.", "name": "Sarah Mitchell", "role": "Verified Buyer"},
+      {"quote": "Bought the gift set for my mom. She ordered three more the same week.", "name": "David Nguyen", "role": "Verified Buyer"},
+      {"quote": "Clean burn, no soot, incredible throw. I can smell it from the next room.", "name": "Rachel Adams", "role": "Verified Buyer"}
+    ]
+  },
+  "competitive_edge": {
+    "eyebrow": "WHY LUMIERE",
+    "headline": "Not Just Another Candle",
+    "description": "Every detail is intentional, from wick to wax.",
+    "benefits": [
+      "100% natural soy wax",
+      "Therapeutic-grade essential oils",
+      "Hand-poured wooden wicks",
+      "60+ hour burn time",
+      "Reusable glass vessels",
+      "Toxin and paraben free"
+    ],
+    "cta": {"text": "Shop Now", "url": "#", "icon": "fas fa-arrow-right"}
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "How long do your candles burn?", "a": "Our standard 10oz candles burn for 60+ hours. The wooden wick provides a clean, even burn throughout."},
+      {"q": "Are they safe for allergies?", "a": "Yes. We use only essential oils — no synthetic fragrances, dyes, or paraffin."},
+      {"q": "Do you offer gift wrapping?", "a": "Every candle ships gift-ready in our signature box. Add a custom note at checkout."},
+      {"q": "What's your return policy?", "a": "Full refund within 30 days if you're not completely satisfied with your purchase."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Find Your Perfect Scent",
+    "description": "Handcrafted candles delivered to your door. Gift sets available.",
+    "cta": {"text": "Shop Collection", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free shipping over $50 • 30-day guarantee"
+  },
+  "footer": {
+    "brand": {"name": "Lumiere Candle Co", "description": "Handcrafted luxury candles made with pure ingredients."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-pinterest-p", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Shop", "links": [{"text": "All Candles"}, {"text": "Gift Sets"}, {"text": "Accessories"}, {"text": "Sale"}]},
+      {"title": "About", "links": [{"text": "Our Story"}, {"text": "Ingredients"}, {"text": "Wholesale"}, {"text": "Blog"}]}
+    ],
+    "contact": {"email": "hello@lumierecandleco.com"},
+    "copyright": "© 2026 Lumiere Candle Co. All rights reserved."
+  }
+}

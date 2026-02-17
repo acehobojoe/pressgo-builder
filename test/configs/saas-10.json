@@ -1,0 +1,89 @@
+{
+  "colors": {
+    "primary": "#1E40AF",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F0F9FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#059669"
+  },
+  "fonts": {"heading": "Inter", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 8},
+  "sections": ["hero", "stats", "features", "results", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "FLEET MANAGEMENT",
+    "headline": "Every Vehicle. Every Route. One Platform.",
+    "subheadline": "GPS tracking, route optimization, fuel monitoring, and driver safety scores for logistics teams.",
+    "cta_primary": {"text": "Request Demo", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Features", "url": "#features"},
+    "trust_line": "Trusted by 500+ fleets • API available",
+    "image": "https://images.pexels.com/photos/3183197/pexels-photo-3183197.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "stats": {
+    "items": [
+      {"value": "500+", "label": "Fleets Managed", "icon": "fas fa-truck"},
+      {"value": "50K+", "label": "Vehicles Tracked", "icon": "fas fa-map-marker-alt"},
+      {"value": "18%", "label": "Avg Fuel Savings", "icon": "fas fa-gas-pump"},
+      {"value": "99.9%", "label": "GPS Uptime", "icon": "fas fa-satellite"}
+    ]
+  },
+  "features": {
+    "eyebrow": "CAPABILITIES",
+    "headline": "Complete Fleet Visibility",
+    "items": [
+      {"icon": "fas fa-map-marked-alt", "title": "Live GPS Tracking", "desc": "Real-time location of every vehicle on a unified dashboard.", "accent": "#1E40AF"},
+      {"icon": "fas fa-route", "title": "Route Optimization", "desc": "AI-powered routing that cuts mileage and delivery times.", "accent": "#059669"},
+      {"icon": "fas fa-tachometer-alt", "title": "Driver Safety Scores", "desc": "Monitor speeding, harsh braking, and idle time.", "accent": "#F59E0B"}
+    ]
+  },
+  "results": {
+    "eyebrow": "IMPACT",
+    "headline": "Proven Fleet Savings",
+    "description": "Average results from LogiTrack customers after 6 months.",
+    "metrics": [
+      {"value": "18%", "label": "Fuel Cost Reduction", "color": "#059669"},
+      {"value": "23%", "label": "More Deliveries Per Day", "color": "#1E40AF"},
+      {"value": "35%", "label": "Fewer Safety Incidents", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CUSTOMERS",
+    "headline": "Fleet Managers Trust LogiTrack",
+    "items": [
+      {"quote": "Route optimization alone saved us $40K in fuel last quarter. ROI was instant.", "name": "Dave Morrison", "role": "Fleet Manager, FastFreight"},
+      {"quote": "Driver safety scores dropped our insurance premiums by 15%.", "name": "Linda Vasquez", "role": "Operations Director, QuickShip"},
+      {"quote": "We went from spreadsheets to LogiTrack. Should have done it years ago.", "name": "Mark Thompson", "role": "Owner, Thompson Logistics"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Questions & Answers",
+    "items": [
+      {"q": "What hardware do I need?", "a": "Our GPS trackers plug into any OBD-II port. We ship pre-configured devices — 5-minute install."},
+      {"q": "Does it work with any vehicle?", "a": "Yes. Cars, trucks, vans, and heavy equipment. Any vehicle with an OBD-II port (1996+)."},
+      {"q": "Do you have an API?", "a": "Full REST API for integrating tracking, routes, and driver data into your existing systems."},
+      {"q": "What's the contract length?", "a": "Month-to-month. No long-term contracts required. Cancel anytime."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Take Control of Your Fleet",
+    "description": "See how LogiTrack can cut costs and improve safety.",
+    "cta": {"text": "Request a Demo", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free pilot program • No contracts"
+  },
+  "footer": {
+    "brand": {"name": "LogiTrack", "description": "Fleet management and GPS tracking for logistics."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "GPS Tracking"}, {"text": "Route Optimization"}, {"text": "Driver Safety"}, {"text": "API"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Case Studies"}, {"text": "Blog"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "sales@logitrack.io", "phone": "(888) 555-FLEET"},
+    "copyright": "© 2026 LogiTrack Fleet. All rights reserved."
+  }
+}

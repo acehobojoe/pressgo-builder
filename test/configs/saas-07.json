@@ -1,0 +1,90 @@
+{
+  "colors": {
+    "primary": "#2563EB",
+    "dark_bg": "#111827",
+    "light_bg": "#F9FAFB",
+    "white": "#FFFFFF",
+    "text_dark": "#111827",
+    "text_muted": "#6B7280",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "DM Sans", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "stats", "features", "results", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "gradient",
+    "eyebrow": "AI CUSTOMER SUPPORT",
+    "headline": "Resolve 40% More Tickets Automatically",
+    "subheadline": "AI-powered chatbot that handles web, email, and Slack. Built-in knowledge base and smart routing.",
+    "cta_primary": {"text": "Try Free", "url": "#", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See It Work", "url": "#"},
+    "trust_line": "Free plan available • 5-minute setup"
+  },
+  "stats": {
+    "items": [
+      {"value": "40%", "label": "Tickets Auto-Resolved", "icon": "fas fa-robot"},
+      {"value": "8,000+", "label": "Support Teams", "icon": "fas fa-headset"},
+      {"value": "< 30s", "label": "Avg Response Time", "icon": "fas fa-clock"},
+      {"value": "4.9", "label": "Customer Rating", "icon": "fas fa-star"}
+    ]
+  },
+  "features": {
+    "eyebrow": "CAPABILITIES",
+    "headline": "Support That Scales",
+    "subheadline": "One platform for every support channel.",
+    "items": [
+      {"icon": "fas fa-comments", "title": "Multi-Channel AI", "desc": "Web chat, email, and Slack — all managed from one inbox.", "accent": "#2563EB"},
+      {"icon": "fas fa-brain", "title": "Knowledge Base", "desc": "AI learns from your docs and answers questions accurately.", "accent": "#10B981"},
+      {"icon": "fas fa-route", "title": "Smart Routing", "desc": "Complex issues auto-escalate to the right human agent.", "accent": "#F59E0B"}
+    ]
+  },
+  "results": {
+    "eyebrow": "IMPACT",
+    "headline": "Measurable Support Improvements",
+    "description": "Average results from teams using Chatly for 90+ days.",
+    "metrics": [
+      {"value": "40%", "label": "Less Ticket Volume", "color": "#2563EB"},
+      {"value": "92%", "label": "Customer Satisfaction", "color": "#10B981"},
+      {"value": "3.5x", "label": "Faster Resolution", "color": "#F59E0B"}
+    ]
+  },
+  "testimonials": {
+    "variant": "featured",
+    "eyebrow": "CUSTOMERS",
+    "headline": "Support Leaders Love Chatly",
+    "items": [
+      {"quote": "Chatly handles 40% of our tickets without any human intervention. Our team focuses on complex issues now. Support quality actually went up.", "name": "Jordan Lee", "role": "VP Support, CloudFirst"},
+      {"quote": "Setup took 20 minutes. The AI was answering accurately from day one.", "name": "Nina Patel", "role": "Support Lead, AppStack"},
+      {"quote": "We scaled from 100 to 10,000 users without adding a single support agent.", "name": "Tom Wagner", "role": "CEO, LaunchPad SaaS"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "How does the AI learn our products?", "a": "Connect your help docs, FAQs, and knowledge base. Chatly indexes everything and answers based on your content."},
+      {"q": "What happens when the AI can't answer?", "a": "It seamlessly hands off to a human agent with full conversation context. No customer frustration."},
+      {"q": "Which channels does it support?", "a": "Web chat widget, email inbox, Slack, and Microsoft Teams. More channels coming soon."},
+      {"q": "Is there a free plan?", "a": "Yes. Free plan includes 100 AI conversations per month, web chat, and basic knowledge base."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Automate Your Support Today",
+    "description": "Join 8,000+ teams delivering faster, smarter support.",
+    "cta": {"text": "Start Free", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free plan • No credit card • 5-minute setup"
+  },
+  "footer": {
+    "brand": {"name": "Chatly", "description": "AI-powered customer support for growing teams."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Pricing"}, {"text": "Integrations"}, {"text": "API Docs"}]},
+      {"title": "Company", "links": [{"text": "About"}, {"text": "Blog"}, {"text": "Changelog"}, {"text": "Status"}]}
+    ],
+    "contact": {"email": "hello@chatly.io"},
+    "copyright": "© 2026 Chatly Support. All rights reserved."
+  }
+}

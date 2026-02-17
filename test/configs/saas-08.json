@@ -1,0 +1,101 @@
+{
+  "colors": {
+    "primary": "#E11D48",
+    "dark_bg": "#0F172A",
+    "light_bg": "#FFF1F2",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Plus Jakarta Sans", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "steps", "results", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "EMAIL FOR CREATORS",
+    "headline": "Emails That Get Opened",
+    "subheadline": "Drag-and-drop editor, automation sequences, and landing pages. Free up to 1,000 subscribers.",
+    "cta_primary": {"text": "Start Free", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Templates", "url": "#"},
+    "trust_line": "Free forever under 1K subs • No credit card",
+    "image": "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "FEATURES",
+    "headline": "Everything You Need to Grow",
+    "items": [
+      {"icon": "fas fa-palette", "title": "Drag & Drop Editor", "desc": "Beautiful emails in minutes. No coding required.", "accent": "#E11D48"},
+      {"icon": "fas fa-cog", "title": "Automation", "desc": "Welcome sequences, drip campaigns, and triggered emails.", "accent": "#7C3AED"},
+      {"icon": "fas fa-chart-line", "title": "Analytics", "desc": "Open rates, click maps, and subscriber growth tracking.", "accent": "#10B981"}
+    ]
+  },
+  "steps": {
+    "variant": "compact",
+    "eyebrow": "GET STARTED",
+    "headline": "Launch in Minutes",
+    "items": [
+      {"num": "1", "title": "Import Subscribers", "desc": "CSV upload or connect your existing tools."},
+      {"num": "2", "title": "Design Your Email", "desc": "Pick a template or build from scratch."},
+      {"num": "3", "title": "Send & Analyze", "desc": "Schedule, send, and track every metric."}
+    ]
+  },
+  "results": {
+    "eyebrow": "BY THE NUMBERS",
+    "headline": "Creators Trust EmailCraft",
+    "description": "Performance metrics from 10,000+ active creators.",
+    "metrics": [
+      {"value": "45%", "label": "Avg Open Rate", "color": "#E11D48"},
+      {"value": "10K+", "label": "Active Creators", "color": "#7C3AED"},
+      {"value": "99.9%", "label": "Deliverability", "color": "#10B981"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CREATORS",
+    "headline": "Loved by Creators",
+    "items": [
+      {"quote": "Switched from Mailchimp. My open rates jumped 15% in the first month.", "name": "Sophia Ellis", "role": "Newsletter Creator"},
+      {"quote": "The automation builder is intuitive. I set up my entire funnel in an afternoon.", "name": "Jake Chen", "role": "Course Creator"},
+      {"quote": "Free plan is actually usable. No surprise paywalls on basic features.", "name": "Maria Santos", "role": "Blogger & Podcaster"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "headline": "Grow at Your Pace",
+    "subheadline": "Free forever for small lists. Scale when ready.",
+    "plans": [
+      {"name": "Free", "price": "$0", "period": "/mo", "description": "Up to 1,000 subscribers", "features": ["1,000 subscribers", "Unlimited emails", "Drag & drop editor", "Basic automation", "Email support"], "cta": {"text": "Start Free", "url": "#"}},
+      {"name": "Creator", "price": "$29", "period": "/mo", "description": "Growing audience", "badge": "POPULAR", "highlighted": true, "features": ["5,000 subscribers", "Advanced automation", "Landing pages", "A/B testing", "Priority support"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Pro", "price": "$79", "period": "/mo", "description": "Professional creators", "features": ["25,000 subscribers", "Everything in Creator", "Custom domain", "API access", "Dedicated IP"], "cta": {"text": "Start Trial", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Questions Answered",
+    "items": [
+      {"q": "Is the free plan really free forever?", "a": "Yes. Up to 1,000 subscribers with unlimited emails. No time limit, no trial expiration."},
+      {"q": "Can I migrate from another platform?", "a": "One-click import from Mailchimp, ConvertKit, and Substack. We handle the migration."},
+      {"q": "Do you support landing pages?", "a": "Yes. Creator plan and above includes a drag-and-drop landing page builder with custom domains."},
+      {"q": "What's your deliverability rate?", "a": "99.9% inbox placement. We maintain strict anti-spam policies and dedicated IP pools."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Start Growing Your Audience",
+    "description": "Free forever. No credit card. No excuses.",
+    "cta": {"text": "Create Free Account", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Join 10,000+ creators"
+  },
+  "footer": {
+    "brand": {"name": "EmailCraft", "description": "Email marketing built for creators."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-youtube", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Pricing"}, {"text": "Templates"}, {"text": "Integrations"}]},
+      {"title": "Resources", "links": [{"text": "Blog"}, {"text": "Help Center"}, {"text": "Community"}, {"text": "Changelog"}]}
+    ],
+    "contact": {"email": "support@emailcraft.io"},
+    "copyright": "© 2026 EmailCraft. All rights reserved."
+  }
+}

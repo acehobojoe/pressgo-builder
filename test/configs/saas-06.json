@@ -1,0 +1,91 @@
+{
+  "colors": {
+    "primary": "#0145FA",
+    "dark_bg": "#0F172A",
+    "light_bg": "#F0F9FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Inter", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "stats", "testimonials", "pricing", "faq", "cta_final", "footer"],
+  "hero": {
+    "variant": "split",
+    "eyebrow": "BUSINESS INTELLIGENCE",
+    "headline": "Data Decisions, Not Guesses",
+    "subheadline": "Real-time dashboards, SQL editor, and automated reports. Connect any data source in minutes.",
+    "cta_primary": {"text": "Start Free", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See Demo", "url": "#"},
+    "trust_line": "SOC 2 certified • 14-day free trial",
+    "image": "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "variant": "alternating",
+    "eyebrow": "FEATURES",
+    "headline": "Analytics That Actually Work",
+    "items": [
+      {"icon": "fas fa-chart-line", "title": "Real-Time Dashboards", "desc": "Live metrics that update as your data changes. Share with anyone.", "image": "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=800"},
+      {"icon": "fas fa-database", "title": "SQL Editor", "desc": "Write queries, visualize results, and save as reusable reports.", "image": "https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=800"},
+      {"icon": "fas fa-cog", "title": "Automated Reports", "desc": "Schedule PDF reports to stakeholders daily, weekly, or monthly.", "image": "https://images.pexels.com/photos/3184451/pexels-photo-3184451.jpeg?auto=compress&cs=tinysrgb&w=800"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "3,200+", "label": "Teams Using DataPulse", "icon": "fas fa-users"},
+      {"value": "50+", "label": "Data Source Connectors", "icon": "fas fa-plug"},
+      {"value": "99.9%", "label": "Uptime SLA", "icon": "fas fa-server"},
+      {"value": "<2s", "label": "Avg Query Time", "icon": "fas fa-bolt"}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "CUSTOMERS",
+    "headline": "Trusted by Data Teams",
+    "items": [
+      {"quote": "Replaced three tools with DataPulse. Our exec team finally checks dashboards daily.", "name": "Lisa Chang", "role": "Head of Analytics, Growthworks"},
+      {"quote": "The SQL editor is what sold us. Power users love it, non-technical folks use dashboards.", "name": "Amir Hassan", "role": "CTO, FinFlow"},
+      {"quote": "Automated reports saved my team 10 hours per week. Worth every penny.", "name": "Sarah Mitchell", "role": "VP Operations, Scalable Inc"}
+    ]
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "headline": "Plans for Every Team",
+    "plans": [
+      {"name": "Starter", "price": "$49", "period": "/mo", "description": "Small teams", "features": ["5 dashboards", "10 data sources", "Daily refresh", "3 team members"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Pro", "price": "$199", "period": "/mo", "description": "Growing teams", "badge": "POPULAR", "highlighted": true, "features": ["Unlimited dashboards", "50 data sources", "Real-time refresh", "15 team members", "SQL editor", "Scheduled reports"], "cta": {"text": "Start Trial", "url": "#"}},
+      {"name": "Enterprise", "price": "Custom", "period": "", "description": "Large organizations", "features": ["Everything in Pro", "Unlimited members", "SSO & audit logs", "Custom connectors", "Dedicated support"], "cta": {"text": "Contact Sales", "url": "#"}}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Questions & Answers",
+    "items": [
+      {"q": "What data sources do you support?", "a": "PostgreSQL, MySQL, BigQuery, Snowflake, Redshift, MongoDB, REST APIs, Google Sheets, and 40+ more."},
+      {"q": "Is my data secure?", "a": "SOC 2 Type II certified. We never store your raw data — queries run in real-time against your sources."},
+      {"q": "Can non-technical users build dashboards?", "a": "Yes. Drag-and-drop dashboard builder requires zero SQL knowledge."},
+      {"q": "Do you offer on-premise deployment?", "a": "Enterprise plan includes on-premise and VPC deployment options."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Start Making Data-Driven Decisions",
+    "description": "Connect your first data source in under 5 minutes.",
+    "cta": {"text": "Start Free Trial", "url": "#pricing", "icon": "fas fa-arrow-right"},
+    "trust_line": "14-day trial • No credit card required"
+  },
+  "footer": {
+    "brand": {"name": "DataPulse", "description": "Business intelligence and analytics for modern teams."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-linkedin-in", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-github", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Features"}, {"text": "Pricing"}, {"text": "Connectors"}, {"text": "Changelog"}]},
+      {"title": "Resources", "links": [{"text": "Docs"}, {"text": "Blog"}, {"text": "Tutorials"}, {"text": "Status"}]}
+    ],
+    "contact": {"email": "support@datapulse.io"},
+    "copyright": "© 2026 DataPulse Analytics. All rights reserved."
+  }
+}

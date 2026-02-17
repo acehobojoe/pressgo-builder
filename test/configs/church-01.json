@@ -1,0 +1,89 @@
+{
+  "colors": {
+    "primary": "#7C3AED",
+    "dark_bg": "#1E293B",
+    "light_bg": "#FAF5FF",
+    "white": "#FFFFFF",
+    "text_dark": "#1E293B",
+    "text_muted": "#64748B",
+    "accent": "#D4A853"
+  },
+  "fonts": {"heading": "Playfair Display", "body": "Lato"},
+  "layout": {"boxed_width": 1100, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "steps", "testimonials", "faq", "map", "cta_final", "footer"],
+  "hero": {
+    "variant": "image",
+    "eyebrow": "WELCOME HOME",
+    "headline": "A Place to Belong",
+    "subheadline": "Sunday services, youth programs, small groups, and community outreach. Everyone is welcome here.",
+    "cta_primary": {"text": "Plan Your Visit", "url": "#steps", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Watch Live", "url": "#"},
+    "trust_line": "Sundays at 9am & 11am • Kids Programs Available",
+    "image": "https://images.pexels.com/photos/3280130/pexels-photo-3280130.jpeg?auto=compress&cs=tinysrgb&w=800"
+  },
+  "features": {
+    "eyebrow": "MINISTRIES",
+    "headline": "Something for Everyone",
+    "items": [
+      {"icon": "fas fa-music", "title": "Worship Services", "desc": "Inspiring messages and live worship every Sunday.", "accent": "#7C3AED"},
+      {"icon": "fas fa-child", "title": "Kids & Youth", "desc": "Age-appropriate programs from nursery through high school.", "accent": "#F59E0B"},
+      {"icon": "fas fa-users", "title": "Small Groups", "desc": "Weekly home groups for connection and spiritual growth.", "accent": "#10B981"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "YOUR FIRST VISIT",
+    "headline": "Plan Your Visit",
+    "items": [
+      {"num": "1", "title": "Pick a Service", "desc": "Sundays at 9am (traditional) or 11am (contemporary)."},
+      {"num": "2", "title": "Drop Off the Kids", "desc": "Check-in at the kids' area. Safe, fun, age-appropriate."},
+      {"num": "3", "title": "Grab Coffee & Connect", "desc": "Stay for coffee after service. Meet the team."}
+    ]
+  },
+  "testimonials": {
+    "variant": "minimal",
+    "eyebrow": "COMMUNITY",
+    "headline": "Our Church Family",
+    "items": [
+      {"quote": "We were nervous visiting a new church. By the second week, it felt like home.", "name": "The Martinez Family", "role": "Members Since 2024"},
+      {"quote": "The youth program changed my teenager's life. She found community and purpose.", "name": "Angela Thompson", "role": "Parent"},
+      {"quote": "Small groups gave us friendships that go deeper than Sunday morning.", "name": "James & Ruth Kim", "role": "Small Group Leaders"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "First-Time Questions",
+    "items": [
+      {"q": "What should I wear?", "a": "Come as you are. Some dress up, some wear jeans. There's no dress code."},
+      {"q": "How long is the service?", "a": "About 75 minutes — worship music and a message. Casual and welcoming."},
+      {"q": "Is there parking?", "a": "Free parking on-site with overflow lots. Greeters will help you find a spot."},
+      {"q": "Can I watch online?", "a": "Yes. Every service is live-streamed on our website and YouTube. Recordings available all week."}
+    ]
+  },
+  "map": {
+    "headline": "Find Us",
+    "address": "789 Grace Avenue",
+    "zoom": 14
+  },
+  "cta_final": {
+    "variant": "card",
+    "headline": "We'd Love to Meet You",
+    "description": "Come as you are. Leave knowing you belong.",
+    "cta": {"text": "Plan Your Visit", "url": "#steps", "icon": "fas fa-arrow-right"},
+    "trust_line": "Sundays at 9am & 11am"
+  },
+  "footer": {
+    "variant": "light",
+    "brand": {"name": "Grace Community Church", "description": "A welcoming place for all to grow in faith and community."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-facebook-f", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-instagram", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-youtube", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Ministries", "links": [{"text": "Worship"}, {"text": "Kids"}, {"text": "Youth"}, {"text": "Small Groups"}]},
+      {"title": "Connect", "links": [{"text": "Plan Your Visit"}, {"text": "Watch Online"}, {"text": "Give"}, {"text": "Contact"}]}
+    ],
+    "contact": {"email": "hello@gracecc.org", "phone": "(555) 789-0123", "address": "789 Grace Avenue"},
+    "copyright": "© 2026 Grace Community Church. All rights reserved."
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "colors": {
+    "primary": "#F59E0B",
+    "dark_bg": "#0C0A09",
+    "light_bg": "#FFFBEB",
+    "white": "#FFFFFF",
+    "text_dark": "#1C1917",
+    "text_muted": "#78716C",
+    "accent": "#10B981"
+  },
+  "fonts": {"heading": "Sora", "body": "Inter"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "features", "stats", "steps", "testimonials", "faq", "cta_final", "footer"],
+  "hero": {
+    "eyebrow": "CRYPTO MADE SIMPLE",
+    "headline": "Buy, Swap, Stake. All in One Wallet.",
+    "subheadline": "Bank-grade security for 200+ tokens. Instant swaps, staking rewards, mobile and desktop.",
+    "cta_primary": {"text": "Create Wallet", "url": "#", "icon": "fas fa-wallet"},
+    "cta_secondary": {"text": "Learn More", "url": "#features"},
+    "trust_line": "256-bit encryption • Non-custodial • Open source"
+  },
+  "features": {
+    "variant": "grid",
+    "eyebrow": "FEATURES",
+    "headline": "Everything in One Wallet",
+    "items": [
+      {"icon": "fas fa-exchange-alt", "title": "Instant Swaps", "desc": "Swap 200+ tokens with zero platform fees.", "accent": "#F59E0B"},
+      {"icon": "fas fa-lock", "title": "Bank-Grade Security", "desc": "Biometric auth, 2FA, and hardware wallet support.", "accent": "#10B981"},
+      {"icon": "fas fa-coins", "title": "Staking Rewards", "desc": "Earn up to 12% APY on supported tokens.", "accent": "#8B5CF6"},
+      {"icon": "fas fa-mobile-alt", "title": "Cross-Platform", "desc": "Sync seamlessly across mobile and desktop.", "accent": "#2563EB"}
+    ]
+  },
+  "stats": {
+    "variant": "dark",
+    "items": [
+      {"value": "$2.1B", "label": "Assets Secured", "icon": "fas fa-shield-alt"},
+      {"value": "200+", "label": "Tokens Supported", "icon": "fas fa-coins"},
+      {"value": "500K+", "label": "Active Wallets", "icon": "fas fa-wallet"},
+      {"value": "0", "label": "Security Breaches", "icon": "fas fa-lock"}
+    ]
+  },
+  "steps": {
+    "eyebrow": "GET STARTED",
+    "headline": "Your Wallet in 60 Seconds",
+    "items": [
+      {"num": "1", "title": "Create Your Wallet", "desc": "Download the app and set up in under a minute."},
+      {"num": "2", "title": "Fund & Buy", "desc": "Deposit crypto or buy with a card. Instant."},
+      {"num": "3", "title": "Swap & Stake", "desc": "Trade tokens and earn rewards — all in the wallet."}
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "COMMUNITY",
+    "headline": "Trusted by the Community",
+    "items": [
+      {"quote": "Only wallet I trust with my portfolio. The security features are unmatched.", "name": "Alex Torres", "role": "Crypto Investor"},
+      {"quote": "Staking rewards paid for my coffee every morning. Passive income is real.", "name": "Jenny Park", "role": "DeFi Enthusiast"},
+      {"quote": "Clean UI, fast swaps, and the open-source code gives me confidence.", "name": "Raj Mehta", "role": "Blockchain Developer"}
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "headline": "Common Questions",
+    "items": [
+      {"q": "Is BlockVault non-custodial?", "a": "Yes. You hold your private keys. We never have access to your funds."},
+      {"q": "What tokens do you support?", "a": "Bitcoin, Ethereum, and 200+ ERC-20, BEP-20, and Solana tokens. We add more weekly."},
+      {"q": "Are there swap fees?", "a": "Zero platform fees. You only pay network gas fees which go to validators, not us."},
+      {"q": "Is the code open source?", "a": "Yes. Our wallet code is fully audited and open source on GitHub."}
+    ]
+  },
+  "cta_final": {
+    "headline": "Your Crypto. Your Keys. Your Wallet.",
+    "description": "Download BlockVault and take control of your digital assets.",
+    "cta": {"text": "Create Free Wallet", "url": "#", "icon": "fas fa-wallet"},
+    "trust_line": "Non-custodial • Open source • Zero platform fees"
+  },
+  "footer": {
+    "brand": {"name": "BlockVault", "description": "Secure cryptocurrency wallet and exchange."},
+    "social_icons": [
+      {"social_icon": {"value": "fab fa-twitter", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-github", "library": "fa-brands"}, "link": {"url": "#"}},
+      {"social_icon": {"value": "fab fa-discord", "library": "fa-brands"}, "link": {"url": "#"}}
+    ],
+    "columns": [
+      {"title": "Product", "links": [{"text": "Wallet"}, {"text": "Swap"}, {"text": "Staking"}, {"text": "Security"}]},
+      {"title": "Resources", "links": [{"text": "Docs"}, {"text": "GitHub"}, {"text": "Blog"}, {"text": "Support"}]}
+    ],
+    "contact": {"email": "support@blockvault.io"},
+    "copyright": "© 2026 BlockVault Wallet. All rights reserved."
+  }
+}
