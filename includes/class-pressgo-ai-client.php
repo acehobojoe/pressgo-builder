@@ -58,7 +58,7 @@ class PressGo_AI_Client {
 				'stream'     => true,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
-					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
+					array( 'role' => 'user',   'content' => self::convert_content_to_openai( $user_content ) ),
 				),
 			);
 			$headers = array(
@@ -247,13 +247,15 @@ class PressGo_AI_Client {
 
 		// Build request body — different format for Anthropic vs OpenAI-compatible.
 		if ( $this->use_openai_format ) {
+			// Convert Anthropic-format content to OpenAI-format content.
+			$openai_content = self::convert_content_to_openai( $user_content );
 			$body = array(
 				'model'      => $this->model,
 				'max_tokens' => 8192,
 				'stream'     => true,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
-					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
+					array( 'role' => 'user',   'content' => $openai_content ),
 				),
 			);
 			$headers = array(
@@ -435,7 +437,7 @@ class PressGo_AI_Client {
 				'max_tokens' => 8192,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
-					array( 'role' => 'user',   'content' => is_array( $user_content ) ? $user_content[0]['text'] : $user_content ),
+					array( 'role' => 'user',   'content' => self::convert_content_to_openai( $user_content ) ),
 				),
 			);
 			$req_headers = array(
@@ -534,6 +536,61 @@ class PressGo_AI_Client {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Convert Anthropic-format content array to OpenAI-format.
+	 *
+	 * Anthropic: [ { type: 'image', source: { type: 'base64', media_type, data } }, { type: 'text', text: '...' } ]
+	 * OpenAI:    [ { type: 'image_url', image_url: { url: 'data:mime;base64,...' } }, { type: 'text', text: '...' } ]
+	 *
+	 * @param array $content Anthropic content blocks.
+	 * @return array|string OpenAI content blocks, or plain string if text-only.
+	 */
+	private static function convert_content_to_openai( $content ) {
+		if ( ! is_array( $content ) ) {
+			return $content;
+		}
+
+		$has_image = false;
+		foreach ( $content as $block ) {
+			if ( isset( $block['type'] ) && 'image' === $block['type'] ) {
+				$has_image = true;
+				break;
+			}
+		}
+
+		// Text-only: just extract the text string.
+		if ( ! $has_image ) {
+			foreach ( $content as $block ) {
+				if ( isset( $block['text'] ) ) {
+					return $block['text'];
+				}
+			}
+			return '';
+		}
+
+		// Multi-modal: convert to OpenAI format.
+		$openai_content = array();
+		foreach ( $content as $block ) {
+			if ( 'image' === $block['type'] && isset( $block['source'] ) ) {
+				$mime = isset( $block['source']['media_type'] ) ? $block['source']['media_type'] : 'image/png';
+				$data = isset( $block['source']['data'] ) ? $block['source']['data'] : '';
+				$openai_content[] = array(
+					'type'      => 'image_url',
+					'image_url' => array(
+						'url' => 'data:' . $mime . ';base64,' . $data,
+					),
+				);
+			} elseif ( 'text' === $block['type'] && isset( $block['text'] ) ) {
+				$openai_content[] = array(
+					'type' => 'text',
+					'text' => $block['text'],
+				);
+			}
+		}
+
+		return $openai_content;
 	}
 
 	/**
