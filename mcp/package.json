@@ -1,0 +1,20 @@
+{
+  "name": "pressgo-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for PressGo Builder — generate Elementor landing pages via AI",
+  "type": "module",
+  "main": "server.js",
+  "bin": {
+    "pressgo-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "license": "GPL-2.0-or-later",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
