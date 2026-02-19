@@ -392,11 +392,6 @@ class PressGo_AI_Client {
 			return new WP_Error( 'api_error', $error_msg );
 		}
 
-		// DEBUG: log import AI response to diagnose parse failures.
-		error_log( 'PressGo IMPORT response length: ' . strlen( $accumulated_text ) );
-		error_log( 'PressGo IMPORT response START: ' . substr( $accumulated_text, 0, 500 ) );
-		error_log( 'PressGo IMPORT response END: ' . substr( $accumulated_text, -500 ) );
-
 		// Parse the accumulated text as JSON config.
 		$config = $this->parse_config_response( $accumulated_text );
 		if ( null === $config ) {
@@ -665,7 +660,8 @@ class PressGo_AI_Client {
 	 * Comprehensive import mode addendum that overrides generation rules.
 	 *
 	 * This text is appended to the system prompt during import to shift the AI
-	 * from "creative generation" to "faithful reproduction."
+	 * from "creative generation" to "faithful reproduction." It works in tandem
+	 * with the classified headings and deduplicated images from build_import_instructions().
 	 */
 	private static function get_import_addendum() {
 		return <<<'IMPORT'
@@ -673,68 +669,103 @@ class PressGo_AI_Client {
 
 ## ⚠️ IMPORT MODE — OVERRIDES ALL ABOVE RULES ⚠️
 
-You are now in IMPORT MODE. You are cloning an existing page, NOT creating a new one. The following rules OVERRIDE the generation rules above. When there is any conflict, IMPORT MODE wins.
+You are now in IMPORT MODE. You are cloning an existing page, NOT creating a new one. The following rules OVERRIDE the generation rules above.
 
 ### CARDINAL RULES
-1. **NEVER fabricate content.** Use ONLY text that appears in the extracted metadata. If the metadata says "Testimonial from one of our clients" — that is the testimonial text. Do NOT invent names, quotes, or descriptions.
-2. **NEVER add sections that don't exist in the original.** If the original has 5 visual sections, output ~5 sections. Do NOT pad with extra sections to reach 7-10.
-3. **NEVER use Pexels photo URLs.** Use ONLY the image URLs extracted from the original page (from the `images` array in metadata).
-4. **Use extracted text VERBATIM** — do not rewrite, improve, shorten, or paraphrase. Even if text seems like a placeholder, use it exactly.
-5. **Ignore the "Content Length Rules" and "Section Selection Guide" above.** Those are for generation mode. In import mode, content length is dictated by the original page.
-6. **Ignore "MAX 10 SECTIONS" and "7-10 entries" rules.** Match the original page's section count exactly.
-7. **Ignore "Visual Rhythm Rules" for bg colors.** Match the original page's actual background colors per section, even if two adjacent sections have the same bg color.
+1. **NEVER fabricate content.** Use ONLY text from the extracted metadata. If metadata says "Testimonial from one of our clients" — that IS the testimonial text. Do NOT invent names, quotes, descriptions, or team members.
+2. **NEVER add sections that don't exist.** Derive section count from the content structure (headings, text groups, image groups), not from generation defaults.
+3. **NEVER use Pexels photo URLs.** Use ONLY images from the metadata.
+4. **Use extracted text VERBATIM** — do not rewrite, improve, shorten, or paraphrase.
+5. **Ignore these generation-mode rules:** "MAX 10 SECTIONS", "Content Length Rules", "Section Selection Guide", "Visual Rhythm Rules", "7-10 entries". Import mode is dictated by the original page.
+
+### HEADING CLASSIFICATION
+The metadata includes headings tagged with role classifications. Map them to config fields as follows:
+
+- **[BRAND-NAME]** → Use as `hero.headline` (it IS the hero heading). Also use for `footer.brand.name`.
+- **[HERO-HEADLINE]** → Use as `hero.headline`.
+- **[HERO-SUBHEADLINE]** → Use as `hero.subheadline`.
+- **[SECTION-HEADING]** → Use as the `headline` field of the matching section (features, gallery, etc.).
+- **[ITEM-TITLE]** → Use as item `title` within a section (feature item, gallery item, step title, etc.).
+- **[CTA-LABEL]** → This is button text. Use ONLY for `cta.text` or `cta_primary.text`. **NEVER use as an eyebrow.**
+- **[FOOTER-LABEL]** → Use as `footer.columns[].title`.
+- **[DESCRIPTION]** → Use as section `description`, `subheadline`, or long-form text field.
+
+Note: Classifications are heuristic guidance. Override them if context clearly suggests a different role.
+
+### EYEBROW RULES (CRITICAL)
+The `eyebrow` field is a SHORT uppercase label that appears ABOVE a section heading on the original page (e.g., "OUR SERVICES", "HOW IT WORKS").
+
+- If no such label exists for a section, set `eyebrow` to `""` (empty string).
+- **NEVER use button text as an eyebrow.**
+- **NEVER duplicate the headline text in the eyebrow.**
+- If a section has only one heading (e.g., "Our Services"), use it as `headline` and leave `eyebrow` as `""`.
+- Only use a separate eyebrow when the metadata clearly shows a short label ABOVE a longer section heading.
 
 ### COLOR MAPPING
-- Convert extracted RGB colors to hex. `rgb(48, 51, 30)` → `#30331E`
-- The most common light bg color from the metadata → `light_bg`
-- The most common dark bg color → `dark_bg`
-- The primary text color on light sections → `text_dark`
-- Any accent/button color → `primary` and `accent`
-- Map each section's background to the closest extracted color. Do NOT use colors not found on the original page.
+- Colors in the metadata are already converted to hex.
+- The most common light background → `light_bg`
+- The most common dark background → `dark_bg`
+- Primary text color on light sections → `text_dark`
+- Muted/secondary text → `text_muted`
+- Button or accent color → `primary` and `accent`
+- Map each section's background to the closest extracted color.
 
 ### FONT MAPPING
-- Use the extracted font families directly in `fonts.heading` and `fonts.body`
-- If the original uses decorative/script fonts (e.g. Pinyon Script, Baskervville), use them for headings
-- If multiple heading fonts are detected, use the most prominent one
+- Use the detected font names in `fonts.heading` and `fonts.body`.
+- If a font is proprietary/custom (not in Google Fonts), use the closest Google Font:
+  - Custom sans-serif (sohne, Charlie Text, Geograph, SweetSans, Plain) → Inter, DM Sans, or Manrope
+  - Custom serif (Chronicle Text, Lyon Text, Ivy Journal) → Libre Baskerville, EB Garamond, or Merriweather
+  - Custom mono (Berkeley Mono, Akkurat Mono) → Fira Code
+  - Garamond Pro → EB Garamond
+  - SF Pro Display → Inter
+- The metadata may include specific fallback suggestions.
 
 ### SECTION TYPE MAPPING
-Map original page sections to PressGo section types based on content patterns:
+**ALL valid section types:** hero, features, gallery, steps, stats, testimonials, competitive_edge, results, faq, pricing, team, cta_final, newsletter, logo_bar, social_proof, map, blog, footer, disclaimer
 
-| Original Pattern | PressGo Section | Recommended Variant |
+**IMPORTANT:** `gallery`, `footer`, `pricing`, `newsletter`, `logo_bar`, `team`, and `map` are all valid even though the config schema enum may not list them. USE them when the original page content matches.
+
+| Original Pattern | PressGo Section | Variant |
 |---|---|---|
-| Large heading + tagline/subtext + CTA button + hero image | `hero` | `split` (if image beside text) or `minimal` (if centered) |
-| Service/offering cards WITH images | `features` | `image_cards` (3 items) or `alternating` (2-3 items with large images) |
-| Service/offering cards WITHOUT images | `features` | `default` (icon-based) or `minimal` |
-| Project/portfolio grid with images + titles | `gallery` | `cards` (with captions) or `default` (grid) |
-| Customer quote(s) | `testimonials` | `minimal` (1-2 quotes) or `default` (3 cards) |
-| CTA block on dark background | `cta_final` | `image` (if has bg image) or `default` (gradient) |
-| Footer with brand + links + copyright | `footer` | `dark` or `light` based on bg color |
-| Stats/numbers row | `stats` | `default` or `inline` |
-| How-it-works / process steps | `steps` | `default` or `timeline` |
+| Brand/headline + tagline + CTA + image | `hero` | `split` (image beside text) or `minimal` (centered) |
+| Service/offering cards WITH photos | `features` | `image_cards` |
+| Service/offering list WITHOUT photos | `features` | `default` or `minimal` |
+| Feature sections with alternating image/text | `features` | `alternating` |
+| Project/portfolio images with titles | `gallery` | `cards` |
+| Image grid without captions | `gallery` | `default` |
+| Customer quotes | `testimonials` | `minimal` (1-2) or `default` (3) |
+| CTA block | `cta_final` | `image` (with bg image) or `default` |
+| Footer with brand + links + copyright | `footer` | `dark` or `light` |
+| Stats/numbers | `stats` | `default` or `inline` |
+| Process steps | `steps` | `default` or `timeline` |
 | FAQ accordion | `faq` | `default` or `split` |
+| Client/partner logos row | `logo_bar` | `default` or `dark` |
 
-### IMAGE ASSIGNMENT (CRITICAL)
-Images in the metadata are listed in PAGE ORDER (top to bottom). Use this order to assign them:
-- Images 1-2 are usually logos or decorative elements near the top → hero section or skip
-- The first large photo (often image 3) → hero `image` field
-- Images that appear AFTER a "Services/Features" heading → features `image_cards` items (each item gets an `image` field)
-- Images that appear AFTER a "Projects/Portfolio/Gallery" heading → gallery section
-- Later images → cta_final or other sections
-- ALWAYS prefer `image_cards` variant for features when images are available for each item.
-- For gallery `cards` variant, each item needs `title` and `image` fields.
+### IMAGE ASSIGNMENT
+Images in the metadata are listed in page order with classification hints:
+
+- **[SVG icon/logo]** → Use for `hero.logo` or `footer.brand.logo`. Skip for section content.
+- **[likely logo]** → Same as above.
+- **[small/icon]** → Skip for section images. May be used as logo.
+- **Unlabeled photos** → Assign in page order:
+  - First large photo near hero content → `hero.image`
+  - Photos grouped after a "Services/Features" heading → features items (use `image_cards` variant, each item gets `image` field)
+  - Photos grouped after a "Projects/Gallery" heading → gallery items (each item gets `title` + `image`)
+  - Later photos → cta_final or other sections as appropriate
+
+### LAYOUT VALUES
+All layout values MUST be **integers**, not strings:
+- `boxed_width`: 1200 (NOT "1200px")
+- `section_padding`: 80-120
+- `card_radius`: 0 (sharp/elegant) or 12-20 (modern/rounded)
+- `button_radius`: 0 (rectangular) or 20-30 (pill-shaped)
 
 ### HANDLING SPARSE METADATA
-- If the metadata has few paragraphs, the original page is likely minimal/elegant — keep sections simple
-- If the metadata has placeholder text (e.g. "Testimonial from one of our clients"), output it verbatim as the quote. Do NOT replace it with fabricated testimonials. Use `testimonials` with `minimal` variant and one item with the placeholder as the quote, and empty name/role.
-- If section count is low (1-3), the page is simple — use fewer sections
-- If there are no buttons detected, omit CTA sections or use minimal variants
-- If the metadata has a testimonial heading but only placeholder text, still include a testimonials section with the placeholder text as-is.
-
-### LAYOUT MATCHING
-- Use `card_radius: 0` for sharp/elegant designs, `card_radius: 12-20` for modern/rounded
-- Use `button_radius: 0` for rectangular buttons, `button_radius: 20-30` for pill buttons
-- Use `section_padding: 80-120` based on the original page's visual density
-- Set `card_shadow` to minimal (0 blur) for flat designs
+- Few paragraphs → minimal/elegant page, use fewer sections
+- Placeholder text → output verbatim (even "Testimonial from one of our clients")
+- Low section count → match it, don't pad
+- No buttons → omit CTA sections or use minimal variants
+- Single testimonial with placeholder → `testimonials` `minimal` variant, one item, empty name/role
 
 IMPORT
 ;
