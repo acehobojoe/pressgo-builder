@@ -240,10 +240,8 @@ class PressGo_AI_Client {
 			return $system_prompt;
 		}
 
-		// Append import addendum to system prompt.
-		$system_prompt .= "\n\nIMPORT MODE: You are cloning an existing page from a screenshot. "
-			. "Reproduce it as faithfully as possible. Use extracted text verbatim. "
-			. "Match colors exactly. Preserve section order from the screenshot.";
+		// Override with comprehensive import rules.
+		$system_prompt .= self::get_import_addendum();
 
 		// Build request body — different format for Anthropic vs OpenAI-compatible.
 		if ( $this->use_openai_format ) {
@@ -251,7 +249,7 @@ class PressGo_AI_Client {
 			$openai_content = self::convert_content_to_openai( $user_content );
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'stream'     => true,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
@@ -265,7 +263,7 @@ class PressGo_AI_Client {
 		} else {
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'stream'     => true,
 				'system'     => $system_prompt,
 				'messages'   => array(
@@ -394,6 +392,11 @@ class PressGo_AI_Client {
 			return new WP_Error( 'api_error', $error_msg );
 		}
 
+		// DEBUG: log import AI response to diagnose parse failures.
+		error_log( 'PressGo IMPORT response length: ' . strlen( $accumulated_text ) );
+		error_log( 'PressGo IMPORT response START: ' . substr( $accumulated_text, 0, 500 ) );
+		error_log( 'PressGo IMPORT response END: ' . substr( $accumulated_text, -500 ) );
+
 		// Parse the accumulated text as JSON config.
 		$config = $this->parse_config_response( $accumulated_text );
 		if ( null === $config ) {
@@ -505,7 +508,7 @@ class PressGo_AI_Client {
 
 	/**
 	 * Parse AI response text to extract JSON config.
-	 * Handles code fences, preamble text, etc.
+	 * Handles code fences, preamble text, and common AI JSON mistakes.
 	 */
 	private function parse_config_response( $text ) {
 		$text = trim( $text );
@@ -533,9 +536,44 @@ class PressGo_AI_Client {
 			if ( $config && is_array( $config ) ) {
 				return $config;
 			}
+
+			// Attempt to repair common AI JSON mistakes.
+			$repaired = self::repair_json( $json_str );
+			$config   = json_decode( $repaired, true );
+			if ( $config && is_array( $config ) ) {
+				return $config;
+			}
+
+			// Log the exact parse error for debugging.
+			error_log( 'PressGo JSON repair failed: ' . json_last_error_msg() );
+			error_log( 'PressGo repaired JSON (first 500): ' . substr( $repaired, 0, 500 ) );
 		}
 
 		return null;
+	}
+
+	/**
+	 * Repair common JSON mistakes from AI output.
+	 *
+	 * Fixes: missing values ("key":,), trailing commas, single quotes, unquoted keys.
+	 */
+	private static function repair_json( $json ) {
+		// Fix missing values: "key":, or "key":} or "key":]
+		$json = preg_replace( '/:\s*,/', ':0,', $json );
+		$json = preg_replace( '/:\s*\}/', ':0}', $json );
+		$json = preg_replace( '/:\s*\]/', ':0]', $json );
+
+		// Fix trailing commas before } or ].
+		$json = preg_replace( '/,\s*\}/', '}', $json );
+		$json = preg_replace( '/,\s*\]/', ']', $json );
+
+		// Fix double-double quotes before key names: "",""key" → "","key"
+		$json = preg_replace( '/""([a-zA-Z_])/', '"$1', $json );
+
+		// Fix stray control characters.
+		$json = preg_replace( '/[\x00-\x1F\x7F]/', '', $json );
+
+		return $json;
 	}
 
 	/**
@@ -552,45 +590,19 @@ class PressGo_AI_Client {
 			return $content;
 		}
 
-		$has_image = false;
+		// DigitalOcean Gradient AI (OpenAI-compatible) does NOT support vision/images.
+		// The content field must be a plain string. Extract and concatenate all text blocks,
+		// skipping any image blocks.
+		$texts = array();
 		foreach ( $content as $block ) {
-			if ( isset( $block['type'] ) && 'image' === $block['type'] ) {
-				$has_image = true;
-				break;
+			if ( isset( $block['type'] ) && 'text' === $block['type'] && isset( $block['text'] ) ) {
+				$texts[] = $block['text'];
+			} elseif ( isset( $block['text'] ) && ! isset( $block['type'] ) ) {
+				$texts[] = $block['text'];
 			}
 		}
 
-		// Text-only: just extract the text string.
-		if ( ! $has_image ) {
-			foreach ( $content as $block ) {
-				if ( isset( $block['text'] ) ) {
-					return $block['text'];
-				}
-			}
-			return '';
-		}
-
-		// Multi-modal: convert to OpenAI format.
-		$openai_content = array();
-		foreach ( $content as $block ) {
-			if ( 'image' === $block['type'] && isset( $block['source'] ) ) {
-				$mime = isset( $block['source']['media_type'] ) ? $block['source']['media_type'] : 'image/png';
-				$data = isset( $block['source']['data'] ) ? $block['source']['data'] : '';
-				$openai_content[] = array(
-					'type'      => 'image_url',
-					'image_url' => array(
-						'url' => 'data:' . $mime . ';base64,' . $data,
-					),
-				);
-			} elseif ( 'text' === $block['type'] && isset( $block['text'] ) ) {
-				$openai_content[] = array(
-					'type' => 'text',
-					'text' => $block['text'],
-				);
-			}
-		}
-
-		return $openai_content;
+		return implode( "\n\n", $texts );
 	}
 
 	/**
@@ -647,5 +659,84 @@ class PressGo_AI_Client {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Comprehensive import mode addendum that overrides generation rules.
+	 *
+	 * This text is appended to the system prompt during import to shift the AI
+	 * from "creative generation" to "faithful reproduction."
+	 */
+	private static function get_import_addendum() {
+		return <<<'IMPORT'
+
+
+## ⚠️ IMPORT MODE — OVERRIDES ALL ABOVE RULES ⚠️
+
+You are now in IMPORT MODE. You are cloning an existing page, NOT creating a new one. The following rules OVERRIDE the generation rules above. When there is any conflict, IMPORT MODE wins.
+
+### CARDINAL RULES
+1. **NEVER fabricate content.** Use ONLY text that appears in the extracted metadata. If the metadata says "Testimonial from one of our clients" — that is the testimonial text. Do NOT invent names, quotes, or descriptions.
+2. **NEVER add sections that don't exist in the original.** If the original has 5 visual sections, output ~5 sections. Do NOT pad with extra sections to reach 7-10.
+3. **NEVER use Pexels photo URLs.** Use ONLY the image URLs extracted from the original page (from the `images` array in metadata).
+4. **Use extracted text VERBATIM** — do not rewrite, improve, shorten, or paraphrase. Even if text seems like a placeholder, use it exactly.
+5. **Ignore the "Content Length Rules" and "Section Selection Guide" above.** Those are for generation mode. In import mode, content length is dictated by the original page.
+6. **Ignore "MAX 10 SECTIONS" and "7-10 entries" rules.** Match the original page's section count exactly.
+7. **Ignore "Visual Rhythm Rules" for bg colors.** Match the original page's actual background colors per section, even if two adjacent sections have the same bg color.
+
+### COLOR MAPPING
+- Convert extracted RGB colors to hex. `rgb(48, 51, 30)` → `#30331E`
+- The most common light bg color from the metadata → `light_bg`
+- The most common dark bg color → `dark_bg`
+- The primary text color on light sections → `text_dark`
+- Any accent/button color → `primary` and `accent`
+- Map each section's background to the closest extracted color. Do NOT use colors not found on the original page.
+
+### FONT MAPPING
+- Use the extracted font families directly in `fonts.heading` and `fonts.body`
+- If the original uses decorative/script fonts (e.g. Pinyon Script, Baskervville), use them for headings
+- If multiple heading fonts are detected, use the most prominent one
+
+### SECTION TYPE MAPPING
+Map original page sections to PressGo section types based on content patterns:
+
+| Original Pattern | PressGo Section | Recommended Variant |
+|---|---|---|
+| Large heading + tagline/subtext + CTA button + hero image | `hero` | `split` (if image beside text) or `minimal` (if centered) |
+| Service/offering cards WITH images | `features` | `image_cards` (3 items) or `alternating` (2-3 items with large images) |
+| Service/offering cards WITHOUT images | `features` | `default` (icon-based) or `minimal` |
+| Project/portfolio grid with images + titles | `gallery` | `cards` (with captions) or `default` (grid) |
+| Customer quote(s) | `testimonials` | `minimal` (1-2 quotes) or `default` (3 cards) |
+| CTA block on dark background | `cta_final` | `image` (if has bg image) or `default` (gradient) |
+| Footer with brand + links + copyright | `footer` | `dark` or `light` based on bg color |
+| Stats/numbers row | `stats` | `default` or `inline` |
+| How-it-works / process steps | `steps` | `default` or `timeline` |
+| FAQ accordion | `faq` | `default` or `split` |
+
+### IMAGE ASSIGNMENT (CRITICAL)
+Images in the metadata are listed in PAGE ORDER (top to bottom). Use this order to assign them:
+- Images 1-2 are usually logos or decorative elements near the top → hero section or skip
+- The first large photo (often image 3) → hero `image` field
+- Images that appear AFTER a "Services/Features" heading → features `image_cards` items (each item gets an `image` field)
+- Images that appear AFTER a "Projects/Portfolio/Gallery" heading → gallery section
+- Later images → cta_final or other sections
+- ALWAYS prefer `image_cards` variant for features when images are available for each item.
+- For gallery `cards` variant, each item needs `title` and `image` fields.
+
+### HANDLING SPARSE METADATA
+- If the metadata has few paragraphs, the original page is likely minimal/elegant — keep sections simple
+- If the metadata has placeholder text (e.g. "Testimonial from one of our clients"), output it verbatim as the quote. Do NOT replace it with fabricated testimonials. Use `testimonials` with `minimal` variant and one item with the placeholder as the quote, and empty name/role.
+- If section count is low (1-3), the page is simple — use fewer sections
+- If there are no buttons detected, omit CTA sections or use minimal variants
+- If the metadata has a testimonial heading but only placeholder text, still include a testimonials section with the placeholder text as-is.
+
+### LAYOUT MATCHING
+- Use `card_radius: 0` for sharp/elegant designs, `card_radius: 12-20` for modern/rounded
+- Use `button_radius: 0` for rectangular buttons, `button_radius: 20-30` for pill buttons
+- Use `section_padding: 80-120` based on the original page's visual density
+- Set `card_shadow` to minimal (0 blur) for flat designs
+
+IMPORT
+;
 	}
 }

@@ -120,19 +120,8 @@ class PressGo_Prompt_Builder {
 			),
 		);
 
-		// Build import instructions with extracted metadata.
-		$instructions  = "You are CLONING an existing page. The screenshot above shows the exact page to reproduce.\n\n";
-		$instructions .= "CRITICAL RULES FOR IMPORT MODE:\n";
-		$instructions .= "- Reproduce the screenshot as faithfully as possible — match layout, spacing, and visual hierarchy.\n";
-		$instructions .= "- Use the extracted text VERBATIM — do NOT rewrite, improve, or paraphrase any text.\n";
-		$instructions .= "- Match the exact colors from the metadata below.\n";
-		$instructions .= "- Choose section types and variants that most closely match each visual section in the screenshot.\n";
-		$instructions .= "- Use the extracted image URLs directly where they appear in the original.\n";
-		$instructions .= "- Preserve the exact section order from the screenshot.\n";
-		$instructions .= "- When in doubt, prioritize visual fidelity to the screenshot over creativity.\n\n";
-
-		$instructions .= "EXTRACTED PAGE DATA:\n";
-		$instructions .= wp_json_encode( $metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		// Build structured import instructions.
+		$instructions = self::build_import_instructions( $metadata );
 
 		$content[] = array(
 			'type' => 'text',
@@ -140,5 +129,134 @@ class PressGo_Prompt_Builder {
 		);
 
 		return $content;
+	}
+
+	/**
+	 * Build detailed import instructions from scraped metadata.
+	 *
+	 * Structures the metadata into clear sections the AI can map to PressGo config,
+	 * with explicit guidance on what to use and what NOT to fabricate.
+	 */
+	private static function build_import_instructions( $metadata ) {
+		$lines = array();
+
+		$lines[] = "IMPORT MODE: Clone this page as faithfully as possible.";
+		$lines[] = "";
+
+		// Page title.
+		$title = isset( $metadata['title'] ) ? $metadata['title'] : 'Imported Page';
+		$lines[] = "PAGE TITLE: {$title}";
+		$lines[] = "";
+
+		// Section count hint.
+		$section_count = isset( $metadata['sectionCount'] ) ? (int) $metadata['sectionCount'] : 0;
+		if ( $section_count > 0 ) {
+			$lines[] = "ESTIMATED SECTION COUNT: {$section_count} visual sections detected on the original page.";
+			$lines[] = "Your output should have approximately {$section_count} sections (plus hero and footer). Do NOT add extra sections.";
+			$lines[] = "";
+		}
+
+		// Colors — pre-convert RGB to hex for clarity.
+		$lines[] = "=== COLORS (use these EXACTLY) ===";
+		$colors = isset( $metadata['colors'] ) ? $metadata['colors'] : array();
+		foreach ( array( 'backgrounds', 'text', 'accents' ) as $color_type ) {
+			if ( ! empty( $colors[ $color_type ] ) ) {
+				$hex_colors = array_map( array( __CLASS__, 'rgb_to_hex' ), $colors[ $color_type ] );
+				$lines[] = ucfirst( $color_type ) . ': ' . implode( ', ', $hex_colors );
+			}
+		}
+		$lines[] = "";
+
+		// Fonts.
+		$fonts = isset( $metadata['fonts'] ) ? $metadata['fonts'] : array();
+		if ( ! empty( $fonts ) ) {
+			$lines[] = "=== FONTS (use these EXACTLY) ===";
+			$lines[] = implode( ', ', $fonts );
+			if ( count( $fonts ) >= 2 ) {
+				$lines[] = "Heading font: {$fonts[0]}";
+				$lines[] = "Body font: {$fonts[1]}";
+			}
+			$lines[] = "";
+		}
+
+		// Texts — organized by type.
+		$texts = isset( $metadata['texts'] ) ? $metadata['texts'] : array();
+
+		$lines[] = "=== EXTRACTED TEXT (use VERBATIM — do NOT rewrite or add to this) ===";
+
+		if ( ! empty( $texts['headings'] ) ) {
+			$lines[] = "HEADINGS (in page order):";
+			foreach ( $texts['headings'] as $i => $h ) {
+				$lines[] = "  " . ( $i + 1 ) . ". {$h}";
+			}
+		}
+
+		if ( ! empty( $texts['paragraphs'] ) ) {
+			$lines[] = "PARAGRAPHS/BODY TEXT:";
+			foreach ( $texts['paragraphs'] as $p ) {
+				$lines[] = "  - {$p}";
+			}
+		}
+
+		if ( ! empty( $texts['buttons'] ) ) {
+			$lines[] = "BUTTONS:";
+			foreach ( $texts['buttons'] as $b ) {
+				$lines[] = "  - {$b}";
+			}
+		}
+
+		if ( ! empty( $texts['links'] ) ) {
+			$lines[] = "NAV LINKS:";
+			foreach ( $texts['links'] as $l ) {
+				$lines[] = "  - {$l}";
+			}
+		}
+		$lines[] = "";
+
+		// Images — with position hints based on page order.
+		$images = isset( $metadata['images'] ) ? $metadata['images'] : array();
+		if ( ! empty( $images ) ) {
+			$lines[] = "=== IMAGES (listed in page order, top to bottom — do NOT use Pexels) ===";
+			$headings_list = isset( $texts['headings'] ) ? $texts['headings'] : array();
+			foreach ( $images as $i => $img ) {
+				$hint = '';
+				if ( $i < 2 ) {
+					$hint = ' (near top — likely logo/decorative)';
+				} elseif ( $i === 2 && count( $images ) > 5 ) {
+					$hint = ' (likely hero image)';
+				}
+				$lines[] = "  " . ( $i + 1 ) . ". {$img}{$hint}";
+			}
+			$lines[] = "";
+
+			// Provide image grouping hint based on heading/image count correlation.
+			$num_images = count( $images );
+			$num_headings = count( $headings_list );
+			if ( $num_images >= 6 ) {
+				$lines[] = "IMAGE ASSIGNMENT HINT: With {$num_images} images, assign them to sections in page order.";
+				$lines[] = "First 1-2 may be logos. Next 1 is likely the hero image. Then groups of 3 likely correspond to feature/service or gallery sections.";
+				$lines[] = "";
+			}
+		}
+
+		// Final reminder.
+		$lines[] = "=== REMINDERS ===";
+		$lines[] = "- Output ONLY valid JSON. No markdown, no code fences.";
+		$lines[] = "- Use ONLY the text, colors, fonts, and images listed above.";
+		$lines[] = "- Do NOT invent testimonials, team members, FAQ items, or any content not in the metadata.";
+		$lines[] = "- If the metadata has placeholder text, use it as-is.";
+		$lines[] = "- Match the section count to the original (~{$section_count} sections).";
+
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Convert an RGB string like "rgb(48, 51, 30)" to hex "#30331E".
+	 */
+	private static function rgb_to_hex( $rgb ) {
+		if ( preg_match( '/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/', $rgb, $m ) ) {
+			return sprintf( '#%02X%02X%02X', (int) $m[1], (int) $m[2], (int) $m[3] );
+		}
+		return $rgb;
 	}
 }
