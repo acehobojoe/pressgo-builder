@@ -47,8 +47,9 @@ class PressGo_Page_Creator {
 		update_post_meta( $post_id, '_elementor_page_settings', $page_settings );
 
 		// Store config for Direct Access (update_page) support.
+		// wp_slash() prevents wp_unslash in update_post_meta from stripping unicode escapes.
 		if ( ! empty( $config ) ) {
-			update_post_meta( $post_id, '_pressgo_config', wp_json_encode( $config ) );
+			update_post_meta( $post_id, '_pressgo_config', wp_slash( wp_json_encode( $config ) ) );
 		}
 		update_post_meta( $post_id, '_pressgo_version', time() );
 
@@ -97,7 +98,7 @@ class PressGo_Page_Creator {
 		update_post_meta( $post_id, '_elementor_page_settings', $page_settings );
 
 		// Store updated config + bump version.
-		update_post_meta( $post_id, '_pressgo_config', wp_json_encode( $config ) );
+		update_post_meta( $post_id, '_pressgo_config', wp_slash( wp_json_encode( $config ) ) );
 		update_post_meta( $post_id, '_pressgo_version', time() );
 
 		// Flush caches.
