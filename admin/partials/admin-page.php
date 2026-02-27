@@ -29,6 +29,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<button type="button" class="pressgo-mode-tab" data-mode="import">
 			<span class="dashicons dashicons-download"></span> Import
 		</button>
+		<button type="button" class="pressgo-mode-tab" data-mode="editor">
+			<span class="dashicons dashicons-visibility"></span> Editor
+		</button>
 	</div>
 
 	<div class="pressgo-input-panel">
@@ -79,6 +82,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span class="dashicons dashicons-download"></span> Import Page
 					</button>
 				</div>
+			</div>
+		</div>
+
+		<!-- Editor mode fields -->
+		<div id="pressgo-editor-fields" class="pressgo-mode-fields" style="display: none;">
+			<div class="pressgo-editor-row">
+				<select id="pressgo-editor-select">
+					<option value="">Select a page...</option>
+				</select>
+				<button id="pressgo-editor-load" class="button button-primary">
+					Open Live Preview
+				</button>
 			</div>
 		</div>
 	</div>

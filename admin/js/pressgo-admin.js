@@ -14,6 +14,7 @@
 	let emptyState;
 	let importUrlInput, importConsentInput, importBtn, importPageTitleInput;
 	let generateFields, importFields;
+	let editorFields, editorSelect, editorLoadBtn;
 	let previewTitle, liveIndicator, iframeWrapper, previewIframe;
 	let imageData = null;
 	let imageType = null;
@@ -96,6 +97,11 @@
 		generateFields = $('#pressgo-generate-fields');
 		importFields = $('#pressgo-import-fields');
 
+		// Editor mode elements.
+		editorFields = $('#pressgo-editor-fields');
+		editorSelect = $('#pressgo-editor-select');
+		editorLoadBtn = $('#pressgo-editor-load');
+
 		// Iframe / live preview elements.
 		previewTitle = $('#pressgo-preview-title');
 		liveIndicator = $('#pressgo-live-indicator');
@@ -126,6 +132,11 @@
 					startImport();
 				}
 			});
+		}
+
+		// Editor mode events.
+		if (editorLoadBtn) {
+			editorLoadBtn.addEventListener('click', loadEditorPreview);
 		}
 
 		// Mode toggle tabs.
@@ -167,13 +178,74 @@
 		});
 
 		// Toggle field visibility.
+		generateFields.style.display = 'none';
+		importFields.style.display = 'none';
+		if (editorFields) editorFields.style.display = 'none';
+
 		if (mode === 'generate') {
 			generateFields.style.display = '';
-			importFields.style.display = 'none';
-		} else {
-			generateFields.style.display = 'none';
+		} else if (mode === 'import') {
 			importFields.style.display = '';
+		} else if (mode === 'editor') {
+			editorFields.style.display = '';
+			fetchEditorPages();
 		}
+	}
+
+	function fetchEditorPages() {
+		if (!pressgoData.restUrl || !pressgoData.restNonce || !editorSelect) return;
+
+		fetch(pressgoData.restUrl + '/pages', {
+			headers: { 'X-WP-Nonce': pressgoData.restNonce },
+			credentials: 'same-origin',
+		})
+			.then(function (r) { return r.ok ? r.json() : []; })
+			.then(function (pages) {
+				// Keep the placeholder option, clear the rest.
+				editorSelect.innerHTML = '<option value="">Select a page...</option>';
+				pages.forEach(function (page) {
+					var opt = document.createElement('option');
+					opt.value = page.id;
+					opt.textContent = page.title + ' (ID ' + page.id + ')';
+					opt.setAttribute('data-url', page.url);
+					editorSelect.appendChild(opt);
+				});
+			})
+			.catch(function () {
+				// Silently fail — dropdown stays with placeholder.
+			});
+	}
+
+	function loadEditorPreview() {
+		if (!editorSelect) return;
+
+		var postId = editorSelect.value;
+		if (!postId) {
+			editorSelect.classList.add('pressgo-shake');
+			setTimeout(function () { editorSelect.classList.remove('pressgo-shake'); }, 500);
+			return;
+		}
+
+		var selectedOption = editorSelect.options[editorSelect.selectedIndex];
+		var viewUrl = selectedOption.getAttribute('data-url');
+		if (!viewUrl) return;
+
+		// Stop any existing polling.
+		stopVersionPolling();
+
+		// Show workspace, hide empty state + section blocks + result actions.
+		if (emptyState) emptyState.style.display = 'none';
+		workspace.style.display = 'block';
+		activityLog.innerHTML = '';
+		sectionPreview.innerHTML = '';
+		sectionPreview.style.display = 'none';
+		resultActions.style.display = 'none';
+
+		// Show iframe preview with live polling.
+		currentPostId = parseInt(postId, 10);
+		showIframePreview(viewUrl, currentPostId);
+
+		workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
 
 	function handleImageSelect(e) {

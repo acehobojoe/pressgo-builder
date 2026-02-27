@@ -182,6 +182,23 @@
 	width: 280px;
 }
 
+/* ─── Editor Mode Fields ─── */
+
+.pressgo-editor-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+#pressgo-editor-select {
+	flex: 1;
+	max-width: 400px;
+	padding: 8px 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	font-size: 14px;
+}
+
 /* ─── Import Mode Fields ─── */
 
 #pressgo-import-url {
