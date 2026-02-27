@@ -28,6 +28,7 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-deactivator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-admin.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-rest-api.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-direct-api.php';
 
 		// Generator classes.
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-element-factory.php';
@@ -45,6 +46,10 @@ class PressGo {
 	}
 
 	private function init_hooks() {
+		// Direct API must init outside is_admin() — REST requests aren't admin context.
+		$direct_api = new PressGo_Direct_API();
+		$direct_api->init();
+
 		if ( is_admin() ) {
 			$admin = new PressGo_Admin();
 			$admin->init();

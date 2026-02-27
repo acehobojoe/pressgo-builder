@@ -17,6 +17,12 @@ echo "Building ${PLUGIN_SLUG}.zip..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/${PLUGIN_SLUG}"
 
+# Bundle config schema for distribution.
+if [ -f "$PLUGIN_DIR/config-schema.json" ]; then
+	cp "$PLUGIN_DIR/config-schema.json" "$PLUGIN_DIR/includes/config-schema.json"
+	echo "Bundled config-schema.json into includes/"
+fi
+
 # Copy plugin files, excluding dev/build artifacts.
 rsync -av --exclude-from=- "$PLUGIN_DIR/" "$BUILD_DIR/${PLUGIN_SLUG}/" <<'EOF'
 node_modules
@@ -31,6 +37,7 @@ brain.json
 config-schema.json
 includes/prompts/system-prompt.txt
 includes/prompts/config-schema.json
+mcp-server
 *.mjs
 package.json
 package-lock.json

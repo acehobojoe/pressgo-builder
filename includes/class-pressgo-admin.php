@@ -13,6 +13,7 @@ class PressGo_Admin {
 		add_action( 'admin_menu', array( $this, 'add_menu_pages' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'wp_ajax_pressgo_generate_direct_key', array( $this, 'handle_generate_direct_key' ) );
 	}
 
 	public function add_menu_pages() {
@@ -132,6 +133,8 @@ class PressGo_Admin {
 			wp_localize_script( 'pressgo-admin', 'pressgoData', array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'pressgo_generate' ),
+				'restUrl' => esc_url_raw( rest_url( 'pressgo/v1' ) ),
+				'restNonce' => wp_create_nonce( 'wp_rest' ),
 			) );
 		}
 	}
@@ -165,5 +168,21 @@ class PressGo_Admin {
 
 	public static function get_model() {
 		return get_option( 'pressgo_model', 'claude-sonnet-4-5-20250929' );
+	}
+
+	/**
+	 * AJAX handler: generate a Direct Access API key.
+	 */
+	public function handle_generate_direct_key() {
+		check_ajax_referer( 'pressgo_generate', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized.' ) );
+		}
+
+		$key = bin2hex( random_bytes( 32 ) );
+		update_option( 'pressgo_direct_access_key', $key );
+
+		wp_send_json_success( array( 'key' => $key ) );
 	}
 }

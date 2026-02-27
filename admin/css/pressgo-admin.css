@@ -480,13 +480,81 @@
 	flex-direction: column;
 }
 
-.pressgo-preview-panel h3 {
+.pressgo-preview-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	padding: 16px 20px;
-	margin: 0;
 	border-bottom: 1px solid #e0e0e0;
+}
+
+.pressgo-preview-header h3 {
+	margin: 0;
 	font-size: 14px;
 	font-weight: 600;
 	color: #1d2327;
+}
+
+.pressgo-preview-panel h3 {
+	padding: 0;
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+/* ─── Live Indicator ─── */
+
+.pressgo-live-indicator {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.pressgo-live-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	background: #00a32a;
+	border-radius: 50%;
+	animation: pressgo-live-pulse 2s ease-in-out infinite;
+}
+
+.pressgo-live-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #00a32a;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.pressgo-live-flash .pressgo-live-dot {
+	animation: pressgo-live-ping 1s ease-out;
+}
+
+@keyframes pressgo-live-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.4; }
+}
+
+@keyframes pressgo-live-ping {
+	0% { box-shadow: 0 0 0 0 rgba(0, 163, 42, 0.6); }
+	100% { box-shadow: 0 0 0 12px rgba(0, 163, 42, 0); }
+}
+
+/* ─── Iframe Preview ─── */
+
+.pressgo-iframe-wrapper {
+	flex: 1;
+	display: flex;
+	min-height: 500px;
+}
+
+.pressgo-preview-iframe {
+	width: 100%;
+	height: 100%;
+	min-height: 500px;
+	border: none;
 }
 
 .pressgo-section-preview {

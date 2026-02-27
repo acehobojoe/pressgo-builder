@@ -46,7 +46,61 @@ class PressGo_Page_Creator {
 		}
 		update_post_meta( $post_id, '_elementor_page_settings', $page_settings );
 
+		// Store config for Direct Access (update_page) support.
+		if ( ! empty( $config ) ) {
+			update_post_meta( $post_id, '_pressgo_config', wp_json_encode( $config ) );
+		}
+		update_post_meta( $post_id, '_pressgo_version', time() );
+
 		// Flush Elementor CSS cache for this post.
+		$this->flush_elementor_cache( $post_id );
+
+		return $post_id;
+	}
+
+	/**
+	 * Update an existing PressGo page by regenerating from config.
+	 *
+	 * @param int   $post_id The post ID to update.
+	 * @param array $config  The new config dict.
+	 * @return int|WP_Error Post ID on success, WP_Error on failure.
+	 */
+	public function update_page( $post_id, $config ) {
+		$post = get_post( $post_id );
+		if ( ! $post || 'page' !== $post->post_type ) {
+			return new WP_Error( 'invalid_post', 'Post not found or not a page.' );
+		}
+
+		// Validate config.
+		$config = PressGo_Config_Validator::validate( $config );
+		if ( is_wp_error( $config ) ) {
+			return $config;
+		}
+
+		// Regenerate Elementor JSON.
+		$generator = new PressGo_Generator();
+		$elements  = $generator->generate( $config );
+
+		if ( empty( $elements ) ) {
+			return new WP_Error( 'empty_elements', 'Generator produced no sections.' );
+		}
+
+		// Update Elementor data.
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+
+		// Update page settings (custom CSS).
+		$page_settings = array( 'hide_title' => 'yes' );
+		$custom_css    = $this->generate_custom_css( $config );
+		if ( $custom_css ) {
+			$page_settings['custom_css'] = $custom_css;
+		}
+		update_post_meta( $post_id, '_elementor_page_settings', $page_settings );
+
+		// Store updated config + bump version.
+		update_post_meta( $post_id, '_pressgo_config', wp_json_encode( $config ) );
+		update_post_meta( $post_id, '_pressgo_version', time() );
+
+		// Flush caches.
 		$this->flush_elementor_cache( $post_id );
 
 		return $post_id;

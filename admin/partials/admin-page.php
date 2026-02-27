@@ -122,8 +122,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<div id="pressgo-activity-log" class="pressgo-activity-log"></div>
 			</div>
 			<div class="pressgo-preview-panel" id="pressgo-preview">
-				<h3>Page Layout</h3>
+				<div class="pressgo-preview-header">
+					<h3 id="pressgo-preview-title">Page Layout</h3>
+					<div id="pressgo-live-indicator" class="pressgo-live-indicator" style="display: none;">
+						<span class="pressgo-live-dot"></span>
+						<span class="pressgo-live-label">Live</span>
+					</div>
+				</div>
 				<div id="pressgo-section-preview" class="pressgo-section-preview"></div>
+				<div id="pressgo-iframe-wrapper" class="pressgo-iframe-wrapper" style="display: none;">
+					<iframe id="pressgo-preview-iframe" class="pressgo-preview-iframe" src="about:blank"></iframe>
+				</div>
 				<div id="pressgo-result-actions" class="pressgo-result-actions" style="display: none;">
 					<p class="pressgo-result-note">Your page is ready! This gets you 95% of the way there &mdash; open it in Elementor to add your finishing touches.</p>
 					<a id="pressgo-edit-link" href="#" class="button button-primary" target="_blank">

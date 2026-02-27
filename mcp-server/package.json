@@ -1,0 +1,24 @@
+{
+  "name": "pressgo-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for editing PressGo landing pages from Claude Code",
+  "type": "module",
+  "bin": {
+    "pressgo-mcp": "./index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "keywords": [
+    "mcp",
+    "pressgo",
+    "elementor",
+    "wordpress",
+    "landing-page"
+  ],
+  "license": "MIT"
+}

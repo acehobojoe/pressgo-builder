@@ -1,5 +1,5 @@
 /**
- * PressGo Admin — SSE stream consumer + live preview.
+ * PressGo Admin — SSE stream consumer + live preview with iframe.
  */
 (function () {
 	'use strict';
@@ -14,10 +14,14 @@
 	let emptyState;
 	let importUrlInput, importConsentInput, importBtn, importPageTitleInput;
 	let generateFields, importFields;
+	let previewTitle, liveIndicator, iframeWrapper, previewIframe;
 	let imageData = null;
 	let imageType = null;
 	let isGenerating = false;
 	let currentMode = 'generate';
+	let pollingInterval = null;
+	let currentPostId = null;
+	let currentVersion = null;
 
 	// Section display names.
 	const SECTION_NAMES = {
@@ -91,6 +95,12 @@
 		importPageTitleInput = $('#pressgo-import-page-title');
 		generateFields = $('#pressgo-generate-fields');
 		importFields = $('#pressgo-import-fields');
+
+		// Iframe / live preview elements.
+		previewTitle = $('#pressgo-preview-title');
+		liveIndicator = $('#pressgo-live-indicator');
+		iframeWrapper = $('#pressgo-iframe-wrapper');
+		previewIframe = $('#pressgo-preview-iframe');
 
 		if (!generateBtn) return;
 
@@ -215,9 +225,17 @@
 		workspace.style.display = 'block';
 		activityLog.innerHTML = '';
 		sectionPreview.innerHTML = '';
+		sectionPreview.style.display = '';
 		resultActions.style.display = 'none';
 		generateBtn.disabled = true;
 		generateBtn.innerHTML = '<span class="pressgo-spinner"></span> Generating...';
+
+		// Reset iframe state.
+		if (iframeWrapper) iframeWrapper.style.display = 'none';
+		if (previewIframe) previewIframe.src = 'about:blank';
+		if (previewTitle) previewTitle.textContent = 'Page Layout';
+		if (liveIndicator) liveIndicator.style.display = 'none';
+		stopVersionPolling();
 
 		// Scroll to workspace.
 		workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -275,9 +293,17 @@
 		workspace.style.display = 'block';
 		activityLog.innerHTML = '';
 		sectionPreview.innerHTML = '';
+		sectionPreview.style.display = '';
 		resultActions.style.display = 'none';
 		importBtn.disabled = true;
 		importBtn.innerHTML = '<span class="pressgo-spinner"></span> Importing...';
+
+		// Reset iframe state.
+		if (iframeWrapper) iframeWrapper.style.display = 'none';
+		if (previewIframe) previewIframe.src = 'about:blank';
+		if (previewTitle) previewTitle.textContent = 'Page Layout';
+		if (liveIndicator) liveIndicator.style.display = 'none';
+		stopVersionPolling();
 
 		// Scroll to workspace.
 		workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -435,7 +461,105 @@
 		viewLink.href = data.view_url;
 		resultActions.style.display = 'flex';
 
+		// Switch to iframe preview after a short delay.
+		currentPostId = data.post_id;
+		setTimeout(function () {
+			showIframePreview(data.view_url, data.post_id);
+		}, 1000);
+
 		finishGeneration();
+	}
+
+	/**
+	 * Switch from section blocks to live iframe preview.
+	 */
+	function showIframePreview(viewUrl, postId) {
+		if (!iframeWrapper || !previewIframe) return;
+
+		// Hide section blocks, show iframe.
+		sectionPreview.style.display = 'none';
+		iframeWrapper.style.display = 'flex';
+
+		// Load page in iframe (add preview=true for draft pages).
+		var iframeSrc = viewUrl;
+		if (iframeSrc.indexOf('?') !== -1) {
+			iframeSrc += '&t=' + Date.now();
+		} else {
+			iframeSrc += '?t=' + Date.now();
+		}
+		previewIframe.src = iframeSrc;
+
+		// Update header.
+		if (previewTitle) previewTitle.textContent = 'Live Preview';
+		if (liveIndicator) liveIndicator.style.display = 'flex';
+
+		// Start polling for version changes.
+		startVersionPolling(postId);
+	}
+
+	/**
+	 * Poll version endpoint every 2 seconds. Reload iframe on change.
+	 */
+	function startVersionPolling(postId) {
+		if (!pressgoData.restUrl || !pressgoData.restNonce) return;
+
+		// Get initial version.
+		fetchVersion(postId).then(function (v) {
+			currentVersion = v;
+		});
+
+		pollingInterval = setInterval(function () {
+			fetchVersion(postId).then(function (v) {
+				if (v && currentVersion && v !== currentVersion) {
+					currentVersion = v;
+					reloadIframe();
+					flashLiveIndicator();
+					addActivity('success', 'Page updated externally — preview reloaded');
+				}
+			});
+		}, 2000);
+	}
+
+	function stopVersionPolling() {
+		if (pollingInterval) {
+			clearInterval(pollingInterval);
+			pollingInterval = null;
+		}
+		currentPostId = null;
+		currentVersion = null;
+	}
+
+	function fetchVersion(postId) {
+		return fetch(pressgoData.restUrl + '/pages/' + postId + '/version', {
+			headers: { 'X-WP-Nonce': pressgoData.restNonce },
+			credentials: 'same-origin',
+		})
+			.then(function (r) {
+				return r.ok ? r.json() : null;
+			})
+			.then(function (data) {
+				return data ? data.version : null;
+			})
+			.catch(function () {
+				return null;
+			});
+	}
+
+	function reloadIframe() {
+		if (!previewIframe || previewIframe.src === 'about:blank') return;
+
+		// Reload with cache-buster.
+		var src = previewIframe.src.replace(/[?&]t=\d+/, '');
+		var sep = src.indexOf('?') !== -1 ? '&' : '?';
+		previewIframe.src = src + sep + 't=' + Date.now();
+	}
+
+	function flashLiveIndicator() {
+		if (!liveIndicator) return;
+		liveIndicator.classList.add('pressgo-live-flash');
+		setTimeout(function () {
+			liveIndicator.classList.remove('pressgo-live-flash');
+		}, 1000);
 	}
 
 	function addSectionBlock(key, status) {
@@ -504,6 +628,7 @@
 		if (emptyState) emptyState.style.display = '';
 		activityLog.innerHTML = '';
 		sectionPreview.innerHTML = '';
+		sectionPreview.style.display = '';
 		resultActions.style.display = 'none';
 		promptInput.value = '';
 		pageTitleInput.value = '';
@@ -511,6 +636,14 @@
 		if (importUrlInput) importUrlInput.value = '';
 		if (importConsentInput) importConsentInput.checked = false;
 		if (importPageTitleInput) importPageTitleInput.value = '';
+
+		// Reset iframe state.
+		if (iframeWrapper) iframeWrapper.style.display = 'none';
+		if (previewIframe) previewIframe.src = 'about:blank';
+		if (previewTitle) previewTitle.textContent = 'Page Layout';
+		if (liveIndicator) liveIndicator.style.display = 'none';
+		stopVersionPolling();
+
 		if (currentMode === 'generate') {
 			promptInput.focus();
 		} else if (importUrlInput) {
