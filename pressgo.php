@@ -10,7 +10,7 @@
  * Author URI:        https://pressgodigital.com
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       pressgo
+ * Text Domain:       pressgo-builder
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

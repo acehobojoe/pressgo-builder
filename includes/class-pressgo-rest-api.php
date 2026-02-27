@@ -22,7 +22,7 @@ class PressGo_Rest_API {
 		check_ajax_referer( 'pressgo_generate', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( 'Unauthorized' );
+			wp_die( esc_html( 'Unauthorized' ) );
 		}
 
 		// Set SSE headers.
@@ -199,7 +199,7 @@ class PressGo_Rest_API {
 		check_ajax_referer( 'pressgo_generate', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( 'Unauthorized' );
+			wp_die( esc_html( 'Unauthorized' ) );
 		}
 
 		// Set SSE headers.
@@ -224,8 +224,7 @@ class PressGo_Rest_API {
 		$image      = null;
 		$image_type = null;
 		if ( ! empty( $_POST['image'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- base64 image data, validated below.
-			$raw_image = wp_unslash( $_POST['image'] );
+			$raw_image = sanitize_text_field( wp_unslash( $_POST['image'] ) );
 			// Validate it looks like base64.
 			if ( preg_match( '/^[A-Za-z0-9+\/=]+$/', $raw_image ) ) {
 				// Check decoded size (10MB max).

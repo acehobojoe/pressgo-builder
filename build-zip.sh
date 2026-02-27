@@ -6,7 +6,7 @@
 
 set -e
 
-PLUGIN_SLUG="pressgo"
+PLUGIN_SLUG="pressgo-builder"
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="/tmp/${PLUGIN_SLUG}-build"
 ZIP_FILE="${PLUGIN_DIR}/${PLUGIN_SLUG}.zip"
@@ -22,10 +22,16 @@ rsync -av --exclude-from=- "$PLUGIN_DIR/" "$BUILD_DIR/${PLUGIN_SLUG}/" <<'EOF'
 node_modules
 .git
 .gitignore
+.distignore
 .DS_Store
 test
 tests
 CLAUDE.md
+brain.json
+config-schema.json
+includes/prompts/system-prompt.txt
+includes/prompts/config-schema.json
+*.mjs
 package.json
 package-lock.json
 build-zip.sh

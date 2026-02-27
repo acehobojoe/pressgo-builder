@@ -371,15 +371,19 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Star Rating widget — proper Elementor star rating.
 	 */
-	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left' ) {
-		return PressGo_Element_Factory::widget( 'star-rating', array(
+	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left', $align_mobile = null ) {
+		$settings = array(
 			'rating'     => $rating,
 			'star_style' => 'star_fontawesome',
 			'icon_size'  => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
 			'icon_space' => array( 'unit' => 'px', 'size' => 2, 'sizes' => array() ),
 			'stars_color' => $color,
 			'align'      => $align,
-		) );
+		);
+		if ( $align_mobile ) {
+			$settings['align_mobile'] = $align_mobile;
+		}
+		return PressGo_Element_Factory::widget( 'star-rating', $settings );
 	}
 
 	/**

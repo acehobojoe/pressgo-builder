@@ -1,6 +1,6 @@
 <?php
 /**
- * Claude API client with streaming support via curl.
+ * Claude API client with streaming support.
  *
  * Supports two backends:
  *   1. Anthropic API (default) — uses user's own API key from plugin settings
@@ -62,8 +62,8 @@ class PressGo_AI_Client {
 				),
 			);
 			$headers = array(
-				'Content-Type: application/json',
-				'Authorization: Bearer ' . $this->api_key,
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $this->api_key,
 			);
 		} else {
 			$body = array(
@@ -79,9 +79,9 @@ class PressGo_AI_Client {
 				),
 			);
 			$headers = array(
-				'Content-Type: application/json',
-				'x-api-key: ' . $this->api_key,
-				'anthropic-version: 2023-06-01',
+				'Content-Type'      => 'application/json',
+				'x-api-key'         => $this->api_key,
+				'anthropic-version' => '2023-06-01',
 			);
 		}
 
@@ -95,23 +95,35 @@ class PressGo_AI_Client {
 		$current_phase     = 'analyzing';
 		$sections_found    = array();
 		$use_openai_format = $this->use_openai_format;
+		$self              = $this;
+		$api_url           = $this->api_url;
 
-		// phpcs:disable WordPress.WP.AlternativeFunctions -- curl is required for SSE streaming;
-		// wp_remote_post() does not support CURLOPT_WRITEFUNCTION for incremental chunk processing.
-		$ch = curl_init();
-		curl_setopt_array( $ch, array(
-			CURLOPT_URL            => $this->api_url,
-			CURLOPT_POST           => true,
-			CURLOPT_POSTFIELDS     => wp_json_encode( $body ),
-			CURLOPT_HTTPHEADER     => $headers,
-			CURLOPT_RETURNTRANSFER => false,
-			CURLOPT_TIMEOUT        => 180,
-			CURLOPT_CONNECTTIMEOUT => 15,
-			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format ) {
+		// Use http_api_curl hook to add CURLOPT_WRITEFUNCTION for SSE streaming.
+		// wp_remote_post() does not natively support incremental chunk processing,
+		// but the http_api_curl hook allows setting a write callback for SSE events.
+		$line_buffer = '';
+		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $api_url, $self, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format, &$line_buffer ) {
+			if ( $url !== $api_url ) {
+				return;
+			}
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.curl__curl_setopt -- Required via http_api_curl for SSE streaming.
+			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $chunk ) use ( $self, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format, &$line_buffer ) {
 				// Always capture raw response for error handling.
-				$raw_response .= $data;
+				$raw_response .= $chunk;
+				$chunk_len = strlen( $chunk );
 
+				// Prepend any incomplete line from the previous chunk.
+				$data = $line_buffer . $chunk;
+				$line_buffer = '';
+
+				// Split into lines; last element may be incomplete if chunk
+				// didn't end on a newline boundary.
 				$lines = explode( "\n", $data );
+				$last  = array_pop( $lines );
+				if ( '' !== $last ) {
+					$line_buffer = $last;
+				}
+
 				foreach ( $lines as $line ) {
 					$line = trim( $line );
 					if ( empty( $line ) || 0 !== strpos( $line, 'data: ' ) ) {
@@ -136,7 +148,7 @@ class PressGo_AI_Client {
 							$content = isset( $delta['content'] ) ? $delta['content'] : '';
 							if ( $content ) {
 								$accumulated_text .= $content;
-								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+								$self->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
 							}
 							$finish = isset( $choices[0]['finish_reason'] ) ? $choices[0]['finish_reason'] : null;
 							if ( 'stop' === $finish && $callback ) {
@@ -152,7 +164,7 @@ class PressGo_AI_Client {
 							if ( isset( $delta['text'] ) ) {
 								$text_chunk = $delta['text'];
 								$accumulated_text .= $text_chunk;
-								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+								$self->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
 							}
 						} elseif ( 'message_stop' === $type ) {
 							if ( $callback ) {
@@ -167,22 +179,28 @@ class PressGo_AI_Client {
 					}
 				}
 
-				return strlen( $data );
-			},
+				return $chunk_len;
+			} );
+		};
+
+		add_action( 'http_api_curl', $stream_handler, 10, 3 );
+
+		$response = wp_remote_post( $this->api_url, array(
+			'timeout' => 180,
+			'headers' => $headers,
+			'body'    => wp_json_encode( $body ),
 		) );
 
-		$result    = curl_exec( $ch );
-		$http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
-		$curl_err  = curl_error( $ch );
-		curl_close( $ch );
-		// phpcs:enable WordPress.WP.AlternativeFunctions
+		remove_action( 'http_api_curl', $stream_handler, 10 );
 
-		if ( false === $result && $curl_err ) {
-			return new WP_Error( 'curl_error', 'Could not connect to Claude API (api.anthropic.com). Error: ' . $curl_err );
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'connection_error', 'Could not connect to Claude API (api.anthropic.com). Error: ' . $response->get_error_message() );
 		}
 
+		$http_code = (int) wp_remote_retrieve_response_code( $response );
+
 		if ( $http_code >= 400 ) {
-			// Parse error from raw response (non-SSE error bodies aren't captured by the stream parser).
+			// Parse error from raw response captured by the stream handler.
 			$error_data = json_decode( $raw_response, true );
 			$error_msg  = '';
 			if ( $error_data && isset( $error_data['error']['message'] ) ) {
@@ -257,8 +275,8 @@ class PressGo_AI_Client {
 				),
 			);
 			$headers = array(
-				'Content-Type: application/json',
-				'Authorization: Bearer ' . $this->api_key,
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $this->api_key,
 			);
 		} else {
 			$body = array(
@@ -274,9 +292,9 @@ class PressGo_AI_Client {
 				),
 			);
 			$headers = array(
-				'Content-Type: application/json',
-				'x-api-key: ' . $this->api_key,
-				'anthropic-version: 2023-06-01',
+				'Content-Type'      => 'application/json',
+				'x-api-key'         => $this->api_key,
+				'anthropic-version' => '2023-06-01',
 			);
 		}
 
@@ -290,21 +308,30 @@ class PressGo_AI_Client {
 		$current_phase     = 'analyzing';
 		$sections_found    = array();
 		$use_openai_format = $this->use_openai_format;
+		$self              = $this;
+		$api_url           = $this->api_url;
 
-		// phpcs:disable WordPress.WP.AlternativeFunctions -- curl is required for SSE streaming.
-		$ch = curl_init();
-		curl_setopt_array( $ch, array(
-			CURLOPT_URL            => $this->api_url,
-			CURLOPT_POST           => true,
-			CURLOPT_POSTFIELDS     => wp_json_encode( $body ),
-			CURLOPT_HTTPHEADER     => $headers,
-			CURLOPT_RETURNTRANSFER => false,
-			CURLOPT_TIMEOUT        => 180,
-			CURLOPT_CONNECTTIMEOUT => 15,
-			CURLOPT_WRITEFUNCTION  => function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format ) {
-				$raw_response .= $data;
+		// Use http_api_curl hook to add CURLOPT_WRITEFUNCTION for SSE streaming.
+		$line_buffer = '';
+		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $api_url, $self, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format, &$line_buffer ) {
+			if ( $url !== $api_url ) {
+				return;
+			}
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.curl__curl_setopt -- Required via http_api_curl for SSE streaming.
+			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $chunk ) use ( $self, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai_format, &$line_buffer ) {
+				$raw_response .= $chunk;
+				$chunk_len = strlen( $chunk );
+
+				// Prepend any incomplete line from the previous chunk.
+				$data = $line_buffer . $chunk;
+				$line_buffer = '';
 
 				$lines = explode( "\n", $data );
+				$last  = array_pop( $lines );
+				if ( '' !== $last ) {
+					$line_buffer = $last;
+				}
+
 				foreach ( $lines as $line ) {
 					$line = trim( $line );
 					if ( empty( $line ) || 0 !== strpos( $line, 'data: ' ) ) {
@@ -328,7 +355,7 @@ class PressGo_AI_Client {
 							$content = isset( $delta['content'] ) ? $delta['content'] : '';
 							if ( $content ) {
 								$accumulated_text .= $content;
-								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+								$self->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
 							}
 							$finish = isset( $choices[0]['finish_reason'] ) ? $choices[0]['finish_reason'] : null;
 							if ( 'stop' === $finish && $callback ) {
@@ -342,7 +369,7 @@ class PressGo_AI_Client {
 							$delta = isset( $event['delta'] ) ? $event['delta'] : array();
 							if ( isset( $delta['text'] ) ) {
 								$accumulated_text .= $delta['text'];
-								$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+								$self->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
 							}
 						} elseif ( 'message_stop' === $type ) {
 							if ( $callback ) {
@@ -357,19 +384,25 @@ class PressGo_AI_Client {
 					}
 				}
 
-				return strlen( $data );
-			},
+				return $chunk_len;
+			} );
+		};
+
+		add_action( 'http_api_curl', $stream_handler, 10, 3 );
+
+		$response = wp_remote_post( $this->api_url, array(
+			'timeout' => 180,
+			'headers' => $headers,
+			'body'    => wp_json_encode( $body ),
 		) );
 
-		$result    = curl_exec( $ch );
-		$http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
-		$curl_err  = curl_error( $ch );
-		curl_close( $ch );
-		// phpcs:enable WordPress.WP.AlternativeFunctions
+		remove_action( 'http_api_curl', $stream_handler, 10 );
 
-		if ( false === $result && $curl_err ) {
-			return new WP_Error( 'curl_error', 'Could not connect to Claude API. Error: ' . $curl_err );
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'connection_error', 'Could not connect to Claude API. Error: ' . $response->get_error_message() );
 		}
+
+		$http_code = (int) wp_remote_retrieve_response_code( $response );
 
 		if ( $http_code >= 400 ) {
 			$error_data = json_decode( $raw_response, true );
@@ -664,110 +697,89 @@ class PressGo_AI_Client {
 	 * with the classified headings and deduplicated images from build_import_instructions().
 	 */
 	private static function get_import_addendum() {
-		return <<<'IMPORT'
-
-
-## ⚠️ IMPORT MODE — OVERRIDES ALL ABOVE RULES ⚠️
-
-You are now in IMPORT MODE. You are cloning an existing page, NOT creating a new one. The following rules OVERRIDE the generation rules above.
-
-### CARDINAL RULES
-1. **NEVER fabricate content.** Use ONLY text from the extracted metadata. If metadata says "Testimonial from one of our clients" — that IS the testimonial text. Do NOT invent names, quotes, descriptions, or team members.
-2. **NEVER add sections that don't exist.** Derive section count from the content structure (headings, text groups, image groups), not from generation defaults.
-3. **NEVER use Pexels photo URLs.** Use ONLY images from the metadata.
-4. **Use extracted text VERBATIM** — do not rewrite, improve, shorten, or paraphrase.
-5. **Ignore these generation-mode rules:** "MAX 10 SECTIONS", "Content Length Rules", "Section Selection Guide", "Visual Rhythm Rules", "7-10 entries". Import mode is dictated by the original page.
-
-### HEADING CLASSIFICATION
-The metadata includes headings tagged with role classifications. Map them to config fields as follows:
-
-- **[BRAND-NAME]** → Use as `hero.headline` (it IS the hero heading). Also use for `footer.brand.name`.
-- **[HERO-HEADLINE]** → Use as `hero.headline`.
-- **[HERO-SUBHEADLINE]** → Use as `hero.subheadline`.
-- **[SECTION-HEADING]** → Use as the `headline` field of the matching section (features, gallery, etc.).
-- **[ITEM-TITLE]** → Use as item `title` within a section (feature item, gallery item, step title, etc.).
-- **[CTA-LABEL]** → This is button text. Use ONLY for `cta.text` or `cta_primary.text`. **NEVER use as an eyebrow.**
-- **[FOOTER-LABEL]** → Use as `footer.columns[].title`.
-- **[DESCRIPTION]** → Use as section `description`, `subheadline`, or long-form text field.
-
-Note: Classifications are heuristic guidance. Override them if context clearly suggests a different role.
-
-### EYEBROW RULES (CRITICAL)
-The `eyebrow` field is a SHORT uppercase label that appears ABOVE a section heading on the original page (e.g., "OUR SERVICES", "HOW IT WORKS").
-
-- If no such label exists for a section, set `eyebrow` to `""` (empty string).
-- **NEVER use button text as an eyebrow.**
-- **NEVER duplicate the headline text in the eyebrow.**
-- If a section has only one heading (e.g., "Our Services"), use it as `headline` and leave `eyebrow` as `""`.
-- Only use a separate eyebrow when the metadata clearly shows a short label ABOVE a longer section heading.
-
-### COLOR MAPPING
-- Colors in the metadata are already converted to hex.
-- The most common light background → `light_bg`
-- The most common dark background → `dark_bg`
-- Primary text color on light sections → `text_dark`
-- Muted/secondary text → `text_muted`
-- Button or accent color → `primary` and `accent`
-- Map each section's background to the closest extracted color.
-
-### FONT MAPPING
-- Use the detected font names in `fonts.heading` and `fonts.body`.
-- If a font is proprietary/custom (not in Google Fonts), use the closest Google Font:
-  - Custom sans-serif (sohne, Charlie Text, Geograph, SweetSans, Plain) → Inter, DM Sans, or Manrope
-  - Custom serif (Chronicle Text, Lyon Text, Ivy Journal) → Libre Baskerville, EB Garamond, or Merriweather
-  - Custom mono (Berkeley Mono, Akkurat Mono) → Fira Code
-  - Garamond Pro → EB Garamond
-  - SF Pro Display → Inter
-- The metadata may include specific fallback suggestions.
-
-### SECTION TYPE MAPPING
-**ALL valid section types:** hero, features, gallery, steps, stats, testimonials, competitive_edge, results, faq, pricing, team, cta_final, newsletter, logo_bar, social_proof, map, blog, footer, disclaimer
-
-**IMPORTANT:** `gallery`, `footer`, `pricing`, `newsletter`, `logo_bar`, `team`, and `map` are all valid even though the config schema enum may not list them. USE them when the original page content matches.
-
-| Original Pattern | PressGo Section | Variant |
-|---|---|---|
-| Brand/headline + tagline + CTA + image | `hero` | `split` (image beside text) or `minimal` (centered) |
-| Service/offering cards WITH photos | `features` | `image_cards` |
-| Service/offering list WITHOUT photos | `features` | `default` or `minimal` |
-| Feature sections with alternating image/text | `features` | `alternating` |
-| Project/portfolio images with titles | `gallery` | `cards` |
-| Image grid without captions | `gallery` | `default` |
-| Customer quotes | `testimonials` | `minimal` (1-2) or `default` (3) |
-| CTA block | `cta_final` | `image` (with bg image) or `default` |
-| Footer with brand + links + copyright | `footer` | `dark` or `light` |
-| Stats/numbers | `stats` | `default` or `inline` |
-| Process steps | `steps` | `default` or `timeline` |
-| FAQ accordion | `faq` | `default` or `split` |
-| Client/partner logos row | `logo_bar` | `default` or `dark` |
-
-### IMAGE ASSIGNMENT
-Images in the metadata are listed in page order with classification hints:
-
-- **[SVG icon/logo]** → Use for `hero.logo` or `footer.brand.logo`. Skip for section content.
-- **[likely logo]** → Same as above.
-- **[small/icon]** → Skip for section images. May be used as logo.
-- **Unlabeled photos** → Assign in page order:
-  - First large photo near hero content → `hero.image`
-  - Photos grouped after a "Services/Features" heading → features items (use `image_cards` variant, each item gets `image` field)
-  - Photos grouped after a "Projects/Gallery" heading → gallery items (each item gets `title` + `image`)
-  - Later photos → cta_final or other sections as appropriate
-
-### LAYOUT VALUES
-All layout values MUST be **integers**, not strings:
-- `boxed_width`: 1200 (NOT "1200px")
-- `section_padding`: 80-120
-- `card_radius`: 0 (sharp/elegant) or 12-20 (modern/rounded)
-- `button_radius`: 0 (rectangular) or 20-30 (pill-shaped)
-
-### HANDLING SPARSE METADATA
-- Few paragraphs → minimal/elegant page, use fewer sections
-- Placeholder text → output verbatim (even "Testimonial from one of our clients")
-- Low section count → match it, don't pad
-- No buttons → omit CTA sections or use minimal variants
-- Single testimonial with placeholder → `testimonials` `minimal` variant, one item, empty name/role
-
-IMPORT
-;
+		return "\n\n"
+			. '## ⚠️ IMPORT MODE — OVERRIDES ALL ABOVE RULES ⚠️' . "\n\n"
+			. 'You are now in IMPORT MODE. You are cloning an existing page, NOT creating a new one. The following rules OVERRIDE the generation rules above.' . "\n\n"
+			. '### CARDINAL RULES' . "\n"
+			. '1. **NEVER fabricate content.** Use ONLY text from the extracted metadata. If metadata says "Testimonial from one of our clients" — that IS the testimonial text. Do NOT invent names, quotes, descriptions, or team members.' . "\n"
+			. '2. **NEVER add sections that don\'t exist.** Derive section count from the content structure (headings, text groups, image groups), not from generation defaults.' . "\n"
+			. '3. **NEVER use Pexels photo URLs.** Use ONLY images from the metadata.' . "\n"
+			. '4. **Use extracted text VERBATIM** — do not rewrite, improve, shorten, or paraphrase.' . "\n"
+			. '5. **Ignore these generation-mode rules:** "MAX 10 SECTIONS", "Content Length Rules", "Section Selection Guide", "Visual Rhythm Rules", "7-10 entries". Import mode is dictated by the original page.' . "\n\n"
+			. '### HEADING CLASSIFICATION' . "\n"
+			. 'The metadata includes headings tagged with role classifications. Map them to config fields as follows:' . "\n\n"
+			. '- **[BRAND-NAME]** → Use as `hero.headline` (it IS the hero heading). Also use for `footer.brand.name`.' . "\n"
+			. '- **[HERO-HEADLINE]** → Use as `hero.headline`.' . "\n"
+			. '- **[HERO-SUBHEADLINE]** → Use as `hero.subheadline`.' . "\n"
+			. '- **[SECTION-HEADING]** → Use as the `headline` field of the matching section (features, gallery, etc.).' . "\n"
+			. '- **[ITEM-TITLE]** → Use as item `title` within a section (feature item, gallery item, step title, etc.).' . "\n"
+			. '- **[CTA-LABEL]** → This is button text. Use ONLY for `cta.text` or `cta_primary.text`. **NEVER use as an eyebrow.**' . "\n"
+			. '- **[FOOTER-LABEL]** → Use as `footer.columns[].title`.' . "\n"
+			. '- **[DESCRIPTION]** → Use as section `description`, `subheadline`, or long-form text field.' . "\n\n"
+			. 'Note: Classifications are heuristic guidance. Override them if context clearly suggests a different role.' . "\n\n"
+			. '### EYEBROW RULES (CRITICAL)' . "\n"
+			. 'The `eyebrow` field is a SHORT uppercase label that appears ABOVE a section heading on the original page (e.g., "OUR SERVICES", "HOW IT WORKS").' . "\n\n"
+			. '- If no such label exists for a section, set `eyebrow` to `""` (empty string).' . "\n"
+			. '- **NEVER use button text as an eyebrow.**' . "\n"
+			. '- **NEVER duplicate the headline text in the eyebrow.**' . "\n"
+			. '- If a section has only one heading (e.g., "Our Services"), use it as `headline` and leave `eyebrow` as `""`.' . "\n"
+			. '- Only use a separate eyebrow when the metadata clearly shows a short label ABOVE a longer section heading.' . "\n\n"
+			. '### COLOR MAPPING' . "\n"
+			. '- Colors in the metadata are already converted to hex.' . "\n"
+			. '- The most common light background → `light_bg`' . "\n"
+			. '- The most common dark background → `dark_bg`' . "\n"
+			. '- Primary text color on light sections → `text_dark`' . "\n"
+			. '- Muted/secondary text → `text_muted`' . "\n"
+			. '- Button or accent color → `primary` and `accent`' . "\n"
+			. '- Map each section\'s background to the closest extracted color.' . "\n\n"
+			. '### FONT MAPPING' . "\n"
+			. '- Use the detected font names in `fonts.heading` and `fonts.body`.' . "\n"
+			. '- If a font is proprietary/custom (not in Google Fonts), use the closest Google Font:' . "\n"
+			. '  - Custom sans-serif (sohne, Charlie Text, Geograph, SweetSans, Plain) → Inter, DM Sans, or Manrope' . "\n"
+			. '  - Custom serif (Chronicle Text, Lyon Text, Ivy Journal) → Libre Baskerville, EB Garamond, or Merriweather' . "\n"
+			. '  - Custom mono (Berkeley Mono, Akkurat Mono) → Fira Code' . "\n"
+			. '  - Garamond Pro → EB Garamond' . "\n"
+			. '  - SF Pro Display → Inter' . "\n"
+			. '- The metadata may include specific fallback suggestions.' . "\n\n"
+			. '### SECTION TYPE MAPPING' . "\n"
+			. '**ALL valid section types:** hero, features, gallery, steps, stats, testimonials, competitive_edge, results, faq, pricing, team, cta_final, newsletter, logo_bar, social_proof, map, blog, footer, disclaimer' . "\n\n"
+			. '**IMPORTANT:** `gallery`, `footer`, `pricing`, `newsletter`, `logo_bar`, `team`, and `map` are all valid even though the config schema enum may not list them. USE them when the original page content matches.' . "\n\n"
+			. '| Original Pattern | PressGo Section | Variant |' . "\n"
+			. '|---|---|---|' . "\n"
+			. '| Brand/headline + tagline + CTA + image | `hero` | `split` (image beside text) or `minimal` (centered) |' . "\n"
+			. '| Service/offering cards WITH photos | `features` | `image_cards` |' . "\n"
+			. '| Service/offering list WITHOUT photos | `features` | `default` or `minimal` |' . "\n"
+			. '| Feature sections with alternating image/text | `features` | `alternating` |' . "\n"
+			. '| Project/portfolio images with titles | `gallery` | `cards` |' . "\n"
+			. '| Image grid without captions | `gallery` | `default` |' . "\n"
+			. '| Customer quotes | `testimonials` | `minimal` (1-2) or `default` (3) |' . "\n"
+			. '| CTA block | `cta_final` | `image` (with bg image) or `default` |' . "\n"
+			. '| Footer with brand + links + copyright | `footer` | `dark` or `light` |' . "\n"
+			. '| Stats/numbers | `stats` | `default` or `inline` |' . "\n"
+			. '| Process steps | `steps` | `default` or `timeline` |' . "\n"
+			. '| FAQ accordion | `faq` | `default` or `split` |' . "\n"
+			. '| Client/partner logos row | `logo_bar` | `default` or `dark` |' . "\n\n"
+			. '### IMAGE ASSIGNMENT' . "\n"
+			. 'Images in the metadata are listed in page order with classification hints:' . "\n\n"
+			. '- **[SVG icon/logo]** → Use for `hero.logo` or `footer.brand.logo`. Skip for section content.' . "\n"
+			. '- **[likely logo]** → Same as above.' . "\n"
+			. '- **[small/icon]** → Skip for section images. May be used as logo.' . "\n"
+			. '- **Unlabeled photos** → Assign in page order:' . "\n"
+			. '  - First large photo near hero content → `hero.image`' . "\n"
+			. '  - Photos grouped after a "Services/Features" heading → features items (use `image_cards` variant, each item gets `image` field)' . "\n"
+			. '  - Photos grouped after a "Projects/Gallery" heading → gallery items (each item gets `title` + `image`)' . "\n"
+			. '  - Later photos → cta_final or other sections as appropriate' . "\n\n"
+			. '### LAYOUT VALUES' . "\n"
+			. 'All layout values MUST be **integers**, not strings:' . "\n"
+			. '- `boxed_width`: 1200 (NOT "1200px")' . "\n"
+			. '- `section_padding`: 80-120' . "\n"
+			. '- `card_radius`: 0 (sharp/elegant) or 12-20 (modern/rounded)' . "\n"
+			. '- `button_radius`: 0 (rectangular) or 20-30 (pill-shaped)' . "\n\n"
+			. '### HANDLING SPARSE METADATA' . "\n"
+			. '- Few paragraphs → minimal/elegant page, use fewer sections' . "\n"
+			. '- Placeholder text → output verbatim (even "Testimonial from one of our clients")' . "\n"
+			. '- Low section count → match it, don\'t pad' . "\n"
+			. '- No buttons → omit CTA sections or use minimal variants' . "\n"
+			. '- Single testimonial with placeholder → `testimonials` `minimal` variant, one item, empty name/role' . "\n";
 	}
 }

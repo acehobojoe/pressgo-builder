@@ -42,7 +42,6 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-scraper-client.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-config-validator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-page-creator.php';
-		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-updater.php';
 	}
 
 	private function init_hooks() {
@@ -53,10 +52,6 @@ class PressGo {
 			$rest_api = new PressGo_Rest_API();
 			$rest_api->init();
 		}
-
-		// GitHub release updater (outside is_admin — WP cron runs in non-admin context).
-		$updater = new PressGo_Updater();
-		$updater->init();
 
 		// Register WP-CLI commands.
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {

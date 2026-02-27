@@ -173,12 +173,12 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
 				isset( $cta1['url'] ) ? $cta1['url'] : '#',
 				$c['accent'], $c['white'], null,
-				isset( $cta1['icon'] ) ? $cta1['icon'] : null ),
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, '', 'center' ),
 		);
 		if ( $cta2 ) {
 			$btn_children[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
 				isset( $cta2['url'] ) ? $cta2['url'] : '#',
-				'transparent', $c['text_dark'], $c['border'] );
+				'transparent', $c['text_dark'], $c['border'], null, '', 'center' );
 		}
 		$left[] = PressGo_Element_Factory::row( $cfg,
 			array_map( function( $btn ) {
@@ -187,18 +187,26 @@ class PressGo_Section_Builder {
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$left[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			// Desktop: stars + text side by side centered.
+			// Mobile: stacks vertically, both centered.
 			$trust_row = PressGo_Element_Factory::row( $cfg,
 				array(
 					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
+						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right', 'center' ) ),
+						array(
+							'vertical_align' => 'middle',
+							'width'          => array( 'unit' => 'px', 'size' => 100, 'sizes' => array() ),
+						)
 					),
 					PressGo_Element_Factory::col(
 						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							$c['text_muted'], 13 ) ),
+							$c['text_muted'], 13, null, null, 'center' ) ),
 						array( 'vertical_align' => 'middle' )
 					),
-				), 8 );
+				), 4, array(
+					'flex_justify_content'         => 'center',
+					'flex_align_items'             => 'center',
+				) );
 			$left[] = $trust_row;
 		}
 

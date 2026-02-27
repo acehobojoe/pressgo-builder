@@ -128,6 +128,20 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 - **Logo bar mobile**: Uses `flex_wrap: wrap` + `flex_direction_mobile: row` + `width_mobile: 28%` so logos wrap into 3 columns instead of stacking
 - **Social proof mobile**: Uses `flex_wrap: wrap` + `flex_direction_mobile: row` + `width_mobile: 45%` so pills wrap into 2 columns
 
+## WP Rocket Compatibility
+- **NEVER use inline onclick/onmouseover** in HTML widgets — WP Rocket's Delay JavaScript rewrites them to `data-rocket-onclick`, breaking handlers
+- **Use addEventListener only** — attach events in `<script>` blocks via `document.addEventListener('click', ...)`
+- **Script exclusion attrs**: Add `data-no-optimize="1" data-no-defer="1" data-no-minify="1"` to any `<script>` tag that must run immediately
+- **Delay JS exclusions**: Add script identifiers to `wp_rocket_settings['delay_js_exclusions']` array
+- **Flush caches after changes**: `rm -rf wp-content/cache/wp-rocket/ wp-content/cache/min/` + `wp elementor flush-css` + `wp cache flush`
+
+## CTA Popup Pattern (Calendly / Scheduling)
+- Use a custom HTML modal with iframe — no external JS SDK dependencies
+- Set CTA button URLs to `#schedule`, intercept via `document.addEventListener('click', ...)`
+- Iframe src loaded lazily on first open for page speed
+- Modal needs: overlay click-to-close, X button, ESC key, body scroll lock, fade animation
+- See `brain.json → cta_popup_pattern` for full implementation details
+
 ## Critical Elementor Rules
 1. **Use flexbox containers** — `elType: 'container'` with `container_type: 'flex'`. All primitives (outer/row/col) are containers.
 2. **NEVER use `_animation`** — causes `elementor-invisible` class, content disappears
