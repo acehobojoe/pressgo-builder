@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, generator
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,10 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 5. Settings page — enter your Claude API key and choose a model
 
 == Changelog ==
+
+= 1.3.1 =
+* Moved inline JavaScript to properly enqueued external file using wp_enqueue_script and wp_localize_script
+* Replaced inline style attributes with CSS classes in the settings page
 
 = 1.3.0 =
 * Fixed container centering — pages now render properly centered on all screen sizes

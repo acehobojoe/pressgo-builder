@@ -34,10 +34,6 @@ class PressGo_Rest_API {
 			ob_end_flush();
 		}
 
-		if ( function_exists( 'set_time_limit' ) ) {
-			set_time_limit( 300 );
-		}
-
 		$url        = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
 		$page_title = isset( $_POST['page_title'] ) ? sanitize_text_field( wp_unslash( $_POST['page_title'] ) ) : 'Imported Page';
 		$consent    = isset( $_POST['consent'] ) ? sanitize_text_field( wp_unslash( $_POST['consent'] ) ) : '';
@@ -212,23 +208,16 @@ class PressGo_Rest_API {
 			ob_end_flush();
 		}
 
-		// Increase time limit for long-running generation.
-		if ( function_exists( 'set_time_limit' ) ) {
-			set_time_limit( 300 ); // phpcs:ignore Generic.PHP.NoSilencedErrors -- required for long-running SSE stream.
-		}
-
 		$prompt     = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
 		$page_title = isset( $_POST['page_title'] ) ? sanitize_text_field( wp_unslash( $_POST['page_title'] ) ) : 'Generated Landing Page';
 
-		// Handle image upload.
+		// Handle image upload (base64-encoded).
 		$image      = null;
 		$image_type = null;
 		if ( ! empty( $_POST['image'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- base64 image data, validated below.
-			$raw_image = wp_unslash( $_POST['image'] );
-			// Validate it looks like base64.
+			$raw_image = sanitize_text_field( wp_unslash( $_POST['image'] ) );
+			// Validate base64 character set and decoded size (10MB max).
 			if ( preg_match( '/^[A-Za-z0-9+\/=]+$/', $raw_image ) ) {
-				// Check decoded size (10MB max).
 				$decoded_size = (int) ( strlen( $raw_image ) * 3 / 4 );
 				if ( $decoded_size > 10 * 1024 * 1024 ) {
 					$this->emit( 'error', array( 'message' => 'Image too large. Maximum size is 10MB.' ) );
@@ -236,7 +225,7 @@ class PressGo_Rest_API {
 				}
 				$image      = $raw_image;
 				$image_type = isset( $_POST['image_type'] ) ? sanitize_text_field( wp_unslash( $_POST['image_type'] ) ) : 'image/png';
-				// Validate MIME type.
+				// Validate MIME type against allowlist.
 				$allowed_types = array( 'image/png', 'image/jpeg', 'image/webp', 'image/gif' );
 				if ( ! in_array( $image_type, $allowed_types, true ) ) {
 					$image_type = 'image/png';

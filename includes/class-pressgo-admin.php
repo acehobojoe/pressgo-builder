@@ -134,6 +134,21 @@ class PressGo_Admin {
 				'nonce'   => wp_create_nonce( 'pressgo_generate' ),
 			) );
 		}
+
+		if ( 'pressgo_page_pressgo-settings' === $hook ) {
+			wp_enqueue_script(
+				'pressgo-settings',
+				PRESSGO_PLUGIN_URL . 'admin/js/pressgo-settings.js',
+				array(),
+				PRESSGO_VERSION,
+				true
+			);
+
+			wp_localize_script( 'pressgo-settings', 'pressgoSettings', array(
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'testNonce' => wp_create_nonce( 'pressgo_test' ),
+			) );
+		}
 	}
 
 	public function render_generator_page() {

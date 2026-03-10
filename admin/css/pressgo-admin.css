@@ -561,6 +561,26 @@
 
 /* ─── Settings Page ─── */
 
+.pressgo-settings-test {
+	margin-top: 20px;
+}
+
+.pressgo-test-result {
+	margin-left: 12px;
+}
+
+.pressgo-status-ok {
+	color: #00a32a;
+}
+
+.pressgo-status-error {
+	color: #d63638;
+}
+
+.pressgo-status-warn {
+	color: #b26200;
+}
+
 .pressgo-settings-info {
 	margin-top: 30px;
 	padding: 20px 24px;

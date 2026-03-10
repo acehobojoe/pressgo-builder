@@ -6,7 +6,7 @@
 
 set -e
 
-PLUGIN_SLUG="pressgo"
+PLUGIN_SLUG="pressgo-builder"
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="/tmp/${PLUGIN_SLUG}-build"
 ZIP_FILE="${PLUGIN_DIR}/${PLUGIN_SLUG}.zip"
@@ -37,6 +37,14 @@ phpunit.xml
 phpcs.xml
 .phpcs.xml
 .editorconfig
+.distignore
+mcp-server
+includes/class-pressgo-updater.php
+wordpress-org-assets
+brain.json
+brain-widget-schemas.json
+config-schema.json
+README.md
 EOF
 
 # Remove any leftover .DS_Store files.
