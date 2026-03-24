@@ -2,6 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+$api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 ?>
 <div class="wrap pressgo-settings">
 	<h1>PressGo Settings</h1>
@@ -33,3 +34,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</ul>
 	</div>
 </div>
+<style>
+	.pressgo-field-pressgo, .pressgo-field-direct { transition: opacity 0.2s; }
+	.pressgo-field-hidden { opacity: 0.3; pointer-events: none; }
+</style>

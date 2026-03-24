@@ -48,11 +48,11 @@ class PressGo_Rest_API {
 			die();
 		}
 
-		$api_key = PressGo_Admin::get_api_key();
-		if ( empty( $api_key ) ) {
-			$this->emit( 'error', array( 'message' => 'Claude API key not configured. Please go to PressGo Settings.' ) );
+		if ( ! PressGo_Admin::has_api_configured() ) {
+			$this->emit( 'error', array( 'message' => 'API key not configured. Please go to PressGo Settings.' ) );
 			die();
 		}
+		$api_key = PressGo_Admin::get_api_key();
 
 		if ( ! PressGo::is_elementor_active() ) {
 			$this->emit( 'error', array( 'message' => 'Elementor is not active. Please install and activate Elementor.' ) );
@@ -129,16 +129,43 @@ class PressGo_Rest_API {
 			wp_send_json_error( array( 'message' => 'Unauthorized.' ) );
 		}
 
-		$results = array();
+		$mode = PressGo_Admin::get_api_mode();
 
-		// Step 1: Test prompt server.
+		if ( 'pressgo' === $mode ) {
+			// Test PressGo API key.
+			$account_key = PressGo_Admin::get_account_key();
+			if ( empty( $account_key ) ) {
+				wp_send_json_error( array( 'message' => 'No PressGo API key configured.' ) );
+			}
+
+			$response = wp_remote_get( 'https://pressgo.app/api/plugin/credits', array(
+				'timeout' => 15,
+				'headers' => array( 'X-PressGo-Key' => $account_key ),
+			) );
+
+			if ( is_wp_error( $response ) ) {
+				wp_send_json_error( array( 'message' => 'Could not reach PressGo API: ' . $response->get_error_message() ) );
+			}
+
+			$status = wp_remote_retrieve_response_code( $response );
+			if ( 401 === $status ) {
+				wp_send_json_error( array( 'message' => 'Invalid PressGo API key. Check your key or create a new one at pressgo.app/dashboard.' ) );
+			}
+			if ( $status >= 400 ) {
+				wp_send_json_error( array( 'message' => 'PressGo API error (HTTP ' . $status . ').' ) );
+			}
+
+			$data    = json_decode( wp_remote_retrieve_body( $response ), true );
+			$credits = isset( $data['total'] ) ? $data['total'] : 0;
+			wp_send_json_success( array( 'message' => "PressGo API connected! {$credits} credits available." ) );
+		}
+
+		// Direct mode — test prompt server + Claude API.
 		$prompt = PressGo_Prompt_Builder::build_system_prompt();
 		if ( is_wp_error( $prompt ) ) {
 			wp_send_json_error( array( 'message' => 'PressGo config server: ' . $prompt->get_error_message() ) );
 		}
-		$results[] = 'Config server OK';
 
-		// Step 2: Test Claude API key with minimal request.
 		$api_key = PressGo_Admin::get_api_key();
 		if ( empty( $api_key ) ) {
 			wp_send_json_error( array( 'message' => 'Config server OK, but no Claude API key configured.' ) );
@@ -238,11 +265,11 @@ class PressGo_Rest_API {
 			die();
 		}
 
-		$api_key = PressGo_Admin::get_api_key();
-		if ( empty( $api_key ) ) {
-			$this->emit( 'error', array( 'message' => 'Claude API key not configured. Please go to PressGo Settings.' ) );
+		if ( ! PressGo_Admin::has_api_configured() ) {
+			$this->emit( 'error', array( 'message' => 'API key not configured. Please go to PressGo Settings.' ) );
 			die();
 		}
+		$api_key = PressGo_Admin::get_api_key();
 
 		if ( ! PressGo::is_elementor_active() ) {
 			$this->emit( 'error', array( 'message' => 'Elementor is not active. Please install and activate Elementor.' ) );

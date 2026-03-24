@@ -50,6 +50,18 @@ class PressGo_Admin {
 	}
 
 	public function register_settings() {
+		register_setting( 'pressgo_settings', 'pressgo_api_mode', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => 'pressgo',
+		) );
+
+		register_setting( 'pressgo_settings', 'pressgo_account_key', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => '',
+		) );
+
 		register_setting( 'pressgo_settings', 'pressgo_api_key', array(
 			'type'              => 'string',
 			'sanitize_callback' => 'sanitize_text_field',
@@ -65,8 +77,25 @@ class PressGo_Admin {
 		add_settings_section(
 			'pressgo_api_section',
 			'API Configuration',
-			null,
+			array( $this, 'render_api_mode_section' ),
 			'pressgo-settings'
+		);
+
+		add_settings_field(
+			'pressgo_api_mode',
+			'API Mode',
+			array( $this, 'render_api_mode_field' ),
+			'pressgo-settings',
+			'pressgo_api_section'
+		);
+
+		add_settings_field(
+			'pressgo_account_key',
+			'PressGo API Key',
+			array( $this, 'render_account_key_field' ),
+			'pressgo-settings',
+			'pressgo_api_section',
+			array( 'class' => 'pressgo-field-pressgo' )
 		);
 
 		add_settings_field(
@@ -74,7 +103,8 @@ class PressGo_Admin {
 			'Claude API Key',
 			array( $this, 'render_api_key_field' ),
 			'pressgo-settings',
-			'pressgo_api_section'
+			'pressgo_api_section',
+			array( 'class' => 'pressgo-field-direct' )
 		);
 
 		add_settings_field(
@@ -82,8 +112,28 @@ class PressGo_Admin {
 			'Claude Model',
 			array( $this, 'render_model_field' ),
 			'pressgo-settings',
-			'pressgo_api_section'
+			'pressgo_api_section',
+			array( 'class' => 'pressgo-field-direct' )
 		);
+	}
+
+	public function render_api_mode_section() {
+		echo '<p>Choose how PressGo connects to AI. Use a <strong>PressGo API key</strong> for the simplest setup (includes free credits), or bring your own Claude API key.</p>';
+	}
+
+	public function render_api_mode_field() {
+		$value = get_option( 'pressgo_api_mode', 'pressgo' );
+		echo '<fieldset>';
+		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 3 free credits/month, buy more as needed</label><br/>';
+		echo '<label><input type="radio" name="pressgo_api_mode" value="direct"' . checked( $value, 'direct', false ) . ' /> <strong>Own API Key</strong> &mdash; use your Anthropic key directly</label>';
+		echo '</fieldset>';
+	}
+
+	public function render_account_key_field() {
+		$value = get_option( 'pressgo_account_key', '' );
+		echo '<input type="password" id="pressgo_account_key" name="pressgo_account_key" value="' . esc_attr( $value ) . '" class="regular-text" autocomplete="off" placeholder="pg_..." />';
+		echo '<p class="description">Your PressGo API key. <a href="https://pressgo.app/register" target="_blank">Create a free account</a> to get one.</p>';
+		echo '<div id="pressgo-credit-balance" style="margin-top:8px;display:none;"></div>';
 	}
 
 	public function render_api_key_field() {
@@ -147,6 +197,7 @@ class PressGo_Admin {
 			wp_localize_script( 'pressgo-settings', 'pressgoSettings', array(
 				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
 				'testNonce' => wp_create_nonce( 'pressgo_test' ),
+				'apiMode'   => self::get_api_mode(),
 			) );
 		}
 	}
@@ -159,10 +210,10 @@ class PressGo_Admin {
 			return;
 		}
 
-		$api_key = self::get_api_key();
-		if ( empty( $api_key ) ) {
+		if ( ! self::has_api_configured() ) {
+			$settings_url = esc_url( admin_url( 'admin.php?page=pressgo-settings' ) );
 			echo '<div class="wrap"><h1>PressGo</h1>';
-			echo '<div class="notice notice-warning"><p>Please <a href="' . esc_url( admin_url( 'admin.php?page=pressgo-settings' ) ) . '">configure your Claude API key</a> before generating pages.</p></div>';
+			echo '<div class="notice notice-warning"><p>Please <a href="' . $settings_url . '">configure your API key</a> before generating pages.</p></div>';
 			echo '</div>';
 			return;
 		}
@@ -172,6 +223,25 @@ class PressGo_Admin {
 
 	public function render_settings_page() {
 		include PRESSGO_PLUGIN_DIR . 'admin/partials/settings-page.php';
+	}
+
+	/**
+	 * Check if any API mode is properly configured.
+	 */
+	public static function has_api_configured() {
+		$mode = self::get_api_mode();
+		if ( 'pressgo' === $mode ) {
+			return ! empty( get_option( 'pressgo_account_key', '' ) );
+		}
+		return ! empty( get_option( 'pressgo_api_key', '' ) );
+	}
+
+	public static function get_api_mode() {
+		return get_option( 'pressgo_api_mode', 'pressgo' );
+	}
+
+	public static function get_account_key() {
+		return get_option( 'pressgo_account_key', '' );
 	}
 
 	public static function get_api_key() {

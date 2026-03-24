@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, generator
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,7 +14,7 @@ Describe a page in plain text and PressGo generates a fully editable Elementor l
 
 PressGo turns a text description into a professional, fully editable Elementor landing page. Describe your business, pick a model, and watch the AI build your page section by section with a real-time streaming preview.
 
-**Bring Your Own Key** — PressGo uses your Anthropic (Claude) API key directly. No middleman, no subscription. You pay only for the API tokens you use.
+**Two ways to connect** — Use a free PressGo API key (includes 3 credits/month) for the easiest setup, or bring your own Anthropic API key for direct access.
 
 **Key Features:**
 
@@ -51,7 +51,7 @@ PressGo turns a text description into a professional, fully editable Elementor l
 
 **How It Works:**
 
-1. Get a Claude API key from [Anthropic](https://console.anthropic.com/)
+1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — or use your own Anthropic key
 2. Enter it in PressGo > Settings
 3. Describe your landing page or upload a design screenshot
 4. Watch the AI stream its progress and build each section live
@@ -59,7 +59,7 @@ PressGo turns a text description into a professional, fully editable Elementor l
 
 == External Services ==
 
-This plugin connects to two external services:
+This plugin connects to external services depending on your API mode:
 
 **1. PressGo Configuration Server (`wp.pressgo.app`)**
 
@@ -68,11 +68,18 @@ When the plugin generates a page, it first retrieves its AI instruction set from
 * [PressGo Privacy Policy](https://pressgo.app/privacy)
 * [PressGo Terms of Service](https://pressgo.app/terms)
 
-**2. Anthropic Claude API (`api.anthropic.com`)**
+**2. PressGo API (`pressgo.app`) — PressGo API mode**
 
-When you click "Generate Page," your text prompt (and optional image) is sent to `api.anthropic.com` over HTTPS using your own API key. The API returns a structured page configuration, which the plugin converts into native Elementor elements entirely on your WordPress site. No data is stored on external servers beyond what is needed to process the API request.
+When using a PressGo API key, your text prompt (and optional image) is sent to `pressgo.app` over HTTPS. PressGo validates your API key, checks your credit balance, forwards the request to Claude AI, and streams the response back. Your prompt is stored temporarily for usage tracking; no page content is retained.
 
-No user data is sent to either service until you explicitly click the Generate button.
+* [PressGo Privacy Policy](https://pressgo.app/privacy)
+* [PressGo Terms of Service](https://pressgo.app/terms)
+
+**3. Anthropic Claude API (`api.anthropic.com`) — Own API Key mode**
+
+When using your own Anthropic API key, your text prompt (and optional image) is sent directly to `api.anthropic.com` over HTTPS. The API returns a structured page configuration, which the plugin converts into native Elementor elements entirely on your WordPress site.
+
+No user data is sent to any service until you explicitly click the Generate button.
 
 * [Anthropic Terms of Service](https://www.anthropic.com/policies/terms)
 * [Anthropic Privacy Policy](https://www.anthropic.com/policies/privacy)
@@ -82,20 +89,20 @@ No user data is sent to either service until you explicitly click the Generate b
 
 1. Upload the `pressgo-builder` folder to `/wp-content/plugins/`
 2. Activate the plugin through the "Plugins" menu in WordPress
-3. Go to PressGo > Settings and enter your Anthropic (Claude) API key
+3. Go to PressGo > Settings and choose your API mode:
+   * **PressGo API** (recommended) — Create a free account at [pressgo.app/register](https://pressgo.app/register) and paste your API key
+   * **Own API Key** — Enter your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
 4. Navigate to PressGo > Generate to create your first page
-
-You can get a Claude API key at [console.anthropic.com](https://console.anthropic.com/).
 
 == Frequently Asked Questions ==
 
 = Do I need an API key? =
 
-Yes. PressGo requires an Anthropic (Claude) API key. You can create one for free at [console.anthropic.com](https://console.anthropic.com/). You only pay for the API tokens you use — there is no PressGo subscription.
+Yes. You have two options: (1) Create a free PressGo account at [pressgo.app](https://pressgo.app/register) — you get 3 free credits per month and can buy more as needed. (2) Use your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
 
 = How much does it cost per page? =
 
-With Claude Haiku 4.5, a typical page costs about $0.02-0.05 in API tokens. With Sonnet 4.5, roughly $0.10-0.30. Opus 4.6 is the most capable but costs more.
+With a **PressGo API key**, each page costs 1-2 credits depending on the model. You get 3 free credits per month, and credit packs start at $9 for 50 credits. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
 
 = What data is sent to external servers? =
 
@@ -122,6 +129,13 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 5. Settings page — enter your Claude API key and choose a model
 
 == Changelog ==
+
+= 1.4.0 =
+* Added PressGo API mode — create a free account at pressgo.app, get 3 credits/month, and generate pages without managing your own API key
+* New API mode toggle in Settings: choose "PressGo API" or "Own API Key"
+* Live credit balance display on the settings page
+* Connection test works with both API modes
+* Existing "Own API Key" mode unchanged — bring your own Anthropic key as before
 
 = 1.3.1 =
 * Moved inline JavaScript to properly enqueued external file using wp_enqueue_script and wp_localize_script
@@ -156,6 +170,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+New PressGo API mode — get a free API key at pressgo.app with 3 credits/month included. No Anthropic account needed.
 
 = 1.3.0 =
 Layout and responsive polish — fixes container centering, adds mobile-responsive font sizes, improves logo bar and social proof on small screens.

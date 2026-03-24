@@ -22,8 +22,21 @@ class PressGo_AI_Client {
 	private $model;
 	private $api_url = 'https://api.anthropic.com/v1/messages';
 	private $use_openai_format = false;
+	private $use_pressgo_api   = false;
 
 	public function __construct( $api_key, $model = null ) {
+		// Check for PressGo API mode first.
+		if ( 'pressgo' === PressGo_Admin::get_api_mode() ) {
+			$account_key = PressGo_Admin::get_account_key();
+			if ( ! empty( $account_key ) ) {
+				$this->api_url         = 'https://pressgo.app/api/plugin/generate';
+				$this->api_key         = $account_key;
+				$this->model           = 'sonnet';
+				$this->use_pressgo_api = true;
+				return;
+			}
+		}
+
 		// Check for OpenAI-compatible backend override (e.g. DO Gradient AI).
 		if ( defined( 'PRESSGO_AI_BACKEND_URL' ) && defined( 'PRESSGO_AI_BACKEND_KEY' ) ) {
 			$this->api_url           = PRESSGO_AI_BACKEND_URL;
@@ -53,8 +66,28 @@ class PressGo_AI_Client {
 
 		$user_content = PressGo_Prompt_Builder::build_user_content( $prompt, $image, $image_type );
 
-		// Build request body and headers — different format for Anthropic vs OpenAI-compatible.
-		if ( $this->use_openai_format ) {
+		// Build request body and headers — format depends on backend.
+		if ( $this->use_pressgo_api ) {
+			$body = array(
+				'prompt'       => is_array( $user_content ) ? wp_json_encode( $user_content ) : $user_content,
+				'systemPrompt' => $system_prompt,
+				'model'        => $this->model,
+				'maxTokens'    => 8192,
+			);
+			// Attach image if present.
+			if ( $image ) {
+				$body['image'] = array(
+					'data'      => $image,
+					'mediaType' => $image_type ?: 'image/png',
+				);
+				// When sending image via PressGo, use the text prompt directly.
+				$body['prompt'] = $prompt;
+			}
+			$wp_headers = array(
+				'Content-Type'  => 'application/json',
+				'X-PressGo-Key' => $this->api_key,
+			);
+		} elseif ( $this->use_openai_format ) {
 			$body = array(
 				'model'      => $this->model,
 				'max_tokens' => 8192,
@@ -89,8 +122,12 @@ class PressGo_AI_Client {
 		}
 
 		if ( $callback ) {
-			$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
-			$callback( 'thinking', array( 'text' => "Connecting to {$backend} ({$this->model})..." ) );
+			if ( $this->use_pressgo_api ) {
+				$callback( 'thinking', array( 'text' => 'Connecting to PressGo API...' ) );
+			} else {
+				$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
+				$callback( 'thinking', array( 'text' => "Connecting to {$backend} ({$this->model})..." ) );
+			}
 		}
 
 		return $this->stream_request( $wp_headers, $body, $callback, 'Generation complete. Processing...' );
@@ -112,8 +149,19 @@ class PressGo_AI_Client {
 		// Override with comprehensive import rules.
 		$system_prompt .= self::get_import_addendum();
 
-		// Build request body and headers — different format for Anthropic vs OpenAI-compatible.
-		if ( $this->use_openai_format ) {
+		// Build request body and headers — format depends on backend.
+		if ( $this->use_pressgo_api ) {
+			$body = array(
+				'prompt'       => is_array( $user_content ) ? wp_json_encode( $user_content ) : $user_content,
+				'systemPrompt' => $system_prompt,
+				'model'        => $this->model,
+				'maxTokens'    => 16384,
+			);
+			$wp_headers = array(
+				'Content-Type'  => 'application/json',
+				'X-PressGo-Key' => $this->api_key,
+			);
+		} elseif ( $this->use_openai_format ) {
 			$openai_content = self::convert_content_to_openai( $user_content );
 			$body = array(
 				'model'      => $this->model,
@@ -149,8 +197,12 @@ class PressGo_AI_Client {
 		}
 
 		if ( $callback ) {
-			$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
-			$callback( 'thinking', array( 'text' => "Analyzing design with {$backend} ({$this->model})..." ) );
+			if ( $this->use_pressgo_api ) {
+				$callback( 'thinking', array( 'text' => 'Analyzing design with PressGo API...' ) );
+			} else {
+				$backend = $this->use_openai_format ? 'OpenAI-compatible backend' : 'Claude AI';
+				$callback( 'thinking', array( 'text' => "Analyzing design with {$backend} ({$this->model})..." ) );
+			}
 		}
 
 		return $this->stream_request( $wp_headers, $body, $callback, 'Import complete. Processing...' );
@@ -174,16 +226,17 @@ class PressGo_AI_Client {
 		$current_phase    = 'analyzing';
 		$sections_found   = array();
 		$use_openai       = $this->use_openai_format;
+		$use_pressgo      = $this->use_pressgo_api;
 		$self             = $this;
 		$target_url       = $this->api_url;
 
 		// Inject CURLOPT_WRITEFUNCTION via the http_api_curl hook for SSE streaming.
-		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $target_url, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $self, $complete_msg ) {
+		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $target_url, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg ) {
 			if ( $url !== $target_url ) {
 				return;
 			}
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.curl__curl_setopt -- required for SSE streaming via http_api_curl hook.
-			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $self, $complete_msg ) {
+			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg ) {
 				$raw_response .= $data;
 
 				$lines = explode( "\n", $data );
@@ -203,7 +256,9 @@ class PressGo_AI_Client {
 						continue;
 					}
 
-					if ( $use_openai ) {
+					if ( $use_pressgo ) {
+						$self->process_pressgo_chunk( $event, $accumulated_text, $current_phase, $sections_found, $callback, $complete_msg );
+					} elseif ( $use_openai ) {
 						$self->process_openai_chunk( $event, $accumulated_text, $current_phase, $sections_found, $callback, $complete_msg );
 					} else {
 						$self->process_anthropic_chunk( $event, $accumulated_text, $current_phase, $sections_found, $callback, $complete_msg );
@@ -252,6 +307,36 @@ class PressGo_AI_Client {
 		}
 
 		return $validated;
+	}
+
+	/**
+	 * Process a PressGo API streaming chunk.
+	 *
+	 * PressGo format: {type:'content', text:'...'}, {type:'done', ...}, {type:'error', error:'...'}
+	 *
+	 * @access private
+	 */
+	public function process_pressgo_chunk( $event, &$accumulated_text, &$current_phase, &$sections_found, $callback, $complete_msg ) {
+		$type = isset( $event['type'] ) ? $event['type'] : '';
+
+		if ( 'content' === $type && isset( $event['text'] ) ) {
+			$accumulated_text .= $event['text'];
+			$this->detect_progress( $accumulated_text, $current_phase, $sections_found, $callback );
+		} elseif ( 'done' === $type ) {
+			if ( $callback ) {
+				$credits = isset( $event['creditsRemaining'] ) ? $event['creditsRemaining'] : null;
+				$msg     = $complete_msg;
+				if ( null !== $credits ) {
+					$msg .= " ({$credits} credits remaining)";
+				}
+				$callback( 'thinking', array( 'text' => $msg ) );
+			}
+		} elseif ( 'error' === $type ) {
+			$error_msg = isset( $event['error'] ) ? $event['error'] : 'Unknown API error';
+			if ( $callback ) {
+				$callback( 'error', array( 'message' => $error_msg ) );
+			}
+		}
 	}
 
 	/**
@@ -318,7 +403,9 @@ class PressGo_AI_Client {
 		if ( empty( $error_msg ) ) {
 			$error_msg = 'API error (HTTP ' . $http_code . ')';
 		}
-		if ( 401 === $http_code ) {
+		if ( 402 === $http_code ) {
+			$error_msg = 'No credits remaining. Purchase more at pressgo.app/dashboard';
+		} elseif ( 401 === $http_code ) {
 			$error_msg .= ' — Please check your API key in PressGo Settings.';
 		} elseif ( 429 === $http_code ) {
 			$error_msg .= ' — Rate limited. Please wait a moment and try again.';
