@@ -31,7 +31,7 @@ class PressGo_AI_Client {
 			if ( ! empty( $account_key ) ) {
 				$this->api_url         = 'https://pressgo.app/api/plugin/generate';
 				$this->api_key         = $account_key;
-				$this->model           = 'sonnet';
+				$this->model           = 'haiku';
 				$this->use_pressgo_api = true;
 				return;
 			}
