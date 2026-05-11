@@ -82,6 +82,8 @@ class PressGo_MCP_Server {
 		$version_url = rest_url( "pressgo/v1/page/{$post_id}/version" );
 		$nonce       = wp_create_nonce( 'wp_rest' );
 		$title       = esc_html( $post->post_title ?: 'Untitled' );
+		$edit_url    = esc_url( admin_url( "post.php?post={$post_id}&action=elementor" ) );
+		$wp_admin    = esc_url( admin_url() );
 
 		status_header( 200 );
 		nocache_headers();
@@ -119,9 +121,35 @@ iframe{width:100%;height:100vh;border:0;display:block}
 	100% {box-shadow:0 0 0 0   rgba(43,214,106,0)}
 }
 #pgstatus .meta{color:#9aa1ad;text-transform:none;letter-spacing:0;font-weight:500;font-size:11px}
+#pgactions{
+	position:fixed;top:12px;left:12px;z-index:9999;
+	display:inline-flex;align-items:center;gap:6px;
+}
+#pgactions a{
+	display:inline-flex;align-items:center;gap:6px;
+	padding:7px 14px;border-radius:999px;
+	background:rgba(28,30,36,0.92);color:#dde0e7;
+	font:600 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	letter-spacing:0.4px;text-transform:uppercase;
+	text-decoration:none;
+	box-shadow:0 2px 10px rgba(0,0,0,0.25);
+	backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+	transition:opacity 0.15s,transform 0.15s;
+	opacity:0.85;
+}
+#pgactions a:hover{opacity:1;transform:translateY(-1px);color:#fff}
+#pgactions a.primary{background:#4364e8;color:#fff;opacity:1}
+#pgactions a.primary:hover{background:#3754d5}
 </style>
 </head>
 <body>
+<div id="pgactions">
+	<a class="primary" href="<?php echo $edit_url; ?>" target="_blank" rel="noopener" title="Open in Elementor editor">
+		<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.293 1.293a1 1 0 0 1 1.414 0l2 2a1 1 0 0 1 0 1.414l-9 9A1 1 0 0 1 5 14H3a1 1 0 0 1-1-1v-2a1 1 0 0 1 .293-.707l9-9zM12 4l1 1 1-1-1-1-1 1z"/></svg>
+		Edit
+	</a>
+	<a href="<?php echo $wp_admin; ?>" target="_blank" rel="noopener" title="WordPress admin">WP Admin</a>
+</div>
 <div id="pgstatus" role="status" aria-live="polite">
 	<span class="dot" aria-hidden="true"></span>
 	<span class="label">Connecting…</span>
@@ -240,6 +268,9 @@ iframe{width:100%;height:100vh;border:0;display:block}
 			$caps['edit_pages'] = true;
 			return $caps;
 		}, 10, 1 );
+		// Hide the WP admin bar in the watch-URL iframe — preview should look
+		// like what a real visitor would see, not like wp-admin.
+		add_filter( 'show_admin_bar', '__return_false' );
 	}
 
 	public function register_routes() {
@@ -494,11 +525,20 @@ iframe{width:100%;height:100vh;border:0;display:block}
 
 				"### When you ask about images, invite RICH input\n" .
 				"Don't just say \"do you have photos.\" Say something like:\n" .
-				"  \"For the visual feel — do any of these work for you? (a) drop image URLs or paste " .
-				"   them in, (b) record a short voice memo describing the vibe and I'll pick stock that " .
-				"   matches, (c) link a competitor or aspirational site you like and I'll borrow cues, " .
-				"   or (d) full creative freedom and I'll grab from Pexels.\"\n" .
+				"  \"For the visual feel — do any of these work for you? (a) attach images right here " .
+				"   in chat, I'll upload them; (b) drop image URLs and I'll fetch them; (c) record a " .
+				"   short voice memo describing the vibe and I'll pick stock that matches; (d) link " .
+				"   a competitor or aspirational site you like and I'll borrow cues; or (e) full " .
+				"   creative freedom and I'll grab from Pexels.\"\n" .
 				"This gets them participating instead of typing 'use stock'.\n\n" .
+
+				"### Handling user-attached images\n" .
+				"When the user pastes an image in chat, your client gives you the bytes as base64. " .
+				"Pass those into `upload_media({ data, alt, filename })`. The tool returns a permanent " .
+				"WordPress URL you then use in image fields (hero.image.url, features.items[].image.url, " .
+				"footer.brand.logo.url, etc.). You can also pass `upload_media({ url })` to copy a " .
+				"public URL into the media library — useful when the user shares a competitor URL or " .
+				"after `screenshot_page` if you want to keep the screenshot. Always set a useful `alt`.\n\n" .
 
 				"### Always check for an existing style guide BEFORE picking colors/fonts\n" .
 				"Most users have a `/style-guide/` page (or `/brand/`, `/design-system/`) on their site " .

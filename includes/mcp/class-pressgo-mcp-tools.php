@@ -269,6 +269,27 @@ class PressGo_MCP_Tools {
 					'required' => array( 'post_id' ),
 				),
 			),
+			array(
+				'name'        => 'upload_media',
+				'description' =>
+					"Upload an image into the WordPress media library. Provide EITHER `data` (base64-encoded " .
+					"image bytes — with or without `data:image/...;base64,` prefix) for direct upload, OR " .
+					"`url` (https://...) to fetch and copy from a public source. Returns the attachment ID + " .
+					"permanent URL you can pass into image fields (hero.image.url, features.items[].image.url, " .
+					"footer.brand.logo.url, etc.). PNG / JPG / WEBP / GIF supported, 10MB max. Use this when " .
+					"the user pastes an image into chat (base64 from Claude's image attachment), when they " .
+					"share a competitor or aspirational URL you want to reference, or after `screenshot_page` " .
+					"if you want to preserve the screenshot in the media library.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'data'     => array( 'type' => 'string', 'description' => 'Base64-encoded image bytes (with or without `data:image/...;base64,` prefix). Use this OR `url`.' ),
+						'url'      => array( 'type' => 'string', 'description' => 'Public HTTPS URL of an image to fetch + copy into the media library. Use this OR `data`.' ),
+						'filename' => array( 'type' => 'string', 'description' => 'Suggested filename, e.g. "hero-bg.jpg". Auto-generated if omitted.' ),
+						'alt'      => array( 'type' => 'string', 'description' => 'Alt text for accessibility + SEO. Strongly recommended.' ),
+					),
+				),
+			),
 		);
 
 		// Annotations — required by the Anthropic Connectors Directory.
@@ -290,6 +311,7 @@ class PressGo_MCP_Tools {
 			'set_footer'       => array( 'title' => 'Set site-wide footer (Pro)', 'destructiveHint' => true, 'idempotentHint' => true ),
 			'get_header'       => array( 'title' => 'Read site-wide header', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'get_footer'       => array( 'title' => 'Read site-wide footer', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
+			'upload_media'     => array( 'title' => 'Upload media',          'destructiveHint' => true,  'idempotentHint' => false, 'openWorldHint' => true ),
 		);
 		foreach ( $defs as &$def ) {
 			if ( isset( $def['name'], $annotations[ $def['name'] ] ) ) {
@@ -318,6 +340,7 @@ class PressGo_MCP_Tools {
 			case 'clone_page':      return self::clone_page( $args, $user );
 			case 'inspect_page':    return self::inspect_page( $args, $user );
 			case 'undo_last_change': return self::undo_last_change( $args, $user );
+			case 'upload_media':    return self::upload_media( $args, $user );
 
 			// Pro-tier tools — gated by PressGo_License.
 			case 'set_header':
@@ -1151,6 +1174,130 @@ class PressGo_MCP_Tools {
 		clean_post_cache( $new_id );
 
 		return self::page_summary( $new_id, "Cloned post {$post_id} → new draft post {$new_id} (\"{$new_title}\"). Iterate freely." );
+	}
+
+	/**
+	 * Upload an image into the WP media library. Accepts base64 bytes OR a
+	 * remote URL to fetch from. Returns { id, url, alt, mime, width, height }.
+	 *
+	 * Capability gate: requires upload_files. SVG is intentionally not in the
+	 * allowed MIME list (XSS surface). Max size 10MB.
+	 */
+	private static function upload_media( $args, $user ) {
+		if ( ! user_can( $user, 'upload_files' ) ) {
+			return new WP_Error( 'mcp_forbidden', 'You do not have permission to upload files on this site.' );
+		}
+
+		$data_b64 = isset( $args['data'] ) ? (string) $args['data'] : '';
+		$src_url  = isset( $args['url'] )  ? (string) $args['url']  : '';
+		$filename = isset( $args['filename'] ) ? sanitize_file_name( (string) $args['filename'] ) : '';
+		$alt      = isset( $args['alt'] )      ? sanitize_text_field( (string) $args['alt'] )    : '';
+
+		if ( '' === $data_b64 && '' === $src_url ) {
+			return new WP_Error( 'mcp_bad_args', 'Provide either `data` (base64) or `url` (https://...).' );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$tmp = '';
+
+		if ( '' !== $src_url ) {
+			$src_url = esc_url_raw( $src_url, array( 'http', 'https' ) );
+			if ( ! $src_url ) {
+				return new WP_Error( 'mcp_bad_args', 'URL must be http/https.' );
+			}
+			$tmp = download_url( $src_url, 60 );
+			if ( is_wp_error( $tmp ) ) {
+				return new WP_Error( 'mcp_upload_failed', 'Could not fetch URL: ' . $tmp->get_error_message() );
+			}
+			if ( '' === $filename ) {
+				$filename = sanitize_file_name( wp_basename( wp_parse_url( $src_url, PHP_URL_PATH ) ) );
+				if ( '' === $filename ) { $filename = 'pressgo-' . time() . '.png'; }
+			}
+		} else {
+			// Strip data:image/..;base64, prefix if present.
+			if ( preg_match( '#^data:image/[a-z+]+;base64,#i', $data_b64 ) ) {
+				$data_b64 = substr( $data_b64, strpos( $data_b64, ',' ) + 1 );
+			}
+			$bytes = base64_decode( $data_b64, true );
+			if ( false === $bytes ) {
+				return new WP_Error( 'mcp_bad_args', '`data` is not valid base64.' );
+			}
+			if ( strlen( $bytes ) > 10 * 1024 * 1024 ) {
+				return new WP_Error( 'mcp_too_large', 'Image too large (10MB max).' );
+			}
+			$tmp = wp_tempnam( $filename ?: 'pressgo-upload' );
+			if ( ! $tmp ) {
+				return new WP_Error( 'mcp_upload_failed', 'Could not create temp file.' );
+			}
+			file_put_contents( $tmp, $bytes );
+			if ( '' === $filename ) { $filename = 'pressgo-upload-' . time() . '.png'; }
+		}
+
+		// Move into media library + validate MIME server-side.
+		// wp_handle_sideload's first arg is by-reference (PHP 8+ strict),
+		// so the file array must be assigned to a variable first.
+		$file_arr = array( 'name' => $filename, 'tmp_name' => $tmp );
+		$sideload = wp_handle_sideload(
+			$file_arr,
+			array(
+				'test_form' => false,
+				'mimes'     => array(
+					'png'      => 'image/png',
+					'jpg|jpeg' => 'image/jpeg',
+					'gif'      => 'image/gif',
+					'webp'     => 'image/webp',
+				),
+			)
+		);
+		if ( ! empty( $sideload['error'] ) ) {
+			@unlink( $tmp );
+			return new WP_Error( 'mcp_upload_failed', $sideload['error'] );
+		}
+
+		$attach_id = wp_insert_attachment( array(
+			'post_mime_type' => $sideload['type'],
+			'post_title'     => $alt ?: pathinfo( $filename, PATHINFO_FILENAME ),
+			'post_content'   => '',
+			'post_status'    => 'inherit',
+			'post_author'    => (int) $user->ID,
+		), $sideload['file'] );
+		if ( is_wp_error( $attach_id ) ) {
+			return $attach_id;
+		}
+
+		$metadata = wp_generate_attachment_metadata( $attach_id, $sideload['file'] );
+		wp_update_attachment_metadata( $attach_id, $metadata );
+
+		if ( '' !== $alt ) {
+			update_post_meta( $attach_id, '_wp_attachment_image_alt', $alt );
+		}
+
+		$w = $metadata['width']  ?? null;
+		$h = $metadata['height'] ?? null;
+
+		return array(
+			'content' => array( array(
+				'type' => 'text',
+				'text' => sprintf(
+					"Uploaded media #%d (%s%s). URL: %s\n\nUse this URL in any image field: hero.image.url, features.items[].image.url, footer.brand.logo.url, etc.",
+					$attach_id,
+					$sideload['type'],
+					( $w && $h ) ? ", {$w}×{$h}" : '',
+					$sideload['url']
+				),
+			) ),
+			'structuredContent' => array(
+				'id'     => $attach_id,
+				'url'    => $sideload['url'],
+				'mime'   => $sideload['type'],
+				'alt'    => $alt,
+				'width'  => $w,
+				'height' => $h,
+			),
+		);
 	}
 
 	private static function inspect_page( $args, $user ) {
