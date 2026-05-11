@@ -2092,22 +2092,53 @@ class PressGo_MCP_Tools {
 			'post_modified_gmt' => current_time( 'mysql', 1 ),
 		) );
 
+		// Re-assert the Elementor "this is an Elementor page" markers after
+		// wp_update_post fires save_post — some third-party hooks (security
+		// scanners, backup plugins, even Elementor's own document validator
+		// under odd conditions) can reset these to empty, which causes the
+		// "Elementor randomly deactivated" symptom where the page renders as
+		// raw HTML with default theme styling. Always restore the canonical
+		// state.
+		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
+		if ( defined( 'ELEMENTOR_VERSION' ) ) {
+			update_post_meta( $post_id, '_elementor_version', ELEMENTOR_VERSION );
+		}
+		if ( get_post_meta( $post_id, '_wp_page_template', true ) !== 'elementor_canvas' ) {
+			update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
+		}
+
 		// Bust the WP object cache for this post.
 		clean_post_cache( $post_id );
 
-		// Drop every Elementor-side per-post cache key. Without this, rapid
-		// add_sections → screenshot_page can return stale renders because
-		// Elementor's compiled CSS / asset manifest is keyed per-post and
-		// reused until explicitly invalidated.
+		// Drop every Elementor-side per-post cache key.
 		delete_post_meta( $post_id, '_elementor_css' );
 		delete_post_meta( $post_id, '_elementor_inner_section_css' );
 		delete_post_meta( $post_id, '_elementor_page_assets' );
 		delete_post_meta( $post_id, '_elementor_controls_usage' );
 
+		// Hard-delete the per-post CSS file on disk. Elementor's $css->delete()
+		// sometimes leaves a stale file when use_external_file() returns false;
+		// removing it directly ensures the next frontend render regenerates
+		// from current _elementor_data. Element IDs (eid()) are randomized
+		// each rebuild, so a stale CSS file's selectors won't match the new
+		// HTML — that's the root cause of the "broken styling after
+		// update_section" symptom.
+		$upload_dir = wp_upload_dir();
+		$css_path   = $upload_dir['basedir'] . '/elementor/css/post-' . $post_id . '.css';
+		if ( file_exists( $css_path ) ) {
+			@unlink( $css_path );
+		}
+
 		if ( class_exists( '\Elementor\Plugin' ) ) {
 			try {
 				$css = \Elementor\Core\Files\CSS\Post::create( $post_id );
 				if ( $css ) { $css->delete(); }
+				// Clear the global files cache — invalidates shared frontend
+				// asset manifests that survive the per-post delete above.
+				if ( method_exists( \Elementor\Plugin::$instance->files_manager, 'clear_cache' ) ) {
+					\Elementor\Plugin::$instance->files_manager->clear_cache();
+				}
 			} catch ( \Throwable $e ) { /* best effort */ }
 		}
 
