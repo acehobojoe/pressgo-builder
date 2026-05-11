@@ -422,6 +422,8 @@ class PressGo_MCP_Tools {
 
 		$err = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! in_array( $type, self::VALID_SECTION_TYPES, true ) ) {
 			return new WP_Error( 'mcp_bad_args', "Unknown section type: {$type}" );
 		}
@@ -468,6 +470,8 @@ class PressGo_MCP_Tools {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! isset( $args['sections'] ) || ! is_array( $args['sections'] ) || ! $args['sections'] ) {
 			return new WP_Error( 'mcp_bad_args', '`sections` must be a non-empty array.' );
 		}
@@ -555,6 +559,8 @@ class PressGo_MCP_Tools {
 
 		$err = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! in_array( $type, self::VALID_SECTION_TYPES, true ) ) {
 			return new WP_Error( 'mcp_bad_args', "Unknown section type: {$type}" );
 		}
@@ -602,6 +608,8 @@ class PressGo_MCP_Tools {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) ) { return $pause; }
 
 		// Snapshot prior state so undo can roll back palette/typography changes.
 		self::push_undo( $post_id, 'set_globals' );
@@ -1169,6 +1177,49 @@ class PressGo_MCP_Tools {
 		return true;
 	}
 
+	/**
+	 * Pause-on-edit: if the user has Elementor open on this page, return an
+	 * mcp_paused WP_Error so the calling tool aborts cleanly.
+	 *
+	 * Why this exists: when the user opens the Elementor editor, they take
+	 * over the page. If Claude keeps writing through MCP at the same time,
+	 * their drag-and-drop edits get clobbered the next time the editor
+	 * polls _elementor_data. WP already maintains _edit_lock for exactly
+	 * this — we just check it.
+	 *
+	 * Bypass: pass `force: true` in args to override (e.g. user explicitly
+	 * said "go ahead even though I'm in the editor"). Read-only tools
+	 * (inspect_page, list_pages, screenshot_page, get_brain) should NOT call
+	 * this — they need to keep working so Claude can re-orient at resume.
+	 */
+	public static function check_pause( $post_id, $args = array() ) {
+		if ( ! empty( $args['force'] ) ) {
+			return null;
+		}
+		if ( ! function_exists( 'wp_check_post_lock' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/post.php';
+		}
+		$locker = wp_check_post_lock( $post_id );
+		if ( ! $locker ) {
+			return null;
+		}
+		$user_obj = get_userdata( $locker );
+		$name     = $user_obj ? $user_obj->display_name : "user #{$locker}";
+		$msg = sprintf(
+			'Page %d is open in the Elementor editor by %s right now — pausing to avoid clobbering their edits. ' .
+			'Tell the user: "I see you\'re editing the page. I\'ve paused — let me know when you want me to continue." ' .
+			'When they say to continue (or after ~3 minutes of inactivity in the editor), call inspect_page first ' .
+			'to see what they changed, then proceed. If they explicitly say "ignore the lock and keep going", ' .
+			'retry the same call with force=true.',
+			$post_id, $name
+		);
+		return new WP_Error( 'mcp_paused', $msg, array(
+			'status'         => 423, // Locked
+			'locker_user_id' => $locker,
+			'expires_in_sec' => apply_filters( 'wp_check_post_lock_window', 150 ),
+		) );
+	}
+
 	public static function read_elementor_data( $post_id ) {
 		$raw = get_post_meta( $post_id, '_elementor_data', true );
 		if ( empty( $raw ) ) {
@@ -1211,6 +1262,8 @@ class PressGo_MCP_Tools {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) ) { return $pause; }
 
 		$stack = get_post_meta( $post_id, self::UNDO_STACK_KEY, true );
 		if ( ! is_array( $stack ) || empty( $stack ) ) {

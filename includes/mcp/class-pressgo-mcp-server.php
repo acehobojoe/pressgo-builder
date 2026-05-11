@@ -537,6 +537,19 @@ iframe{width:100%;height:100vh;border:0;display:block}
 				"and HAND OFF. Do not loop screenshot → update → screenshot more than ONCE without " .
 				"the user telling you something new — they are watching live, let them lead.\n\n" .
 
+				"## When the user opens Elementor mid-build (paused state)\n\n" .
+				"If you call a write tool (add_section, update_section, set_globals, undo_last_change, " .
+				"add_sections) and get back an error code `mcp_paused`, it means the user has the " .
+				"Elementor editor open right now and your write would clobber their drag-and-drop edits. " .
+				"Don't retry. Tell them in plain words: \"Looks like you're editing — I've paused. " .
+				"Tell me when you'd like me to continue.\" Then stop calling tools.\n\n" .
+				"When they say to continue (or after a few minutes), do ONE thing first: call " .
+				"`inspect_page` (read-only, never paused) to see the current state. If they restructured " .
+				"something, acknowledge it before proceeding (\"I see you swapped the hero CTA copy — " .
+				"want me to keep that and continue with the next sections?\"). Only then resume writes.\n\n" .
+				"If they explicitly say \"go ahead anyway\" or \"force it\", retry the same call with " .
+				"`force: true` in the args — this overrides the lock check.\n\n" .
+
 				"## Discovery topics (pull from these as relevant — never dump all at once)\n" .
 				"  - **Business**: what does it do, who is the visitor, what's the primary action?\n" .
 				"  - **Voice**: friendly/serious/playful/premium/technical? Any tone to AVOID?\n" .
