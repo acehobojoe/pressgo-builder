@@ -270,6 +270,35 @@ class PressGo_MCP_Tools {
 				),
 			),
 			array(
+				'name'        => 'upload_media_chunked',
+				'description' =>
+					"Upload a LARGE image by chunking. Use this when the base64 of the image is more " .
+					"than ~70KB (single-shot upload_media fails because the tool-call payload exceeds " .
+					"your per-response token budget). Recommended chunk size: 50KB raw = ~70KB base64 " .
+					"= ~17K tokens per call.\n\n" .
+					"How to use:\n" .
+					"  1. Split the base64 string into N chunks of ~70K characters each.\n" .
+					"  2. First call: pass the first chunk with `index=0`, `total=N` (and optional " .
+					"     `filename`/`alt`). Server returns an `upload_id`.\n" .
+					"  3. Subsequent calls: pass each next chunk with the same `upload_id`, " .
+					"     `index=N`, `total=N`.\n" .
+					"  4. LAST call (index = total-1) finalizes — server assembles, sideloads, " .
+					"     returns permanent URL + attachment ID like upload_media does.\n\n" .
+					"Server enforces 10MB total. Allowed MIMEs: PNG, JPG, GIF, WEBP.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'chunk'     => array( 'type' => 'string', 'description' => 'Base64-encoded slice of image bytes (with or without data: prefix on first chunk).' ),
+						'index'     => array( 'type' => 'integer', 'description' => 'Zero-based chunk index.' ),
+						'total'     => array( 'type' => 'integer', 'description' => 'Total number of chunks for this upload.' ),
+						'upload_id' => array( 'type' => 'string', 'description' => 'Returned by the first call. Pass on every subsequent chunk.' ),
+						'filename'  => array( 'type' => 'string', 'description' => 'Suggested filename.' ),
+						'alt'       => array( 'type' => 'string', 'description' => 'Alt text. Set on the last call.' ),
+					),
+					'required' => array( 'chunk', 'index', 'total' ),
+				),
+			),
+			array(
 				'name'        => 'set_user_profile',
 				'description' =>
 					"Save the current user's profile so future chats don't have to re-ask onboarding " .
@@ -347,6 +376,7 @@ class PressGo_MCP_Tools {
 			'get_header'       => array( 'title' => 'Read site-wide header', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'get_footer'       => array( 'title' => 'Read site-wide footer', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'upload_media'     => array( 'title' => 'Upload media',          'destructiveHint' => true,  'idempotentHint' => false, 'openWorldHint' => true ),
+			'upload_media_chunked' => array( 'title' => 'Upload media (chunked)', 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => true ),
 			'set_user_profile' => array( 'title' => 'Save user profile',     'destructiveHint' => true,  'idempotentHint' => true ),
 			'get_user_profile' => array( 'title' => 'Read user profile',     'readOnlyHint'    => true,  'idempotentHint' => true ),
 		);
@@ -378,6 +408,7 @@ class PressGo_MCP_Tools {
 			case 'inspect_page':    return self::inspect_page( $args, $user );
 			case 'undo_last_change': return self::undo_last_change( $args, $user );
 			case 'upload_media':    return self::upload_media( $args, $user );
+			case 'upload_media_chunked': return self::upload_media_chunked( $args, $user );
 			case 'set_user_profile': return self::set_user_profile( $args, $user );
 			case 'get_user_profile': return self::get_user_profile( $args, $user );
 
@@ -1335,6 +1366,167 @@ class PressGo_MCP_Tools {
 				'alt'    => $alt,
 				'width'  => $w,
 				'height' => $h,
+			),
+		);
+	}
+
+	/**
+	 * Chunked variant of upload_media. Avoids the per-tool-call token
+	 * budget that single-shot base64 upload hits on images larger than
+	 * ~70KB (ie. anything more than a thumbnail).
+	 *
+	 * Caller streams chunks until the last one (index == total-1)
+	 * triggers finalization. State lives in a temp file inside
+	 * uploads/.pressgo-uploads/{upload_id}.bin until the final chunk
+	 * arrives, then sideloads + cleans up.
+	 */
+	private static function upload_media_chunked( $args, $user ) {
+		if ( ! user_can( $user, 'upload_files' ) ) {
+			return new WP_Error( 'mcp_forbidden', 'You do not have permission to upload files on this site.' );
+		}
+
+		$chunk_b64 = isset( $args['chunk'] ) ? (string) $args['chunk'] : '';
+		$index     = isset( $args['index'] ) ? (int) $args['index']   : 0;
+		$total     = isset( $args['total'] ) ? max( 1, (int) $args['total'] ) : 1;
+		$upload_id = isset( $args['upload_id'] ) ? sanitize_key( (string) $args['upload_id'] ) : '';
+		$filename  = isset( $args['filename'] )  ? sanitize_file_name( (string) $args['filename'] ) : '';
+		$alt       = isset( $args['alt'] )       ? sanitize_text_field( (string) $args['alt'] )    : '';
+
+		if ( '' === $chunk_b64 ) {
+			return new WP_Error( 'mcp_bad_args', '`chunk` is required.' );
+		}
+		if ( $index < 0 || $index >= $total ) {
+			return new WP_Error( 'mcp_bad_args', '`index` must satisfy 0 <= index < total.' );
+		}
+		// First chunk: server allocates the upload_id. Use lowercase-hex so
+		// sanitize_key() round-trips cleanly (it lowercases its input, which
+		// would otherwise mismatch a mixed-case wp_generate_password output).
+		if ( '' === $upload_id ) {
+			if ( 0 !== $index ) {
+				return new WP_Error( 'mcp_bad_args', 'No upload_id provided but index != 0. Pass the upload_id from chunk 0 on every subsequent chunk.' );
+			}
+			$upload_id = 'pgupload_' . bin2hex( random_bytes( 8 ) );
+		}
+
+		// Strip data URI prefix if present (only on first chunk in practice).
+		if ( preg_match( '#^data:image/[a-z+]+;base64,#i', $chunk_b64 ) ) {
+			$chunk_b64 = substr( $chunk_b64, strpos( $chunk_b64, ',' ) + 1 );
+		}
+		// DON'T decode individual chunks — base64 strings split at arbitrary
+		// boundaries aren't individually valid (each chunk must be a multiple
+		// of 4 chars, which we can't guarantee for client-supplied splits).
+		// Append the base64 TEXT and decode the whole thing on finalize.
+
+		$dirs    = wp_upload_dir();
+		$tmp_dir = trailingslashit( $dirs['basedir'] ) . '.pressgo-uploads';
+		if ( ! file_exists( $tmp_dir ) ) {
+			wp_mkdir_p( $tmp_dir );
+			@file_put_contents( $tmp_dir . '/.htaccess', "Deny from all\n" );
+			@file_put_contents( $tmp_dir . '/index.html', '' );
+		}
+		$tmp_file = $tmp_dir . '/' . $upload_id . '.b64';
+
+		clearstatcache( true, $tmp_file );
+		$existing_b64 = file_exists( $tmp_file ) ? filesize( $tmp_file ) : 0;
+		// Approximate raw bytes from base64 length: 3/4 ratio. 10MB raw cap.
+		if ( ( $existing_b64 + strlen( $chunk_b64 ) ) * 3 / 4 > 10 * 1024 * 1024 ) {
+			@unlink( $tmp_file );
+			return new WP_Error( 'mcp_too_large', 'Upload exceeded 10MB total. Aborted.' );
+		}
+		file_put_contents( $tmp_file, $chunk_b64, FILE_APPEND );
+		clearstatcache( true, $tmp_file );
+		$received_b64_len = filesize( $tmp_file );
+		$approx_raw      = (int) ( $received_b64_len * 3 / 4 );
+
+		// Not the last chunk — return progress + the upload_id.
+		if ( $index < $total - 1 ) {
+			return array(
+				'content' => array( array( 'type' => 'text', 'text' =>
+					sprintf( "Chunk %d/%d received (~%d raw bytes so far). Continue with the next chunk using upload_id=%s.",
+						$index + 1, $total, $approx_raw, $upload_id )
+				) ),
+				'structuredContent' => array(
+					'upload_id'      => $upload_id,
+					'received_bytes' => $approx_raw,
+					'complete'       => false,
+				),
+			);
+		}
+
+		// Final chunk — decode the entire concatenated base64 in one pass.
+		$bytes = base64_decode( file_get_contents( $tmp_file ), true );
+		if ( false === $bytes ) {
+			@unlink( $tmp_file );
+			return new WP_Error( 'mcp_bad_args', 'Concatenated base64 was invalid (was a chunk corrupted in transit?).' );
+		}
+		// Replace the .b64 file with the decoded bytes for sideload.
+		@unlink( $tmp_file );
+		$tmp_file = $tmp_dir . '/' . $upload_id . '.bin';
+		file_put_contents( $tmp_file, $bytes );
+
+		// Final chunk — sideload into media library.
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		if ( '' === $filename ) { $filename = 'pressgo-upload-' . time() . '.png'; }
+
+		$file_arr = array( 'name' => $filename, 'tmp_name' => $tmp_file );
+		$sideload = wp_handle_sideload(
+			$file_arr,
+			array(
+				'test_form' => false,
+				'mimes'     => array(
+					'png'      => 'image/png',
+					'jpg|jpeg' => 'image/jpeg',
+					'gif'      => 'image/gif',
+					'webp'     => 'image/webp',
+				),
+			)
+		);
+		if ( ! empty( $sideload['error'] ) ) {
+			@unlink( $tmp_file );
+			return new WP_Error( 'mcp_upload_failed', $sideload['error'] );
+		}
+
+		$attach_id = wp_insert_attachment( array(
+			'post_mime_type' => $sideload['type'],
+			'post_title'     => $alt ?: pathinfo( $filename, PATHINFO_FILENAME ),
+			'post_content'   => '',
+			'post_status'    => 'inherit',
+			'post_author'    => (int) $user->ID,
+		), $sideload['file'] );
+		if ( is_wp_error( $attach_id ) ) {
+			return $attach_id;
+		}
+
+		$metadata = wp_generate_attachment_metadata( $attach_id, $sideload['file'] );
+		wp_update_attachment_metadata( $attach_id, $metadata );
+		if ( '' !== $alt ) {
+			update_post_meta( $attach_id, '_wp_attachment_image_alt', $alt );
+		}
+
+		$w = $metadata['width']  ?? null;
+		$h = $metadata['height'] ?? null;
+
+		return array(
+			'content' => array( array(
+				'type' => 'text',
+				'text' => sprintf(
+					"Upload complete (chunked, %d/%d). Media #%d (%s%s). URL: %s",
+					$index + 1, $total, $attach_id, $sideload['type'],
+					( $w && $h ) ? ", {$w}×{$h}" : '', $sideload['url']
+				),
+			) ),
+			'structuredContent' => array(
+				'id'        => $attach_id,
+				'url'       => $sideload['url'],
+				'mime'      => $sideload['type'],
+				'alt'       => $alt,
+				'width'     => $w,
+				'height'    => $h,
+				'upload_id' => $upload_id,
+				'complete'  => true,
 			),
 		);
 	}

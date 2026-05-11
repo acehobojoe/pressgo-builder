@@ -584,11 +584,17 @@ iframe{width:100%;height:100vh;border:0;display:block}
 
 				"### Handling user-attached images\n" .
 				"When the user pastes an image in chat, your client gives you the bytes as base64. " .
-				"Pass those into `upload_media({ data, alt, filename })`. The tool returns a permanent " .
-				"WordPress URL you then use in image fields (hero.image.url, features.items[].image.url, " .
-				"footer.brand.logo.url, etc.). You can also pass `upload_media({ url })` to copy a " .
-				"public URL into the media library — useful when the user shares a competitor URL or " .
-				"after `screenshot_page` if you want to keep the screenshot. Always set a useful `alt`.\n\n" .
+				"Pick the upload tool by image size:\n" .
+				"  - **Base64 < 70KB** (≈ a 50KB raw image — usually thumbnails / icons): use " .
+				"     `upload_media({ data, alt, filename })`. Single tool call.\n" .
+				"  - **Base64 ≥ 70KB** (anything photo-sized): use `upload_media_chunked` and split " .
+				"     the base64 into chunks of ~70KB each. The first call returns an `upload_id`; " .
+				"     pass it back on every subsequent call. The last call (index = total-1) returns " .
+				"     the final URL. This avoids your per-response token budget killing the upload.\n" .
+				"  - **You have a URL instead of bytes**: use `upload_media({ url, alt })` — the " .
+				"     server fetches and copies into the media library.\n" .
+				"All three return a permanent WP URL you then use in image fields (hero.image.url, " .
+				"features.items[].image.url, footer.brand.logo.url, etc.). Always set a useful `alt`.\n\n" .
 
 				"### Always check for an existing style guide BEFORE picking colors/fonts\n" .
 				"Most users have a `/style-guide/` page (or `/brand/`, `/design-system/`) on their site " .
