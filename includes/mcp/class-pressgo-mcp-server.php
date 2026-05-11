@@ -92,30 +92,126 @@ class PressGo_MCP_Server {
 <meta charset="utf-8">
 <title><?php echo $title; ?> — PressGo Watch</title>
 <style>
-html,body{margin:0;height:100%;background:#f6f7fb}
+html,body{margin:0;height:100%;background:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 iframe{width:100%;height:100vh;border:0;display:block}
+#pgstatus{
+	position:fixed;top:12px;right:12px;z-index:9999;
+	display:inline-flex;align-items:center;gap:8px;
+	padding:7px 14px;border-radius:999px;
+	background:rgba(28,30,36,0.92);color:#dde0e7;
+	font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;
+	box-shadow:0 2px 10px rgba(0,0,0,0.25);
+	backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+	user-select:none;cursor:default;transition:opacity 0.15s;
+}
+#pgstatus .dot{
+	width:8px;height:8px;border-radius:50%;background:#7a808c;
+	transition:background 0.2s ease,box-shadow 0.4s ease;
+}
+#pgstatus.live  .dot{background:#2bd66a}
+#pgstatus.slow  .dot{background:#f5c451}
+#pgstatus.err   .dot{background:#e0506a}
+#pgstatus.flash .dot{box-shadow:0 0 0 8px rgba(43,214,106,0)}
+#pgstatus.flash .dot{animation:pgpulse 0.55s ease-out}
+@keyframes pgpulse{
+	0%   {box-shadow:0 0 0 0   rgba(43,214,106,0.55)}
+	70%  {box-shadow:0 0 0 12px rgba(43,214,106,0)}
+	100% {box-shadow:0 0 0 0   rgba(43,214,106,0)}
+}
+#pgstatus .meta{color:#9aa1ad;text-transform:none;letter-spacing:0;font-weight:500;font-size:11px}
 </style>
 </head>
 <body>
+<div id="pgstatus" role="status" aria-live="polite">
+	<span class="dot" aria-hidden="true"></span>
+	<span class="label">Connecting…</span>
+	<span class="meta"></span>
+</div>
 <iframe id="f" src="<?php echo esc_url( $preview_url ); ?>"></iframe>
 <script>
 (function(){
+	var POLL_MS         = 1500;
+	var SLOW_AFTER_MS   = 30000;   // no remote change in 30s = "idle" yellow
+	var ERR_AFTER_TRIES = 3;       // 3 consecutive fetch failures = red
+
+	var iframe   = document.getElementById('f');
+	var statusEl = document.getElementById('pgstatus');
+	var labelEl  = statusEl.querySelector('.label');
+	var metaEl   = statusEl.querySelector('.meta');
+	var src      = <?php echo wp_json_encode( $preview_url ); ?>;
+
 	var lastModified = '';
-	var iframe = document.getElementById('f');
-	var src = <?php echo wp_json_encode( $preview_url ); ?>;
+	var lastChange   = Date.now();
+	var lastSections = null;
+	var failStreak   = 0;
+	var pollCount    = 0;
+
+	function setState(cls, label){
+		statusEl.classList.remove('live','slow','err');
+		statusEl.classList.add(cls);
+		labelEl.textContent = label;
+	}
+	function setMeta(text){ metaEl.textContent = text; }
+	function flash(){
+		statusEl.classList.add('flash');
+		setTimeout(function(){ statusEl.classList.remove('flash'); }, 600);
+	}
+	function fmtAgo(ms){
+		var s = Math.floor(ms/1000);
+		if (s < 5)   return 'just now';
+		if (s < 60)  return s + 's ago';
+		if (s < 3600) return Math.floor(s/60) + 'm ago';
+		return Math.floor(s/3600) + 'h ago';
+	}
+
+	function repaint(){
+		var ageMs = Date.now() - lastChange;
+		var parts = [];
+		if (lastSections != null) parts.push(lastSections + (lastSections === 1 ? ' section' : ' sections'));
+		if (lastModified)         parts.push('updated ' + fmtAgo(ageMs));
+		setMeta(parts.join(' · '));
+
+		if (failStreak >= ERR_AFTER_TRIES) {
+			setState('err', 'Connection error');
+		} else if (lastModified && ageMs > SLOW_AFTER_MS) {
+			setState('slow', 'Idle');
+		} else if (lastModified) {
+			setState('live', 'Live');
+		}
+	}
+
 	function poll(){
+		pollCount++;
 		fetch(<?php echo wp_json_encode( $version_url ); ?>, {
 			headers: { 'X-WP-Nonce': <?php echo wp_json_encode( $nonce ); ?> },
-			credentials: 'same-origin'
-		}).then(function(r){return r.ok?r.json():null}).then(function(d){
-			if(!d) return;
-			if(lastModified && d.modified_gmt !== lastModified){
-				iframe.src = src + '&_=' + Date.now();
+			credentials: 'same-origin',
+			cache: 'no-store'
+		}).then(function(r){
+			if (!r.ok) throw new Error('HTTP ' + r.status);
+			return r.json();
+		}).then(function(d){
+			failStreak = 0;
+			if (!d || !d.modified_gmt) return;
+			if (lastSections !== d.section_count || lastModified !== d.modified_gmt) {
+				if (lastModified) {
+					iframe.src = src + '&_=' + Date.now();
+					flash();
+				}
+				lastChange = Date.now();
 			}
 			lastModified = d.modified_gmt;
-		}).catch(function(){});
+			lastSections = d.section_count;
+			repaint();
+		}).catch(function(err){
+			failStreak++;
+			console.warn('[PressGo Watch] poll failed (' + failStreak + '):', err && err.message);
+			repaint();
+		});
 	}
-	poll(); setInterval(poll, 1500);
+
+	// Surface state continuously even between polls so the "Xs ago" counter ticks.
+	setInterval(repaint, 1000);
+	poll(); setInterval(poll, POLL_MS);
 })();
 </script>
 </body>
