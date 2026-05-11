@@ -512,14 +512,17 @@ class PressGo_Widget_Helpers {
 		$fonts = $cfg['fonts'];
 		$c     = $cfg['colors'];
 
+		// Testimonial cards always have a white background; use fixed-dark
+		// text tokens so dark-themed pages (where text_dark is set to a
+		// light color) don't render invisible quote bodies.
 		$s = array(
 			'testimonial_content'   => $quote,
 			'testimonial_name'      => $name,
 			'testimonial_job'       => $role,
 			'testimonial_alignment' => $align,
-			'content_content_color' => $c['text_dark'],
-			'name_text_color'       => $c['text_dark'],
-			'job_text_color'        => $c['text_muted'],
+			'content_content_color' => PressGo_Style_Utils::card_text(),
+			'name_text_color'       => PressGo_Style_Utils::card_text(),
+			'job_text_color'        => PressGo_Style_Utils::card_text_muted(),
 			'content_typography_typography'     => 'custom',
 			'content_typography_font_family'   => $fonts['body'],
 			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),

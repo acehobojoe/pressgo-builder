@@ -2669,20 +2669,46 @@ class PressGo_Section_Builder {
 		$header = PressGo_Style_Utils::section_header( $cfg, $tm['eyebrow'], $tm['headline'],
 			isset( $tm['subheadline'] ) ? $tm['subheadline'] : null );
 
+		$card_text       = PressGo_Style_Utils::card_text();
+		$card_text_muted = PressGo_Style_Utils::card_text_muted();
 		$member_cols = array();
 		foreach ( $tm['members'] as $member ) {
 			$widgets = array();
 
-			// Photo — circular crop.
+			// Accept bio OR description as the bio text. AI sometimes sends
+			// {description: "..."} matching the canonical media-bio shape.
+			$bio = '';
+			if ( ! empty( $member['bio'] ) ) {
+				$bio = $member['bio'];
+			} elseif ( ! empty( $member['description'] ) ) {
+				$bio = $member['description'];
+			}
+
+			// Photo. If missing, render an initials-circle placeholder so the
+			// card doesn't have a gaping hole where the avatar should be.
 			if ( ! empty( $member['photo'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
 					$member['name'], 150, 999, false, 'center' );
-				$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			} else {
+				$initials = '';
+				$parts = preg_split( '/\s+/', trim( (string) $member['name'] ) );
+				foreach ( $parts as $p ) {
+					if ( $p !== '' ) { $initials .= strtoupper( substr( $p, 0, 1 ) ); }
+					if ( strlen( $initials ) >= 2 ) { break; }
+				}
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+					'<div style="width:120px;height:120px;border-radius:9999px;margin:0 auto;'
+					. 'display:flex;align-items:center;justify-content:center;'
+					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.12 ) . ';'
+					. 'color:' . $c['primary'] . ';font-size:36px;font-weight:700;'
+					. 'line-height:1;letter-spacing:-1px;">' . esc_html( $initials ) . '</div>',
+					'center', null, 14 );
 			}
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
 
 			// Name.
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $member['name'], 'h4', 'center',
-				$c['text_dark'], 20, '700' );
+				$card_text, 20, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 4 );
 
 			// Role.
@@ -2690,17 +2716,17 @@ class PressGo_Section_Builder {
 				$c['primary'], 14 );
 
 			// Bio.
-			if ( ! empty( $member['bio'] ) ) {
+			if ( ! empty( $bio ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
-				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $member['bio'], 'center',
-					$c['text_muted'], 14 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $bio, 'center',
+					$card_text_muted, 14 );
 			}
 
 			// Social icons.
 			if ( ! empty( $member['social'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 				$widgets[] = PressGo_Widget_Helpers::social_icons_w(
-					$member['social'], 12, 'custom', $c['text_muted'], 'circle', 'center', 8
+					$member['social'], 12, 'custom', $c['primary'], 'circle', 'center', 8
 				);
 			}
 
@@ -3033,11 +3059,15 @@ class PressGo_Section_Builder {
 		}
 
 		$gallery = PressGo_Element_Factory::widget( 'image-gallery', array(
-			'wp_gallery'         => $gallery_items,
-			'gallery_columns'    => (string) $columns,
-			'gallery_link'       => 'file',
-			'gallery_rand'       => '',
-			'open_lightbox'      => 'yes',
+			'wp_gallery'           => $gallery_items,
+			'gallery_columns'      => (string) $columns,
+			'gallery_link'         => 'file',
+			'gallery_rand'         => '',
+			'open_lightbox'        => 'yes',
+			// Force a sensible image size — without this Elementor falls
+			// back to the WP "thumbnail" size (150x150) and the gallery
+			// renders as tiny fragmented squares regardless of source.
+			'gallery_image_size'   => 'large',
 		) );
 
 		$children = array_merge( $header, array( $gallery ) );
