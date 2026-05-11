@@ -291,9 +291,10 @@ class PressGo_MCP_Tools {
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
-						'limit'         => array( 'type' => 'integer', 'description' => 'Max items to return (default 10, max 50).' ),
-						'since_minutes' => array( 'type' => 'integer', 'description' => 'Only return uploads within this many minutes (default 60, max 1440).' ),
-						'mime_prefix'   => array( 'type' => 'string', 'description' => 'Filter by MIME prefix (default "image/").' ),
+						'limit'              => array( 'type' => 'integer', 'description' => 'Max items to return (default 10, max 50).' ),
+						'since_minutes'      => array( 'type' => 'integer', 'description' => 'Only return uploads within this many minutes (default 60, max 1440).' ),
+						'mime_prefix'        => array( 'type' => 'string', 'description' => 'Filter by MIME prefix (default "image/").' ),
+						'include_thumbnails' => array( 'type' => 'boolean', 'description' => 'Embed each result\'s thumbnail as an MCP image content block so you can SEE what each image is. Defaults to true when there are multiple results OR auto-generated filenames (UUIDs, IMG_*, etc). Pass false to skip and save tokens when you only need URLs.' ),
 					),
 				),
 			),
@@ -1577,6 +1578,13 @@ class PressGo_MCP_Tools {
 		$limit         = max( 1, min( 50, isset( $args['limit'] ) ? (int) $args['limit'] : 10 ) );
 		$since_minutes = max( 1, min( 1440, isset( $args['since_minutes'] ) ? (int) $args['since_minutes'] : 60 ) );
 		$mime_prefix   = isset( $args['mime_prefix'] ) ? (string) $args['mime_prefix'] : 'image/';
+		// Default to including thumbnails when there's likely to be ambiguity
+		// (more than 1 result OR auto-generated filename detected). This
+		// removes the "Claude is blind, has to ask the user" failure mode.
+		// Caller can explicitly set false to opt out.
+		$include_thumbs = isset( $args['include_thumbnails'] )
+			? (bool) $args['include_thumbnails']
+			: null; // sentinel: decide after we have results
 
 		$after = gmdate( 'Y-m-d H:i:s', time() - ( $since_minutes * 60 ) );
 
@@ -1633,6 +1641,20 @@ class PressGo_MCP_Tools {
 				$m['url']
 			);
 		}
+		// Auto-include thumbnails when caller didn't specify and we have
+		// either >1 result OR an auto-generated filename (UUID-style,
+		// IMG_*, pressgo-upload-*, etc.) — Claude can't reason about
+		// filenames it can't interpret.
+		if ( null === $include_thumbs ) {
+			$has_auto_name = false;
+			foreach ( $out as $m ) {
+				if ( preg_match( '/^([A-F0-9-]{30,}|IMG_\d+|pressgo-upload-\d+|DSC\d+|Screenshot)/i', $m['filename'] ) ) {
+					$has_auto_name = true; break;
+				}
+			}
+			$include_thumbs = ( count( $out ) > 1 ) || $has_auto_name;
+		}
+
 		$text = sprintf(
 			"Found %d recent image%s in the media library (last %d minutes):\n%s\n\n" .
 			"%s",
@@ -1640,13 +1662,50 @@ class PressGo_MCP_Tools {
 			count( $out ) === 1 ? '' : 's',
 			$since_minutes,
 			implode( "\n", $summary ),
-			count( $out ) === 1
-				? "Use this URL in image fields. Confirm with the user it's the right one."
-				: "Read the filenames back to the user and ask which one to use. Don't guess — the wrong image is worse than asking."
+			$include_thumbs
+				? ( count( $out ) === 1
+					? "Thumbnail is embedded below — confirm it's what the user wants before using."
+					: "Thumbnails are embedded below — look at each one to decide which goes where (hero / team / logo / etc.). When still uncertain after seeing them, ask the user." )
+				: "Use this URL in image fields. Confirm with the user it's the right one."
 		);
 
+		$content = array( array( 'type' => 'text', 'text' => $text ) );
+
+		// Embed inline thumbnails as MCP image content blocks if requested.
+		// Uses WP's auto-generated 'thumbnail' size (typically 150x150) so
+		// each is small (~5-15KB base64) — cheap enough to include even for
+		// 10 results.
+		if ( $include_thumbs ) {
+			foreach ( $out as $m ) {
+				$tid     = $m['id'];
+				$file    = get_attached_file( $tid );
+				$th_meta = wp_get_attachment_image_src( $tid, 'thumbnail' );
+				if ( ! $th_meta ) { continue; }
+				// thumbnail src: [url, width, height, is_intermediate]
+				// Need the actual file path for the thumbnail size.
+				$meta = wp_get_attachment_metadata( $tid );
+				if ( ! empty( $meta['sizes']['thumbnail']['file'] ) ) {
+					$th_path = dirname( $file ) . '/' . $meta['sizes']['thumbnail']['file'];
+				} else {
+					$th_path = $file; // fallback to original
+				}
+				if ( ! is_readable( $th_path ) ) { continue; }
+				$bytes = @file_get_contents( $th_path );
+				if ( false === $bytes || strlen( $bytes ) > 200 * 1024 ) { continue; } // 200KB ceiling per thumbnail
+				$content[] = array(
+					'type' => 'text',
+					'text' => sprintf( '↓ Thumbnail of %s (id=%d)', $m['filename'], $tid ),
+				);
+				$content[] = array(
+					'type'     => 'image',
+					'data'     => base64_encode( $bytes ),
+					'mimeType' => $m['mime'],
+				);
+			}
+		}
+
 		return array(
-			'content' => array( array( 'type' => 'text', 'text' => $text ) ),
+			'content'           => $content,
 			'structuredContent' => array(
 				'count'         => count( $out ),
 				'since_minutes' => $since_minutes,

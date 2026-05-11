@@ -875,8 +875,11 @@ iframe#f{position:relative;z-index:0}
 				"  3. If exactly one image came back: use the `url` field in image properties " .
 				"     (hero.image.url, features.items[].image.url, footer.brand.logo.url, etc.). " .
 				"     Confirm the filename back to the user — \"using `yoga-hero.jpg`, sound right?\"\n" .
-				"  4. If multiple came back: read the filenames + sizes back, ask which one. " .
-				"     Don't guess — the wrong image is worse than asking.\n\n" .
+				"  4. If multiple came back and the filenames don't tell you which is which " .
+				"     (auto-generated names like IMG_1234.jpg or UUID.jpeg), call again with " .
+				"     `include_thumbnails: true` — the response will embed the actual thumbnails " .
+				"     so you can SEE each one. Then decide which goes where (hero photo / team " .
+				"     headshot / logo / etc.) and confirm with the user before using.\n\n" .
 				"Why this path: it works for ANY image size (multi-MB photos, multiple images at " .
 				"once, raw camera shots) with zero token-budget gymnastics. Total user effort: " .
 				"~5 seconds. Total reliability: 100%.\n\n" .
