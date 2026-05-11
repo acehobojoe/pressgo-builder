@@ -353,7 +353,8 @@ class PressGo_Widget_Helpers {
 	 */
 	public static function icon_box_w( $cfg, $icon, $title, $desc, $icon_color = null,
 									   $position = 'top', $view = 'stacked', $shape = 'circle',
-									   $secondary_color = null, $align = 'center' ) {
+									   $secondary_color = null, $align = 'center',
+									   $title_color = null, $desc_color = null ) {
 		$c     = $cfg['colors'];
 		$fonts = $cfg['fonts'];
 
@@ -362,6 +363,16 @@ class PressGo_Widget_Helpers {
 		}
 		if ( null === $secondary_color ) {
 			$secondary_color = PressGo_Style_Utils::hex_to_rgba( $icon_color, 0.1 );
+		}
+		// Default title/desc to text_dark/text_muted (fine on light section
+		// backgrounds). Card-using callers should pass card_text() /
+		// card_text_muted() instead — text_dark inverts to a light color on
+		// dark-themed pages and disappears against the white card surface.
+		if ( null === $title_color ) {
+			$title_color = $c['text_dark'];
+		}
+		if ( null === $desc_color ) {
+			$desc_color = $c['text_muted'];
 		}
 
 		$s = array(
@@ -376,9 +387,9 @@ class PressGo_Widget_Helpers {
 			'icon_size'      => array( 'unit' => 'px', 'size' => 28, 'sizes' => array() ),
 			'icon_space'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
 			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
-			'title_color'    => $c['text_dark'],
+			'title_color'    => $title_color,
 			'title_color_hover' => $icon_color,
-			'description_color' => $c['text_muted'],
+			'description_color' => $desc_color,
 			'title_typography_typography'       => 'custom',
 			'title_typography_font_family'     => $fonts['heading'],
 			'title_typography_font_weight'     => '700',

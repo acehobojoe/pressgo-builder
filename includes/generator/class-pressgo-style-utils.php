@@ -33,6 +33,37 @@ class PressGo_Style_Utils {
 	}
 
 	/**
+	 * Pick a readable text color (near-black or white) for a given background.
+	 * Uses relative luminance per WCAG — pages with light primaries (electric
+	 * yellow, blush, etc.) now get dark text on primary backgrounds instead of
+	 * invisible white text.
+	 */
+	public static function text_on_color( $hex ) {
+		$rgb = self::hex_to_rgb( $hex );
+		$lum = ( 0.299 * $rgb['r'] + 0.587 * $rgb['g'] + 0.114 * $rgb['b'] ) / 255;
+		return $lum > 0.6 ? '#0F172A' : '#FFFFFF';
+	}
+
+	/**
+	 * Fixed near-black for content inside white/light cards.
+	 *
+	 * Builders should use this — NOT $c['text_dark'] — for text living on a
+	 * card_style() container. text_dark is the dark-on-section color, which
+	 * the user may set to a light value for dark-themed pages; using it on a
+	 * white card then makes the content disappear.
+	 */
+	public static function card_text() {
+		return '#0F172A';
+	}
+
+	/**
+	 * Muted near-black for secondary content inside cards.
+	 */
+	public static function card_text_muted() {
+		return '#4B5563';
+	}
+
+	/**
 	 * Reusable card styling (border, radius, shadow, padding).
 	 */
 	public static function card_style( $cfg, $pad = 32 ) {
@@ -75,14 +106,19 @@ class PressGo_Style_Utils {
 
 	/**
 	 * Standard section header (eyebrow + headline + optional subheadline).
+	 *
+	 * Pass `$dark = true` for dark sections (forces white headline). Otherwise
+	 * the headline uses a fixed near-black so it stays readable on white/light
+	 * section backgrounds even when the page's text_dark token is inverted
+	 * to a light value for dark-themed pages.
 	 */
 	public static function section_header( $cfg, $eyebrow, $headline, $subheadline = null, $dark = false ) {
 		$c        = $cfg['colors'];
 		$elements = array();
 
 		$eyebrow_color  = $dark ? 'rgba(255,255,255,0.5)' : $c['primary'];
-		$headline_color = $dark ? $c['white'] : $c['text_dark'];
-		$sub_color      = $dark ? 'rgba(255,255,255,0.7)' : $c['text_muted'];
+		$headline_color = $dark ? $c['white'] : self::card_text();
+		$sub_color      = $dark ? 'rgba(255,255,255,0.7)' : self::card_text_muted();
 
 		$elements[] = PressGo_Widget_Helpers::heading_w( $cfg, $eyebrow, 'h6', 'center', $eyebrow_color,
 			13, '600', 4, null, 'uppercase' );

@@ -457,12 +457,14 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.8)', 19, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
-		// CTA buttons.
+		// CTA buttons. Primary CTA renders on a white background — use a
+		// guaranteed-dark text color (not text_dark, which inverts to light
+		// on dark-themed pages and disappears against the white button).
 		$btn_cols = array(
 			PressGo_Element_Factory::col(
 				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
 					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['white'], $c['text_dark'], null,
+					$c['white'], PressGo_Style_Utils::card_text(), null,
 					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
 				array( 'vertical_align' => 'middle' )
 			),
@@ -495,7 +497,6 @@ class PressGo_Section_Builder {
 		}
 
 		// Colorful gradient using primary + a contrasting color.
-		$rgb = PressGo_Style_Utils::hex_to_rgb( $c['primary'] );
 		$gradient_b = isset( $c['accent'] ) ? $c['accent'] : '#8B5CF6';
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -899,7 +900,8 @@ class PressGo_Section_Builder {
 					PressGo_Widget_Helpers::icon_box_w( $cfg,
 						$item['icon'], $item['title'], $desc,
 						$accent, 'top', 'stacked', 'circle',
-						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
+						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
+						PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 				),
 				$style
 			);
@@ -997,7 +999,8 @@ class PressGo_Section_Builder {
 					PressGo_Widget_Helpers::icon_box_w( $cfg,
 						$item['icon'], $item['title'], $item['desc'],
 						$accent, 'left', 'default', 'circle',
-						null, 'left' ),
+						null, 'left',
+						PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 				),
 				array(
 					'padding' => array(
@@ -1092,7 +1095,8 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::icon_box_w( $cfg,
 					$item['icon'], $item['title'], $item['desc'],
 					$accent, 'left', 'stacked', 'circle',
-					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
+					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
+					PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 			);
 
 			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
@@ -1287,6 +1291,15 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$r = $cfg['results'];
 
+		// Results uses a dark-gradient section by design. If user-supplied
+		// dark_bg is actually light, white text will be invisible — pick a
+		// readable label color based on the gradient's start luminance.
+		$on_dark      = PressGo_Style_Utils::text_on_color( $c['dark_bg'] );
+		$label_color  = ( '#FFFFFF' === $on_dark ) ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.6)';
+		$card_bg      = ( '#FFFFFF' === $on_dark ) ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)';
+		$card_border  = ( '#FFFFFF' === $on_dark ) ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)';
+		$desc_color   = ( '#FFFFFF' === $on_dark ) ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.7)';
+
 		$metric_cols = array();
 		$fonts = $cfg['fonts'];
 		foreach ( $r['metrics'] as $item ) {
@@ -1301,7 +1314,7 @@ class PressGo_Section_Builder {
 				'duration'               => 2000,
 				'title'                  => $item['label'],
 				'number_color'           => $item['color'],
-				'title_color'            => 'rgba(255,255,255,0.6)',
+				'title_color'            => $label_color,
 				'typography_typography'          => 'custom',
 				'typography_font_family'         => $fonts['heading'],
 				'typography_font_weight'         => '800',
@@ -1320,7 +1333,7 @@ class PressGo_Section_Builder {
 				array(
 					'flex_align_items'       => 'center',
 					'background_background'  => 'classic',
-					'background_color'       => 'rgba(255,255,255,0.06)',
+					'background_color'       => $card_bg,
 					'border_radius'          => array(
 						'unit' => 'px', 'top' => '16', 'right' => '16',
 						'bottom' => '16', 'left' => '16', 'isLinked' => true,
@@ -1338,15 +1351,15 @@ class PressGo_Section_Builder {
 						'unit' => 'px', 'top' => '1', 'right' => '1',
 						'bottom' => '1', 'left' => '1', 'isLinked' => true,
 					),
-					'border_color'           => 'rgba(255,255,255,0.1)',
+					'border_color'           => $card_border,
 				)
 			);
 		}
 
-		$header               = PressGo_Style_Utils::section_header( $cfg, $r['eyebrow'], $r['headline'], null, true );
+		$header               = PressGo_Style_Utils::section_header( $cfg, $r['eyebrow'], $r['headline'], null, ( '#FFFFFF' === $on_dark ) );
 		$header_without_spacer = array_slice( $header, 0, -1 );
 		$header_without_spacer[] = PressGo_Widget_Helpers::text_w( $cfg, $r['description'], 'center',
-			'rgba(255,255,255,0.7)', 16 );
+			$desc_color, 16 );
 		$header_without_spacer[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		$children = array_merge( $header_without_spacer,
@@ -1470,7 +1483,7 @@ class PressGo_Section_Builder {
 							PressGo_Element_Factory::widget( 'icon-list', array(
 								'icon_list'                    => $icon_list_items,
 								'icon_color'                   => $c['accent'],
-								'text_color'                   => $c['text_dark'],
+								'text_color'                   => PressGo_Style_Utils::card_text(),
 								'icon_size'                    => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
 								'text_indent'                  => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
 								'space_between'                => array( 'unit' => 'px', 'size' => 20, 'sizes' => array() ),
@@ -1612,7 +1625,8 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::icon_box_w( $cfg,
 					$icon, $benefit, '',
 					$accent, 'left', 'stacked', 'circle',
-					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
+					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
+					PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 			);
 
 			$style = PressGo_Style_Utils::card_style( $cfg, 24 );
@@ -1913,19 +1927,25 @@ class PressGo_Section_Builder {
 		$f     = $cfg['faq'];
 		$fonts = $cfg['fonts'];
 
+		// faq_split's section background is hardcoded to $c['white'] (see
+		// outer() below), so this is effectively a white surface — use
+		// fixed dark text colors regardless of the page's theme tokens.
+		$on_section       = PressGo_Style_Utils::card_text();
+		$on_section_muted = PressGo_Style_Utils::card_text_muted();
+
 		// Left column: eyebrow, headline, description.
 		$left = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $f['eyebrow'], 'h6', 'left',
 				$c['primary'], 13, '600', 4, null, 'uppercase', null, null, 'center' ),
 			PressGo_Widget_Helpers::spacer_w( 12 ),
 			PressGo_Widget_Helpers::heading_w( $cfg, $f['headline'], 'h2', 'left',
-				$c['text_dark'], 38, '800', -1, 1.2, null, 28, 32, 'center' ),
+				$on_section, 38, '800', -1, 1.2, null, 28, 32, 'center' ),
 		);
 
 		if ( ! empty( $f['description'] ) ) {
 			$left[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $f['description'], 'left',
-				$c['text_muted'], 16, null, 1.7, 'center' );
+				$on_section_muted, 16, null, 1.7, 'center' );
 		}
 
 		if ( ! empty( $f['cta'] ) ) {
@@ -1957,7 +1977,7 @@ class PressGo_Section_Builder {
 		$toggle = PressGo_Element_Factory::widget( 'toggle', array(
 			'tabs'                             => $tabs,
 			'border_color'                     => $c['border'],
-			'title_color'                      => $c['text_dark'],
+			'title_color'                      => $on_section,
 			'tab_active_color'                 => $c['primary'],
 			'title_typography_typography'       => 'custom',
 			'title_typography_font_family'     => $fonts['heading'],
@@ -1969,7 +1989,7 @@ class PressGo_Section_Builder {
 			'content_typography_font_size'     => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'content_typography_line_height'   => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
-			'content_color'                    => $c['text_muted'],
+			'content_color'                    => $on_section_muted,
 			'space_between'                    => 0,
 			'toggle_icon_align'                => 'right',
 		) );
@@ -2053,30 +2073,41 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$ct = $cfg['cta_final'];
 
+		// Pick text color based on primary's luminance — pages with light
+		// primaries (electric yellow, blush, light violet) were rendering
+		// invisible white headlines on near-white gradient backgrounds.
+		$on_primary       = PressGo_Style_Utils::text_on_color( $c['primary'] );
+		$is_light_primary = ( '#FFFFFF' !== $on_primary );
+		$muted_alpha      = $is_light_primary ? 'rgba(15,23,42,0.75)' : 'rgba(255,255,255,0.75)';
+		$trust_alpha      = $is_light_primary ? 'rgba(15,23,42,0.55)' : 'rgba(255,255,255,0.45)';
+		$btn_bg           = $is_light_primary ? '#0F172A' : $c['white'];
+		$btn_text         = $is_light_primary ? '#FFFFFF' : $c['primary'];
+
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $ct['headline'], 'h2', 'center',
-				$c['white'], 44, '800', -1, 1.2, null, 30, 38 ),
+				$on_primary, 44, '800', -1, 1.2, null, 30, 38 ),
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
-				'rgba(255,255,255,0.75)', 18, 16 ),
+				$muted_alpha, 18, 16 ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
 			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
 				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
-				$c['white'], $c['primary'], null,
+				$btn_bg, $btn_text, null,
 				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
 		);
 
 		if ( ! empty( $ct['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $ct['trust_line'],
-				'center', 'rgba(255,255,255,0.45)', 14 );
+				'center', $trust_alpha, 14 );
 		}
 
 		// Social icons if provided.
 		if ( ! empty( $ct['social_icons'] ) ) {
+			$icon_color = $is_light_primary ? 'rgba(15,23,42,0.6)' : 'rgba(255,255,255,0.5)';
 			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 			$children[] = PressGo_Widget_Helpers::social_icons_w(
-				$ct['social_icons'], 16, 'custom', 'rgba(255,255,255,0.5)', 'circle', 'center', 12
+				$ct['social_icons'], 16, 'custom', $icon_color, 'circle', 'center', 12
 			);
 		}
 
@@ -2103,29 +2134,36 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$ct = $cfg['cta_final'];
 
+		// Card sits on a white background. text_dark/text_muted invert on
+		// dark-themed pages and disappear; use the fixed card text tokens.
+		// CTA button bg is primary, label color picks contrast for it.
+		$card_text       = PressGo_Style_Utils::card_text();
+		$card_text_muted = PressGo_Style_Utils::card_text_muted();
+		$btn_label       = PressGo_Style_Utils::text_on_color( $c['primary'] );
+
 		$card_children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $ct['headline'], 'h2', 'center',
-				$c['text_dark'], 38, '800', -1, 1.2, null, 28, 34 ),
+				$card_text, 38, '800', -1, 1.2, null, 28, 34 ),
 			PressGo_Widget_Helpers::spacer_w( 12 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center', $c['text_muted'], 17, 15 ),
+			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center', $card_text_muted, 17, 15 ),
 			PressGo_Widget_Helpers::spacer_w( 24 ),
 			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
 				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
-				$c['primary'], $c['white'], null,
+				$c['primary'], $btn_label, null,
 				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
 		);
 
 		if ( ! empty( $ct['trust_line'] ) ) {
 			$card_children[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			$card_children[] = PressGo_Widget_Helpers::text_w( $cfg, $ct['trust_line'],
-				'center', $c['text_muted'], 13 );
+				'center', $card_text_muted, 13 );
 		}
 
 		// Social icons if provided.
 		if ( ! empty( $ct['social_icons'] ) ) {
 			$card_children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 			$card_children[] = PressGo_Widget_Helpers::social_icons_w(
-				$ct['social_icons'], 14, 'custom', $c['text_muted'], 'circle', 'center', 10
+				$ct['social_icons'], 14, 'custom', $card_text_muted, 'circle', 'center', 10
 			);
 		}
 
@@ -2235,23 +2273,30 @@ class PressGo_Section_Builder {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 			}
 
+			// Card content uses fixed near-black colors (cards are white
+			// regardless of theme; text_dark inverts for dark-themed pages
+			// and disappears). Outline button uses dark text + dark border
+			// so it stays visible even when primary is a light color.
+			$card_text       = PressGo_Style_Utils::card_text();
+			$card_text_muted = PressGo_Style_Utils::card_text_muted();
+
 			// Plan name.
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['name'], 'h4', 'center',
-				$c['text_dark'], 20, '700' );
+				$card_text, 20, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 
 			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'center',
-				$c['text_dark'], 48, '800', -2, 1.0, null, 34, 40 );
+				$card_text, 48, '800', -2, 1.0, null, 34, 40 );
 			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'center',
-				$c['text_muted'], 16 );
+				$card_text_muted, 16 );
 
 			// Description.
 			if ( ! empty( $plan['description'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $plan['description'], 'center',
-					$c['text_muted'], 14 );
+					$card_text_muted, 14 );
 			}
 
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
@@ -2271,7 +2316,7 @@ class PressGo_Section_Builder {
 			$widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
 				'icon_list'                    => $icon_items,
 				'icon_color'                   => $highlighted ? $c['primary'] : $c['accent'],
-				'text_color'                   => $c['text_dark'],
+				'text_color'                   => $card_text,
 				'icon_size'                    => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 				'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 				'space_between'                => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
@@ -2287,13 +2332,18 @@ class PressGo_Section_Builder {
 			// CTA button — full width on all screens.
 			$cta = isset( $plan['cta'] ) ? $plan['cta'] : array( 'text' => 'Get Started', 'url' => '#' );
 			if ( $highlighted ) {
+				// Solid primary fill — pick text color for contrast against
+				// the primary background.
 				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
 					isset( $cta['url'] ) ? $cta['url'] : '#',
-					$c['primary'], $c['white'], null, null, 'center' );
+					$c['primary'], PressGo_Style_Utils::text_on_color( $c['primary'] ),
+					null, null, 'center' );
 			} else {
+				// Outline button uses card_text for the label/border so it's
+				// readable on the white card even when primary is light.
 				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
 					isset( $cta['url'] ) ? $cta['url'] : '#',
-					'transparent', $c['primary'], $c['primary'], null, 'center' );
+					'transparent', $card_text, $card_text, null, 'center' );
 			}
 
 			// Card styling.
@@ -2337,29 +2387,37 @@ class PressGo_Section_Builder {
 			$highlighted = ! empty( $plan['highlighted'] );
 			$widgets = array();
 
+			// Card content uses fixed near-black colors — cards are white
+			// regardless of theme. CTA button label picks contrast for
+			// either the primary fill (highlighted) or stays dark on the
+			// transparent outline (non-highlighted).
+			$card_text       = PressGo_Style_Utils::card_text();
+			$card_text_muted = PressGo_Style_Utils::card_text_muted();
+
 			// Badge row.
 			if ( ! empty( $plan['badge'] ) ) {
+				$badge_text = PressGo_Style_Utils::text_on_color( $c['primary'] );
 				$widgets[] = self::pill_button( $cfg, strtoupper( $plan['badge'] ),
-					$c['primary'], $c['white'], $c['primary'] );
+					$c['primary'], $badge_text, $c['primary'] );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			}
 
 			// Plan name + price on same visual line.
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['name'], 'h4', 'left',
-				$c['text_dark'], 22, '700' );
+				$card_text, 22, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 4 );
 
 			// Price (amount + period as separate widgets).
 			$period = isset( $plan['period'] ) ? $plan['period'] : '/mo';
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'left',
-				$c['text_dark'], 36, '800', -1, 1.0, null, 28, 32 );
+				$card_text, 36, '800', -1, 1.0, null, 28, 32 );
 			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'left',
-				$c['text_muted'], 14 );
+				$card_text_muted, 14 );
 
 			if ( ! empty( $plan['description'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $plan['description'], 'left',
-					$c['text_muted'], 14 );
+					$card_text_muted, 14 );
 			}
 
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
@@ -2378,7 +2436,7 @@ class PressGo_Section_Builder {
 				$widgets[] = PressGo_Element_Factory::widget( 'icon-list', array(
 					'icon_list'                    => $icon_items,
 					'icon_color'                   => $highlighted ? $c['primary'] : $c['accent'],
-					'text_color'                   => $c['text_dark'],
+					'text_color'                   => $card_text,
 					'icon_size'                    => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
 					'text_indent'                  => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 					'space_between'                => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
@@ -2397,11 +2455,12 @@ class PressGo_Section_Builder {
 			if ( $highlighted ) {
 				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
 					isset( $cta['url'] ) ? $cta['url'] : '#',
-					$c['primary'], $c['white'], null, null, 'left' );
+					$c['primary'], PressGo_Style_Utils::text_on_color( $c['primary'] ),
+					null, null, 'left' );
 			} else {
 				$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'],
 					isset( $cta['url'] ) ? $cta['url'] : '#',
-					'transparent', $c['primary'], $c['primary'], null, 'left' );
+					'transparent', $card_text, $card_text, null, 'left' );
 			}
 
 			// Card styling.
