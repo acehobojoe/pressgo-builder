@@ -42,6 +42,17 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-scraper-client.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-config-validator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-page-creator.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-editor-integration.php';
+
+		// MCP server.
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-storage.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-tools.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-resources.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-server.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-oauth.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-admin.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-telemetry.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-license.php';
 	}
 
 	private function init_hooks() {
@@ -52,6 +63,24 @@ class PressGo {
 			$rest_api = new PressGo_Rest_API();
 			$rest_api->init();
 		}
+
+		// Elementor editor integration runs on both admin + editor iframe loads,
+		// so initialise it outside the is_admin() gate above.
+		$editor = new PressGo_Editor_Integration();
+		$editor->init();
+
+		// MCP server — REST routes on the front-end, admin UI in wp-admin.
+		// The enabled flag short-circuits the JSON-RPC handler but discovery
+		// + admin UI always run so users can re-enable.
+		( new PressGo_MCP_Server() )->init();
+		( new PressGo_MCP_OAuth() )->init();
+		( new PressGo_MCP_Telemetry() )->init();
+		if ( is_admin() ) {
+			( new PressGo_MCP_Admin() )->init();
+		}
+
+		// Ensure tables exist (idempotent: dbDelta no-ops when current).
+		add_action( 'plugins_loaded', array( 'PressGo_MCP_Storage', 'maybe_install' ), 20 );
 
 		// Register WP-CLI commands.
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {

@@ -1,0 +1,546 @@
+<?php
+/**
+ * PressGo MCP — JSON-RPC 2.0 server (Streamable HTTP transport).
+ *
+ * One REST endpoint, /wp-json/pressgo/v1/mcp, that the AI client POSTs JSON-RPC
+ * requests to. We don't currently stream responses (the work is fast enough
+ * to return synchronously), but the transport spec is satisfied — we set
+ * the right Content-Type, accept a single request or batch, and emit
+ * Mcp-Session-Id so future calls can resume.
+ *
+ * Auth: Bearer token in the Authorization header. Tokens come from the
+ * PressGo_MCP_Storage layer (manual API keys or OAuth-issued).
+ *
+ * Methods we implement:
+ *   - initialize          (handshake; declares server capabilities)
+ *   - notifications/initialized   (no-op)
+ *   - ping                (heartbeat)
+ *   - tools/list          (catalogue from PressGo_MCP_Tools::definitions())
+ *   - tools/call          (dispatches to PressGo_MCP_Tools::call())
+ *   - resources/list      (catalogue from PressGo_MCP_Resources::list_static())
+ *   - resources/templates/list
+ *   - resources/read      (dispatches to PressGo_MCP_Resources::read())
+ *
+ * All other methods return -32601 method-not-found.
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class PressGo_MCP_Server {
+
+	const PROTOCOL_VERSION = '2025-06-18';
+	const SERVER_NAME      = 'PressGo';
+
+	public function init() {
+		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+
+		// Allow the screenshot service to render drafts via a short-lived
+		// HMAC-signed query token. The hook runs early, before WP's normal
+		// post_status visibility check.
+		add_action( 'pre_get_posts', array( $this, 'maybe_authorize_signed_preview' ), 1 );
+
+		// Standalone /pressgo-watch/{id} page — iframe + auto-reload.
+		add_action( 'parse_request', array( $this, 'serve_watch_page' ), 1 );
+	}
+
+	/**
+	 * Serve /pressgo-watch/{id} as a tiny standalone HTML page (no WP admin
+	 * chrome) that iframes the live preview and reloads on change. Auth-gated:
+	 * requires edit_pages.
+	 */
+	public function serve_watch_page() {
+		$path = isset( $_SERVER['REQUEST_URI'] ) ? wp_parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) : '';
+		if ( ! preg_match( '#^/pressgo-watch/(\d+)/?$#', rtrim( $path, '/' ), $m ) ) {
+			return;
+		}
+		$post_id = (int) $m[1];
+
+		if ( ! is_user_logged_in() ) {
+			$current_url = ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+			wp_safe_redirect( wp_login_url( $current_url ) );
+			exit;
+		}
+		if ( ! current_user_can( 'edit_pages' ) ) {
+			status_header( 403 ); echo 'Forbidden'; exit;
+		}
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			status_header( 404 ); echo 'Not found'; exit;
+		}
+
+		// Build a signed preview URL the iframe can render even for drafts.
+		$exp        = time() + 3600;
+		$tok        = PressGo_MCP_Tools::sign_preview_token( $post_id, $exp );
+		$is_page    = ( 'page' === $post->post_type );
+		$qs         = $is_page ? array( 'page_id' => $post_id ) : array( 'p' => $post_id, 'post_type' => $post->post_type );
+		$qs['pgmcp_preview'] = $tok;
+		$qs['pgmcp_exp']     = $exp;
+		$preview_url = add_query_arg( $qs, home_url( '/' ) );
+
+		$version_url = rest_url( "pressgo/v1/page/{$post_id}/version" );
+		$nonce       = wp_create_nonce( 'wp_rest' );
+		$title       = esc_html( $post->post_title ?: 'Untitled' );
+
+		status_header( 200 );
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=utf-8' );
+		?><!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title><?php echo $title; ?> — PressGo Watch</title>
+<style>
+html,body{margin:0;height:100%;background:#f6f7fb}
+iframe{width:100%;height:100vh;border:0;display:block}
+</style>
+</head>
+<body>
+<iframe id="f" src="<?php echo esc_url( $preview_url ); ?>"></iframe>
+<script>
+(function(){
+	var lastModified = '';
+	var iframe = document.getElementById('f');
+	var src = <?php echo wp_json_encode( $preview_url ); ?>;
+	function poll(){
+		fetch(<?php echo wp_json_encode( $version_url ); ?>, {
+			headers: { 'X-WP-Nonce': <?php echo wp_json_encode( $nonce ); ?> },
+			credentials: 'same-origin'
+		}).then(function(r){return r.ok?r.json():null}).then(function(d){
+			if(!d) return;
+			if(lastModified && d.modified_gmt !== lastModified){
+				iframe.src = src + '&_=' + Date.now();
+			}
+			lastModified = d.modified_gmt;
+		}).catch(function(){});
+	}
+	poll(); setInterval(poll, 1500);
+})();
+</script>
+</body>
+</html><?php
+		exit;
+	}
+
+	/**
+	 * If the request URL has ?p={id}&pgmcp_preview={hmac}&pgmcp_exp={ts} and
+	 * the HMAC verifies, treat this request as authorised to view the draft.
+	 * We do that by adding 'draft' to the queryable post statuses for this
+	 * single request.
+	 */
+	public function maybe_authorize_signed_preview( $query ) {
+		if ( ! $query->is_main_query() ) { return; }
+		$post_id = (int) ( $_GET['page_id'] ?? $_GET['p'] ?? 0 );
+		$token   = isset( $_GET['pgmcp_preview'] ) ? (string) $_GET['pgmcp_preview'] : '';
+		$exp     = isset( $_GET['pgmcp_exp'] ) ? (int) $_GET['pgmcp_exp'] : 0;
+		if ( ! $post_id || ! $token || ! $exp ) { return; }
+		if ( ! PressGo_MCP_Tools::verify_preview_token( $post_id, $exp, $token ) ) { return; }
+		$query->set( 'post_status', array( 'publish', 'draft', 'pending', 'private' ) );
+		// Also allow Elementor to render the page as if logged in.
+		add_filter( 'user_has_cap', function ( $caps ) {
+			$caps['read'] = true;
+			$caps['edit_posts'] = true;
+			$caps['edit_pages'] = true;
+			return $caps;
+		}, 10, 1 );
+	}
+
+	public function register_routes() {
+		// Tiny version endpoint for the watch page — returns just the data
+		// the poll loop needs to decide whether to reload the iframe.
+		register_rest_route( 'pressgo/v1', '/page/(?P<post_id>\d+)/version', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'handle_page_version' ),
+			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+		) );
+
+		register_rest_route( 'pressgo/v1', '/mcp', array(
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle' ),
+				'permission_callback' => '__return_true', // Bearer auth in handle().
+			),
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_get' ),
+				'permission_callback' => '__return_true',
+			),
+			array(
+				'methods'             => 'OPTIONS',
+				'callback'            => array( $this, 'handle_options' ),
+				'permission_callback' => '__return_true',
+			),
+		) );
+	}
+
+	/* ─── Transport ─────────────────────────────────────────────────── */
+
+	public function handle_options() {
+		return $this->cors( new WP_REST_Response( null, 204 ) );
+	}
+
+	public function handle_page_version( WP_REST_Request $request ) {
+		$post_id = (int) $request['post_id'];
+		$post    = get_post( $post_id );
+		if ( ! $post ) {
+			return new WP_REST_Response( array( 'error' => 'not_found' ), 404 );
+		}
+		return new WP_REST_Response( array(
+			'modified_gmt' => $post->post_modified_gmt,
+			'section_count' => count( PressGo_MCP_Tools::read_elementor_data( $post_id ) ),
+		), 200 );
+	}
+
+	/** Some clients GET the URL once to verify it's a Streamable HTTP endpoint. */
+	public function handle_get() {
+		return $this->cors( new WP_REST_Response( array(
+			'name'    => self::SERVER_NAME,
+			'version' => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
+			'protocol' => self::PROTOCOL_VERSION,
+		), 200 ) );
+	}
+
+	public function handle( WP_REST_Request $request ) {
+		$user_row = $this->authenticate( $request );
+		if ( is_wp_error( $user_row ) ) {
+			return $this->cors( new WP_REST_Response( array(
+				'jsonrpc' => '2.0',
+				'error'   => array( 'code' => -32001, 'message' => $user_row->get_error_message() ),
+				'id'      => null,
+			), 401, array(
+				// RFC 6750 / OAuth 2.0 Resource Metadata: tell the client where to authenticate.
+				'WWW-Authenticate' => 'Bearer realm="PressGo MCP", resource_metadata="' . esc_url_raw( rest_url( 'pressgo/v1/mcp' ) ) . '"',
+			) ) );
+		}
+
+		// Resolve to a WP_User for capability checks.
+		$user = get_user_by( 'id', (int) $user_row['user_id'] );
+		if ( ! $user || ! user_can( $user, 'edit_pages' ) ) {
+			return $this->cors( new WP_REST_Response( array(
+				'jsonrpc' => '2.0',
+				'error'   => array( 'code' => -32001, 'message' => 'User does not have edit_pages capability.' ),
+				'id'      => null,
+			), 403 ) );
+		}
+
+		$body = $request->get_body();
+		$json = json_decode( $body, true );
+		if ( ! is_array( $json ) ) {
+			return $this->cors( new WP_REST_Response( array(
+				'jsonrpc' => '2.0',
+				'error'   => array( 'code' => -32700, 'message' => 'Parse error: invalid JSON.' ),
+				'id'      => null,
+			), 400 ) );
+		}
+
+		// Batch or single?
+		$is_batch = isset( $json[0] ) && is_array( $json[0] );
+		$messages = $is_batch ? $json : array( $json );
+
+		$responses = array();
+		foreach ( $messages as $msg ) {
+			$resp = $this->dispatch( $msg, $user );
+			if ( null !== $resp ) {
+				$responses[] = $resp;
+			}
+		}
+
+		// Notifications (no id) get no response. Empty result -> 202 Accepted.
+		if ( empty( $responses ) ) {
+			return $this->cors( new WP_REST_Response( null, 202 ) );
+		}
+		$payload = $is_batch ? $responses : $responses[0];
+
+		return $this->cors( new WP_REST_Response( $payload, 200, array(
+			'Content-Type'   => 'application/json',
+			'Mcp-Session-Id' => $this->session_id_for( $user ),
+		) ) );
+	}
+
+	/* ─── Auth ──────────────────────────────────────────────────────── */
+
+	private function authenticate( WP_REST_Request $request ) {
+		// Authorization header: "Bearer <token>"
+		$auth = $request->get_header( 'authorization' );
+		if ( empty( $auth ) ) {
+			$auth = $request->get_header( 'Authorization' );
+		}
+		if ( empty( $auth ) || stripos( $auth, 'Bearer ' ) !== 0 ) {
+			return new WP_Error( 'mcp_unauthorized', 'Missing Bearer token. Authenticate via OAuth or paste a PressGo API key.' );
+		}
+		$token = trim( substr( $auth, 7 ) );
+		$row   = PressGo_MCP_Storage::validate_token( $token );
+		if ( ! $row ) {
+			return new WP_Error( 'mcp_invalid_token', 'Invalid or expired token.' );
+		}
+		return $row;
+	}
+
+	private function session_id_for( $user ) {
+		// Stable per-user session identifier — useful so the AI client can
+		// resume; not used for state today.
+		return 'pgmcp_' . substr( hash( 'sha256', 'session|' . $user->ID . '|' . wp_salt() ), 0, 24 );
+	}
+
+	private function cors( WP_REST_Response $r ) {
+		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '*';
+		$r->header( 'Access-Control-Allow-Origin', $origin );
+		$r->header( 'Access-Control-Allow-Methods', 'POST, GET, OPTIONS' );
+		$r->header( 'Access-Control-Allow-Headers', 'Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version' );
+		$r->header( 'Access-Control-Expose-Headers', 'Mcp-Session-Id, WWW-Authenticate' );
+		$r->header( 'Vary', 'Origin' );
+		return $r;
+	}
+
+	/* ─── Dispatch ──────────────────────────────────────────────────── */
+
+	private function dispatch( $msg, $user ) {
+		$id     = array_key_exists( 'id', $msg ) ? $msg['id'] : null;
+		$method = isset( $msg['method'] ) ? (string) $msg['method'] : '';
+		$params = isset( $msg['params'] ) ? $msg['params'] : array();
+
+		// Notification (no id) — never returns a response.
+		$is_notification = ! array_key_exists( 'id', $msg );
+
+		try {
+			switch ( $method ) {
+				case 'initialize':
+					$result = $this->initialize( $params );
+					break;
+				case 'notifications/initialized':
+					return null; // no response for notifications.
+				case 'ping':
+					$result = new stdClass();
+					break;
+				case 'tools/list':
+					$result = array( 'tools' => PressGo_MCP_Tools::definitions() );
+					break;
+				case 'tools/call':
+					$result = $this->call_tool( $params, $user );
+					break;
+				case 'resources/list':
+					$result = array(
+						'resources' => PressGo_MCP_Resources::list_static(),
+					);
+					break;
+				case 'resources/templates/list':
+					$result = array(
+						'resourceTemplates' => PressGo_MCP_Resources::list_templates(),
+					);
+					break;
+				case 'resources/read':
+					$uri = isset( $params['uri'] ) ? (string) $params['uri'] : '';
+					if ( '' === $uri ) {
+						throw new RuntimeException( 'resources/read requires `uri`.' );
+					}
+					$res = PressGo_MCP_Resources::read( $uri, $user );
+					if ( is_wp_error( $res ) ) {
+						return $this->error_response( $id, -32602, $res->get_error_message() );
+					}
+					$result = $res;
+					break;
+				case 'logging/setLevel':
+					$result = new stdClass();
+					break;
+				default:
+					if ( $is_notification ) { return null; }
+					return $this->error_response( $id, -32601, "Method not found: {$method}" );
+			}
+		} catch ( Throwable $e ) {
+			if ( $is_notification ) { return null; }
+			return $this->error_response( $id, -32603, $e->getMessage() );
+		}
+
+		if ( $is_notification ) { return null; }
+
+		return array(
+			'jsonrpc' => '2.0',
+			'id'      => $id,
+			'result'  => $result,
+		);
+	}
+
+	private function initialize( $params ) {
+		// Echo the client's protocol version if we recognise it; otherwise serve our default.
+		$client_proto = isset( $params['protocolVersion'] ) ? (string) $params['protocolVersion'] : '';
+		$proto = $client_proto ?: self::PROTOCOL_VERSION;
+
+		return array(
+			'protocolVersion' => $proto,
+			'capabilities'    => array(
+				'tools'     => array( 'listChanged' => false ),
+				'resources' => array( 'subscribe' => false, 'listChanged' => false ),
+				'prompts'   => array( 'listChanged' => false ),
+				'logging'   => new stdClass(),
+			),
+			'serverInfo'      => array(
+				'name'    => self::SERVER_NAME,
+				'version' => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
+				'title'   => 'PressGo — AI Page Builder',
+			),
+			'instructions'    =>
+				"You are a senior web design consultant — not a generator. The person on the other end is " .
+				"hiring you. Behave the way a $200/hr designer would behave: ask before building, propose " .
+				"before deciding, show your reasoning, and push back when their request will hurt them. " .
+				"You happen to use Elementor + WordPress as your medium.\n\n" .
+
+				"## HARD RULE: First turn = ZERO tool calls\n\n" .
+				"On the user's first message, do NOT call any tool — not even get_brain. Your only job on " .
+				"turn 1 is to interview the client. Push back gently if they say \"just build it\" — " .
+				"a page built without discovery is a page they'll hate the moment they see it.\n\n" .
+
+				"### Open like a consultant, not an interrogator\n" .
+				"Lead with one warm sentence acknowledging what they're building, then 3-4 focused " .
+				"questions — never a 12-bullet wall. Cover at least: WHO the visitor is, the PRIMARY " .
+				"ACTION you want them to take, and what BRAND/IMAGE assets they have. Save voice + " .
+				"section-level questions for turn 2.\n\n" .
+
+				"### When you ask about images, invite RICH input\n" .
+				"Don't just say \"do you have photos.\" Say something like:\n" .
+				"  \"For the visual feel — do any of these work for you? (a) drop image URLs or paste " .
+				"   them in, (b) record a short voice memo describing the vibe and I'll pick stock that " .
+				"   matches, (c) link a competitor or aspirational site you like and I'll borrow cues, " .
+				"   or (d) full creative freedom and I'll grab from Pexels.\"\n" .
+				"This gets them participating instead of typing 'use stock'.\n\n" .
+
+				"### Always check for an existing style guide BEFORE picking colors/fonts\n" .
+				"Most users have a `/style-guide/` page (or `/brand/`, `/design-system/`) on their site " .
+				"with their existing palette + typography. Before turn 2 ends, call `list_pages` and " .
+				"scan for one. If found: read it (the watch_url pattern works), match its palette/fonts. " .
+				"If NOT found: explicitly offer — \"I don't see a style guide on your site. Want me to " .
+				"build one as a separate page first? It's a 30-second job and every page I build for " .
+				"you afterwards will stay consistent with it.\" Many will say yes. Then build the " .
+				"style-guide page (palette swatches + type scale + button styles + sample header/footer) " .
+				"BEFORE the landing page they originally asked for.\n\n" .
+
+				"## Build small, get buy-in, then expand — DO NOT one-shot the page\n\n" .
+				"After discovery, do NOT call `add_sections` with 8-12 sections in one shot. Instead:\n" .
+				"  1. `create_page` (title only) — share the watch_url verbatim (see hard rule below)\n" .
+				"  2. Add ONLY the hero — one `add_section` call. Then stop.\n" .
+				"  3. Tell the user: \"Hero is up — take a look at the watch URL and tell me how it " .
+				"     reads. Want it bolder, smaller, different photo, different copy? Then I'll build " .
+				"     out the rest in the same direction.\"\n" .
+				"  4. Wait for their reaction. Adjust the hero with `update_section` if needed.\n" .
+				"  5. Once they're happy with the hero, propose the rest of the section outline in " .
+				"     plain text. Get their OK. Then add the remaining sections (batched is fine).\n" .
+				"This pattern doubles the chance they love the final page. The hero sets every other " .
+				"section's tone — don't commit to 10 sections in a direction the user hasn't seen yet.\n\n" .
+
+				"## HARD RULE: After create_page, share the watch URL — verbatim\n\n" .
+				"`create_page` returns a `watch_url`. The user opens it and sees each section appear " .
+				"live as you build (~1.5s latency). This is the killer feature; skipping it makes the " .
+				"experience feel like a black box. On the turn after create_page, your message MUST " .
+				"include the watch_url exactly as returned + one-line directive: \"Open this in another " .
+				"tab and you'll see the page assemble as I build.\" Do this BEFORE you call any other " .
+				"tool. (For users on mobile / Claude on iPhone — works the same; they open the URL in " .
+				"Safari.)\n\n" .
+
+				"## Cap the iteration loop\n\n" .
+				"After a build chunk, take ONE screenshot (`viewport=all` for desktop+tablet+mobile) " .
+				"and HAND OFF. Do not loop screenshot → update → screenshot more than ONCE without " .
+				"the user telling you something new — they are watching live, let them lead.\n\n" .
+
+				"## Discovery topics (pull from these as relevant — never dump all at once)\n" .
+				"  - **Business**: what does it do, who is the visitor, what's the primary action?\n" .
+				"  - **Voice**: friendly/serious/playful/premium/technical? Any tone to AVOID?\n" .
+				"  - **Proof**: testimonials, reviews, case studies, certifications, years in business?\n" .
+				"  - **Content**: do they have copy, or should you draft? Must-have phrases?\n" .
+				"  - **Visuals**: photos / voice memo / aspirational link / Pexels stock? (see above)\n" .
+				"  - **Brand**: existing /style-guide/ page? Colors/fonts to match? (see above)\n" .
+				"  - **CTA**: book / call / sign up / buy / something else?\n" .
+				"  - **Sections**: anything that MUST be there — pricing, FAQ, map, team?\n" .
+				"If they answered something up front, don't re-ask — but call out what you're inferring " .
+				"so they can correct you (\"I'm reading you as 'premium-but-warm' — push back if not\").\n\n" .
+
+				"## Tools — use in this order\n" .
+				"  1. `get_brain` — read once at session start (variants + per-field schema bundled)\n" .
+				"  2. `list_pages` — check for existing /style-guide/ before picking palette\n" .
+				"  3. `create_page` (title only) — get the watch_url, share it\n" .
+				"  4. `add_section` for the hero — ONE section, not the whole page\n" .
+				"  5. After hero is approved: `add_sections` (batched) for the rest\n" .
+				"  6. `screenshot_page` viewport=`all` — after a meaningful chunk, never in tight loops\n" .
+				"  7. `inspect_page` — cheap state check without burning a screenshot\n" .
+				"  8. `update_section` / `set_globals` — refine\n" .
+				"  9. `undo_last_change` — if you change something they don't like\n" .
+				"  10. `clone_page` — for A/B variants\n\n" .
+
+				"## Style of communication\n" .
+				"  - Plain. Warm. Designerly. You're the pro on this side of the table.\n" .
+				"  - Short turns. Three sentences usually beats ten.\n" .
+				"  - Surface trade-offs (\"split hero gives the photo real estate; if you want the " .
+				"     headline bigger I can swap to the gradient variant — your call\")\n" .
+				"  - When the user asks for something that will hurt them (every section in dark mode, " .
+				"     5 CTAs, headlines in ALL CAPS), say so kindly, then offer a better path.\n" .
+				"  - Never say \"as an AI\" or apologise for being one.",
+		);
+	}
+
+	private function call_tool( $params, $user ) {
+		$name = isset( $params['name'] ) ? (string) $params['name'] : '';
+		$args = isset( $params['arguments'] ) ? $params['arguments'] : array();
+
+		$t0  = microtime( true );
+		$res = PressGo_MCP_Tools::call( $name, $args, $user );
+		$ms  = (int) ( ( microtime( true ) - $t0 ) * 1000 );
+
+		// Record an event for the watch view + (optional) telemetry.
+		$post_id = is_array( $args ) && isset( $args['post_id'] ) ? (int) $args['post_id'] : null;
+		// create_page doesn't carry post_id in args — it's in the result.
+		if ( ! $post_id && is_array( $res ) && isset( $res['structuredContent']['post_id'] ) ) {
+			$post_id = (int) $res['structuredContent']['post_id'];
+		}
+		$summary = $this->summarise_call( $name, $args, $res );
+		PressGo_MCP_Storage::record_event( array(
+			'tool'          => $name,
+			'post_id'       => $post_id,
+			'user_id'       => $user ? $user->ID : null,
+			'summary'       => $summary,
+			'args_json'     => wp_json_encode( $args ),
+			'result_status' => is_wp_error( $res ) ? 'error' : 'ok',
+			'duration_ms'   => $ms,
+		) );
+		// Fire-and-forget telemetry (only POSTs if user opted in).
+		do_action( 'pressgo_mcp_event', $name, $args, $res, $user, $ms );
+
+		if ( is_wp_error( $res ) ) {
+			return array(
+				'isError' => true,
+				'content' => array(
+					array( 'type' => 'text', 'text' => $res->get_error_message() ),
+				),
+			);
+		}
+		return $res;
+	}
+
+	private function summarise_call( $name, $args, $res ) {
+		$args = is_array( $args ) ? $args : (array) $args;
+		switch ( $name ) {
+			case 'create_page':
+				return 'Created "' . ( $args['title'] ?? '' ) . '"';
+			case 'add_section':
+				return 'Added ' . ( $args['type'] ?? '?' ) . ( ! empty( $args['variant'] ) ? '/' . $args['variant'] : '' );
+			case 'update_section':
+				return 'Updated section ' . ( $args['section_index'] ?? '?' ) . ' → ' . ( $args['type'] ?? '?' );
+			case 'set_globals':
+				$keys = array_keys( array_intersect_key( $args, array_flip( array( 'colors', 'fonts', 'layout' ) ) ) );
+				return 'Updated globals: ' . implode( ', ', $keys );
+			case 'screenshot_page':
+				return 'Screenshot ' . ( $args['viewport'] ?? 'desktop' );
+			case 'list_pages':
+				return 'Listed pages';
+			case 'get_brain':
+				return 'Read brain';
+		}
+		return $name;
+	}
+
+	private function error_response( $id, $code, $message ) {
+		return array(
+			'jsonrpc' => '2.0',
+			'id'      => $id,
+			'error'   => array( 'code' => $code, 'message' => $message ),
+		);
+	}
+}
