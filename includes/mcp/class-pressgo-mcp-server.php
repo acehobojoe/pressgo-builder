@@ -142,18 +142,25 @@ iframe{width:100%;height:100vh;border:0;display:block}
 #pgactions a.primary{background:#4364e8;color:#fff;opacity:1}
 #pgactions a.primary:hover{background:#3754d5}
 
-/* Drop zone — full-page overlay when user drags a file over the window. */
+/* iframe sits below the drop overlay's z-index so drops over the iframe area
+ * still get caught by the parent window's listener instead of being eaten
+ * by the iframe's own document. */
+iframe#f{position:relative;z-index:0}
+
+/* Drop zone — full-page overlay when user drags a file over the window.
+ * Must be pointer-events:auto when active so it catches drop events that
+ * would otherwise fall through to the iframe underneath. */
 #pgdrop-overlay{
-	position:fixed;inset:0;z-index:9998;display:none;
-	background:rgba(67,100,232,0.85);backdrop-filter:blur(4px);
+	position:fixed;inset:0;z-index:99999;display:none;
+	background:rgba(67,100,232,0.92);backdrop-filter:blur(4px);
 	-webkit-backdrop-filter:blur(4px);
 	align-items:center;justify-content:center;
-	color:#fff;font:600 24px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	color:#fff;font:600 26px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 	text-align:center;pointer-events:none;
 }
-#pgdrop-overlay.active{display:flex}
-#pgdrop-overlay .inner{padding:60px 80px;border:3px dashed rgba(255,255,255,0.6);border-radius:24px;max-width:520px}
-#pgdrop-overlay .sub{font-size:14px;font-weight:500;opacity:0.85;margin-top:8px}
+#pgdrop-overlay.active{display:flex;pointer-events:auto}
+#pgdrop-overlay .inner{padding:60px 80px;border:3px dashed rgba(255,255,255,0.75);border-radius:24px;max-width:560px;pointer-events:none}
+#pgdrop-overlay .sub{font-size:14px;font-weight:500;opacity:0.85;margin-top:10px}
 
 /* Drop button (small pill, opens file picker as alternative to drag-drop) */
 #pgdrop-btn{
@@ -230,26 +237,53 @@ iframe{width:100%;height:100vh;border:0;display:block}
 		return t && (Array.prototype.indexOf.call(t,'Files') !== -1);
 	}
 
+	// dragenter fires on whatever inner element the cursor is over.
+	// Once we see one for a file drag, we go straight to "active" and
+	// keep the overlay visible until drop/dragleave-outside-window.
+	function activate(){
+		overlay.classList.add('active');
+	}
+	function deactivate(){
+		dragDepth = 0;
+		overlay.classList.remove('active');
+	}
+
 	window.addEventListener('dragenter', function(e){
 		if (!isImageDrag(e)) return;
 		e.preventDefault(); dragDepth++;
-		overlay.classList.add('active');
-	});
+		activate();
+	}, true);
 	window.addEventListener('dragover', function(e){
-		if (isImageDrag(e)) e.preventDefault();
-	});
+		// Required to make this element a valid drop target.
+		if (isImageDrag(e)) {
+			e.preventDefault();
+			if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+		}
+	}, true);
+	// dragleave triggers a LOT during normal mouse movement across child
+	// elements. Only deactivate when the cursor truly exits the viewport.
 	window.addEventListener('dragleave', function(e){
 		if (!isImageDrag(e)) return;
 		dragDepth--;
-		if (dragDepth <= 0) { dragDepth = 0; overlay.classList.remove('active'); }
-	});
-	window.addEventListener('drop', function(e){
+		// Viewport exit: relatedTarget is null AND coords are outside the viewport.
+		if (dragDepth <= 0 ||
+			(e.clientX <= 0 || e.clientY <= 0 ||
+			 e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+			deactivate();
+		}
+	}, true);
+
+	// drop fires on whichever element catches it. With pointer-events:auto on
+	// the active overlay, that's always the overlay (sitting above the iframe).
+	function handleDrop(e){
 		if (!isImageDrag(e)) return;
 		e.preventDefault();
-		dragDepth = 0; overlay.classList.remove('active');
-		var files = e.dataTransfer.files;
+		deactivate();
+		var files = e.dataTransfer && e.dataTransfer.files;
 		if (files && files.length) upload(files[0]);
-	});
+	}
+	overlay.addEventListener('drop', handleDrop);
+	window.addEventListener('drop', handleDrop, true);
 
 	btn.addEventListener('click', function(){ fileIn.click(); });
 	fileIn.addEventListener('change', function(){
