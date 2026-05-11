@@ -285,6 +285,54 @@ iframe#f{position:relative;z-index:0}
 	overlay.addEventListener('drop', handleDrop);
 	window.addEventListener('drop', handleDrop, true);
 
+	// CRITICAL: the iframe is same-origin (it's just our preview URL on the
+	// same WP site), but its contentDocument has its own event loop —
+	// dragenter on the iframe area doesn't bubble to the parent window. So
+	// we have to INJECT a listener inside the iframe's document and have it
+	// call back into the parent's activate(). Once the overlay is visible,
+	// it sits above the iframe (z-index) and pointer-events:auto so it
+	// catches subsequent drag/drop events directly.
+	function bindIframeDragForwarders(){
+		try {
+			var idoc = iframe.contentDocument;
+			if (!idoc || idoc._pgdragBound) return;
+			idoc._pgdragBound = true;
+
+			idoc.addEventListener('dragenter', function(e){
+				if (!isImageDrag(e)) return;
+				e.preventDefault();
+				dragDepth++;
+				activate();
+			}, true);
+			idoc.addEventListener('dragover', function(e){
+				if (isImageDrag(e)) {
+					e.preventDefault();
+					if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+				}
+			}, true);
+			// In case drop somehow lands inside the iframe before the overlay
+			// gets in front of the cursor — handle it as a fallback.
+			idoc.addEventListener('drop', function(e){
+				if (!isImageDrag(e)) return;
+				e.preventDefault();
+				deactivate();
+				var files = e.dataTransfer && e.dataTransfer.files;
+				if (files && files.length) upload(files[0]);
+			}, true);
+		} catch (err) {
+			// Cross-origin or sandboxed iframe — silently give up. The drop
+			// pill button still works as a manual upload path.
+			console.warn('[PressGo Watch] iframe drag forwarding unavailable:', err.message);
+		}
+	}
+
+	// Bind on initial load + every time the iframe src changes (e.g. live-
+	// reload after a section is added).
+	iframe.addEventListener('load', bindIframeDragForwarders);
+	if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+		bindIframeDragForwarders();
+	}
+
 	btn.addEventListener('click', function(){ fileIn.click(); });
 	fileIn.addEventListener('change', function(){
 		if (fileIn.files && fileIn.files[0]) upload(fileIn.files[0]);
