@@ -678,8 +678,10 @@ class PressGo_Section_Builder {
 		foreach ( $items as $idx => $item ) {
 			list( $prefix, $number, $suffix ) = self::parse_stat_value( $item['value'] );
 
-			$accent_colors = array( $c['accent'], '#06B6D4', '#F59E0B', '#8B5CF6', '#EC4899' );
-			$number_color  = $accent_colors[ $idx % count( $accent_colors ) ];
+			// Use the brand accent for all counters by default — random
+			// pastel cycling looked unbranded. Caller can pass an explicit
+			// per-item color in item.color to opt out.
+			$number_color = isset( $item['color'] ) ? $item['color'] : $c['accent'];
 
 			$counter = PressGo_Element_Factory::widget( 'counter', array(
 				'starting_number'        => $number,
@@ -705,9 +707,21 @@ class PressGo_Section_Builder {
 				'title_typography_font_size'     => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			) );
 
+			$col_children = array();
+			if ( ! empty( $item['icon'] ) ) {
+				$col_children[] = PressGo_Widget_Helpers::icon_w(
+					$item['icon'],
+					'rgba(255,255,255,0.08)',
+					22, 'stacked', 'circle', $number_color
+				);
+				$col_children[] = PressGo_Widget_Helpers::spacer_w( 8 );
+			}
+			$col_children[] = $counter;
+
 			$stat_cols[] = PressGo_Element_Factory::col(
-				array( $counter ),
+				$col_children,
 				array(
+					'flex_align_items' => 'center',
 					'padding' => array(
 						'unit' => 'px', 'top' => '24', 'right' => '16',
 						'bottom' => '24', 'left' => '16', 'isLinked' => false,
@@ -1164,18 +1178,19 @@ class PressGo_Section_Builder {
 
 		$step_cols = array();
 		foreach ( $st['items'] as $idx => $item ) {
-			$num_bg = ( $idx === 0 ) ? $c['primary'] : PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 );
-			$num_color = ( $idx === 0 ) ? $c['white'] : $c['primary'];
+			// All items get the same solid pill — previously only item 0
+			// got the primary fill, so steps 1+ rendered with a near-
+			// invisible 10%-alpha background.
+			$pill_html =
+				'<div style="display:flex; align-items:center; justify-content:center; '
+				. 'width:48px; height:48px; margin:0 auto; border-radius:12px; '
+				. 'background:' . $c['primary'] . '; color:' . $c['white'] . '; '
+				. 'font-weight:800; font-size:18px; line-height:1;">'
+				. esc_html( $item['num'] ) . '</div>';
 
-			// Number badge + title + description stacked.
 			$step_cols[] = PressGo_Element_Factory::col(
 				array(
-					PressGo_Widget_Helpers::text_w( $cfg,
-						'<span style="display:inline-flex; align-items:center; justify-content:center; '
-						. 'width:48px; height:48px; border-radius:12px; '
-						. 'background:' . $num_bg . '; color:' . $num_color . '; '
-						. 'font-weight:800; font-size:18px;">' . $item['num'] . '</span>',
-						'center', null, 18 ),
+					PressGo_Widget_Helpers::text_w( $cfg, $pill_html, 'center', null, 18 ),
 					PressGo_Widget_Helpers::spacer_w( 16 ),
 					PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h4', 'center',
 						$c['text_dark'], 18, '700' ),
@@ -3078,12 +3093,26 @@ class PressGo_Section_Builder {
 			$children = array_merge( $children, $header );
 		}
 
-		$address      = isset( $map['address'] ) ? $map['address'] : '';
+		$address      = isset( $map['address'] ) ? trim( (string) $map['address'] ) : '';
 		$height       = isset( $map['height'] ) ? (int) $map['height'] : 400;
 		$zoom         = isset( $map['zoom'] ) ? (int) $map['zoom'] : 14;
 		$height_mob   = max( 200, intdiv( $height * 5, 8 ) );
 
-		$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom, $height_mob );
+		// Heuristic: a renderable address needs at least a comma (street, city)
+		// or a ZIP/state. Bare "123 Johnson St" embeds an empty map silently.
+		// Render a text placeholder instead so the failure is visible.
+		$looks_complete = $address && ( strpos( $address, ',' ) !== false
+			|| preg_match( '/\b\d{5}(-\d{4})?\b/', $address )
+			|| preg_match( '/\b[A-Z]{2}\b/', $address ) );
+
+		if ( $looks_complete ) {
+			$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom, $height_mob );
+		} else {
+			$msg = $address
+				? 'Map unavailable — address needs a city or ZIP to embed (got: "' . $address . '").'
+				: 'Map unavailable — no address provided.';
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $msg, 'center', $c['text_muted'], 14 );
+		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 60, 60 );

@@ -26,7 +26,7 @@ class PressGo_Page_Creator {
 			'meta_input'   => array(
 				'_elementor_edit_mode'  => 'builder',
 				'_elementor_template_type' => 'wp-page',
-				'_wp_page_template'    => 'elementor_header_footer',
+				'_wp_page_template'    => 'elementor_canvas',
 				'_elementor_version'   => defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : '3.20.0',
 			),
 		) );

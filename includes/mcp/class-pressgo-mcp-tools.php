@@ -501,7 +501,7 @@ class PressGo_MCP_Tools {
 				'meta_input'  => array(
 					'_elementor_edit_mode'      => 'builder',
 					'_elementor_template_type'  => 'wp-page',
-					'_wp_page_template'         => 'elementor_header_footer',
+					'_wp_page_template'         => 'elementor_canvas',
 					'_elementor_data'           => '[]',
 					'_elementor_page_settings'  => array( 'hide_title' => 'yes' ),
 				),
@@ -552,7 +552,7 @@ class PressGo_MCP_Tools {
 				'meta_input'  => array(
 					'_elementor_edit_mode'      => 'builder',
 					'_elementor_template_type'  => 'wp-page',
-					'_wp_page_template'         => 'elementor_header_footer',
+					'_wp_page_template'         => 'elementor_canvas',
 					'_elementor_data'           => '[]',
 					'_elementor_page_settings'  => array( 'hide_title' => 'yes' ),
 				),
@@ -813,11 +813,12 @@ class PressGo_MCP_Tools {
 	}
 
 	private static function update_section( $args, $user ) {
-		$post_id = (int) ( $args['post_id'] ?? 0 );
-		$index   = (int) ( $args['section_index'] ?? -1 );
-		$type    = isset( $args['type'] ) ? sanitize_key( $args['type'] ) : '';
-		$variant = isset( $args['variant'] ) ? sanitize_key( $args['variant'] ) : '';
-		$data    = ( isset( $args['data'] ) && is_array( $args['data'] ) ) ? $args['data'] : null;
+		$post_id      = (int) ( $args['post_id'] ?? 0 );
+		$index        = (int) ( $args['section_index'] ?? -1 );
+		$type         = isset( $args['type'] ) ? sanitize_key( $args['type'] ) : '';
+		$variant_arg  = isset( $args['variant'] ) ? sanitize_key( $args['variant'] ) : null;
+		$variant_passed = array_key_exists( 'variant', $args );
+		$data         = ( isset( $args['data'] ) && is_array( $args['data'] ) ) ? $args['data'] : null;
 
 		$err = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
@@ -833,6 +834,23 @@ class PressGo_MCP_Tools {
 		$existing = self::read_elementor_data( $post_id );
 		if ( $index < 0 || $index >= count( $existing ) ) {
 			return new WP_Error( 'mcp_bad_args', "section_index {$index} is out of range (page has " . count( $existing ) . " sections)." );
+		}
+
+		// Preserve the existing variant if the caller didn't pass one. AI
+		// clients commonly omit `variant` expecting it to stay the same;
+		// silently switching to the default variant (and a different builder)
+		// is a high-impact failure mode.
+		$variant = '';
+		if ( $variant_passed && $variant_arg ) {
+			$variant = $variant_arg;
+		} else {
+			$prior_records = get_post_meta( $post_id, '_pressgo_sections', true );
+			if ( is_array( $prior_records ) && isset( $prior_records[ $index ] ) ) {
+				$prior = $prior_records[ $index ];
+				if ( isset( $prior['type'] ) && $prior['type'] === $type && ! empty( $prior['variant'] ) ) {
+					$variant = sanitize_key( $prior['variant'] );
+				}
+			}
 		}
 
 		$section_data = $data;
