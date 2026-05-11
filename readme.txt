@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,6 +139,19 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.1.0 =
+* **New MCP tool — upload_media**: AI clients (Claude / Cursor / etc.) can now upload images directly. Pass base64 bytes when the user pastes an image in chat, or pass a URL to fetch and copy from a public source. Returns a permanent WordPress media-library URL ready to use in any image field.
+* **New MCP tool — upload_media_chunked**: for larger images that overflow Claude's per-response token budget. Split the base64 into ~70KB chunks; the server reassembles and sideloads on the final call.
+* **New MCP tools — set_user_profile / get_user_profile**: first-time users now get a 3-4 question welcome wizard (designer / developer / marketer / business owner; small business / blog / portfolio / etc.; beginner / intermediate / advanced; voice preference). Answers persist per WP user across all future chats, so the wizard runs once. The MCP server auto-injects the saved profile into the initialize instructions block, so Claude calibrates tone + technical depth without re-asking.
+* **Brain doc additions**: get_brain now bundles new `section_schemas` (per-section field requirements), `validation_behavior` (what fails hard vs silent-coerces), `quickstart_minimal_configs` (copy-pasteable starter snippets), `known_gotchas`, and `agent_instructions` reference docs so AI clients build correct pages on the first try.
+* **Security hardening**: all CTA URLs now run through a sanitizer that strips javascript:, data:, file: schemes. Heading content is escaped (no raw <script> tags). Text-editor content runs through wp_kses_post. URL sanitizer applies at every link surface (hero/features/pricing/cta_final/footer/etc.).
+* **Field aliases for forgiveness**: features and steps accept `description` as an alias for `desc`; footer columns accept `items` as an alias for `links`. Eliminates the "Lorem ipsum leaking through because the field name was wrong" failure mode.
+* **Cache invalidation tightened**: write_elementor_data now clears `_elementor_css`, `_elementor_inner_section_css`, `_elementor_page_assets`, and `_elementor_controls_usage` post meta + fires the clean_post_cache action + WP Rocket hook. Fixes the "rapid add_sections then screenshot returns stale render" race.
+* **Hero validator relaxed**: only `headline` is strictly required. Subheadline, CTAs, and eyebrow are all optional and simply suppress their respective widgets when missing.
+* **Testimonials**: items with empty quote are skipped entirely. No more "John Doe / designer" placeholder leaking to published pages.
+* **Watch URL polish**: top-left now has "Edit" and "WP Admin" pills so users can jump from preview into the editor. Top-right status pill now distinguishes Live / Idle / Connection error states with a "N sections · updated Xs ago" meter. Admin bar suppressed inside the iframe so the preview looks like what a real visitor would see.
+* **MCP setup page**: rewrote the PressGo > MCP Server admin page as a clear 3-step flow with one-click URL copy and per-client setup snippets opened by default. New users now see what to do without clicking around.
+
 = 2.0.0 =
 * **Major release** — adds an MCP server so you can connect Claude Desktop, Cursor, claude.ai, Claude Code, or any MCP client to your site and build Elementor pages by chatting with your own AI subscription.
 * **Live editor sync** — toggle the "Live" pill in the Elementor editor and chat-driven edits appear in real time without reloading. Drag-and-drop alongside the AI.
@@ -192,6 +205,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.1.0 =
+Adds image upload via MCP (single-shot + chunked), first-time-user welcome wizard with persistent profile, security hardening on CTA URLs, and a clearer 3-step setup page. Backwards compatible.
 
 = 2.0.0 =
 Major release: adds an MCP server so Claude / Cursor / claude.ai can build Elementor pages on your site by chat with live preview. Existing text generator + credit billing unchanged.
