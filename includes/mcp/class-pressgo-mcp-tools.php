@@ -29,7 +29,7 @@ class PressGo_MCP_Tools {
 	 */
 	public static function definitions() {
 		$section_enum = self::VALID_SECTION_TYPES;
-		return array(
+		$defs = array(
 			array(
 				'name'        => 'create_page',
 				'description' =>
@@ -270,6 +270,34 @@ class PressGo_MCP_Tools {
 				),
 			),
 		);
+
+		// Annotations — required by the Anthropic Connectors Directory.
+		// Each tool gets a human display title and either a readOnlyHint
+		// (no side effects) or a destructiveHint (modifies state).
+		$annotations = array(
+			'create_page'      => array( 'title' => 'Create page',           'destructiveHint' => true,  'idempotentHint' => false ),
+			'add_section'      => array( 'title' => 'Add section',           'destructiveHint' => true,  'idempotentHint' => false ),
+			'add_sections'     => array( 'title' => 'Add sections (batched)','destructiveHint' => true,  'idempotentHint' => false ),
+			'update_section'   => array( 'title' => 'Update section',        'destructiveHint' => true,  'idempotentHint' => true  ),
+			'set_globals'      => array( 'title' => 'Update page globals',   'destructiveHint' => true,  'idempotentHint' => true  ),
+			'list_pages'       => array( 'title' => 'List pages',            'readOnlyHint'    => true,  'idempotentHint' => true  ),
+			'get_brain'        => array( 'title' => 'Read PressGo brain',    'readOnlyHint'    => true,  'idempotentHint' => true  ),
+			'screenshot_page'  => array( 'title' => 'Screenshot page',       'readOnlyHint'    => true,  'idempotentHint' => true,  'openWorldHint' => true ),
+			'inspect_page'     => array( 'title' => 'Inspect page state',    'readOnlyHint'    => true,  'idempotentHint' => true  ),
+			'clone_page'       => array( 'title' => 'Clone page',            'destructiveHint' => true,  'idempotentHint' => false ),
+			'undo_last_change' => array( 'title' => 'Undo last change',      'destructiveHint' => true,  'idempotentHint' => false ),
+			'set_header'       => array( 'title' => 'Set site-wide header (Pro)', 'destructiveHint' => true, 'idempotentHint' => true ),
+			'set_footer'       => array( 'title' => 'Set site-wide footer (Pro)', 'destructiveHint' => true, 'idempotentHint' => true ),
+			'get_header'       => array( 'title' => 'Read site-wide header', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
+			'get_footer'       => array( 'title' => 'Read site-wide footer', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
+		);
+		foreach ( $defs as &$def ) {
+			if ( isset( $def['name'], $annotations[ $def['name'] ] ) ) {
+				$def['annotations'] = $annotations[ $def['name'] ];
+			}
+		}
+		unset( $def );
+		return $defs;
 	}
 
 	/* ─── Dispatch ──────────────────────────────────────────────────── */

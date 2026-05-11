@@ -1,26 +1,30 @@
-=== PressGo — AI Page Builder for Elementor ===
+=== PressGo — AI Page Builder for Elementor (MCP + Generator) ===
 Contributors: acehobojoe
-Tags: elementor, ai, page builder, landing page, generator
+Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Describe a page in plain text and PressGo generates a fully editable Elementor landing page with a live streaming preview.
+Connect Claude / Cursor / any MCP client to your WordPress site and build Elementor pages by chat with live preview. Or use the built-in text generator.
 
 == Description ==
 
-PressGo turns a text description into a professional, fully editable Elementor landing page. Describe your business, pick a model, and watch the AI build your page section by section with a real-time streaming preview.
+PressGo gives WordPress two ways to build Elementor landing pages with AI:
 
-**Two ways to connect** — Use a free PressGo API key (includes 3 credits/month) for the easiest setup, or bring your own Anthropic API key for direct access.
+**1. MCP Server (new in 2.0)** — Connect Claude Desktop, Cursor, claude.ai web, Claude Code, or any Model Context Protocol client to your site. Chat with your AI like a designer ("build me a yoga studio landing page, modern feel, book-a-class CTA"), and watch sections appear in your Elementor editor in real time. You bring your own AI subscription — no per-page cost from us. Free tier: 3 page builds per day. PressGo Pro ($10/mo) lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
+
+**2. Built-in generator** — Type a text prompt in WordPress → PressGo → Generate, and PressGo builds a complete page using either a free PressGo account (3 credits/month included) or your own Anthropic API key. Pay-as-you-go credit packs available for higher volume.
 
 **Key Features:**
 
-* Generate complete landing pages from a text prompt
-* Upload a screenshot or sketch and get a matching page
-* Live streaming preview — watch sections appear as the AI writes them
+* MCP server with OAuth 2.1 + 11 tools for chat-driven page building
+* Live Elementor editor sync — chat edits appear in the editor without reloading
+* Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
+* "Watch URL" — share a live preview link with clients while you build
+* Built-in text generator with image upload + URL import
 * 19 section types with 48 layout variants
 * Every element is native Elementor — fully editable, no shortcodes
 * Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
@@ -135,6 +139,19 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.0.0 =
+* **Major release** — adds an MCP server so you can connect Claude Desktop, Cursor, claude.ai, Claude Code, or any MCP client to your site and build Elementor pages by chatting with your own AI subscription.
+* **Live editor sync** — toggle the "Live" pill in the Elementor editor and chat-driven edits appear in real time without reloading. Drag-and-drop alongside the AI.
+* **Pause-and-resume** — when you open the Elementor editor on a page the AI is working on, the AI pauses automatically using WordPress's `_edit_lock`. Your manual edits stay safe; tell the AI to continue when you're done.
+* **Watch URL** — every chat-built page gets a `pressgo-watch/{id}` link with a status pill (live / idle / connection error) so you can show clients real-time progress on any device.
+* **PressGo Pro tier** — $10/mo subscription adds site-wide custom header/footer, lifts the daily build cap, raises screenshot quota to 1,000/day, and unlocks all future Pro features. License-key activation in PressGo > MCP Server.
+* **Free-tier daily limit** — free MCP users can create up to 3 pages per UTC day. Iteration on existing pages is unlimited.
+* **OAuth 2.1 with PKCE + dynamic client registration** for the MCP endpoint, so AI clients can authenticate cleanly.
+* **11 MCP tools** — create_page, add_section, add_sections (batched), update_section, set_globals, list_pages, get_brain, screenshot_page, clone_page, undo_last_change, inspect_page (plus Pro-gated set_header/set_footer/get_header/get_footer).
+* **Designer-consultant flow** — the MCP server tells AI clients to interview the user before building, build the hero first for buy-in, ask for photos / voice memos / aspirational links, and offer to build a /style-guide/ page first if one isn't on the site.
+* **Migrated screenshot service** to a dedicated `screenshot.pressgo.app` Puppeteer endpoint so generation never bottlenecks on the main pressgo.app box.
+* Existing built-in text generator and credit-based billing are unchanged — both flows now coexist in one plugin.
+
 = 1.4.0 =
 * Added PressGo API mode — create a free account at pressgo.app, get 3 credits/month, and generate pages without managing your own API key
 * New API mode toggle in Settings: choose "PressGo API" or "Own API Key"
@@ -175,6 +192,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.0.0 =
+Major release: adds an MCP server so Claude / Cursor / claude.ai can build Elementor pages on your site by chat with live preview. Existing text generator + credit billing unchanged.
 
 = 1.4.0 =
 New PressGo API mode — get a free API key at pressgo.app with 3 credits/month included. No Anthropic account needed.
