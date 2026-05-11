@@ -273,17 +273,24 @@ class PressGo_MCP_Tools {
 				'name'        => 'upload_media_chunked',
 				'description' =>
 					"Upload a LARGE image by chunking. Use this when the base64 of the image is more " .
-					"than ~70KB (single-shot upload_media fails because the tool-call payload exceeds " .
-					"your per-response token budget). Recommended chunk size: 50KB raw = ~70KB base64 " .
-					"= ~17K tokens per call.\n\n" .
-					"How to use:\n" .
-					"  1. Split the base64 string into N chunks of ~70K characters each.\n" .
-					"  2. First call: pass the first chunk with `index=0`, `total=N` (and optional " .
-					"     `filename`/`alt`). Server returns an `upload_id`.\n" .
-					"  3. Subsequent calls: pass each next chunk with the same `upload_id`, " .
-					"     `index=N`, `total=N`.\n" .
-					"  4. LAST call (index = total-1) finalizes — server assembles, sideloads, " .
-					"     returns permanent URL + attachment ID like upload_media does.\n\n" .
+					"than ~16KB (single-shot upload_media fails on anything bigger). The constraint " .
+					"is YOUR output budget per tool call, not the server — each call's args have to " .
+					"fit in one of your responses.\n\n" .
+					"### Chunk size — IMPORTANT\n" .
+					"**Use chunks of EXACTLY 16,000 base64 characters or smaller**. Larger chunks " .
+					"hit your max_tokens ceiling on a single response and the tool call gets cut off " .
+					"mid-stream (you'll see the request spin forever and never get a reply). 16K " .
+					"base64 ≈ 12KB raw bytes ≈ ~4K output tokens, which fits comfortably.\n\n" .
+					"For a typical 500KB photo: base64 is ~680KB → 43 chunks at 16K each. That sounds " .
+					"like a lot, but each call is fast and the user sees real progress (\"45% uploaded\").\n\n" .
+					"### Procedure\n" .
+					"  1. Compute the total: `total = ceil(base64.length / 16000)`.\n" .
+					"  2. First call: chunk = base64[0:16000], index=0, total=N, (filename, alt). " .
+					"     Server returns `upload_id`.\n" .
+					"  3. Subsequent calls: chunk = base64[i*16000 : (i+1)*16000], index=i, total=N, " .
+					"     upload_id=<the id from step 2>. (Pass `alt` again on the last call too.)\n" .
+					"  4. Last call (index=total-1) finalizes — server assembles + sideloads + " .
+					"     returns the permanent media URL + attachment ID.\n\n" .
 					"Server enforces 10MB total. Allowed MIMEs: PNG, JPG, GIF, WEBP.",
 				'inputSchema' => array(
 					'type'       => 'object',

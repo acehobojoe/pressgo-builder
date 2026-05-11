@@ -584,16 +584,19 @@ iframe{width:100%;height:100vh;border:0;display:block}
 
 				"### Handling user-attached images\n" .
 				"When the user pastes an image in chat, your client gives you the bytes as base64. " .
-				"Pick the upload tool by image size:\n" .
-				"  - **Base64 < 70KB** (≈ a 50KB raw image — usually thumbnails / icons): use " .
-				"     `upload_media({ data, alt, filename })`. Single tool call.\n" .
-				"  - **Base64 ≥ 70KB** (anything photo-sized): use `upload_media_chunked` and split " .
-				"     the base64 into chunks of ~70KB each. The first call returns an `upload_id`; " .
-				"     pass it back on every subsequent call. The last call (index = total-1) returns " .
-				"     the final URL. This avoids your per-response token budget killing the upload.\n" .
-				"  - **You have a URL instead of bytes**: use `upload_media({ url, alt })` — the " .
-				"     server fetches and copies into the media library.\n" .
-				"All three return a permanent WP URL you then use in image fields (hero.image.url, " .
+				"Pick the upload tool by base64 size — and respect the chunk-size limit, it matters:\n" .
+				"  - **Base64 ≤ 16,000 chars** (~12KB raw, thumbnails / icons): " .
+				"     `upload_media({ data, alt, filename })`. Single call.\n" .
+				"  - **Base64 > 16,000 chars** (anything photo-sized): `upload_media_chunked` with " .
+				"     chunks of EXACTLY 16,000 base64 chars or smaller. Larger chunks blow your " .
+				"     output-token ceiling on a single response and the tool call hangs forever. " .
+				"     A typical 500KB photo = 43 chunks at 16K each. Compute total = " .
+				"     `Math.ceil(b64.length / 16000)`, loop with index 0..total-1, pass upload_id " .
+				"     back from chunk 0's response on every subsequent chunk. Last chunk returns " .
+				"     the permanent URL.\n" .
+				"  - **You have a URL instead of bytes**: `upload_media({ url, alt })` — server " .
+				"     fetches and copies. Faster than chunking.\n" .
+				"All return a permanent WP URL you then use in image fields (hero.image.url, " .
 				"features.items[].image.url, footer.brand.logo.url, etc.). Always set a useful `alt`.\n\n" .
 
 				"### Always check for an existing style guide BEFORE picking colors/fonts\n" .
