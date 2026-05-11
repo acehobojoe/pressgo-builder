@@ -80,6 +80,7 @@ class PressGo_MCP_Server {
 		$preview_url = add_query_arg( $qs, home_url( '/' ) );
 
 		$version_url = rest_url( "pressgo/v1/page/{$post_id}/version" );
+		$upload_url  = rest_url( 'pressgo/v1/media-upload' );
 		$nonce       = wp_create_nonce( 'wp_rest' );
 		$title       = esc_html( $post->post_title ?: 'Untitled' );
 		$edit_url    = esc_url( admin_url( "post.php?post={$post_id}&action=elementor" ) );
@@ -140,6 +141,51 @@ iframe{width:100%;height:100vh;border:0;display:block}
 #pgactions a:hover{opacity:1;transform:translateY(-1px);color:#fff}
 #pgactions a.primary{background:#4364e8;color:#fff;opacity:1}
 #pgactions a.primary:hover{background:#3754d5}
+
+/* Drop zone — full-page overlay when user drags a file over the window. */
+#pgdrop-overlay{
+	position:fixed;inset:0;z-index:9998;display:none;
+	background:rgba(67,100,232,0.85);backdrop-filter:blur(4px);
+	-webkit-backdrop-filter:blur(4px);
+	align-items:center;justify-content:center;
+	color:#fff;font:600 24px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	text-align:center;pointer-events:none;
+}
+#pgdrop-overlay.active{display:flex}
+#pgdrop-overlay .inner{padding:60px 80px;border:3px dashed rgba(255,255,255,0.6);border-radius:24px;max-width:520px}
+#pgdrop-overlay .sub{font-size:14px;font-weight:500;opacity:0.85;margin-top:8px}
+
+/* Drop button (small pill, opens file picker as alternative to drag-drop) */
+#pgdrop-btn{
+	position:fixed;bottom:16px;left:16px;z-index:9999;
+	display:inline-flex;align-items:center;gap:7px;
+	padding:7px 14px;border-radius:999px;
+	background:rgba(28,30,36,0.92);color:#dde0e7;border:none;
+	font:600 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	letter-spacing:0.4px;text-transform:uppercase;
+	box-shadow:0 2px 10px rgba(0,0,0,0.25);
+	backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+	cursor:pointer;opacity:0.85;transition:opacity 0.15s,transform 0.15s;
+}
+#pgdrop-btn:hover{opacity:1;transform:translateY(-1px);color:#fff}
+#pgdrop-btn.uploading{background:#4364e8;color:#fff;opacity:1}
+
+/* Toast after successful upload */
+#pgtoast{
+	position:fixed;bottom:60px;left:16px;z-index:9999;
+	max-width:420px;display:none;
+	padding:14px 18px;border-radius:14px;
+	background:rgba(28,30,36,0.96);color:#fff;
+	font:500 13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	box-shadow:0 8px 28px rgba(0,0,0,0.35);
+	backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+#pgtoast.show{display:block;animation:pgtoast-in 0.25s ease-out}
+@keyframes pgtoast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#pgtoast .filename{font-weight:700;color:#fff}
+#pgtoast .url{font-family:Menlo,Monaco,monospace;font-size:11px;background:rgba(255,255,255,0.1);padding:6px 8px;border-radius:6px;margin-top:6px;display:block;word-break:break-all}
+#pgtoast button{background:#4364e8;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:8px;font-size:12px}
+#pgtoast button:hover{background:#3754d5}
 </style>
 </head>
 <body>
@@ -150,6 +196,97 @@ iframe{width:100%;height:100vh;border:0;display:block}
 	</a>
 	<a href="<?php echo $wp_admin; ?>" target="_blank" rel="noopener" title="WordPress admin">WP Admin</a>
 </div>
+
+<button type="button" id="pgdrop-btn" title="Drag any image onto this page, or click to choose">📷 Drop image</button>
+<div id="pgdrop-overlay">
+	<div class="inner">
+		Drop the image anywhere
+		<div class="sub">It uploads to your WordPress media library — your AI will see it next time it lists recent media.</div>
+	</div>
+</div>
+<div id="pgtoast" role="status" aria-live="polite"></div>
+<input type="file" id="pgdrop-file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
+
+<script>
+(function(){
+	var UPLOAD_URL = <?php echo wp_json_encode( $upload_url ); ?>;
+	var NONCE      = <?php echo wp_json_encode( $nonce ); ?>;
+
+	var btn      = document.getElementById('pgdrop-btn');
+	var overlay  = document.getElementById('pgdrop-overlay');
+	var toast    = document.getElementById('pgtoast');
+	var fileIn   = document.getElementById('pgdrop-file');
+	var dragDepth = 0;
+
+	function showToast(html, ms){
+		toast.innerHTML = html;
+		toast.classList.add('show');
+		clearTimeout(toast._t);
+		toast._t = setTimeout(function(){ toast.classList.remove('show'); }, ms || 8000);
+	}
+	function isImageDrag(e){
+		if (!e.dataTransfer) return false;
+		var t = e.dataTransfer.types;
+		return t && (Array.prototype.indexOf.call(t,'Files') !== -1);
+	}
+
+	window.addEventListener('dragenter', function(e){
+		if (!isImageDrag(e)) return;
+		e.preventDefault(); dragDepth++;
+		overlay.classList.add('active');
+	});
+	window.addEventListener('dragover', function(e){
+		if (isImageDrag(e)) e.preventDefault();
+	});
+	window.addEventListener('dragleave', function(e){
+		if (!isImageDrag(e)) return;
+		dragDepth--;
+		if (dragDepth <= 0) { dragDepth = 0; overlay.classList.remove('active'); }
+	});
+	window.addEventListener('drop', function(e){
+		if (!isImageDrag(e)) return;
+		e.preventDefault();
+		dragDepth = 0; overlay.classList.remove('active');
+		var files = e.dataTransfer.files;
+		if (files && files.length) upload(files[0]);
+	});
+
+	btn.addEventListener('click', function(){ fileIn.click(); });
+	fileIn.addEventListener('change', function(){
+		if (fileIn.files && fileIn.files[0]) upload(fileIn.files[0]);
+		fileIn.value = '';
+	});
+
+	function upload(file){
+		btn.classList.add('uploading');
+		btn.textContent = 'Uploading…';
+		var fd = new FormData();
+		fd.append('file', file);
+		fetch(UPLOAD_URL, {
+			method: 'POST',
+			body: fd,
+			credentials: 'same-origin',
+			headers: { 'X-WP-Nonce': NONCE },
+		}).then(function(r){
+			return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error || ('HTTP ' + r.status)); });
+		}).then(function(data){
+			btn.classList.remove('uploading');
+			btn.textContent = '📷 Drop image';
+			showToast(
+				'<div>Uploaded <span class="filename">' + (data.filename || 'image') + '</span>'
+				+ (data.width ? ' · ' + data.width + '×' + data.height : '') + '</div>'
+				+ '<code class="url">' + data.url + '</code>'
+				+ '<button onclick="navigator.clipboard.writeText(' + JSON.stringify(data.url) + ');this.textContent=\'Copied!\'">Copy URL</button>',
+				15000
+			);
+		}).catch(function(err){
+			btn.classList.remove('uploading');
+			btn.textContent = '📷 Drop image';
+			showToast('<div style="color:#ffb3b3">Upload failed: ' + (err.message || err) + '</div>', 6000);
+		});
+	}
+})();
+</script>
 <div id="pgstatus" role="status" aria-live="polite">
 	<span class="dot" aria-hidden="true"></span>
 	<span class="label">Connecting…</span>
@@ -282,6 +419,16 @@ iframe{width:100%;height:100vh;border:0;display:block}
 			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
 		) );
 
+		// Drop-from-watch-page upload endpoint. Logged-in user with
+		// upload_files capability can multipart-POST a file here from the
+		// watch URL's drop zone. Returns the resulting attachment URL.
+		// AI clients then find the upload via list_recent_media.
+		register_rest_route( 'pressgo/v1', '/media-upload', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'handle_media_upload' ),
+			'permission_callback' => function () { return current_user_can( 'upload_files' ); },
+		) );
+
 		register_rest_route( 'pressgo/v1', '/mcp', array(
 			array(
 				'methods'             => 'POST',
@@ -305,6 +452,47 @@ iframe{width:100%;height:100vh;border:0;display:block}
 
 	public function handle_options() {
 		return $this->cors( new WP_REST_Response( null, 204 ) );
+	}
+
+	public function handle_media_upload( WP_REST_Request $request ) {
+		$files = $request->get_file_params();
+		if ( empty( $files['file'] ) ) {
+			return new WP_REST_Response( array( 'error' => 'No file uploaded under `file`.' ), 400 );
+		}
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		// media_handle_upload picks up $_FILES['file'] and runs full WP
+		// upload validation + attachment creation + thumbnail generation.
+		$attach_id = media_handle_upload( 'file', 0, array(), array(
+			'mimes' => array(
+				'png'      => 'image/png',
+				'jpg|jpeg' => 'image/jpeg',
+				'gif'      => 'image/gif',
+				'webp'     => 'image/webp',
+			),
+			'test_form' => false,
+		) );
+		if ( is_wp_error( $attach_id ) ) {
+			return new WP_REST_Response( array( 'error' => $attach_id->get_error_message() ), 400 );
+		}
+
+		$alt = sanitize_text_field( (string) $request->get_param( 'alt' ) );
+		if ( '' !== $alt ) {
+			update_post_meta( $attach_id, '_wp_attachment_image_alt', $alt );
+		}
+
+		$meta = wp_get_attachment_metadata( $attach_id );
+		return new WP_REST_Response( array(
+			'id'       => (int) $attach_id,
+			'url'      => wp_get_attachment_url( $attach_id ),
+			'filename' => basename( get_attached_file( $attach_id ) ?: '' ),
+			'mime'     => get_post_mime_type( $attach_id ),
+			'alt'      => $alt,
+			'width'    => isset( $meta['width'] )  ? (int) $meta['width']  : null,
+			'height'   => isset( $meta['height'] ) ? (int) $meta['height'] : null,
+		), 200 );
 	}
 
 	public function handle_page_version( WP_REST_Request $request ) {
