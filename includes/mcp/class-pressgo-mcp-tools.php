@@ -399,6 +399,9 @@ class PressGo_MCP_Tools {
 		// Increment the daily free counter only on successful create.
 		self::increment_free_create_counter();
 
+		// Fire-and-forget heartbeat to pressgo.app for real-time visibility.
+		self::send_heartbeat();
+
 		$watch_url = class_exists( 'PressGo_MCP_Admin' ) ? PressGo_MCP_Admin::watch_url( $post_id ) : '';
 		$note = "Page created (id={$post_id}).\n\n" .
 			"⚠️ ACTION REQUIRED: Tell the user this URL to watch you build the page live in their browser:\n" .
@@ -458,6 +461,36 @@ class PressGo_MCP_Tools {
 		$key   = 'pressgo_free_creates_' . gmdate( 'Y-m-d' );
 		$count = (int) get_option( $key, 0 );
 		update_option( $key, $count + 1, false ); // autoload=false so this doesn't bloat object cache
+	}
+
+	/**
+	 * Fire-and-forget heartbeat POST to pressgo.app/api/plugin/heartbeat after
+	 * a successful create_page. Tells the backend our current count + tier so
+	 * we have real-time per-site visibility on the admin endpoint.
+	 *
+	 * Uses non-blocking wp_remote_post (timeout=0.01s) — adds ~0 latency to
+	 * the user-facing call. Failures are silently ignored.
+	 */
+	public static function send_heartbeat() {
+		global $wp_version;
+		$is_pro = class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro();
+		$tier   = $is_pro ? 'pro' : 'free';
+		$count  = $is_pro ? 0 : (int) get_option( 'pressgo_free_creates_' . gmdate( 'Y-m-d' ), 0 );
+
+		wp_remote_post( 'https://pressgo.app/api/plugin/heartbeat', array(
+			'timeout'  => 0.01, // fire-and-forget
+			'blocking' => false,
+			'headers'  => array(
+				'Content-Type'   => 'application/json',
+				'X-Pressgo-Site' => md5( home_url() ),
+				'X-Pressgo-Tier' => $tier,
+			),
+			'body'     => wp_json_encode( array(
+				'creates_today'  => $count,
+				'plugin_version' => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
+				'wp_version'     => $wp_version ?? '',
+			) ),
+		) );
 	}
 
 	/**
