@@ -3262,8 +3262,20 @@ class PressGo_Section_Builder {
 	// ──────────────────────────────────────────────
 
 	public static function build_disclaimer( $cfg ) {
-		$c    = $cfg['colors'];
-		$text = isset( $cfg['disclaimer'] ) ? $cfg['disclaimer'] : '';
+		$c   = $cfg['colors'];
+		$raw = isset( $cfg['disclaimer'] ) ? $cfg['disclaimer'] : '';
+
+		// Accept either a flat string (top-level config style) or an object
+		// {text: "..."}. add_section's contract requires data to be an
+		// array, so AI clients always pass the object form — without this
+		// alias the section silently failed.
+		if ( is_array( $raw ) ) {
+			$text = isset( $raw['text'] ) ? (string) $raw['text']
+				: ( isset( $raw['content'] ) ? (string) $raw['content']
+				: ( isset( $raw['disclaimer'] ) ? (string) $raw['disclaimer'] : '' ) );
+		} else {
+			$text = (string) $raw;
+		}
 
 		if ( empty( $text ) ) {
 			return null;
