@@ -15,6 +15,35 @@ class PressGo_Section_Builder {
 	private static function s() { return 'PressGo_Style_Utils'; }
 
 	/**
+	 * Inline button group — a flexbox row that lets buttons size to their
+	 * content and stay grouped (instead of getting wrapped in 50%-width
+	 * columns by row(), which pushes them to opposite edges of the row).
+	 * Use this for hero CTAs, pricing card CTAs, etc.
+	 */
+	private static function btn_group( $buttons, $align = 'center', $gap = 12 ) {
+		return array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'isInner'  => true,
+			'settings' => array(
+				'container_type'        => 'flex',
+				'content_width'         => 'full',
+				'flex_direction'        => 'row',
+				'flex_direction_mobile' => 'column',
+				'flex_wrap'             => 'wrap',
+				'flex_justify_content'  => $align === 'left' ? 'flex-start'
+					: ( $align === 'right' ? 'flex-end' : 'center' ),
+				'flex_align_items'      => 'center',
+				'flex_gap'              => array(
+					'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap,
+					'isLinked' => true,
+				),
+			),
+			'elements' => $buttons,
+		);
+	}
+
+	/**
 	 * Parse a stat value like "$2,500+" or "98%" into [prefix, number, suffix].
 	 * Commas inside the number are stripped (so "$2,500+" → 2500, not 2).
 	 * Non-numeric values fall back to number=0.
@@ -93,44 +122,29 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
-		// CTA buttons.
-		$btn_cols = array(
-			PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
-					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['accent'], $c['white'], null,
-					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			),
+		// CTA buttons grouped + centered (not split to row edges by 50%-cols).
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['accent'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
 		);
-
 		if ( $cta2 ) {
-			$btn_cols[] = PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
-					isset( $cta2['url'] ) ? $cta2['url'] : '#',
-					'transparent', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			);
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'transparent', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' );
 		}
+		$children[] = self::btn_group( $btns, 'center', 14 );
 
-		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
-
-		// Trust line with star-rating widget.
+		// Trust line — own centered line below CTAs, not absorbed into the
+		// CTA row.
 		if ( ! empty( $h['trust_line'] ) ) {
-			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							'rgba(255,255,255,0.5)', 14 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$children[] = $trust_row;
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					'rgba(255,255,255,0.55)', 13 ),
+			), 'center', 10 );
 		}
 
 		// Parse primary color for radial overlay.
@@ -183,7 +197,7 @@ class PressGo_Section_Builder {
 		$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $c['text_muted'], 17, 15, 1.7, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 24 );
 
-		// Buttons row.
+		// CTA buttons grouped (left-aligned for split hero).
 		$btn_children = array(
 			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
 				isset( $cta1['url'] ) ? $cta1['url'] : '#',
@@ -195,26 +209,15 @@ class PressGo_Section_Builder {
 				isset( $cta2['url'] ) ? $cta2['url'] : '#',
 				'transparent', $c['text_dark'], $c['border'] );
 		}
-		$left[] = PressGo_Element_Factory::row( $cfg,
-			array_map( function( $btn ) {
-				return PressGo_Element_Factory::col( array( $btn ) );
-			}, $btn_children ), 12 );
+		$left[] = self::btn_group( $btn_children, 'left', 12 );
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$left[] = PressGo_Widget_Helpers::spacer_w( 20 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							$c['text_muted'], 13 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$left[] = $trust_row;
+			$left[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+					$c['text_muted'], 13 ),
+			), 'left', 10 );
 		}
 
 		// Right column: image.
@@ -283,41 +286,27 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.8)', 19, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
-		// CTA buttons.
-		$btn_cols = array(
-			PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
-					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['accent'], $c['white'], null,
-					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			),
+		// CTA buttons grouped + centered.
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['accent'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
 		);
 		if ( $cta2 ) {
-			$btn_cols[] = PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
-					isset( $cta2['url'] ) ? $cta2['url'] : '#',
-					'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			);
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' );
 		}
-		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
+		$children[] = self::btn_group( $btns, 'center', 14 );
 
 		if ( ! empty( $h['trust_line'] ) ) {
-			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							'rgba(255,255,255,0.6)', 14 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$children[] = $trust_row;
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					'rgba(255,255,255,0.6)', 13 ),
+			), 'center', 10 );
 		}
 
 		// Build section with background image + dark overlay.
@@ -382,39 +371,27 @@ class PressGo_Section_Builder {
 			$c['text_muted'], 18, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
-		// CTA buttons.
-		$btn_cols = array(
-			PressGo_Element_Factory::col( array(
-				PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
-					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['primary'], $c['white'], null,
-					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'right' ),
-			) ),
+		// CTA buttons grouped + centered.
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['primary'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
 		);
 		if ( $cta2 ) {
-			$btn_cols[] = PressGo_Element_Factory::col( array(
-				PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
-					isset( $cta2['url'] ) ? $cta2['url'] : '#',
-					'transparent', $c['text_dark'], $c['border'], null, 'left' ),
-			) );
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'transparent', $c['text_dark'], $c['border'], null, 'center' );
 		}
-		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 12 );
+		$children[] = self::btn_group( $btns, 'center', 12 );
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							$c['text_muted'], 13 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$children[] = $trust_row;
+			$children[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					$c['text_muted'], 13 ),
+			), 'center', 10 );
 		}
 
 		// Video embed below the CTA.
@@ -463,43 +440,29 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.8)', 19, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
-		// CTA buttons. Primary CTA renders on a white background — use a
-		// guaranteed-dark text color (not text_dark, which inverts to light
-		// on dark-themed pages and disappears against the white button).
-		$btn_cols = array(
-			PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
-					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['white'], PressGo_Style_Utils::card_text(), null,
-					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			),
+		// CTA buttons grouped + centered. Primary CTA on white background
+		// uses card_text() (always near-black) so dark-themed pages don't
+		// render invisible white-on-white text.
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['white'], PressGo_Style_Utils::card_text(), null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
 		);
 		if ( $cta2 ) {
-			$btn_cols[] = PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
-					isset( $cta2['url'] ) ? $cta2['url'] : '#',
-					'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			);
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' );
 		}
-		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
+		$children[] = self::btn_group( $btns, 'center', 14 );
 
 		if ( ! empty( $h['trust_line'] ) ) {
-			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							'rgba(255,255,255,0.5)', 14 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$children[] = $trust_row;
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					'rgba(255,255,255,0.55)', 13 ),
+			), 'center', 10 );
 		}
 
 		// Colorful gradient using primary + a contrasting color.
@@ -551,44 +514,28 @@ class PressGo_Section_Builder {
 			$c['text_muted'], 18, 15 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
-		// CTA buttons.
-		$btn_cols = array(
-			PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
-					isset( $cta1['url'] ) ? $cta1['url'] : '#',
-					$c['primary'], $c['white'], null,
-					isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			),
+		// CTA buttons grouped + centered.
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['primary'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
 		);
-
 		if ( $cta2 ) {
-			$btn_cols[] = PressGo_Element_Factory::col(
-				array( PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
-					isset( $cta2['url'] ) ? $cta2['url'] : '#',
-					'transparent', $c['text_dark'], $c['border'], null, 'center' ) ),
-				array( 'vertical_align' => 'middle' )
-			);
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'transparent', $c['text_dark'], $c['border'], null, 'center' );
 		}
+		$children[] = self::btn_group( $btns, 'center', 14 );
 
-		$children[] = PressGo_Element_Factory::row( $cfg, $btn_cols, 16 );
-
-		// Trust line.
+		// Trust line — own centered line below CTAs.
 		if ( ! empty( $h['trust_line'] ) ) {
-			$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
-			$trust_row = PressGo_Element_Factory::row( $cfg,
-				array(
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'right' ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-					PressGo_Element_Factory::col(
-						array( PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-							$c['text_muted'], 14 ) ),
-						array( 'vertical_align' => 'middle' )
-					),
-				), 8 );
-			$children[] = $trust_row;
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = self::btn_group( array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					$c['text_muted'], 13 ),
+			), 'center', 10 );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -2757,8 +2704,24 @@ class PressGo_Section_Builder {
 			if ( ! empty( $member['photo'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
 					$member['name'], 120, 999, false, 'center' );
-				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			} else {
+				// Initials placeholder so the member card doesn't have a
+				// gaping empty avatar slot when photo is missing.
+				$initials = '';
+				$parts = preg_split( '/\s+/', trim( (string) $member['name'] ) );
+				foreach ( $parts as $p ) {
+					if ( $p !== '' ) { $initials .= strtoupper( substr( $p, 0, 1 ) ); }
+					if ( strlen( $initials ) >= 2 ) { break; }
+				}
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+					'<div style="width:100px;height:100px;border-radius:9999px;margin:0 auto;'
+					. 'display:flex;align-items:center;justify-content:center;'
+					. 'background:' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.12 ) . ';'
+					. 'color:' . $c['primary'] . ';font-size:30px;font-weight:700;'
+					. 'line-height:1;letter-spacing:-1px;">' . esc_html( $initials ) . '</div>',
+					'center', null, 14 );
 			}
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $member['name'], 'h5', 'center',
 				$c['text_dark'], 17, '700' );
@@ -2769,7 +2732,7 @@ class PressGo_Section_Builder {
 			if ( ! empty( $member['social'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 				$widgets[] = PressGo_Widget_Helpers::social_icons_w(
-					$member['social'], 10, 'custom', $c['text_muted'], 'circle', 'center', 6
+					$member['social'], 10, 'custom', $c['primary'], 'circle', 'center', 6
 				);
 			}
 
@@ -3048,12 +3011,19 @@ class PressGo_Section_Builder {
 		$images  = isset( $gl['images'] ) ? $gl['images'] : array();
 		$columns = isset( $gl['columns'] ) ? $gl['columns'] : 3;
 
-		// Build image gallery using Elementor's gallery widget.
+		// Build gallery items. Elementor's image-gallery widget binds images
+		// by ATTACHMENT ID, not URL — passing url+id='' falls back to a
+		// totally unrelated image (often the first attachment in the media
+		// library). Look up the WP attachment ID from the URL so the
+		// gallery actually shows what was passed.
 		$gallery_items = array();
 		foreach ( $images as $img ) {
+			$url = is_array( $img ) ? ( isset( $img['url'] ) ? $img['url'] : '' ) : $img;
+			if ( ! $url ) { continue; }
+			$attach_id = attachment_url_to_postid( $url );
 			$gallery_items[] = array(
-				'url' => is_array( $img ) ? $img['url'] : $img,
-				'id'  => '',
+				'url' => $url,
+				'id'  => $attach_id ? (string) $attach_id : '',
 				'alt' => is_array( $img ) && isset( $img['alt'] ) ? $img['alt'] : '',
 			);
 		}

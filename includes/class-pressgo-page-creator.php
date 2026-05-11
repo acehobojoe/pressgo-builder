@@ -131,6 +131,28 @@ class PressGo_Page_Creator {
     color: rgba(255,255,255,0.8) !important;
 }
 
+/* Anchor hover — inherit brand primary instead of browser-blue underline.
+ * Scoped to widget content so it doesn't override theme nav styling. */
+.elementor-widget-text-editor a,
+.elementor-widget-text-editor a:visited,
+.elementor-widget-heading a,
+.elementor-widget-heading a:visited {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+.elementor-widget-text-editor a:hover,
+.elementor-widget-heading a:hover {
+    color: {$primary};
+    text-decoration: none;
+}
+/* Dark sections get a lighter hover so primary stays readable. */
+.e-parent[style*='background-color: rgb(10'] .elementor-widget-text-editor a:hover,
+.e-parent[style*='background-color: rgb(15'] .elementor-widget-text-editor a:hover,
+.e-parent[style*='background-color: rgb(11'] .elementor-widget-text-editor a:hover {
+    color: rgba(255,255,255,0.9);
+}
+
 /* Smooth scroll */
 html {
     scroll-behavior: smooth;
