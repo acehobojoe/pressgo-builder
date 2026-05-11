@@ -277,8 +277,31 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Image widget.
 	 */
+	/**
+	 * Normalize an image field that may be either a plain URL string or a
+	 * media object {url, alt, id} (the brain documents the object form).
+	 * Returns array('url' => string, 'alt' => string).
+	 */
+	public static function normalize_image( $value ) {
+		if ( is_array( $value ) ) {
+			return array(
+				'url' => isset( $value['url'] ) ? (string) $value['url'] : '',
+				'alt' => isset( $value['alt'] ) ? (string) $value['alt'] : '',
+			);
+		}
+		return array( 'url' => (string) $value, 'alt' => '' );
+	}
+
 	public static function image_w( $url, $alt = '', $width = null, $radius = 0,
 									$shadow = false, $align = 'center' ) {
+		// Accept either a string URL or a {url, alt} object — AI clients
+		// often pass the object form because that's what the brain media
+		// type documents.
+		$norm = self::normalize_image( $url );
+		$url  = $norm['url'];
+		if ( empty( $alt ) && ! empty( $norm['alt'] ) ) {
+			$alt = $norm['alt'];
+		}
 		$s = array(
 			'image'      => array( 'url' => $url, 'id' => '', 'alt' => $alt, 'source' => 'library' ),
 			'image_size' => 'full',

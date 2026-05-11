@@ -35,7 +35,7 @@ const SITE = process.env.PRESSGO_TEST_SITE || 'https://wp.pressgo.app';
 const SSH  = process.env.PRESSGO_TEST_SSH  || 'digitalocean';
 const WPDIR = process.env.PRESSGO_TEST_WPDIR || '/var/www/wp.pressgo.app/htdocs';
 const MCP_URL = `${SITE}/wp-json/pressgo/v1/mcp`;
-const MODEL   = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+const MODEL   = process.env.MODEL || 'claude-opus-4-7';
 const MAX_TOKENS = 6000;  // Generous so tool calls don't truncate mid-execution.
 
 // ─── Auth ────────────────────────────────────────────────────────────
@@ -108,6 +108,30 @@ const SCENARIOS = [
       "I write conversion copy for B2B SaaS. Visitors are usually marketing leads or founders looking for help with landing pages or email sequences. Goal: book a discovery call. Voice: confident, slightly irreverent, no fluff. Calendly link: https://calendly.com/copywriter/discovery",
       "Sections: hero, social proof (logos), services, work samples (3 case studies), testimonials, FAQ, final CTA. Use stock for now — I'll swap in real client logos later.",
       "Cool, draft it.",
+    ],
+  },
+
+  {
+    name: 'plumber-with-image-mention',
+    description: 'Mirrors a real session that failed: user mentions uploading images. AI should NOT look in the chat-uploads folder — it should call list_recent_media to check the WP media library.',
+    topics: ['voice', 'visitor', 'cta', 'photos'],
+    expect_no_uploads_folder_check: true,
+    turns: [
+      "Can you start a design for a plumbing company with pressgo builder and give me the watch url",
+      "Steve's plumbing, let me give some images. ok i added you some. 123 johnson st. we do only residential and we want to focus on irrigation systems, modern",
+      "go ahead and build it out",
+    ],
+  },
+
+  {
+    name: 'image-upload-via-watch-url',
+    description: 'User uploads a real image via the watch URL drop zone. AI should find it via list_recent_media and use the wp.pressgo.app URL — NOT a Pexels fallback.',
+    topics: ['voice', 'cta'],
+    turns: [
+      "Build a yoga studio landing page. Brand is Sun Salutation, in Austin, focus on beginners and prenatal classes. Warm, calm voice. Cream + sage green. Book-a-class CTA goes to https://sunsalutation.com/book.",
+      // 2nd turn — we'll programmatically upload an image to the media library before this turn fires
+      "ok i just dropped a hero image into the watch URL — it's a sun-soaked studio interior. use that for the hero.",
+      "looks good ship it",
     ],
   },
 
@@ -236,6 +260,15 @@ function score(scenario, log) {
   // Were any tool calls successful end-to-end?
   const sentInlineWatchUrl = /pressgo-watch/.test(allDiscoveryText);
 
+  // Watch-URL upload routing: when user says "I dropped/uploaded an image",
+  // AI must NOT mention checking the chat-uploads folder, and SHOULD have
+  // called list_recent_media. Real failure mode from Joe's session.
+  const userMentionedUpload = scenario.turns.some(t =>
+    /\b(drop|drop in|dropped|upload|uploaded|added you|sent you|added some|gave you).*image|image.*for you/i.test(t));
+  const aiCheckedChatUploads = /(\/mnt\/user-data\/uploads|chat-uploads folder|uploads folder is empty)/i.test(allDiscoveryText);
+  const aiCalledListRecentMedia = log.some(t =>
+    (t.tool_calls || []).some(c => c.name && c.name.endsWith('list_recent_media')));
+
   return {
     turns:                  log.length,
     turns_before_first_tool: turnsBeforeFirstTool,
@@ -245,6 +278,9 @@ function score(scenario, log) {
     topics_missed:          (scenario.topics || []).filter(t => !topicsMentioned.includes(t)),
     proposed_outline:       proposedOutline,
     sent_watch_url:         sentInlineWatchUrl,
+    user_mentioned_upload:  userMentionedUpload,
+    ai_checked_chat_uploads: aiCheckedChatUploads,
+    ai_called_list_recent_media: aiCalledListRecentMedia,
     tool_call_sequence:     log.flatMap(t => (t.tool_calls || []).map(c => c.name)),
   };
 }
@@ -304,6 +340,11 @@ async function main() {
     console.log(`    topics_missed           : [${s.topics_missed.join(', ')}] ${markGood(s.topics_missed.length === 0)}`);
     console.log(`    proposed_outline        : ${s.proposed_outline} ${markGood(s.proposed_outline)}`);
     console.log(`    shared_watch_url        : ${s.sent_watch_url} ${markGood(s.sent_watch_url)}`);
+    if (s.user_mentioned_upload) {
+      console.log(`    user_mentioned_upload   : true`);
+      console.log(`    ai_checked_chat_uploads : ${s.ai_checked_chat_uploads} ${markGood(!s.ai_checked_chat_uploads)}  (should be false)`);
+      console.log(`    ai_called_list_recent_media : ${s.ai_called_list_recent_media} ${markGood(s.ai_called_list_recent_media)}  (should be true)`);
+    }
     console.log(`    tool_call_sequence      : ${s.tool_call_sequence.join(' → ')}`);
 
     // Save full transcript for forensics.

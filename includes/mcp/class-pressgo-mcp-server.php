@@ -177,21 +177,30 @@ iframe#f{position:relative;z-index:0}
 #pgdrop-btn:hover{opacity:1;transform:translateY(-1px);color:#fff}
 #pgdrop-btn.uploading{background:#4364e8;color:#fff;opacity:1}
 
-/* Toast after successful upload */
+/* Toast stack — recent upload results, newest on top.
+ * pointer-events: none on the wrapper so drags pass through to the overlay
+ * even when the toast is visible. Individual rows re-enable for buttons. */
 #pgtoast{
-	position:fixed;bottom:60px;left:16px;z-index:9999;
-	max-width:420px;display:none;
-	padding:14px 18px;border-radius:14px;
-	background:rgba(28,30,36,0.96);color:#fff;
+	position:fixed;bottom:60px;left:16px;z-index:9998;
+	max-width:420px;display:none;flex-direction:column;gap:8px;
 	font:500 13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+	pointer-events:none;
+}
+#pgtoast.show{display:flex;animation:pgtoast-in 0.25s ease-out}
+@keyframes pgtoast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#pgtoast .row{
+	background:rgba(28,30,36,0.96);color:#fff;
+	padding:12px 16px;border-radius:14px;
 	box-shadow:0 8px 28px rgba(0,0,0,0.35);
 	backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+	pointer-events:auto;
+	animation:pgrow-in 0.2s ease-out;
 }
-#pgtoast.show{display:block;animation:pgtoast-in 0.25s ease-out}
-@keyframes pgtoast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#pgtoast .row.err{border-left:3px solid #e0506a;color:#ffb3b3}
+@keyframes pgrow-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
 #pgtoast .filename{font-weight:700;color:#fff}
 #pgtoast .url{font-family:Menlo,Monaco,monospace;font-size:11px;background:rgba(255,255,255,0.1);padding:6px 8px;border-radius:6px;margin-top:6px;display:block;word-break:break-all}
-#pgtoast button{background:#4364e8;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:8px;font-size:12px}
+#pgtoast button{background:#4364e8;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:6px;font-size:11px}
 #pgtoast button:hover{background:#3754d5}
 </style>
 </head>
@@ -212,7 +221,7 @@ iframe#f{position:relative;z-index:0}
 	</div>
 </div>
 <div id="pgtoast" role="status" aria-live="polite"></div>
-<input type="file" id="pgdrop-file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
+<input type="file" id="pgdrop-file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none">
 
 <script>
 (function(){
@@ -224,12 +233,59 @@ iframe#f{position:relative;z-index:0}
 	var toast    = document.getElementById('pgtoast');
 	var fileIn   = document.getElementById('pgdrop-file');
 	var dragDepth = 0;
+	var inFlight = 0;
+	var recent   = []; // stack of {ok, filename, url, width, height, err}
 
-	function showToast(html, ms){
-		toast.innerHTML = html;
+	function escHtml(s){
+		return String(s).replace(/[&<>"']/g, function(c){
+			return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+		});
+	}
+	function updateBtn(){
+		if (inFlight > 0) {
+			btn.classList.add('uploading');
+			btn.textContent = inFlight === 1 ? 'Uploading…' : 'Uploading ' + inFlight + '…';
+		} else {
+			btn.classList.remove('uploading');
+			btn.textContent = '📷 Drop image';
+		}
+	}
+	function renderToast(){
+		if (!recent.length) {
+			toast.classList.remove('show');
+			toast.innerHTML = '';
+			return;
+		}
+		toast.innerHTML = recent.map(function(it){
+			if (it.ok) {
+				return '<div class="row"><div>Uploaded <span class="filename">' + escHtml(it.filename) + '</span>'
+					+ (it.width ? ' · ' + it.width + '×' + it.height : '') + '</div>'
+					+ '<code class="url">' + escHtml(it.url) + '</code>'
+					+ '<button data-url="' + escHtml(it.url) + '">Copy URL</button>'
+					+ '</div>';
+			}
+			return '<div class="row err">Upload failed: ' + escHtml(it.err) + '</div>';
+		}).join('');
+		// Wire copy buttons (re-bound each render since innerHTML wipes them).
+		Array.prototype.forEach.call(toast.querySelectorAll('button[data-url]'), function(b){
+			b.addEventListener('click', function(){
+				navigator.clipboard.writeText(b.getAttribute('data-url'));
+				b.textContent = 'Copied!';
+				setTimeout(function(){ b.textContent = 'Copy URL'; }, 1500);
+			});
+		});
 		toast.classList.add('show');
+		// Auto-dismiss the stack after 15s of no new uploads.
 		clearTimeout(toast._t);
-		toast._t = setTimeout(function(){ toast.classList.remove('show'); }, ms || 8000);
+		toast._t = setTimeout(function(){
+			recent = [];
+			renderToast();
+		}, 15000);
+	}
+	function pushResult(item){
+		recent.unshift(item);
+		if (recent.length > 6) recent.pop();
+		renderToast();
 	}
 	function isImageDrag(e){
 		if (!e.dataTransfer) return false;
@@ -275,14 +331,25 @@ iframe#f{position:relative;z-index:0}
 
 	// drop fires on whichever element catches it. With pointer-events:auto on
 	// the active overlay, that's always the overlay (sitting above the iframe).
+	function uploadFiles(files){
+		if (!files || !files.length) return;
+		// Loop through ALL dropped files — each starts an independent upload.
+		// Browsers cap parallel fetches to ~6 per origin which is plenty.
+		Array.prototype.forEach.call(files, function(f){
+			if (f && f.type && f.type.indexOf('image/') === 0) upload(f);
+		});
+	}
 	function handleDrop(e){
 		if (!isImageDrag(e)) return;
 		e.preventDefault();
 		deactivate();
 		var files = e.dataTransfer && e.dataTransfer.files;
-		if (files && files.length) upload(files[0]);
+		uploadFiles(files);
 	}
-	overlay.addEventListener('drop', handleDrop);
+	// IMPORTANT: only ONE drop listener — window capture-phase fires first
+	// and catches drops anywhere on the page (including over the overlay).
+	// Adding a second listener on the overlay would double-fire and upload
+	// every dropped file twice.
 	window.addEventListener('drop', handleDrop, true);
 
 	// CRITICAL: the iframe is same-origin (it's just our preview URL on the
@@ -327,7 +394,7 @@ iframe#f{position:relative;z-index:0}
 				e.preventDefault();
 				deactivate();
 				var files = e.dataTransfer && e.dataTransfer.files;
-				if (files && files.length) upload(files[0]);
+				uploadFiles(files);
 			}, true);
 		} catch (err) {
 			// Cross-origin or sandboxed iframe — silently give up. The drop
@@ -360,13 +427,13 @@ iframe#f{position:relative;z-index:0}
 
 	btn.addEventListener('click', function(){ fileIn.click(); });
 	fileIn.addEventListener('change', function(){
-		if (fileIn.files && fileIn.files[0]) upload(fileIn.files[0]);
+		uploadFiles(fileIn.files);
 		fileIn.value = '';
 	});
 
 	function upload(file){
-		btn.classList.add('uploading');
-		btn.textContent = 'Uploading…';
+		inFlight++;
+		updateBtn();
 		var fd = new FormData();
 		fd.append('file', file);
 		fetch(UPLOAD_URL, {
@@ -377,19 +444,19 @@ iframe#f{position:relative;z-index:0}
 		}).then(function(r){
 			return r.ok ? r.json() : r.json().then(function(j){ throw new Error(j.error || ('HTTP ' + r.status)); });
 		}).then(function(data){
-			btn.classList.remove('uploading');
-			btn.textContent = '📷 Drop image';
-			showToast(
-				'<div>Uploaded <span class="filename">' + (data.filename || 'image') + '</span>'
-				+ (data.width ? ' · ' + data.width + '×' + data.height : '') + '</div>'
-				+ '<code class="url">' + data.url + '</code>'
-				+ '<button onclick="navigator.clipboard.writeText(' + JSON.stringify(data.url) + ');this.textContent=\'Copied!\'">Copy URL</button>',
-				15000
-			);
+			inFlight--;
+			updateBtn();
+			pushResult({
+				ok: true,
+				filename: data.filename || file.name || 'image',
+				url: data.url,
+				width: data.width,
+				height: data.height,
+			});
 		}).catch(function(err){
-			btn.classList.remove('uploading');
-			btn.textContent = '📷 Drop image';
-			showToast('<div style="color:#ffb3b3">Upload failed: ' + (err.message || err) + '</div>', 6000);
+			inFlight--;
+			updateBtn();
+			pushResult({ ok: false, err: err.message || String(err) });
 		});
 	}
 })();

@@ -330,7 +330,7 @@ class PressGo_Section_Builder {
 
 		if ( $img ) {
 			$extra['background_background']        = 'classic';
-			$extra['background_image']             = array( 'url' => $img, 'id' => '', 'size' => '' );
+			$extra['background_image']             = array( 'url' => PressGo_Widget_Helpers::normalize_image( $img )['url'], 'id' => '', 'size' => '' );
 			$extra['background_position']          = 'center center';
 			$extra['background_size']              = 'cover';
 			$extra['background_overlay_background'] = 'classic';
@@ -2180,7 +2180,7 @@ class PressGo_Section_Builder {
 		$extra = array();
 		if ( $img ) {
 			$extra['background_background']        = 'classic';
-			$extra['background_image']             = array( 'url' => $img, 'id' => '', 'size' => '' );
+			$extra['background_image']             = array( 'url' => PressGo_Widget_Helpers::normalize_image( $img )['url'], 'id' => '', 'size' => '' );
 			$extra['background_position']          = 'center center';
 			$extra['background_size']              = 'cover';
 			$extra['background_overlay_background'] = 'classic';
