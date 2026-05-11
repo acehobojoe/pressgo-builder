@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,6 +139,11 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.1.1 =
+* **Image upload — better default flow.** Real-world testing of `upload_media_chunked` showed AI clients (Claude / Cursor) can't reliably output enough base64 in a single tool call to upload a real photo, even with chunking. New approach: `list_recent_media` tool + AI tells the user "drop your image into wp-admin/upload.php, say done when ready" → AI finds it and uses the URL. Works for any image size, ~5 seconds of user effort.
+* Tightened chunked-upload chunk-size recommendation to 16,000 base64 chars (~12KB raw / ~4K output tokens) per call. Server-side limit is 10MB total, but the per-call constraint comes from the AI client's per-response output budget.
+* Updated MCP instructions to clarify reference-vs-on-page distinction: sketches, layout references, palette inspiration, and competitor screenshots stay in chat (AI uses vision to read them); only images that actually go on the page need the upload flow.
+
 = 2.1.0 =
 * **New MCP tool — upload_media**: AI clients (Claude / Cursor / etc.) can now upload images directly. Pass base64 bytes when the user pastes an image in chat, or pass a URL to fetch and copy from a public source. Returns a permanent WordPress media-library URL ready to use in any image field.
 * **New MCP tool — upload_media_chunked**: for larger images that overflow Claude's per-response token budget. Split the base64 into ~70KB chunks; the server reassembles and sideloads on the final call.
@@ -205,6 +210,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.1.1 =
+Patch release. New list_recent_media tool gives the AI a much more reliable way to handle user-uploaded images: ask the user to drop into wp-admin/upload.php and find it from the recent uploads.
 
 = 2.1.0 =
 Adds image upload via MCP (single-shot + chunked), first-time-user welcome wizard with persistent profile, security hardening on CTA URLs, and a clearer 3-step setup page. Backwards compatible.
