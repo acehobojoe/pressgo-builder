@@ -705,6 +705,8 @@ class PressGo_MCP_Tools {
 			}
 			$endpoint = add_query_arg( $qs, $service );
 
+			$tier = ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) ? 'pro' : 'free';
+
 			$response = wp_remote_get( $endpoint, array(
 				'timeout' => 90,
 				'headers' => array(
@@ -712,6 +714,8 @@ class PressGo_MCP_Tools {
 					'X-Pressgo-MCP'  => '1',
 					// Site-scoped rate-limit key — one quota per WP install.
 					'X-Pressgo-Site' => md5( home_url() ),
+					// Tier signal — Pro sites get a higher daily cap on the screenshot service.
+					'X-Pressgo-Tier' => $tier,
 				),
 			) );
 			if ( is_wp_error( $response ) ) {
