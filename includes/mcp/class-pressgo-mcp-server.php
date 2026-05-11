@@ -522,11 +522,14 @@ iframe{width:100%;height:100vh;border:0;display:block}
 			"future chat), Claude will see the saved profile in the initialize block and skip the " .
 			"wizard entirely. The user only does this once.\n\n" .
 			"### Sprinkle these capabilities into conversation as relevant\n" .
-			"  - \"You can paste an image right here — I'll upload it and use it on the page.\"\n" .
+			"  - \"For images, easiest way is drop them straight into your WordPress media " .
+			"     library — open `/wp-admin/upload.php`, drag-drop, I'll find them.\"\n" .
+			"  - \"You can also drop a public URL or paste an image right here in chat — I'll " .
+			"     pull it in.\"\n" .
 			"  - \"You can record a quick voice memo describing the vibe — I'll match the tone.\"\n" .
 			"  - \"You can drop a link to a competitor or aspirational site — I'll borrow cues.\"\n" .
-			"  - \"You can sketch something on paper, photograph it, and send the photo — I'll " .
-			"     interpret the layout.\"\n" .
+			"  - \"You can sketch something on paper, photograph it, drop in the media library, " .
+			"     I'll interpret the layout.\"\n" .
 			"  - \"Want me to take a screenshot of how it looks right now?\"\n" .
 			"Don't list them all upfront — surface the right one at the right moment.\n\n---\n\n";
 	}
@@ -583,21 +586,40 @@ iframe{width:100%;height:100vh;border:0;display:block}
 				"This gets them participating instead of typing 'use stock'.\n\n" .
 
 				"### Handling user-attached images\n" .
-				"When the user pastes an image in chat, your client gives you the bytes as base64. " .
-				"Pick the upload tool by base64 size — and respect the chunk-size limit, it matters:\n" .
-				"  - **Base64 ≤ 16,000 chars** (~12KB raw, thumbnails / icons): " .
-				"     `upload_media({ data, alt, filename })`. Single call.\n" .
-				"  - **Base64 > 16,000 chars** (anything photo-sized): `upload_media_chunked` with " .
-				"     chunks of EXACTLY 16,000 base64 chars or smaller. Larger chunks blow your " .
-				"     output-token ceiling on a single response and the tool call hangs forever. " .
-				"     A typical 500KB photo = 43 chunks at 16K each. Compute total = " .
-				"     `Math.ceil(b64.length / 16000)`, loop with index 0..total-1, pass upload_id " .
-				"     back from chunk 0's response on every subsequent chunk. Last chunk returns " .
-				"     the permanent URL.\n" .
-				"  - **You have a URL instead of bytes**: `upload_media({ url, alt })` — server " .
-				"     fetches and copies. Faster than chunking.\n" .
-				"All return a permanent WP URL you then use in image fields (hero.image.url, " .
-				"features.items[].image.url, footer.brand.logo.url, etc.). Always set a useful `alt`.\n\n" .
+				"First decide: does this image **belong ON the page**, or is it **just for your " .
+				"understanding** (a sketch, a layout reference, color inspiration, a competitor " .
+				"screenshot)?\n\n" .
+				"**If it's reference-only** (sketch / wireframe / aspirational layout / palette " .
+				"inspiration / competitor screenshot) — look at it directly with your vision. " .
+				"Describe what you see back to the user (\"warm earthy tones, 3-column layout, " .
+				"big hero image with the price overlaid\") so they know you got it, then use those " .
+				"cues when you build. Don't upload anything; the image stays in chat with you.\n\n" .
+				"**If it needs to appear on the actual page** (a real hero photo, product shot, " .
+				"team headshot, logo, etc.) — the BEST flow is:\n\n" .
+				"  1. Say to the user: \"Easiest way — open " .
+				"     `https://<their-site>/wp-admin/upload.php` in a new tab, drop your image " .
+				"     there, then say done when you're back.\" (Get the site URL from `list_pages` " .
+				"     or remember it from earlier turns.)\n" .
+				"  2. When the user says done, call " .
+				"     `list_recent_media({ since_minutes: 5 })`.\n" .
+				"  3. If exactly one image came back: use the `url` field in image properties " .
+				"     (hero.image.url, features.items[].image.url, footer.brand.logo.url, etc.). " .
+				"     Confirm the filename back to the user — \"using `yoga-hero.jpg`, sound right?\"\n" .
+				"  4. If multiple came back: read the filenames + sizes back, ask which one. " .
+				"     Don't guess — the wrong image is worse than asking.\n\n" .
+				"Why this path: it works for ANY image size (multi-MB photos, multiple images at " .
+				"once, raw camera shots) with zero token-budget gymnastics. Total user effort: " .
+				"~5 seconds. Total reliability: 100%.\n\n" .
+				"### When to NOT use the drop-in-WP path\n" .
+				"  - **User shares a public URL** (Pexels, competitor screenshot, etc.): use " .
+				"     `upload_media({ url, alt })` — server fetches and copies.\n" .
+				"  - **Tiny base64 image, < 16,000 chars** (icons, thumbs): " .
+				"     `upload_media({ data, alt, filename })` works in a single call.\n" .
+				"  - **You absolutely must handle larger base64 inline** (rare): " .
+				"     `upload_media_chunked` with chunks of EXACTLY 16,000 base64 chars max. " .
+				"     Each chunk has to fit in one of your responses. This is slow and fragile; " .
+				"     prefer the drop-in-WP path.\n\n" .
+				"Always set a useful `alt` on every uploaded image.\n\n" .
 
 				"### Always check for an existing style guide BEFORE picking colors/fonts\n" .
 				"Most users have a `/style-guide/` page (or `/brand/`, `/design-system/`) on their site " .

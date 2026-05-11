@@ -270,6 +270,34 @@ class PressGo_MCP_Tools {
 				),
 			),
 			array(
+				'name'        => 'list_recent_media',
+				'description' =>
+					"List the most recent images in the WordPress media library. The PRIMARY way " .
+					"to handle user images: tell the user to drop the image into their WP admin's " .
+					"Media Library (https://<site>/wp-admin/upload.php), then call this tool to " .
+					"find it. Returns up to `limit` recent image attachments with {id, url, " .
+					"filename, mime, alt, width, height, uploaded_at}.\n\n" .
+					"When to use this vs the upload tools:\n" .
+					"  - **First choice — almost always**: tell user \"open " .
+					"     https://<site>/wp-admin/upload.php in a new tab, drop your image there, " .
+					"     and tell me when done\" → then call `list_recent_media({since_minutes: 5})` " .
+					"     → use the URL. 5 seconds of user effort, no token-budget gymnastics, no " .
+					"     chunking, just works for any image size including multi-MB photos.\n" .
+					"  - Use `upload_media({url})` when the user shares a public URL.\n" .
+					"  - Use `upload_media({data})` only for tiny images (base64 < 16K).\n" .
+					"  - Use `upload_media_chunked` only as last resort (slow, fragile).\n\n" .
+					"If multiple recent uploads match, ask the user which one (read filenames " .
+					"back to them). Don't guess — the wrong image is worse than asking.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'limit'         => array( 'type' => 'integer', 'description' => 'Max items to return (default 10, max 50).' ),
+						'since_minutes' => array( 'type' => 'integer', 'description' => 'Only return uploads within this many minutes (default 60, max 1440).' ),
+						'mime_prefix'   => array( 'type' => 'string', 'description' => 'Filter by MIME prefix (default "image/").' ),
+					),
+				),
+			),
+			array(
 				'name'        => 'upload_media_chunked',
 				'description' =>
 					"Upload a LARGE image by chunking. Use this when the base64 of the image is more " .
@@ -384,6 +412,7 @@ class PressGo_MCP_Tools {
 			'get_footer'       => array( 'title' => 'Read site-wide footer', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'upload_media'     => array( 'title' => 'Upload media',          'destructiveHint' => true,  'idempotentHint' => false, 'openWorldHint' => true ),
 			'upload_media_chunked' => array( 'title' => 'Upload media (chunked)', 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => true ),
+			'list_recent_media' => array( 'title' => 'List recent media',     'readOnlyHint'    => true,  'idempotentHint' => true ),
 			'set_user_profile' => array( 'title' => 'Save user profile',     'destructiveHint' => true,  'idempotentHint' => true ),
 			'get_user_profile' => array( 'title' => 'Read user profile',     'readOnlyHint'    => true,  'idempotentHint' => true ),
 		);
@@ -416,6 +445,7 @@ class PressGo_MCP_Tools {
 			case 'undo_last_change': return self::undo_last_change( $args, $user );
 			case 'upload_media':    return self::upload_media( $args, $user );
 			case 'upload_media_chunked': return self::upload_media_chunked( $args, $user );
+			case 'list_recent_media': return self::list_recent_media( $args, $user );
 			case 'set_user_profile': return self::set_user_profile( $args, $user );
 			case 'get_user_profile': return self::get_user_profile( $args, $user );
 
@@ -1534,6 +1564,93 @@ class PressGo_MCP_Tools {
 				'height'    => $h,
 				'upload_id' => $upload_id,
 				'complete'  => true,
+			),
+		);
+	}
+
+	/**
+	 * List the most recent attachments in the WP media library. Used by AI
+	 * clients to find an image the user just dropped via wp-admin → media
+	 * library — way smoother than chunked base64 for non-trivial photos.
+	 */
+	private static function list_recent_media( $args, $user ) {
+		$limit         = max( 1, min( 50, isset( $args['limit'] ) ? (int) $args['limit'] : 10 ) );
+		$since_minutes = max( 1, min( 1440, isset( $args['since_minutes'] ) ? (int) $args['since_minutes'] : 60 ) );
+		$mime_prefix   = isset( $args['mime_prefix'] ) ? (string) $args['mime_prefix'] : 'image/';
+
+		$after = gmdate( 'Y-m-d H:i:s', time() - ( $since_minutes * 60 ) );
+
+		$attachments = get_posts( array(
+			'post_type'      => 'attachment',
+			'post_status'    => 'inherit',
+			'posts_per_page' => $limit,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'date_query'     => array( array( 'column' => 'post_date_gmt', 'after' => $after ) ),
+		) );
+
+		$out = array();
+		foreach ( $attachments as $att ) {
+			$mime = (string) $att->post_mime_type;
+			if ( $mime_prefix && 0 !== strpos( $mime, $mime_prefix ) ) { continue; }
+			$url   = wp_get_attachment_url( $att->ID );
+			$meta  = wp_get_attachment_metadata( $att->ID );
+			$alt   = (string) get_post_meta( $att->ID, '_wp_attachment_image_alt', true );
+			$thumb = wp_get_attachment_image_src( $att->ID, 'thumbnail' );
+			$out[] = array(
+				'id'            => (int) $att->ID,
+				'url'           => $url ?: '',
+				'thumbnail_url' => $thumb ? $thumb[0] : '',
+				'filename'      => basename( get_attached_file( $att->ID ) ?: '' ),
+				'mime'          => $mime,
+				'alt'           => $alt,
+				'width'         => isset( $meta['width'] )  ? (int) $meta['width']  : null,
+				'height'        => isset( $meta['height'] ) ? (int) $meta['height'] : null,
+				'uploaded_at'   => $att->post_date_gmt,
+				'uploaded_by'   => (int) $att->post_author,
+			);
+		}
+
+		if ( empty( $out ) ) {
+			return array(
+				'content' => array( array( 'type' => 'text', 'text' =>
+					"No images uploaded in the last {$since_minutes} minutes. Did the user finish the upload? " .
+					"Ask them to confirm — they should see the image as a tile in the media library at " .
+					site_url( '/wp-admin/upload.php' ) . " after dropping. If they did, try increasing " .
+					"`since_minutes` to widen the window."
+				) ),
+				'structuredContent' => array( 'count' => 0, 'media' => array() ),
+			);
+		}
+
+		$summary = array();
+		foreach ( $out as $m ) {
+			$summary[] = sprintf( "  • %s (%s%s, %s) → %s",
+				$m['filename'],
+				$m['mime'],
+				( $m['width'] && $m['height'] ) ? ", {$m['width']}×{$m['height']}" : '',
+				human_time_diff( strtotime( $m['uploaded_at'] ), time() ) . ' ago',
+				$m['url']
+			);
+		}
+		$text = sprintf(
+			"Found %d recent image%s in the media library (last %d minutes):\n%s\n\n" .
+			"%s",
+			count( $out ),
+			count( $out ) === 1 ? '' : 's',
+			$since_minutes,
+			implode( "\n", $summary ),
+			count( $out ) === 1
+				? "Use this URL in image fields. Confirm with the user it's the right one."
+				: "Read the filenames back to the user and ask which one to use. Don't guess — the wrong image is worse than asking."
+		);
+
+		return array(
+			'content' => array( array( 'type' => 'text', 'text' => $text ) ),
+			'structuredContent' => array(
+				'count'         => count( $out ),
+				'since_minutes' => $since_minutes,
+				'media'         => $out,
 			),
 		);
 	}
