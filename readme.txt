@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,6 +139,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.1.2 =
+* **Fix: stats counters showing 0 in screenshots.** Elementor's counter widget uses Intersection Observer for the count-up animation, which doesn't fire in headless screenshots — so AI clients calling `screenshot_page` saw "0" instead of the real values. Counters now start at the target number, so the value always displays correctly regardless of scroll state. (Trade-off: no animated count-up, but stats are reliably readable.)
+* **Fix: accent_hover defaulting to bright green.** When a user supplied a custom `accent` color (e.g. gold), `accent_hover` was falling through to a hardcoded `#009E15` green default. Now derived via darken-by-20 from the supplied accent. Stats parser also handles comma-separated numbers correctly ("$2,500+" → 2500, not 2).
+* **MCP context — anti-confusion guidance.** Added routing rule: when user says "I dropped an image," AI's first call is `list_recent_media({since_minutes: 5})`, not `ls /mnt/user-data/uploads/`. Added explicit "do not curl these URLs" note to `list_recent_media` description since the host isn't in Claude's sandbox network allowlist — bytes are delivered inline as MCP image content blocks instead.
+* **Watch URL drop-zone reliability.** Fixed iframe ReferenceError that broke drop detection on first page load. Drag-and-drop on the watch URL now binds correctly through to the iframe document and stays bound across same-origin iframe reloads.
+
 = 2.1.1 =
 * **Image upload — better default flow.** Real-world testing of `upload_media_chunked` showed AI clients (Claude / Cursor) can't reliably output enough base64 in a single tool call to upload a real photo, even with chunking. New approach: `list_recent_media` tool + AI tells the user "drop your image into wp-admin/upload.php, say done when ready" → AI finds it and uses the URL. Works for any image size, ~5 seconds of user effort.
 * Tightened chunked-upload chunk-size recommendation to 16,000 base64 chars (~12KB raw / ~4K output tokens) per call. Server-side limit is 10MB total, but the per-call constraint comes from the AI client's per-response output budget.
@@ -210,6 +216,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.1.2 =
+Stability patch. Fixes stats counters showing "0" in headless screenshots, accent_hover defaulting to bright green when user supplies a custom accent, comma handling in stat values, and watch URL drop-zone iframe binding. Adds MCP context guidance so AI clients don't go fishing in the wrong upload folder.
 
 = 2.1.1 =
 Patch release. New list_recent_media tool gives the AI a much more reliable way to handle user-uploaded images: ask the user to drop into wp-admin/upload.php and find it from the recent uploads.

@@ -881,6 +881,12 @@ iframe#f{position:relative;z-index:0}
 				"This gets them participating instead of typing 'use stock'.\n\n" .
 
 				"### Handling user-attached images\n" .
+				"**ROUTING RULE:** when the user says \"I dropped/uploaded/sent an image\", your " .
+				"FIRST action is `list_recent_media({ since_minutes: 5 })` — NOT `ls " .
+				"/mnt/user-data/uploads/`. PressGo has its own pipe (watch URL → WP media library); " .
+				"the chat-uploads folder is irrelevant here. If list_recent_media comes back empty, " .
+				"the upload didn't land — ask the user to retry, don't go fishing in other " .
+				"directories.\n\n" .
 				"First decide: does this image **belong ON the page**, or is it **just for your " .
 				"understanding** (a sketch, a layout reference, color inspiration, a competitor " .
 				"screenshot)?\n\n" .

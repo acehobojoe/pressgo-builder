@@ -277,6 +277,12 @@ class PressGo_MCP_Tools {
 					"Media Library (https://<site>/wp-admin/upload.php), then call this tool to " .
 					"find it. Returns up to `limit` recent image attachments with {id, url, " .
 					"filename, mime, alt, width, height, uploaded_at}.\n\n" .
+					"**DO NOT curl/fetch the returned URLs.** The site host is not in your sandbox " .
+					"network allowlist — external fetches return 403 host_not_allowed. You don't " .
+					"need to fetch them: when there are multiple results (or auto-generated " .
+					"filenames), this tool auto-embeds each thumbnail as an MCP image content " .
+					"block, which your client renders straight into your vision input. The bytes " .
+					"are already in your context. Don't reach for web_fetch.\n\n" .
 					"When to use this vs the upload tools:\n" .
 					"  - **First choice — almost always**: tell user \"open " .
 					"     https://<site>/wp-admin/upload.php in a new tab, drop your image there, " .
@@ -286,13 +292,16 @@ class PressGo_MCP_Tools {
 					"  - Use `upload_media({url})` when the user shares a public URL.\n" .
 					"  - Use `upload_media({data})` only for tiny images (base64 < 16K).\n" .
 					"  - Use `upload_media_chunked` only as last resort (slow, fragile).\n\n" .
+					"**since_minutes guidance:** if the user just said they uploaded (in this turn), " .
+					"use 5. If you're scanning for an older asset, use 60 (default). Going wider " .
+					"surfaces stale leftovers from prior sessions.\n\n" .
 					"If multiple recent uploads match, ask the user which one (read filenames " .
 					"back to them). Don't guess — the wrong image is worse than asking.",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
 						'limit'              => array( 'type' => 'integer', 'description' => 'Max items to return (default 10, max 50).' ),
-						'since_minutes'      => array( 'type' => 'integer', 'description' => 'Only return uploads within this many minutes (default 60, max 1440).' ),
+						'since_minutes'      => array( 'type' => 'integer', 'description' => 'Only return uploads within this many minutes. Use 5 if user just uploaded this turn; 60 (default) otherwise. Max 1440.' ),
 						'mime_prefix'        => array( 'type' => 'string', 'description' => 'Filter by MIME prefix (default "image/").' ),
 						'include_thumbnails' => array( 'type' => 'boolean', 'description' => 'Embed each result\'s thumbnail as an MCP image content block so you can SEE what each image is. Defaults to true when there are multiple results OR auto-generated filenames (UUIDs, IMG_*, etc). Pass false to skip and save tokens when you only need URLs.' ),
 					),

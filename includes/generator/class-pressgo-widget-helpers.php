@@ -585,9 +585,10 @@ class PressGo_Widget_Helpers {
 		$tab_size = max( 32, intdiv( $number_size * 7, 8 ) );
 		$mob_size = max( 28, intdiv( $number_size * 3, 4 ) );
 
+		$end = is_numeric( str_replace( array( ',', '.' ), '', $number ) ) ? $number : 0;
 		$s = array(
-			'starting_number' => 0,
-			'ending_number'   => is_numeric( str_replace( array( ',', '.' ), '', $number ) ) ? $number : 0,
+			'starting_number' => $end,
+			'ending_number'   => $end,
 			'suffix'          => $suffix,
 			'prefix'          => $prefix,
 			'title'           => $title,

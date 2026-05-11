@@ -36,12 +36,14 @@ class PressGo_Config_Validator {
 			}
 		}
 
-		// Set color defaults.
+		// Set color defaults. accent_hover must derive from accent — otherwise
+		// a user-supplied gold accent renders with a green hover state.
+		$accent = isset( $config['colors']['accent'] ) ? $config['colors']['accent'] : '#00B418';
 		$color_defaults = array(
 			'primary_dark'  => self::darken_hex( $config['colors']['primary'], 30 ),
 			'primary_light' => '#E8F0FE',
 			'accent'        => '#00B418',
-			'accent_hover'  => '#009E15',
+			'accent_hover'  => self::darken_hex( $accent, 20 ),
 			'text_light'    => 'rgba(255,255,255,0.75)',
 			'gold'          => '#F59E0B',
 			'border'        => 'rgba(0,0,0,0.06)',

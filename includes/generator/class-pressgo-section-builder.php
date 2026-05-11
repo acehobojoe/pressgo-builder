@@ -15,6 +15,21 @@ class PressGo_Section_Builder {
 	private static function s() { return 'PressGo_Style_Utils'; }
 
 	/**
+	 * Parse a stat value like "$2,500+" or "98%" into [prefix, number, suffix].
+	 * Commas inside the number are stripped (so "$2,500+" → 2500, not 2).
+	 * Non-numeric values fall back to number=0.
+	 */
+	private static function parse_stat_value( $val ) {
+		$val = (string) $val;
+		// Strip commas before extracting the digit run.
+		$stripped = str_replace( ',', '', $val );
+		if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $stripped, $m ) ) {
+			return array( $m[1], (int) $m[2], $m[3] );
+		}
+		return array( '', 0, '' );
+	}
+
+	/**
 	 * Pill-shaped button widget for tags/badges (social proof, etc.).
 	 * Uses native Elementor button so each pill is editable without touching HTML.
 	 */
@@ -585,19 +600,10 @@ class PressGo_Section_Builder {
 
 		$stat_cols = array();
 		foreach ( $items as $item ) {
-			$val    = $item['value'];
-			$prefix = '';
-			$suffix = '';
-			$number = 0;
-
-			if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $val, $m ) ) {
-				$prefix = $m[1];
-				$number = (int) $m[2];
-				$suffix = $m[3];
-			}
+			list( $prefix, $number, $suffix ) = self::parse_stat_value( $item['value'] );
 
 			$counter = PressGo_Element_Factory::widget( 'counter', array(
-				'starting_number'        => 0,
+				'starting_number'        => $number,
 				'ending_number'          => $number,
 				'prefix'                 => $prefix,
 				'suffix'                 => $suffix,
@@ -670,22 +676,13 @@ class PressGo_Section_Builder {
 
 		$stat_cols = array();
 		foreach ( $items as $idx => $item ) {
-			$val    = $item['value'];
-			$prefix = '';
-			$suffix = '';
-			$number = 0;
-
-			if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $val, $m ) ) {
-				$prefix = $m[1];
-				$number = (int) $m[2];
-				$suffix = $m[3];
-			}
+			list( $prefix, $number, $suffix ) = self::parse_stat_value( $item['value'] );
 
 			$accent_colors = array( $c['accent'], '#06B6D4', '#F59E0B', '#8B5CF6', '#EC4899' );
 			$number_color  = $accent_colors[ $idx % count( $accent_colors ) ];
 
 			$counter = PressGo_Element_Factory::widget( 'counter', array(
-				'starting_number'        => 0,
+				'starting_number'        => $number,
 				'ending_number'          => $number,
 				'prefix'                 => $prefix,
 				'suffix'                 => $suffix,
@@ -740,16 +737,7 @@ class PressGo_Section_Builder {
 
 		$stat_cols = array();
 		foreach ( $items as $idx => $item ) {
-			$val    = $item['value'];
-			$prefix = '';
-			$suffix = '';
-			$number = 0;
-
-			if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $val, $m ) ) {
-				$prefix = $m[1];
-				$number = (int) $m[2];
-				$suffix = $m[3];
-			}
+			list( $prefix, $number, $suffix ) = self::parse_stat_value( $item['value'] );
 
 			$stat_cols[] = PressGo_Element_Factory::col(
 				array(
@@ -1288,18 +1276,10 @@ class PressGo_Section_Builder {
 		$fonts = $cfg['fonts'];
 		foreach ( $r['metrics'] as $item ) {
 			// Parse prefix/number/suffix from value strings like "40%", "3x", "4.7".
-			$val    = $item['value'];
-			$prefix = '';
-			$suffix = '';
-			$number = 0;
-			if ( preg_match( '/^([^\d]*)(\d+)(.*)$/', $val, $m ) ) {
-				$prefix = $m[1];
-				$number = (int) $m[2];
-				$suffix = $m[3];
-			}
+			list( $prefix, $number, $suffix ) = self::parse_stat_value( $item['value'] );
 
 			$counter = PressGo_Element_Factory::widget( 'counter', array(
-				'starting_number'        => 0,
+				'starting_number'        => $number,
 				'ending_number'          => $number,
 				'prefix'                 => $prefix,
 				'suffix'                 => $suffix,
