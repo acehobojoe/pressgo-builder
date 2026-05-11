@@ -294,9 +294,19 @@ iframe#f{position:relative;z-index:0}
 	// catches subsequent drag/drop events directly.
 	function bindIframeDragForwarders(){
 		try {
-			var idoc = iframe.contentDocument;
-			if (!idoc || idoc._pgdragBound) return;
+			// Look up the iframe at call time — this IIFE runs BEFORE the
+			// iframe element exists in the DOM (script tag is above it),
+			// so we can't capture a reference at IIFE entry.
+			var iframeEl = document.getElementById('f');
+			if (!iframeEl) return;
+			var idoc = iframeEl.contentDocument;
+			if (!idoc) {
+				console.warn('[PressGo Watch] iframe contentDocument unavailable (cross-origin?)');
+				return;
+			}
+			if (idoc._pgdragBound) return;
 			idoc._pgdragBound = true;
+			console.log('[PressGo Watch] drag forwarders bound to iframe document');
 
 			idoc.addEventListener('dragenter', function(e){
 				if (!isImageDrag(e)) return;
@@ -327,11 +337,26 @@ iframe#f{position:relative;z-index:0}
 	}
 
 	// Bind on initial load + every time the iframe src changes (e.g. live-
-	// reload after a section is added).
-	iframe.addEventListener('load', bindIframeDragForwarders);
-	if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-		bindIframeDragForwarders();
-	}
+	// reload after a section is added). Also poll for ~10s while the iframe
+	// element + its contentDocument come into existence (this script runs
+	// BEFORE the iframe element appears in the DOM).
+	var pollTries = 0;
+	var pollIv = setInterval(function(){
+		pollTries++;
+		try {
+			var iframeEl = document.getElementById('f');
+			if (!iframeEl) return; // iframe element not in DOM yet — keep polling
+			// Attach 'load' listener (idempotent — addEventListener dedupes
+			// identical listeners) so live-reloads also re-bind.
+			iframeEl.addEventListener('load', bindIframeDragForwarders);
+			var idoc = iframeEl.contentDocument;
+			if (idoc && idoc._pgdragBound) { clearInterval(pollIv); return; }
+			if (idoc && (idoc.readyState === 'complete' || idoc.readyState === 'interactive')) {
+				bindIframeDragForwarders();
+			}
+		} catch (e) { clearInterval(pollIv); }
+		if (pollTries > 50) clearInterval(pollIv); // 10s @ 200ms
+	}, 200);
 
 	btn.addEventListener('click', function(){ fileIn.click(); });
 	fileIn.addEventListener('change', function(){
