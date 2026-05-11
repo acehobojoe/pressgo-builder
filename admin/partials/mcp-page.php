@@ -67,13 +67,42 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 		</div>
 	<?php endif; ?>
 
-	<!-- ─── Server URL + status ─── -->
-	<div class="pressgo-card">
+	<!-- ─── Quick start: server URL + one-click copy + status ─── -->
+	<div class="pressgo-card pressgo-quickstart">
 		<div class="pressgo-card-head">
-			<h2>Server endpoint</h2>
+			<h2 style="margin:0;">1. Your MCP server URL</h2>
 			<span class="pressgo-status <?php echo $enabled ? 'is-on' : 'is-off'; ?>"><?php echo $enabled ? 'Enabled' : 'Disabled'; ?></span>
 		</div>
-		<p>Point any MCP client at:</p>
+		<p style="margin:8px 0 6px;">Copy this. You'll paste it into your AI client's connector settings in step 2.</p>
+		<div style="display:flex;gap:8px;align-items:center;">
+			<code class="pressgo-code-block" id="pressgo-mcp-url" style="flex:1;margin:0;"><?php echo esc_html( $mcp_url ); ?></code>
+			<button type="button" class="button button-secondary" id="pressgo-copy-url" data-copy="<?php echo esc_attr( $mcp_url ); ?>">
+				<span class="dashicons dashicons-admin-page" style="vertical-align:middle;margin-top:2px;"></span> Copy
+			</button>
+		</div>
+		<p class="description" style="margin-top:8px;">
+			<strong>First time?</strong> Step 2 below shows you exactly where to paste this for each AI client. The first connection opens an OAuth login back to this WordPress site so you can approve.
+		</p>
+	</div>
+	<script>
+	(function(){
+		var btn = document.getElementById('pressgo-copy-url');
+		if (!btn) return;
+		btn.addEventListener('click', function(){
+			navigator.clipboard.writeText(btn.getAttribute('data-copy')).then(function(){
+				var orig = btn.innerHTML;
+				btn.innerHTML = '<span class="dashicons dashicons-yes" style="vertical-align:middle;margin-top:2px;"></span> Copied!';
+				setTimeout(function(){ btn.innerHTML = orig; }, 1800);
+			});
+		});
+	})();
+	</script>
+
+	<!-- (legacy server-endpoint hidden block — kept for the toggle form) -->
+	<div class="pressgo-card" style="display:none;">
+		<div class="pressgo-card-head">
+			<h2>Server endpoint</h2>
+		</div>
 		<code class="pressgo-code-block"><?php echo esc_html( $mcp_url ); ?></code>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:16px;">
@@ -206,27 +235,33 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 
 	<!-- ─── Setup snippets ─── -->
 	<div class="pressgo-card">
-		<h2>Connect your AI client</h2>
+		<h2 style="margin-top:0;">2. Connect your AI client</h2>
+		<p style="margin:0 0 14px;color:#646970;">Pick the client you use. Each one takes about 60 seconds.</p>
+
 		<details open>
-			<summary><strong>Claude Desktop</strong> &mdash; uses OAuth, easiest path</summary>
+			<summary><strong>Claude Desktop</strong> &mdash; OAuth, easiest path (recommended)</summary>
 			<ol>
 				<li>Open Claude Desktop &rarr; <strong>Settings &rarr; Connectors</strong>.</li>
 				<li>Click <strong>Add custom connector</strong>.</li>
-				<li>Paste the URL: <code><?php echo esc_html( $mcp_url ); ?></code></li>
-				<li>Claude will redirect you here to log in and approve the connection.</li>
+				<li>Paste the URL from step 1: <code><?php echo esc_html( $mcp_url ); ?></code></li>
+				<li>Click <strong>Add</strong>. Claude will open a browser tab here to log in &mdash; approve the connection on the next screen.</li>
+				<li>Back in Claude, start a new chat and say something like <em>&ldquo;build me a landing page for a coffee shop&rdquo;</em>. Claude will use PressGo automatically.</li>
 			</ol>
 		</details>
 
-		<details>
-			<summary><strong>Claude Code</strong> (CLI) &mdash; uses OAuth or API key</summary>
-			<p>OAuth (recommended):</p>
-			<code class="pressgo-code-block">claude mcp add pressgo --transport http --url "<?php echo esc_html( $mcp_url ); ?>"</code>
-			<p>API key:</p>
-			<code class="pressgo-code-block">claude mcp add pressgo --transport http --url "<?php echo esc_html( $mcp_url ); ?>" --header "Authorization: Bearer YOUR_KEY_HERE"</code>
+		<details open>
+			<summary><strong>Claude.ai</strong> (web, Pro/Team) &mdash; OAuth via Custom Connectors</summary>
+			<ol>
+				<li>Go to <strong>Settings &rarr; Connectors &rarr; Add custom connector</strong>.</li>
+				<li>Paste the URL from step 1: <code><?php echo esc_html( $mcp_url ); ?></code></li>
+				<li>Claude.ai will open a tab here to authorize. Approve to connect.</li>
+				<li>Start a chat and ask Claude to build a page.</li>
+			</ol>
 		</details>
 
-		<details>
+		<details open>
 			<summary><strong>Cursor</strong> &mdash; via <code>~/.cursor/mcp.json</code></summary>
+			<p style="margin-bottom:6px;">Add this block to <code>~/.cursor/mcp.json</code> (create the file if it doesn't exist). Replace <code>YOUR_KEY_HERE</code> with a key you'll generate below in step 3.</p>
 			<code class="pressgo-code-block">{
   "mcpServers": {
     "pressgo": {
@@ -235,24 +270,30 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
     }
   }
 }</code>
+			<p style="margin-top:8px;">Restart Cursor after editing.</p>
 		</details>
 
 		<details>
-			<summary><strong>Claude.ai</strong> (web) &mdash; via Custom Connectors</summary>
-			<ol>
-				<li>Go to <strong>Settings &rarr; Connectors &rarr; Add custom connector</strong>.</li>
-				<li>Paste the URL: <code><?php echo esc_html( $mcp_url ); ?></code></li>
-				<li>Claude.ai will redirect you here to authorize. Approve to connect.</li>
-			</ol>
+			<summary><strong>Claude Code</strong> (CLI) &mdash; OAuth or API key</summary>
+			<p style="margin-bottom:6px;">OAuth (recommended &mdash; opens a browser to authorize):</p>
+			<code class="pressgo-code-block">claude mcp add pressgo --transport http --url "<?php echo esc_html( $mcp_url ); ?>"</code>
+			<p style="margin-top:10px;margin-bottom:6px;">Or with a static API key (generate one in step 3 below):</p>
+			<code class="pressgo-code-block">claude mcp add pressgo --transport http --url "<?php echo esc_html( $mcp_url ); ?>" --header "Authorization: Bearer YOUR_KEY_HERE"</code>
+		</details>
+
+		<details>
+			<summary><strong>Other MCP-capable clients</strong> (Zed, Continue.dev, custom)</summary>
+			<p>The endpoint is JSON-RPC 2.0 over Streamable HTTP at <code><?php echo esc_html( $mcp_url ); ?></code>. Auth is OAuth 2.1 with PKCE + Dynamic Client Registration (RFC 7591), or static bearer tokens you generate below.</p>
+			<p>Full protocol documentation: <a href="https://pressgo.app/docs/mcp" target="_blank" rel="noopener">pressgo.app/docs/mcp</a></p>
 		</details>
 	</div>
 
 	<!-- ─── Manual API keys ─── -->
 	<div class="pressgo-card">
 		<div class="pressgo-card-head">
-			<h2>API keys</h2>
+			<h2 style="margin:0;">3. API keys (only for Cursor / Claude Code / custom)</h2>
 		</div>
-		<p>For clients that want a static bearer token (Cursor, custom integrations).</p>
+		<p>If you connected via OAuth in step 2 (Claude Desktop / Claude.ai), you don't need a key here &mdash; OAuth handles auth automatically. Generate a key only for clients that want a static bearer token.</p>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="pressgo-issue-form">
 			<?php wp_nonce_field( PressGo_MCP_Admin::NONCE_ACTION ); ?>
