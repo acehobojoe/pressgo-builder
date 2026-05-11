@@ -41,6 +41,14 @@ class PressGo_MCP_Server {
 		// post_status visibility check.
 		add_action( 'pre_get_posts', array( $this, 'maybe_authorize_signed_preview' ), 1 );
 
+		// Suppress the WP admin bar inside the watch-URL iframe. Must hook
+		// BEFORE the `init` action — _wp_admin_bar_init() runs on init at
+		// priority 0 and reads is_admin_bar_showing() once; adding the
+		// show_admin_bar filter inside pre_get_posts is too late.
+		if ( ! empty( $_GET['pgmcp_preview'] ) ) {
+			add_filter( 'show_admin_bar', '__return_false', 100 );
+		}
+
 		// Standalone /pressgo-watch/{id} page — iframe + auto-reload.
 		add_action( 'parse_request', array( $this, 'serve_watch_page' ), 1 );
 	}
