@@ -31,6 +31,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<li><strong>PHP Version:</strong> <?php echo esc_html( PHP_VERSION ); ?></li>
 			<li><strong>Plugin Version:</strong> <?php echo esc_html( PRESSGO_VERSION ); ?></li>
 			<li><strong>Section Types:</strong> 19 types, 48 layout variants</li>
+			<li><strong>Support:</strong> <a href="mailto:joe@pressgo.app">joe@pressgo.app</a></li>
 		</ul>
 	</div>
 </div>

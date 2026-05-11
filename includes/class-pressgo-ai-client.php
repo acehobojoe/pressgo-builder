@@ -52,13 +52,15 @@ class PressGo_AI_Client {
 	/**
 	 * Generate a config dict from a prompt, streaming events to the browser via callback.
 	 *
-	 * @param string        $prompt     User's text prompt.
-	 * @param string|null   $image      Base64-encoded image.
-	 * @param string|null   $image_type Image MIME type.
-	 * @param callable      $callback   fn($event_type, $data) — called to emit SSE events.
+	 * @param string        $prompt        User's text prompt.
+	 * @param string|null   $image         Base64-encoded image.
+	 * @param string|null   $image_type    Image MIME type.
+	 * @param callable      $callback      fn($event_type, $data) — called to emit SSE events.
+	 * @param callable|null $text_listener fn($accumulated_text) — called after every chunk
+	 *                                     append (used by the editor flow's section parser).
 	 * @return array|WP_Error Parsed config array, or WP_Error.
 	 */
-	public function generate_config_streaming( $prompt, $image = null, $image_type = null, $callback = null ) {
+	public function generate_config_streaming( $prompt, $image = null, $image_type = null, $callback = null, $text_listener = null ) {
 		$system_prompt = PressGo_Prompt_Builder::build_system_prompt();
 		if ( is_wp_error( $system_prompt ) ) {
 			return $system_prompt;
@@ -130,7 +132,7 @@ class PressGo_AI_Client {
 			}
 		}
 
-		return $this->stream_request( $wp_headers, $body, $callback, 'Generation complete. Processing...' );
+		return $this->stream_request( $wp_headers, $body, $callback, 'Generation complete. Processing...', $text_listener );
 	}
 
 	/**
@@ -220,7 +222,7 @@ class PressGo_AI_Client {
 	 * @param string   $complete_msg   Message to emit when stream completes.
 	 * @return array|WP_Error Parsed and validated config, or WP_Error.
 	 */
-	private function stream_request( $wp_headers, $body, $callback, $complete_msg ) {
+	private function stream_request( $wp_headers, $body, $callback, $complete_msg, $text_listener = null ) {
 		$accumulated_text = '';
 		$raw_response     = '';
 		$current_phase    = 'analyzing';
@@ -231,12 +233,12 @@ class PressGo_AI_Client {
 		$target_url       = $this->api_url;
 
 		// Inject CURLOPT_WRITEFUNCTION via the http_api_curl hook for SSE streaming.
-		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $target_url, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg ) {
+		$stream_handler = function ( &$handle, $parsed_args, $url ) use ( $target_url, &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg, $text_listener ) {
 			if ( $url !== $target_url ) {
 				return;
 			}
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.curl__curl_setopt -- required for SSE streaming via http_api_curl hook.
-			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg ) {
+			curl_setopt( $handle, CURLOPT_WRITEFUNCTION, function ( $ch, $data ) use ( &$accumulated_text, &$raw_response, &$current_phase, &$sections_found, $callback, $use_openai, $use_pressgo, $self, $complete_msg, $text_listener ) {
 				$raw_response .= $data;
 
 				$lines = explode( "\n", $data );
@@ -262,6 +264,12 @@ class PressGo_AI_Client {
 						$self->process_openai_chunk( $event, $accumulated_text, $current_phase, $sections_found, $callback, $complete_msg );
 					} else {
 						$self->process_anthropic_chunk( $event, $accumulated_text, $current_phase, $sections_found, $callback, $complete_msg );
+					}
+
+					// Notify the editor-flow stream parser (if provided) so it can
+					// emit per-section events as soon as a section completes.
+					if ( $text_listener ) {
+						call_user_func( $text_listener, $accumulated_text );
 					}
 				}
 

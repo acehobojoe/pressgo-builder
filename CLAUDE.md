@@ -1,33 +1,68 @@
 # PressGo Plugin — Developer Reference
 
 ## Overview
-WordPress plugin that generates Elementor landing pages from text descriptions or screenshots. The AI orchestration (system prompt, schema, Claude API calls) lives on `server.pressgo.app` — the plugin sends prompts to our server and receives SSE events back.
+WordPress plugin that generates Elementor landing pages from text descriptions or screenshots. Supports two API modes:
+1. **PressGo API** (default) — users get a `pg_` key from pressgo.app, credits-based billing, Haiku model
+2. **Own API Key** — users enter their Anthropic key directly, choose their own model
 
 ## Architecture
-```
-User prompt → PressGo server (streaming SSE) → config dict JSON → local PHP Generator → Elementor JSON → wp_insert_post()
-```
 
-### Flow
+### PressGo API Mode (default)
 ```
 Browser → admin-ajax (WordPress)
-  → PressGo_AI_Client (curl streaming to server.pressgo.app)
-    → /api/pressgo/generate (Next.js route)
-      → Claude API (streaming, with secret prompt)
-    ← SSE events (thinking, progress, section, config)
-  ← re-emit SSE events to browser
-→ config arrives → local Generator → Elementor JSON → wp_insert_post
+  → PressGo_AI_Client → POST https://pressgo.app/api/plugin/generate
+    → X-PressGo-Key auth → credit check → Claude API (Haiku)
+    ← SSE events: {type:'content',text}, {type:'done',usage,creditsRemaining}, {type:'error'}
+  ← re-emit as browser SSE events
+→ config JSON → local Generator → Elementor JSON → wp_insert_post
+```
+
+### Direct API Mode
+```
+Browser → admin-ajax (WordPress)
+  → PressGo_AI_Client → POST https://api.anthropic.com/v1/messages
+    ← Anthropic SSE events (content_block_delta, message_stop)
+  ← re-emit as browser SSE events
+→ config JSON → local Generator → Elementor JSON → wp_insert_post
 ```
 
 ## Key Files
-- `pressgo.php` — Plugin bootstrap, constants (PRESSGO_API_URL)
+- `pressgo.php` — Plugin bootstrap, constants, version (1.4.0)
 - `includes/class-pressgo.php` — Singleton, loads dependencies
-- `includes/class-pressgo-admin.php` — Admin pages, settings (PressGo API key)
-- `includes/class-pressgo-rest-api.php` — SSE streaming endpoint (admin-ajax)
-- `includes/class-pressgo-ai-client.php` — Streams from server.pressgo.app, re-emits SSE
+- `includes/class-pressgo-admin.php` — Admin pages, settings (API mode toggle, PressGo key, Claude key, model)
+- `includes/class-pressgo-rest-api.php` — SSE streaming endpoint (admin-ajax), connection test (both modes)
+- `includes/class-pressgo-ai-client.php` — Three backends: PressGo API, Anthropic direct, OpenAI-compatible
 - `includes/class-pressgo-page-creator.php` — wp_insert_post + Elementor postmeta (hide_title, custom CSS)
 - `includes/class-pressgo-config-validator.php` — Config schema validation
 - `includes/generator/` — Elementor JSON generation
+
+## PressGo API Integration (pressgo.app)
+
+### Backend (Express on DO server, port 3003)
+- **Plugin API**: `POST /api/plugin/generate` — key auth, credit deduction, Claude streaming
+- **Credits check**: `GET /api/plugin/credits` — lightweight balance check for plugin settings page
+- **Account management**: `/api/account/credits`, `/api/account/api-keys`, `/api/account/usage`
+- **Stripe checkout**: `/api/account/purchase-credits` — micro ($1/5), small ($2.50/15), starter ($7/50), pro ($24/200)
+
+### Credit System
+- 3 free credits/month per account (resets monthly)
+- Per-model costs: Haiku = 1 credit, Sonnet = 2 credits, Opus = 10 credits
+- Default model: Haiku (~$0.02/generation, ~9x margin on credit price)
+- Race-condition safe: credit deduction wrapped in SQLite transaction
+- Rate limited: 10 registrations/IP/hour, 60 generations/IP/hour
+
+### API Key Format
+- Generated: `pg_` + 32 hex chars (e.g., `pg_dfad7060958f0b674dd9e4e15a3cab1a`)
+- Stored as SHA256 hash in `api_keys` table, full key shown once at creation
+- Max 5 keys per user, `last_used_at` tracking
+
+### Plugin Settings (class-pressgo-admin.php)
+- `pressgo_api_mode` — 'pressgo' (default) or 'direct'
+- `pressgo_account_key` — PressGo API key (pg_...)
+- `pressgo_api_key` — Anthropic API key (for direct mode)
+- `pressgo_model` — Claude model (for direct mode)
+- `PressGo_Admin::has_api_configured()` — checks whichever mode is active
+- Settings JS fetches live credit balance from `pressgo.app/api/plugin/credits`
 
 ## Generator Architecture
 - `PressGo_Element_Factory` — Core primitives: `eid()`, `widget()`, `outer()`, `row()`, `col()`
@@ -61,17 +96,21 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | hero | `minimal` | `build_hero_minimal` | Clean white bg, centered text, no gradient |
 | features | _(default)_ | `build_features` | 3-column card grid with accent borders |
 | features | `alternating` | `build_features_alternating` | Alternating text/image rows |
+| features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
+| features | `image_cards` | `build_features_image_cards` | Image on top of each card |
+| features | `grid` | `build_features_grid` | 2-column card grid for 4+ features |
 | testimonials | _(default)_ | `build_testimonials` | 3-column cards with star ratings |
 | testimonials | `featured` | `build_testimonials_featured` | Single large quote + small cards |
 | testimonials | `grid` | `build_testimonials_grid` | 2-column card grid with avatars |
+| testimonials | `minimal` | `build_testimonials_minimal` | Centered quotes with dividers, no cards |
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
-| testimonials | `minimal` | `build_testimonials_minimal` | Centered quotes with dividers, no cards |
 | social_proof | _(default)_ | `build_social_proof` | Industry pill badges on light bg |
 | social_proof | `dark` | `build_social_proof_dark` | Industry pill badges on dark bg |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
 | stats | `dark` | `build_stats_dark` | Dark gradient bg with colored counters |
+| stats | `inline` | `build_stats_inline` | Minimal horizontal counter row with dividers |
 | steps | _(default)_ | `build_steps` | Numbered circles on light bg cards |
 | steps | `compact` | `build_steps_compact` | Numbered pill badges with divider |
 | steps | `timeline` | `build_steps_timeline` | Vertical timeline with connecting line |
@@ -79,19 +118,15 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | faq | `split` | `build_faq_split` | Header left, accordion right |
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
-| features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
-| features | `image_cards` | `build_features_image_cards` | Image on top of each card |
-| features | `grid` | `build_features_grid` | 2-column card grid for 4+ features |
+| cta_final | `image` | `build_cta_final_image` | Background image with dark overlay |
 | newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
 | newsletter | `inline` | `build_newsletter_inline` | Gradient bar with headline + button |
 | results | _(default)_ | `build_results` | Dark gradient with counter cards |
 | results | `bars` | `build_results_bars` | Light bg with animated progress bars |
 | team | _(default)_ | `build_team` | Photo + name + role + bio + social cards |
 | team | `compact` | `build_team_compact` | Small photos, name + role only, no cards |
-| cta_final | `image` | `build_cta_final_image` | Background image with dark overlay |
 | pricing | _(default)_ | `build_pricing` | 2-4 column plan cards with feature lists |
 | pricing | `compact` | `build_pricing_compact` | Left-aligned cards, smaller price, bordered highlight |
-| stats | `inline` | `build_stats_inline` | Minimal horizontal counter row with dividers |
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | logo_bar | `dark` | `build_logo_bar_dark` | Dark bg logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
@@ -99,16 +134,6 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | gallery | `cards` | `build_gallery_cards` | 2-col image cards with optional captions |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 | footer | `light` | `build_footer_light` | White/light bg footer with colored icons |
-
-Config example:
-```php
-'hero' => array(
-    'variant' => 'split',
-    'image'   => 'https://images.pexels.com/photos/3183150/...',
-    'headline' => '...',
-    // ...
-),
-```
 
 ### Section Types (19 types, 48 builder methods)
 hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, gallery, newsletter, cta_final, map, footer, disclaimer
@@ -168,21 +193,6 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 - Image preference DB with industry-contextual search at `/var/www/pressgo.app/backend/src/routes/v4.js`
 - Direct Pexels URLs work without API key: `https://images.pexels.com/photos/{ID}/pexels-photo-{ID}.jpeg?auto=compress&cs=tinysrgb&w=800`
 
-## Streaming Flow
-1. Browser POSTs to `admin-ajax.php?action=pressgo_generate_stream`
-2. Plugin streams curl to `server.pressgo.app/api/pressgo/generate` with `X-PressGo-Key` header
-3. Server calls Claude, emits SSE events: `thinking`, `progress`, `section`, `config`
-4. Plugin re-emits events to browser, then locally validates config + generates Elementor JSON
-5. JavaScript reads via `fetch()` + `ReadableStream` (not EventSource, since we need POST)
-
-## What Lives on Server (not in plugin)
-- System prompt
-- Config schema
-- Prompt builder logic
-- Claude API calls + model selection
-- API key for Claude
-- Image search + selection (Pexels API)
-
 ## Testing
 - PHP 7.4+ compatible (uses `intdiv()`, no union types, no named args)
 - Works with Elementor Free; blog section requires Pro
@@ -194,7 +204,25 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 - **Batch config test**: `bash test/build-from-configs.sh` — rebuilds 23 test pages from `test/configs/*.json` via SSH
 - **70 test pages** on wp.pressgo.app: 23 from pre-generated configs, 47 from API generation
 - Deploy single file: `scp file.php digitalocean:/var/www/wp.pressgo.app/htdocs/wp-content/plugins/pressgo-builder/path/file.php`
+- **IMPORTANT**: After scp, fix ownership: `ssh digitalocean "chown -R www-data:www-data /var/www/wp.pressgo.app/htdocs/wp-content/plugins/pressgo-builder/"`
 - Flush CSS after deploy: `ssh digitalocean "cd /var/www/wp.pressgo.app/htdocs && wp elementor flush-css --allow-root"`
 
+## WordPress.org SVN Deploy
+- SVN repo: `https://plugins.svn.wordpress.org/pressgo-builder/`
+- Username: `acehobojoe` (credentials cached in `~/.subversion/auth/`)
+- SVN password stored locally in `.svn-credentials` (gitignored)
+- Deploy flow:
+  1. Update version in `pressgo.php` (header + PRESSGO_VERSION constant) and `readme.txt` (Stable tag)
+  2. Add changelog entry to `readme.txt`
+  3. Commit to git + push to GitHub
+  4. `svn checkout https://plugins.svn.wordpress.org/pressgo-builder/ /tmp/pressgo-svn --depth immediates`
+  5. `svn update /tmp/pressgo-svn/trunk --set-depth infinity`
+  6. rsync plugin files to `/tmp/pressgo-svn/trunk/` (same excludes as build-zip.sh)
+  7. `svn add` any new files, `svn copy trunk tags/{version}`
+  8. `svn commit -m "Release {version}" --username acehobojoe`
+
 ## Settings
-- **PressGo API Key** — authenticates plugin → server.pressgo.app
+- **API Mode** (`pressgo_api_mode`) — 'pressgo' (default) or 'direct'
+- **PressGo API Key** (`pressgo_account_key`) — `pg_` key from pressgo.app
+- **Claude API Key** (`pressgo_api_key`) — Anthropic key (direct mode only)
+- **Claude Model** (`pressgo_model`) — model selector (direct mode only)

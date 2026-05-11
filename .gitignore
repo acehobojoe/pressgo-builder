@@ -26,3 +26,9 @@ includes/prompts/config-schema.json
 
 # Environment
 .env
+
+# SVN credentials
+.svn-credentials
+
+# Local Claude session config (per-user, not for repo)
+.claude/

@@ -2,15 +2,18 @@
 <html>
 <head>
 <title>PressGo — WordPress.org Asset Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <style>
-  body { font-family: system-ui; background: #1a1a2e; color: #fff; padding: 40px; }
-  h1 { color: #00b4d8; }
+  body { font-family: 'DM Sans', system-ui; background: #1a1a2e; color: #fff; padding: 40px; }
+  h1 { color: #5B4FFF; }
   .asset { margin: 30px 0; }
-  .asset h3 { color: #90e0ef; margin-bottom: 8px; }
+  .asset h3 { color: #9d97ff; margin-bottom: 8px; }
   .asset p { color: #888; font-size: 13px; margin: 4px 0 12px; }
   canvas { border: 1px solid #333; display: block; }
-  button { background: #00b4d8; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 8px; font-size: 14px; }
-  button:hover { background: #0096c7; }
+  button { background: #5B4FFF; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 8px; font-size: 14px; }
+  button:hover { background: #4a3fe6; }
 </style>
 </head>
 <body>
@@ -50,35 +53,37 @@ function drawIcon(canvasId, size) {
   const ctx = c.getContext('2d');
   const s = size / 256; // scale factor
 
-  // Background gradient
+  // Background gradient — navy to indigo
   const bg = ctx.createLinearGradient(0, 0, size, size);
-  bg.addColorStop(0, '#0043B3');
-  bg.addColorStop(1, '#0096c7');
+  bg.addColorStop(0, '#1A1A2E');
+  bg.addColorStop(1, '#5B4FFF');
   ctx.fillStyle = bg;
   roundRect(ctx, 0, 0, size, size, 40 * s);
   ctx.fill();
 
-  // "P" letterform
+  // "P" letterform — Playfair Display
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${150 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.font = `bold ${150 * s}px "Playfair Display", Georgia, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('P', size / 2, size / 2 - 4 * s);
+  ctx.fillText('P', size / 2 - 6 * s, size / 2 - 4 * s);
 
-  // Small "Go" accent
-  ctx.fillStyle = '#00e676';
-  ctx.font = `bold ${44 * s}px system-ui, -apple-system, sans-serif`;
+  // Small "Go" accent — green
+  ctx.fillStyle = '#4ADE80';
+  ctx.font = `bold ${44 * s}px "DM Sans", system-ui, sans-serif`;
   ctx.textAlign = 'left';
-  ctx.fillText('Go', size * 0.55, size * 0.62);
+  ctx.fillText('Go', size * 0.53, size * 0.62);
 
   // Spark/AI accent dots
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillStyle = 'rgba(91, 79, 255, 0.5)';
   ctx.beginPath();
   ctx.arc(size * 0.82, size * 0.22, 8 * s, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = 'rgba(74, 222, 128, 0.4)';
   ctx.beginPath();
   ctx.arc(size * 0.88, size * 0.32, 5 * s, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
   ctx.beginPath();
   ctx.arc(size * 0.78, size * 0.15, 4 * s, 0, Math.PI * 2);
   ctx.fill();
@@ -89,16 +94,16 @@ function drawBanner(canvasId, w, h) {
   const ctx = c.getContext('2d');
   const s = w / 1544;
 
-  // Background gradient
+  // Background gradient — navy to indigo
   const bg = ctx.createLinearGradient(0, 0, w, 0);
-  bg.addColorStop(0, '#0a1628');
-  bg.addColorStop(0.5, '#0043B3');
-  bg.addColorStop(1, '#0096c7');
+  bg.addColorStop(0, '#1A1A2E');
+  bg.addColorStop(0.6, '#2D2B55');
+  bg.addColorStop(1, '#5B4FFF');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
   // Subtle grid pattern
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.strokeStyle = 'rgba(91, 79, 255, 0.08)';
   ctx.lineWidth = 1;
   for (let x = 0; x < w; x += 40 * s) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
@@ -107,22 +112,22 @@ function drawBanner(canvasId, w, h) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
   }
 
-  // "PressGo" text
+  // "PressGo" text — Playfair Display
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${72 * s}px system-ui, -apple-system, sans-serif`;
+  ctx.font = `bold ${72 * s}px "Playfair Display", Georgia, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('PressGo', w / 2, h * 0.4);
 
-  // Tagline
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = `${26 * s}px system-ui, -apple-system, sans-serif`;
+  // Tagline — DM Sans
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = `${26 * s}px "DM Sans", system-ui, sans-serif`;
   ctx.fillText('AI Page Builder for Elementor', w / 2, h * 0.6);
 
-  // Accent line
+  // Accent line — green
   const lg = ctx.createLinearGradient(w * 0.35, 0, w * 0.65, 0);
   lg.addColorStop(0, 'transparent');
-  lg.addColorStop(0.5, '#00e676');
+  lg.addColorStop(0.5, '#4ADE80');
   lg.addColorStop(1, 'transparent');
   ctx.strokeStyle = lg;
   ctx.lineWidth = 2 * s;

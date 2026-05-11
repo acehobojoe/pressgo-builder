@@ -94,6 +94,10 @@ No user data is sent to any service until you explicitly click the Generate butt
    * **Own API Key** — Enter your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
 4. Navigate to PressGo > Generate to create your first page
 
+== Support ==
+
+Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.app).
+
 == Frequently Asked Questions ==
 
 = Do I need an API key? =
@@ -127,6 +131,7 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 3. Generated landing page with hero, features, pricing, and more
 4. Elementor editor — every widget is fully editable
 5. Settings page — enter your Claude API key and choose a model
+8. Live editing (beta) — connect Claude / Cursor / any MCP-capable AI to your site, talk in chat, watch sections appear in the Elementor editor in real time. No reload needed.
 
 == Changelog ==
 
