@@ -310,6 +310,12 @@ class PressGo_MCP_Tools {
 			return new WP_Error( 'mcp_bad_args', 'create_page requires a non-empty title.' );
 		}
 
+		// Free-tier daily cap on page creation. Pro is unlimited.
+		$cap_check = self::check_free_create_cap();
+		if ( is_wp_error( $cap_check ) ) {
+			return $cap_check;
+		}
+
 		// If config provided, build incrementally (one bad section shouldn't
 		// nuke the whole call). Otherwise create an empty draft.
 		if ( $config ) {
@@ -390,6 +396,9 @@ class PressGo_MCP_Tools {
 			self::maybe_inject_globals( $post_id );
 		}
 
+		// Increment the daily free counter only on successful create.
+		self::increment_free_create_counter();
+
 		$watch_url = class_exists( 'PressGo_MCP_Admin' ) ? PressGo_MCP_Admin::watch_url( $post_id ) : '';
 		$note = "Page created (id={$post_id}).\n\n" .
 			"⚠️ ACTION REQUIRED: Tell the user this URL to watch you build the page live in their browser:\n" .
@@ -397,6 +406,58 @@ class PressGo_MCP_Tools {
 			"Don't paraphrase — give them the exact URL. They open it in another tab, then every section " .
 			"you add appears within ~1.5s. This is the headline feature; don't skip it.";
 		return self::page_summary( $post_id, $note );
+	}
+
+	/**
+	 * Free-tier daily cap on create_page. Pro tier is unlimited.
+	 *
+	 * Counter is per-WP-install, daily-rotating, stored in wp_options
+	 * (`pressgo_free_creates_YYYY-MM-DD`). Resets at UTC midnight.
+	 *
+	 * Returns null if allowed, WP_Error if cap reached. Filterable cap:
+	 *   add_filter('pressgo_free_create_cap_per_day', fn() => 5);
+	 */
+	public static function check_free_create_cap() {
+		if ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) {
+			return null; // Pro = no cap
+		}
+		$cap   = (int) apply_filters( 'pressgo_free_create_cap_per_day', 3 );
+		$key   = 'pressgo_free_creates_' . gmdate( 'Y-m-d' );
+		$count = (int) get_option( $key, 0 );
+		if ( $count < $cap ) {
+			return null;
+		}
+		$msg = sprintf(
+			"Free-tier daily limit reached: %d/%d pages today. Three options to share with the user:\n\n" .
+			"  1. Upgrade to PressGo Pro — unlimited builds + custom header/footer + 1,000 screenshots/day.\n" .
+			"     Sign up: https://pressgo.app/dashboard\n\n" .
+			"  2. Wait until UTC midnight — the limit resets each day.\n\n" .
+			"  3. Use the credit-based generator inside WordPress (PressGo menu > Generate). " .
+			"     Pay-per-page, separate from this MCP flow.\n\n" .
+			"Tell the user about all three; let them pick. Do not retry the create until tomorrow " .
+			"or until the user upgrades.",
+			$count, $cap
+		);
+		return new WP_Error( 'mcp_free_cap_exceeded', $msg, array(
+			'status'      => 429,
+			'used'        => $count,
+			'cap'         => $cap,
+			'remaining'   => 0,
+			'upgrade_url' => 'https://pressgo.app/dashboard',
+			'resets_at'   => gmdate( 'Y-m-d\TH:i:s\Z', strtotime( 'tomorrow midnight UTC' ) ),
+		) );
+	}
+
+	/**
+	 * Increment today's free-tier create counter. No-op for Pro sites.
+	 */
+	public static function increment_free_create_counter() {
+		if ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) {
+			return;
+		}
+		$key   = 'pressgo_free_creates_' . gmdate( 'Y-m-d' );
+		$count = (int) get_option( $key, 0 );
+		update_option( $key, $count + 1, false ); // autoload=false so this doesn't bloat object cache
 	}
 
 	/**

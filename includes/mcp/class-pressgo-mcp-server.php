@@ -537,7 +537,15 @@ iframe{width:100%;height:100vh;border:0;display:block}
 				"and HAND OFF. Do not loop screenshot → update → screenshot more than ONCE without " .
 				"the user telling you something new — they are watching live, let them lead.\n\n" .
 
-				"## When the user opens Elementor mid-build (paused state)\n\n" .
+				"## Free-tier daily limit (`mcp_free_cap_exceeded`)\n\n" .
+			"`create_page` is capped on the free tier (3 pages per UTC day per WP install). If the " .
+			"user is already on Pro, the cap doesn't apply and you'll never see this. If you DO get " .
+			"`mcp_free_cap_exceeded` back, the error message lists the three options for the user " .
+			"(upgrade to Pro, wait until tomorrow, use the credit-based WP generator). Relay them in " .
+			"a friendly way and stop. Don't retry. Don't try to build the rest of the page on the " .
+			"already-existing draft from a previous turn.\n\n" .
+
+			"## When the user opens Elementor mid-build (paused state)\n\n" .
 				"If you call a write tool (add_section, update_section, set_globals, undo_last_change, " .
 				"add_sections) and get back an error code `mcp_paused`, it means the user has the " .
 				"Elementor editor open right now and your write would clobber their drag-and-drop edits. " .
