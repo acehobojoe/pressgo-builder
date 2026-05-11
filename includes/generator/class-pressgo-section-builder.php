@@ -329,12 +329,18 @@ class PressGo_Section_Builder {
 		);
 
 		if ( $img ) {
-			$extra['background_background']        = 'classic';
-			$extra['background_image']             = array( 'url' => PressGo_Widget_Helpers::normalize_image( $img )['url'], 'id' => '', 'size' => '' );
-			$extra['background_position']          = 'center center';
-			$extra['background_size']              = 'cover';
-			$extra['background_overlay_background'] = 'classic';
-			$extra['background_overlay_color']     = 'rgba(0,0,0,0.65)';
+			$norm_url = PressGo_Widget_Helpers::normalize_image( $img )['url'];
+			if ( $norm_url ) {
+				$extra['background_background']        = 'classic';
+				$extra['background_image']             = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
+				$extra['background_position']          = 'center center';
+				$extra['background_size']              = 'cover';
+				// Stronger overlay so hero text stays readable on busy or
+				// bright photos. Was 0.65; 0.78 keeps the image visible
+				// without sacrificing legibility.
+				$extra['background_overlay_background'] = 'classic';
+				$extra['background_overlay_color']     = 'rgba(0,0,0,0.78)';
+			}
 		} else {
 			// Fallback to gradient if no image.
 			$rgb = PressGo_Style_Utils::hex_to_rgb( $c['primary'] );
@@ -1027,23 +1033,45 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		$r = (string) $cfg['layout']['card_radius'];
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
 			$img_url = isset( $item['image'] ) ? $item['image'] : '';
+			$norm_url = $img_url ? PressGo_Widget_Helpers::normalize_image( $img_url )['url'] : '';
 
 			$widgets = array();
-			if ( $img_url ) {
-				$widgets[] = PressGo_Widget_Helpers::image_w( $img_url, $item['title'],
-					null, 0, false, 'center' );
-				$widgets[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			if ( $norm_url ) {
+				// Image rendered as a fixed-height background-image container
+				// so all cards stay the same height regardless of the source
+				// image's natural aspect ratio. Image-widget approach renders
+				// at natural size, which made cards uneven when AI passed
+				// portraits + landscapes mixed.
+				$widgets[] = PressGo_Element_Factory::col( array(),
+					array(
+						'background_background' => 'classic',
+						'background_image'      => array( 'url' => $norm_url, 'id' => '', 'size' => '' ),
+						'background_position'   => 'center center',
+						'background_size'       => 'cover',
+						'min_height'            => array( 'unit' => 'px', 'size' => 220, 'sizes' => array() ),
+						'min_height_mobile'     => array( 'unit' => 'px', 'size' => 180, 'sizes' => array() ),
+						'border_radius'         => array(
+							'unit' => 'px', 'top' => $r, 'right' => $r,
+							'bottom' => '0', 'left' => '0', 'isLinked' => false,
+						),
+						'margin'                => array(
+							'unit' => 'px', 'top' => '0', 'right' => '-24',
+							'bottom' => '0', 'left' => '-24', 'isLinked' => false,
+						),
+					)
+				);
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 20 );
 			}
 			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h4', 'left',
-				$c['text_dark'], 20, '700' );
+				PressGo_Style_Utils::card_text(), 20, '700' );
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
 			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $item['desc'], 'left',
-				$c['text_muted'], 15 );
+				PressGo_Style_Utils::card_text_muted(), 15 );
 
-			$r = (string) $cfg['layout']['card_radius'];
 			$feature_cols[] = PressGo_Element_Factory::col( $widgets, array(
 				'background_background' => 'classic',
 				'background_color'      => $c['white'],
@@ -1063,6 +1091,7 @@ class PressGo_Section_Builder {
 					'unit' => 'px', 'top' => '0', 'right' => '24',
 					'bottom' => '28', 'left' => '24', 'isLinked' => false,
 				),
+				'overflow'              => 'hidden',
 			) );
 		}
 
@@ -1558,12 +1587,6 @@ class PressGo_Section_Builder {
 				'', 'center' ),
 		);
 
-		$right = array();
-		if ( $img ) {
-			$right[] = PressGo_Widget_Helpers::image_w( $img,
-				$ce['headline'], null, (int) $cfg['layout']['card_radius'], true );
-		}
-
 		$left_col  = PressGo_Element_Factory::col( $left, array(
 			'vertical_align' => 'middle',
 			'padding'        => array(
@@ -1575,12 +1598,33 @@ class PressGo_Section_Builder {
 				'bottom' => '20', 'left' => '0', 'isLinked' => false,
 			),
 		) );
-		$right_col = PressGo_Element_Factory::col( $right, array(
+
+		// Right column: use background-image on the col instead of an image
+		// widget. background-cover fills the column at min_height regardless
+		// of the image's natural aspect ratio — the image widget approach
+		// rendered at natural size, which often left the column looking
+		// like an empty white panel when the image was small.
+		$right_col_settings = array(
 			'vertical_align'    => 'middle',
-			'min_height'        => array( 'unit' => 'px', 'size' => 350, 'sizes' => array() ),
-			'min_height_tablet' => array( 'unit' => 'px', 'size' => 280, 'sizes' => array() ),
-			'min_height_mobile' => array( 'unit' => 'px', 'size' => 220, 'sizes' => array() ),
-		) );
+			'min_height'        => array( 'unit' => 'px', 'size' => 380, 'sizes' => array() ),
+			'min_height_tablet' => array( 'unit' => 'px', 'size' => 300, 'sizes' => array() ),
+			'min_height_mobile' => array( 'unit' => 'px', 'size' => 240, 'sizes' => array() ),
+		);
+		if ( $img ) {
+			$norm_url = PressGo_Widget_Helpers::normalize_image( $img )['url'];
+			if ( $norm_url ) {
+				$r = (string) $cfg['layout']['card_radius'];
+				$right_col_settings['background_background'] = 'classic';
+				$right_col_settings['background_image']      = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
+				$right_col_settings['background_position']   = 'center center';
+				$right_col_settings['background_size']       = 'cover';
+				$right_col_settings['border_radius']         = array(
+					'unit' => 'px', 'top' => $r, 'right' => $r,
+					'bottom' => $r, 'left' => $r, 'isLinked' => true,
+				);
+			}
+		}
+		$right_col = PressGo_Element_Factory::col( array(), $right_col_settings );
 
 		return PressGo_Element_Factory::outer( $cfg,
 			array( PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 48 ) ),
@@ -1615,15 +1659,36 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 32 ),
 		);
 
+		// Accept either rich `items` ({icon, title, desc}) or the legacy
+		// flat `benefits` (string[]). Brain documents items as the canonical
+		// shape — without this fallback the items array was silently
+		// dropped and only benefits would render.
+		$source = array();
+		if ( ! empty( $ce['items'] ) && is_array( $ce['items'] ) ) {
+			foreach ( $ce['items'] as $item ) {
+				if ( ! is_array( $item ) ) { continue; }
+				$source[] = array(
+					'title' => isset( $item['title'] ) ? $item['title'] : '',
+					'desc'  => isset( $item['desc'] ) ? $item['desc']
+							 : ( isset( $item['description'] ) ? $item['description'] : '' ),
+					'icon'  => isset( $item['icon'] ) ? $item['icon'] : null,
+				);
+			}
+		} elseif ( ! empty( $ce['benefits'] ) && is_array( $ce['benefits'] ) ) {
+			foreach ( $ce['benefits'] as $benefit ) {
+				$source[] = array( 'title' => $benefit, 'desc' => '', 'icon' => null );
+			}
+		}
+
 		// Benefit cards — 3 per row.
 		$cards = array();
-		foreach ( $ce['benefits'] as $idx => $benefit ) {
+		foreach ( $source as $idx => $item ) {
 			$accent = $accent_pool[ $idx % count( $accent_pool ) ];
-			$icon   = $benefit_icons[ $idx % count( $benefit_icons ) ];
+			$icon   = ! empty( $item['icon'] ) ? $item['icon'] : $benefit_icons[ $idx % count( $benefit_icons ) ];
 
 			$widgets = array(
 				PressGo_Widget_Helpers::icon_box_w( $cfg,
-					$icon, $benefit, '',
+					$icon, $item['title'], $item['desc'],
 					$accent, 'left', 'stacked', 'circle',
 					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
 					PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
@@ -2232,12 +2297,18 @@ class PressGo_Section_Builder {
 
 		$extra = array();
 		if ( $img ) {
-			$extra['background_background']        = 'classic';
-			$extra['background_image']             = array( 'url' => PressGo_Widget_Helpers::normalize_image( $img )['url'], 'id' => '', 'size' => '' );
-			$extra['background_position']          = 'center center';
-			$extra['background_size']              = 'cover';
-			$extra['background_overlay_background'] = 'classic';
-			$extra['background_overlay_color']     = 'rgba(0,0,0,0.7)';
+			$norm_url = PressGo_Widget_Helpers::normalize_image( $img )['url'];
+			if ( $norm_url ) {
+				$extra['background_background']        = 'classic';
+				$extra['background_image']             = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
+				$extra['background_position']          = 'center center';
+				$extra['background_size']              = 'cover';
+				// Lighter overlay so the image actually reads through. Was
+				// 0.7 = pure dark slab; 0.5 keeps text readable while
+				// letting the photo be visible.
+				$extra['background_overlay_background'] = 'classic';
+				$extra['background_overlay_color']     = 'rgba(0,0,0,0.5)';
+			}
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -3100,22 +3171,31 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$nl = $cfg['newsletter'];
 
+		// Section sits on a primary gradient. If primary is light (clay,
+		// blush, lime), white text disappears — pick contrast based on
+		// primary luminance.
+		$on_primary       = PressGo_Style_Utils::text_on_color( $c['primary'] );
+		$is_light_primary = ( '#FFFFFF' !== $on_primary );
+		$desc_color       = $is_light_primary ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.7)';
+		$btn_bg           = $is_light_primary ? '#0F172A' : $c['white'];
+		$btn_label        = $is_light_primary ? '#FFFFFF' : $c['primary'];
+
 		$left = array(
 			PressGo_Widget_Helpers::heading_w( $cfg,
 				isset( $nl['headline'] ) ? $nl['headline'] : 'Stay in the Loop',
-				'h3', 'left', $c['white'], 28, '800', -0.5, 1.3, null, 24 ),
+				'h3', 'left', $on_primary, 28, '800', -0.5, 1.3, null, 24 ),
 		);
 		if ( ! empty( $nl['description'] ) ) {
 			$left[] = PressGo_Widget_Helpers::spacer_w( 8 );
 			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $nl['description'], 'left',
-				'rgba(255,255,255,0.7)', 15 );
+				$desc_color, 15 );
 		}
 
 		$right = array(
 			PressGo_Widget_Helpers::btn_w( $cfg,
 				isset( $nl['cta_text'] ) ? $nl['cta_text'] : 'Subscribe',
 				isset( $nl['cta_url'] ) ? $nl['cta_url'] : '#',
-				$c['white'], $c['primary'], null,
+				$btn_bg, $btn_label, null,
 				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'right' ),
 		);
 
