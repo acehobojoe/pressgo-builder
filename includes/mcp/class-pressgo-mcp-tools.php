@@ -270,6 +270,41 @@ class PressGo_MCP_Tools {
 				),
 			),
 			array(
+				'name'        => 'set_user_profile',
+				'description' =>
+					"Save the current user's profile so future chats don't have to re-ask onboarding " .
+					"questions. Persists across sessions on the WordPress install. Call after the user " .
+					"answers the welcome-wizard questions on their FIRST interaction. After that, " .
+					"`get_user_profile` returns these values automatically and the welcome wizard is " .
+					"skipped. All fields optional — pass only what the user told you. Whenever the user " .
+					"corrects something about themselves later (\"actually I'm a developer\"), call this " .
+					"again to update.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'user_type'        => array( 'type' => 'string', 'enum' => array( 'designer', 'developer', 'marketer', 'business_owner', 'agency', 'exploring' ), 'description' => 'Who the user is.' ),
+						'site_type'        => array( 'type' => 'string', 'enum' => array( 'small_business', 'personal_blog', 'portfolio', 'ecommerce', 'saas', 'nonprofit', 'agency_client', 'other' ), 'description' => 'What kind of website overall.' ),
+						'expertise_level'  => array( 'type' => 'string', 'enum' => array( 'beginner', 'intermediate', 'advanced' ), 'description' => 'How comfortable with WordPress / Elementor / web design.' ),
+						'voice_preference' => array( 'type' => 'string', 'description' => 'Plain-text capture of preferred tone (e.g. "playful but premium").' ),
+						'notes'            => array( 'type' => 'string', 'description' => 'Anything else useful to remember across chats.' ),
+					),
+				),
+			),
+			array(
+				'name'        => 'get_user_profile',
+				'description' =>
+					"Read the current user's saved profile. Returns `{ known: false }` for first-time " .
+					"users — run the welcome wizard (3-4 questions max) before building anything, then " .
+					"call `set_user_profile` to remember the answers. Returns `{ known: true, profile }` " .
+					"for returning users — skip the wizard and use the profile to calibrate. You don't " .
+					"need to call this on every chat — the same data is auto-injected into your " .
+					"initialize instructions on every connection.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => new stdClass(),
+				),
+			),
+			array(
 				'name'        => 'upload_media',
 				'description' =>
 					"Upload an image into the WordPress media library. Provide EITHER `data` (base64-encoded " .
@@ -312,6 +347,8 @@ class PressGo_MCP_Tools {
 			'get_header'       => array( 'title' => 'Read site-wide header', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'get_footer'       => array( 'title' => 'Read site-wide footer', 'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'upload_media'     => array( 'title' => 'Upload media',          'destructiveHint' => true,  'idempotentHint' => false, 'openWorldHint' => true ),
+			'set_user_profile' => array( 'title' => 'Save user profile',     'destructiveHint' => true,  'idempotentHint' => true ),
+			'get_user_profile' => array( 'title' => 'Read user profile',     'readOnlyHint'    => true,  'idempotentHint' => true ),
 		);
 		foreach ( $defs as &$def ) {
 			if ( isset( $def['name'], $annotations[ $def['name'] ] ) ) {
@@ -341,6 +378,8 @@ class PressGo_MCP_Tools {
 			case 'inspect_page':    return self::inspect_page( $args, $user );
 			case 'undo_last_change': return self::undo_last_change( $args, $user );
 			case 'upload_media':    return self::upload_media( $args, $user );
+			case 'set_user_profile': return self::set_user_profile( $args, $user );
+			case 'get_user_profile': return self::get_user_profile( $args, $user );
 
 			// Pro-tier tools — gated by PressGo_License.
 			case 'set_header':
@@ -1297,6 +1336,73 @@ class PressGo_MCP_Tools {
 				'width'  => $w,
 				'height' => $h,
 			),
+		);
+	}
+
+	const PROFILE_META_KEY = 'pressgo_user_profile';
+
+	/**
+	 * Read the saved user profile. Public so the MCP server can inject it
+	 * into the initialize response (so returning users skip the wizard
+	 * automatically without Claude having to call get_user_profile).
+	 */
+	public static function read_user_profile( $user_id ) {
+		$profile = get_user_meta( (int) $user_id, self::PROFILE_META_KEY, true );
+		return is_array( $profile ) && ! empty( $profile ) ? $profile : null;
+	}
+
+	private static function get_user_profile( $args, $user ) {
+		$profile = self::read_user_profile( $user->ID );
+		if ( ! $profile ) {
+			return array(
+				'content' => array( array( 'type' => 'text', 'text' =>
+					"No profile saved for this user yet. This is a first-time interaction. " .
+					"Run the welcome wizard (3-4 questions max) before building anything, " .
+					"then call set_user_profile to remember the answers."
+				) ),
+				'structuredContent' => array( 'known' => false ),
+			);
+		}
+		return array(
+			'content' => array( array( 'type' => 'text', 'text' =>
+				"Returning user profile loaded:\n" . wp_json_encode( $profile, JSON_PRETTY_PRINT ) .
+				"\n\nUse this to calibrate (technical depth, language style, default site framing). Skip the welcome wizard."
+			) ),
+			'structuredContent' => array( 'known' => true, 'profile' => $profile ),
+		);
+	}
+
+	private static function set_user_profile( $args, $user ) {
+		$existing = self::read_user_profile( $user->ID );
+		$profile  = is_array( $existing ) ? $existing : array();
+
+		$enums = array(
+			'user_type'       => array( 'designer', 'developer', 'marketer', 'business_owner', 'agency', 'exploring' ),
+			'site_type'       => array( 'small_business', 'personal_blog', 'portfolio', 'ecommerce', 'saas', 'nonprofit', 'agency_client', 'other' ),
+			'expertise_level' => array( 'beginner', 'intermediate', 'advanced' ),
+		);
+		foreach ( $enums as $key => $valid ) {
+			if ( isset( $args[ $key ] ) ) {
+				$val = sanitize_key( (string) $args[ $key ] );
+				if ( in_array( $val, $valid, true ) ) {
+					$profile[ $key ] = $val;
+				}
+			}
+		}
+		foreach ( array( 'voice_preference', 'notes' ) as $free ) {
+			if ( isset( $args[ $free ] ) ) {
+				$profile[ $free ] = sanitize_textarea_field( (string) $args[ $free ] );
+			}
+		}
+		$profile['updated_at'] = time();
+		update_user_meta( $user->ID, self::PROFILE_META_KEY, $profile );
+
+		return array(
+			'content' => array( array( 'type' => 'text', 'text' =>
+				"Saved user profile. Future chats will skip the welcome wizard for this user.\n" .
+				wp_json_encode( $profile, JSON_PRETTY_PRINT )
+			) ),
+			'structuredContent' => array( 'profile' => $profile ),
 		);
 	}
 

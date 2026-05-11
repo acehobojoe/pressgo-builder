@@ -433,7 +433,7 @@ iframe{width:100%;height:100vh;border:0;display:block}
 		try {
 			switch ( $method ) {
 				case 'initialize':
-					$result = $this->initialize( $params );
+					$result = $this->initialize( $params, $user );
 					break;
 				case 'notifications/initialized':
 					return null; // no response for notifications.
@@ -488,10 +488,59 @@ iframe{width:100%;height:100vh;border:0;display:block}
 		);
 	}
 
-	private function initialize( $params ) {
+	/**
+	 * Returns either a "you know this user already, skip the wizard" block
+	 * (with their saved profile) or a "this is a first-time user, run the
+	 * wizard" block. Prepended to the main instructions string so it's the
+	 * very first thing Claude reads on every initialize handshake.
+	 */
+	private function build_profile_block( $profile ) {
+		if ( is_array( $profile ) && ! empty( $profile ) ) {
+			$pretty = wp_json_encode( $profile, JSON_PRETTY_PRINT );
+			return "## Returning user — profile loaded\n\n" .
+				"This user has a saved profile from a previous chat:\n```\n{$pretty}\n```\n\n" .
+				"Skip the welcome wizard. Calibrate your tone, technical depth, and default site " .
+				"framing to this profile. If they correct anything (\"actually I'm not technical\"), " .
+				"call `set_user_profile` with the update.\n\n---\n\n";
+		}
+		return "## First-time user — run the welcome wizard\n\n" .
+			"No profile saved for this user yet. On their FIRST message in this connection, before " .
+			"anything else, ask 3-4 calibration questions to figure out who they are and what they're " .
+			"building. Pick the questions that fit naturally — don't dump all four at once. Aim for " .
+			"a friendly, designer-on-an-intro-call tone, not an interrogation.\n\n" .
+			"### Questions to pull from\n" .
+			"  - **Who you are**: \"Quick check — are you more of a designer, developer, marketer, " .
+			"     business owner, or just exploring?\" → maps to `user_type` enum.\n" .
+			"  - **What kind of site**: \"And the site overall — small business, personal blog, " .
+			"     portfolio, e-commerce, SaaS, something else?\" → maps to `site_type` enum.\n" .
+			"  - **Comfort level**: \"How are you with WordPress / Elementor — first time, " .
+			"     comfortable, or you basically live in the editor?\" → maps to `expertise_level`.\n" .
+			"  - **Voice**: \"What voice do you want — playful / premium / friendly / no-nonsense / " .
+			"     other?\" → goes into `voice_preference` (free text).\n\n" .
+			"### After they answer\n" .
+			"Call `set_user_profile` with what you learned. From that point on (this chat AND every " .
+			"future chat), Claude will see the saved profile in the initialize block and skip the " .
+			"wizard entirely. The user only does this once.\n\n" .
+			"### Sprinkle these capabilities into conversation as relevant\n" .
+			"  - \"You can paste an image right here — I'll upload it and use it on the page.\"\n" .
+			"  - \"You can record a quick voice memo describing the vibe — I'll match the tone.\"\n" .
+			"  - \"You can drop a link to a competitor or aspirational site — I'll borrow cues.\"\n" .
+			"  - \"You can sketch something on paper, photograph it, and send the photo — I'll " .
+			"     interpret the layout.\"\n" .
+			"  - \"Want me to take a screenshot of how it looks right now?\"\n" .
+			"Don't list them all upfront — surface the right one at the right moment.\n\n---\n\n";
+	}
+
+	private function initialize( $params, $user = null ) {
 		// Echo the client's protocol version if we recognise it; otherwise serve our default.
 		$client_proto = isset( $params['protocolVersion'] ) ? (string) $params['protocolVersion'] : '';
 		$proto = $client_proto ?: self::PROTOCOL_VERSION;
+
+		// Inject saved user profile so returning users skip the welcome wizard.
+		$profile = ( $user && class_exists( 'PressGo_MCP_Tools' ) )
+			? PressGo_MCP_Tools::read_user_profile( $user->ID )
+			: null;
+		$profile_block = $this->build_profile_block( $profile );
 
 		return array(
 			'protocolVersion' => $proto,
@@ -507,6 +556,7 @@ iframe{width:100%;height:100vh;border:0;display:block}
 				'title'   => 'PressGo — AI Page Builder',
 			),
 			'instructions'    =>
+				$profile_block .
 				"You are a senior web design consultant — not a generator. The person on the other end is " .
 				"hiring you. Behave the way a $200/hr designer would behave: ask before building, propose " .
 				"before deciding, show your reasoning, and push back when their request will hurt them. " .
