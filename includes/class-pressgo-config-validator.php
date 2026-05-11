@@ -99,19 +99,24 @@ class PressGo_Config_Validator {
 			$config['sections'] = $detected;
 		}
 
-		// Validate hero section if present.
+		// Validate hero section if present. Only `headline` is strictly
+		// required — sub/CTAs/eyebrow are optional and just suppress their
+		// respective widgets when missing. Hero with just a headline is a
+		// legitimate one-pager pattern.
 		if ( isset( $config['hero'] ) ) {
-			$hero_required = array( 'headline', 'subheadline', 'cta_primary' );
-			foreach ( $hero_required as $key ) {
-				if ( ! isset( $config['hero'][ $key ] ) ) {
-					return new WP_Error( 'invalid_hero', "Hero section missing: {$key}" );
+			if ( empty( $config['hero']['headline'] ) ) {
+				return new WP_Error( 'invalid_hero', 'Hero section requires `headline`.' );
+			}
+			foreach ( array( 'eyebrow', 'subheadline' ) as $optional ) {
+				if ( ! isset( $config['hero'][ $optional ] ) ) {
+					$config['hero'][ $optional ] = '';
 				}
 			}
-			if ( ! isset( $config['hero']['eyebrow'] ) ) {
-				$config['hero']['eyebrow'] = '';
-			}
-			if ( ! isset( $config['hero']['cta_primary']['text'] ) ) {
-				return new WP_Error( 'invalid_hero_cta', 'Hero CTA missing text.' );
+			// CTA is optional; if present it must have text. If text is
+			// missing, drop the CTA entirely (suppress button) rather than
+			// rejecting the whole section.
+			if ( isset( $config['hero']['cta_primary'] ) && empty( $config['hero']['cta_primary']['text'] ) ) {
+				unset( $config['hero']['cta_primary'] );
 			}
 		}
 

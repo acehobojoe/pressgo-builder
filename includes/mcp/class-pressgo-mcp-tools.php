@@ -1437,14 +1437,30 @@ class PressGo_MCP_Tools {
 			'post_modified_gmt' => current_time( 'mysql', 1 ),
 		) );
 
-		// Bust Elementor's CSS cache + the WP object cache for this post.
+		// Bust the WP object cache for this post.
 		clean_post_cache( $post_id );
+
+		// Drop every Elementor-side per-post cache key. Without this, rapid
+		// add_sections → screenshot_page can return stale renders because
+		// Elementor's compiled CSS / asset manifest is keyed per-post and
+		// reused until explicitly invalidated.
+		delete_post_meta( $post_id, '_elementor_css' );
+		delete_post_meta( $post_id, '_elementor_inner_section_css' );
+		delete_post_meta( $post_id, '_elementor_page_assets' );
+		delete_post_meta( $post_id, '_elementor_controls_usage' );
+
 		if ( class_exists( '\Elementor\Plugin' ) ) {
 			try {
 				$css = \Elementor\Core\Files\CSS\Post::create( $post_id );
 				if ( $css ) { $css->delete(); }
 			} catch ( \Throwable $e ) { /* best effort */ }
 		}
+
+		// Page-cache plugins (WP Rocket, etc.) commonly use these hooks.
+		if ( function_exists( 'rocket_clean_post' ) ) {
+			rocket_clean_post( $post_id );
+		}
+		do_action( 'clean_post_cache', $post_id, get_post( $post_id ) );
 	}
 
 	public static function get_page_globals( $post_id ) {

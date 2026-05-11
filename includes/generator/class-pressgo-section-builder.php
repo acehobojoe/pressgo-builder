@@ -879,6 +879,11 @@ class PressGo_Section_Builder {
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
 			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+			// Accept 'description' as alias for canonical 'desc'. Force empty
+			// string when neither is set so icon-box doesn't leak its default
+			// Lorem ipsum placeholder.
+			$desc = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
 			$style  = PressGo_Style_Utils::card_style( $cfg );
 			// Accent top border only.
 			$style['border_width'] = array(
@@ -890,7 +895,7 @@ class PressGo_Section_Builder {
 			$feature_cols[] = PressGo_Element_Factory::col(
 				array(
 					PressGo_Widget_Helpers::icon_box_w( $cfg,
-						$item['icon'], $item['title'], $item['desc'],
+						$item['icon'], $item['title'], $desc,
 						$accent, 'top', 'stacked', 'circle',
 						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left' ),
 				),
@@ -1117,6 +1122,8 @@ class PressGo_Section_Builder {
 		$step_cols = array();
 		foreach ( $st['items'] as $item ) {
 			$gold = isset( $c['gold'] ) ? $c['gold'] : $c['primary'];
+			$desc = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
 			$step_cols[] = PressGo_Element_Factory::col(
 				array(
 					PressGo_Widget_Helpers::heading_w( $cfg, $item['num'], 'h3', 'center',
@@ -1125,7 +1132,7 @@ class PressGo_Section_Builder {
 					PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h4', 'center',
 						$c['text_dark'], 20, '700' ),
 					PressGo_Widget_Helpers::spacer_w( 8 ),
-					PressGo_Widget_Helpers::text_w( $cfg, $item['desc'], 'center', $c['text_muted'], 15 ),
+					PressGo_Widget_Helpers::text_w( $cfg, $desc, 'center', $c['text_muted'], 15 ),
 				),
 				array(
 					'flex_align_items'       => 'center',
@@ -1653,6 +1660,12 @@ class PressGo_Section_Builder {
 
 		$testimonial_cols = array();
 		foreach ( $t['items'] as $idx => $item ) {
+			// Skip empty testimonials so the widget's "John Doe / designer"
+			// placeholder defaults never leak to the rendered page.
+			if ( empty( $item['quote'] ) ) { continue; }
+			if ( empty( $item['name'] ) ) { $item['name'] = ''; $item['role'] = ''; }
+			if ( ! isset( $item['role'] ) ) { $item['role'] = ''; }
+
 			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
 			// Left accent border only.
 			$style['border_width'] = array(
@@ -2662,6 +2675,7 @@ class PressGo_Section_Builder {
 		) );
 
 		// Link columns — one text_w per link for individual editability.
+		// Accept 'items' as alias for 'links' (the canonical key).
 		$link_columns = isset( $ft['columns'] ) ? $ft['columns'] : array();
 		foreach ( $link_columns as $lc ) {
 			$col_widgets = array();
@@ -2669,7 +2683,11 @@ class PressGo_Section_Builder {
 				$c['white'], 14, '700' );
 			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
-			foreach ( $lc['links'] as $link ) {
+			$col_links = isset( $lc['links'] ) && is_array( $lc['links'] ) ? $lc['links']
+				: ( isset( $lc['items'] ) && is_array( $lc['items'] ) ? $lc['items'] : array() );
+
+			foreach ( $col_links as $link ) {
+				if ( ! isset( $link['text'] ) ) { continue; }
 				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
 					esc_html( $link['text'] ), 'left', 'rgba(255,255,255,0.6)', 14, null, 1.4 );
 			}

@@ -11,6 +11,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PressGo_Widget_Helpers {
 
 	/**
+	 * Sanitize a URL for use in CTA / link fields.
+	 *
+	 * Allowed: http(s):// absolute URLs, mailto:, tel:, relative paths
+	 * starting with /, and #anchor fragments. Anything else (javascript:,
+	 * data:, file:, vbscript:, etc.) is replaced with '#' so the link
+	 * still renders but cannot execute scripts or escape the page.
+	 */
+	public static function sanitize_url( $url ) {
+		if ( ! is_string( $url ) || '' === $url ) {
+			return '#';
+		}
+		$url = trim( $url );
+		// Anchor fragment.
+		if ( '#' === $url[0] ) {
+			return $url;
+		}
+		// Relative path.
+		if ( '/' === $url[0] ) {
+			return $url;
+		}
+		// Allowed schemes.
+		$lower = strtolower( $url );
+		if ( 0 === strpos( $lower, 'http://' )
+			|| 0 === strpos( $lower, 'https://' )
+			|| 0 === strpos( $lower, 'mailto:' )
+			|| 0 === strpos( $lower, 'tel:' ) ) {
+			// Use WP's own validator as a final pass.
+			$clean = esc_url_raw( $url, array( 'http', 'https', 'mailto', 'tel' ) );
+			return $clean ? $clean : '#';
+		}
+		// Reject everything else (javascript:, data:, file:, etc.).
+		return '#';
+	}
+
+	/**
 	 * Heading widget.
 	 */
 	public static function heading_w( $cfg, $text, $tag = 'h2', $align = 'left', $color = null,
@@ -18,6 +53,10 @@ class PressGo_Widget_Helpers {
 									   $line_height = null, $transform = null, $size_mobile = null,
 									   $size_tablet = null, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
+		// Strip HTML — headings render via the title setting which Elementor
+		// outputs raw. Without this, a user passing <script> in the headline
+		// would land as a literal tag in the page DOM.
+		$text  = sanitize_text_field( (string) $text );
 		$s     = array(
 			'title'                    => $text,
 			'header_size'              => $tag,
@@ -61,6 +100,10 @@ class PressGo_Widget_Helpers {
 	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16,
 								   $size_mobile = null, $line_height = 1.7, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
+		// Allow safe inline tags (<strong>, <em>, links) but strip scripts /
+		// iframes / event handlers. wp_kses_post is the standard WP filter
+		// for user-supplied rich content.
+		$html  = wp_kses_post( (string) $html );
 		$s     = array(
 			'editor'                   => $html,
 			'align'                    => $align,
@@ -99,6 +142,8 @@ class PressGo_Widget_Helpers {
 		}
 
 		$radius = (string) $layout['button_radius'];
+		$text   = sanitize_text_field( (string) $text );
+		$url    = self::sanitize_url( $url );
 		$s      = array(
 			'text'                     => $text,
 			'link'                     => array( 'url' => $url, 'is_external' => false, 'nofollow' => false ),
