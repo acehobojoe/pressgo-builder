@@ -177,6 +177,43 @@ class PressGo_MCP_Tools {
 				),
 			),
 			array(
+				'name'        => 'screenshot_url',
+				'description' =>
+					"Capture a screenshot of ANY public URL — competitor sites, an aspirational design, " .
+					"another WordPress install you own, a blog post on this same site, anything. Same modes " .
+					"as `screenshot_page` (viewport, full_page, section_index) but takes a URL instead of a " .
+					"post_id, so you can render pages this plugin doesn't manage.\n\n" .
+					"Use this when:\n" .
+					"  - the user shares a competitor or reference URL and you want to look at it\n" .
+					"  - you're managing multiple WP installs and want to screenshot one without installing the plugin there\n" .
+					"  - you need a screenshot of a non-PressGo page on this site (e.g. a blog post)\n\n" .
+					"Counts against the same daily screenshot quota as `screenshot_page`. Private/local IPs " .
+					"are rejected by the service.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'url'           => array(
+							'type'        => 'string',
+							'description' => 'Absolute http or https URL to render.',
+						),
+						'viewport'      => array(
+							'type'        => 'string',
+							'enum'        => array( 'desktop', 'mobile', 'tablet', 'all' ),
+							'description' => '`all` returns three images (desktop+tablet+mobile). Defaults to desktop.',
+						),
+						'full_page'     => array(
+							'type'        => 'boolean',
+							'description' => 'If true, capture the entire scrolled length. Default false.',
+						),
+						'section_index' => array(
+							'type'        => 'integer',
+							'description' => 'Zero-based top-level section index to crop to. Default: full page (or first viewport).',
+						),
+					),
+					'required' => array( 'url' ),
+				),
+			),
+			array(
 				'name'        => 'clone_page',
 				'description' =>
 					"Duplicate an existing PressGo page so you can iterate on a variant without losing the " .
@@ -413,6 +450,7 @@ class PressGo_MCP_Tools {
 			'list_pages'       => array( 'title' => 'List pages',            'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'get_brain'        => array( 'title' => 'Read PressGo brain',    'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'screenshot_page'  => array( 'title' => 'Screenshot page',       'readOnlyHint'    => true,  'idempotentHint' => true,  'openWorldHint' => true ),
+			'screenshot_url'   => array( 'title' => 'Screenshot URL',        'readOnlyHint'    => true,  'idempotentHint' => true,  'openWorldHint' => true ),
 			'inspect_page'     => array( 'title' => 'Inspect page state',    'readOnlyHint'    => true,  'idempotentHint' => true  ),
 			'clone_page'       => array( 'title' => 'Clone page',            'destructiveHint' => true,  'idempotentHint' => false ),
 			'undo_last_change' => array( 'title' => 'Undo last change',      'destructiveHint' => true,  'idempotentHint' => false ),
@@ -449,6 +487,7 @@ class PressGo_MCP_Tools {
 			case 'list_pages':      return self::list_pages( $args, $user );
 			case 'get_brain':       return self::get_brain( $args, $user );
 			case 'screenshot_page': return self::screenshot_page( $args, $user );
+			case 'screenshot_url':  return self::screenshot_url( $args, $user );
 			case 'add_sections':    return self::add_sections( $args, $user );
 			case 'clone_page':      return self::clone_page( $args, $user );
 			case 'inspect_page':    return self::inspect_page( $args, $user );
@@ -954,28 +993,84 @@ class PressGo_MCP_Tools {
 		$full_page     = ! empty( $args['full_page'] );
 		$section_index = isset( $args['section_index'] ) ? (int) $args['section_index'] : null;
 
+		$title = get_the_title( $post_id );
+		return self::fetch_screenshot_viewports(
+			self::auth_preview_url( $post_id ),
+			self::resolve_viewports( $viewport_arg ),
+			$full_page,
+			$section_index,
+			"Post {$post_id} (\"{$title}\")"
+		);
+	}
+
+	private static function screenshot_url( $args, $user ) {
+		$url = isset( $args['url'] ) ? esc_url_raw( $args['url'] ) : '';
+		if ( '' === $url ) {
+			return new WP_Error( 'mcp_invalid_url', 'url is required (absolute http or https).' );
+		}
+		$parts = wp_parse_url( $url );
+		if ( empty( $parts['scheme'] ) || ! in_array( $parts['scheme'], array( 'http', 'https' ), true ) ) {
+			return new WP_Error( 'mcp_invalid_url', 'url must be absolute http or https.' );
+		}
+
+		$viewport_arg  = isset( $args['viewport'] ) ? sanitize_key( $args['viewport'] ) : 'desktop';
+		$full_page     = ! empty( $args['full_page'] );
+		$section_index = isset( $args['section_index'] ) ? (int) $args['section_index'] : null;
+
+		return self::fetch_screenshot_viewports(
+			$url,
+			self::resolve_viewports( $viewport_arg ),
+			$full_page,
+			$section_index,
+			'URL ' . esc_url( $url )
+		);
+	}
+
+	/**
+	 * Resolve a viewport CLI arg into the list of viewports to capture.
+	 * `all` expands to desktop+tablet+mobile; anything else falls back to desktop.
+	 */
+	private static function resolve_viewports( $viewport_arg ) {
+		if ( 'all' === $viewport_arg ) {
+			return array( 'desktop', 'tablet', 'mobile' );
+		}
+		if ( in_array( $viewport_arg, array( 'desktop', 'tablet', 'mobile' ), true ) ) {
+			return array( $viewport_arg );
+		}
+		return array( 'desktop' );
+	}
+
+	/**
+	 * Render a URL via the PressGo screenshot service for one or more viewports
+	 * and pack the bytes into MCP image content blocks.
+	 *
+	 * Shared by screenshot_page (current site, internal preview URL) and
+	 * screenshot_url (any caller-supplied public URL). Both paths count against
+	 * the same per-site daily quota via the X-Pressgo-Site header.
+	 *
+	 * @param string   $url            Public http/https URL to render.
+	 * @param array    $viewports      Viewports to capture (desktop|tablet|mobile).
+	 * @param bool     $full_page      If true, capture the whole scrolled length.
+	 * @param int|null $section_index  Crop to nth top-level section, or null for none.
+	 * @param string   $title_text     Label inserted at the top of the content blocks.
+	 * @return array|WP_Error          MCP content array, or WP_Error on failure.
+	 */
+	private static function fetch_screenshot_viewports( $url, $viewports, $full_page, $section_index, $title_text ) {
 		$service = (string) get_option( 'pressgo_screenshot_url', 'https://pressgo.app/api/screenshot' );
 		if ( '' === trim( $service ) ) {
 			return new WP_Error( 'mcp_misconfigured', 'Screenshot service URL is not configured.' );
 		}
 
-		// Pick which viewports to capture.
-		if ( 'all' === $viewport_arg ) {
-			$viewports = array( 'desktop', 'tablet', 'mobile' );
-		} elseif ( in_array( $viewport_arg, array( 'desktop', 'tablet', 'mobile' ), true ) ) {
-			$viewports = array( $viewport_arg );
-		} else {
-			$viewports = array( 'desktop' );
-		}
+		$tier      = ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) ? 'pro' : 'free';
+		$site_hash = md5( home_url() );
 
-		$preview_url = self::auth_preview_url( $post_id );
 		$content_blocks = array();
-		$captured = array();
+		$captured       = array();
 
 		foreach ( $viewports as $vp ) {
 			$qs = array(
-				'url'       => rawurlencode( $preview_url ),
-				'viewport'  => $vp,
+				'url'      => rawurlencode( $url ),
+				'viewport' => $vp,
 			);
 			if ( $full_page ) {
 				$qs['full_page'] = '1';
@@ -985,15 +1080,13 @@ class PressGo_MCP_Tools {
 			}
 			$endpoint = add_query_arg( $qs, $service );
 
-			$tier = ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) ? 'pro' : 'free';
-
 			$response = wp_remote_get( $endpoint, array(
 				'timeout' => 90,
 				'headers' => array(
 					'Accept'         => 'image/png,image/*',
 					'X-Pressgo-MCP'  => '1',
 					// Site-scoped rate-limit key — one quota per WP install.
-					'X-Pressgo-Site' => md5( home_url() ),
+					'X-Pressgo-Site' => $site_hash,
 					// Tier signal — Pro sites get a higher daily cap on the screenshot service.
 					'X-Pressgo-Tier' => $tier,
 				),
@@ -1019,16 +1112,15 @@ class PressGo_MCP_Tools {
 
 			$label = $vp;
 			if ( null !== $section_index ) { $label .= " section #{$section_index}"; }
-			elseif ( $full_page ) { $label .= ' full-page'; }
+			elseif ( $full_page )           { $label .= ' full-page'; }
 
 			$content_blocks[] = array( 'type' => 'image', 'data' => base64_encode( $bytes ), 'mimeType' => $mime );
-			$captured[] = $label . ' (' . number_format( strlen( $bytes ) / 1024, 0 ) . 'KB)';
+			$captured[]       = $label . ' (' . number_format( strlen( $bytes ) / 1024, 0 ) . 'KB)';
 		}
 
-		$title = get_the_title( $post_id );
 		array_unshift( $content_blocks, array(
 			'type' => 'text',
-			'text' => "Post {$post_id} (\"{$title}\") — captured: " . implode( ', ', $captured ),
+			'text' => $title_text . ' — captured: ' . implode( ', ', $captured ),
 		) );
 
 		return array( 'content' => $content_blocks );

@@ -132,10 +132,17 @@ class PressGo_Rest_API {
 		$mode = PressGo_Admin::get_api_mode();
 
 		if ( 'pressgo' === $mode ) {
-			// Test PressGo API key.
-			$account_key = PressGo_Admin::get_account_key();
+			// Test PressGo API key. Prefer the key explicitly passed in by
+			// the JS (i.e. what the user has typed into the field) so they
+			// can test BEFORE clicking Save. Fall back to the saved option
+			// when no override is provided.
+			$override    = isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '';
+			$account_key = $override !== '' ? $override : PressGo_Admin::get_account_key();
 			if ( empty( $account_key ) ) {
-				wp_send_json_error( array( 'message' => 'No PressGo API key configured.' ) );
+				wp_send_json_error( array( 'message' => 'No PressGo API key entered. Paste your key from pressgo.app/dashboard, then click Test.' ) );
+			}
+			if ( strpos( $account_key, 'pg_' ) !== 0 ) {
+				wp_send_json_error( array( 'message' => 'API key must start with "pg_". Copy it from pressgo.app/dashboard.' ) );
 			}
 
 			$response = wp_remote_get( 'https://pressgo.app/api/plugin/credits', array(
@@ -149,7 +156,11 @@ class PressGo_Rest_API {
 
 			$status = wp_remote_retrieve_response_code( $response );
 			if ( 401 === $status ) {
-				wp_send_json_error( array( 'message' => 'Invalid PressGo API key. Check your key or create a new one at pressgo.app/dashboard.' ) );
+				$saved = PressGo_Admin::get_account_key();
+				$hint  = ( $override !== '' && $override !== $saved )
+					? ' (Tip: click Save Changes — what you typed has not been saved yet.)'
+					: ' Check your key or create a new one at pressgo.app/dashboard.';
+				wp_send_json_error( array( 'message' => 'Invalid PressGo API key.' . $hint ) );
 			}
 			if ( $status >= 400 ) {
 				wp_send_json_error( array( 'message' => 'PressGo API error (HTTP ' . $status . ').' ) );
@@ -166,7 +177,9 @@ class PressGo_Rest_API {
 			wp_send_json_error( array( 'message' => 'PressGo config server: ' . $prompt->get_error_message() ) );
 		}
 
-		$api_key = PressGo_Admin::get_api_key();
+		// Same live-value pattern for the Anthropic key in direct mode.
+		$api_override = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
+		$api_key      = $api_override !== '' ? $api_override : PressGo_Admin::get_api_key();
 		if ( empty( $api_key ) ) {
 			wp_send_json_error( array( 'message' => 'Config server OK, but no Claude API key configured.' ) );
 		}

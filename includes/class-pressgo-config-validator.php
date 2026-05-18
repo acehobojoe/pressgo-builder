@@ -20,19 +20,34 @@ class PressGo_Config_Validator {
 			return new WP_Error( 'invalid_config', 'Config must be an array/object.' );
 		}
 
-		// Required top-level keys.
-		$required = array( 'colors', 'fonts', 'layout' );
-		foreach ( $required as $key ) {
-			if ( ! isset( $config[ $key ] ) ) {
-				return new WP_Error( 'missing_key', "Config missing required key: {$key}" );
-			}
+		// Fill in missing top-level scaffolding with safe defaults. Previously
+		// these threw a hard error which surfaced to the user as "Config
+		// missing required key: colors" — usually triggered when the AI hit
+		// max_tokens and the JSON got truncated before colors/fonts/layout
+		// were emitted. Better UX: build the page with sane defaults and let
+		// them edit colors after.
+		if ( ! isset( $config['colors'] ) || ! is_array( $config['colors'] ) ) {
+			$config['colors'] = array();
+		}
+		if ( ! isset( $config['fonts'] ) || ! is_array( $config['fonts'] ) ) {
+			$config['fonts'] = array();
+		}
+		if ( ! isset( $config['layout'] ) || ! is_array( $config['layout'] ) ) {
+			$config['layout'] = array();
 		}
 
-		// Validate colors.
-		$required_colors = array( 'primary', 'dark_bg', 'light_bg', 'white', 'text_dark', 'text_muted' );
-		foreach ( $required_colors as $color_key ) {
-			if ( ! isset( $config['colors'][ $color_key ] ) ) {
-				return new WP_Error( 'missing_color', "Config missing required color: {$color_key}" );
+		// Same for the six required color tokens — fill instead of fail.
+		$color_fallbacks = array(
+			'primary'    => '#2563EB',
+			'dark_bg'    => '#0F172A',
+			'light_bg'   => '#F8FAFC',
+			'white'      => '#FFFFFF',
+			'text_dark'  => '#0F172A',
+			'text_muted' => '#64748B',
+		);
+		foreach ( $color_fallbacks as $color_key => $fallback ) {
+			if ( ! isset( $config['colors'][ $color_key ] ) || ! is_string( $config['colors'][ $color_key ] ) ) {
+				$config['colors'][ $color_key ] = $fallback;
 			}
 		}
 
