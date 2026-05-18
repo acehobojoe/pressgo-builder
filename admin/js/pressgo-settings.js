@@ -79,7 +79,20 @@
 		btn.disabled = true;
 		btn.textContent = 'Testing...';
 		result.innerHTML = '';
-		fetch(pressgoSettings.ajaxUrl + '?action=pressgo_test_connection&nonce=' + pressgoSettings.testNonce)
+
+		// POST the live field values so the test verifies what's currently
+		// typed, not the last-saved option. Fixes the classic save-before-test
+		// gotcha where users paste a new key and see "Invalid API key"
+		// because the server is still testing the OLD saved key.
+		var body = new FormData();
+		body.append('action', 'pressgo_test_connection');
+		body.append('nonce', pressgoSettings.testNonce);
+		var keyEl = document.getElementById('pressgo_account_key');
+		var apiEl = document.getElementById('pressgo_api_key');
+		if (keyEl && keyEl.value) { body.append('key', keyEl.value.trim()); }
+		if (apiEl && apiEl.value) { body.append('api_key', apiEl.value.trim()); }
+
+		fetch(pressgoSettings.ajaxUrl, { method: 'POST', body: body })
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				if (data.success) {

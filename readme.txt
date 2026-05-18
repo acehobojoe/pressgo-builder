@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.2
+Stable tag: 2.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,7 +139,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
-= Unreleased =
+= 2.1.3 =
+* **Fix: "Config missing required key: colors" hard error in the generator.** The validator was rejecting any AI output that didn't include `colors`, `fonts`, or `layout` at the top level — usually triggered when the AI hit max_tokens mid-stream and the JSON got truncated before those fields were emitted. Validator now fills sensible defaults instead, so the page builds with a neutral palette and the user can edit colors after. Same fallback applied to the six required color tokens (primary, dark_bg, light_bg, white, text_dark, text_muted).
+* **Fix: "Invalid PressGo API key" after pasting a new key.** The Test Connection button was reading the LAST-SAVED key from the database, not the value currently in the input field — so users who pasted a fresh key and tested before clicking Save Changes saw "Invalid" because the server was testing their old (revoked) key. Test now POSTs the live field value. Added a clear hint when the typed value doesn't match the saved one: "click Save Changes — what you typed has not been saved yet." Same fix applied to the Anthropic API key in direct mode.
 * **New MCP tool — `screenshot_url`**: capture a screenshot of any public URL (competitor sites, aspirational designs, another WordPress install you own, a non-PressGo blog post on this same site). Same modes as `screenshot_page` (`viewport=desktop|tablet|mobile|all`, `full_page`, `section_index`) but takes a URL instead of a `post_id`, so AI clients can render pages this plugin doesn't manage. Counts against the same per-site daily quota; private/local IPs are still rejected by the screenshot service. Internal refactor: `screenshot_page` and `screenshot_url` now share a single `fetch_screenshot_viewports()` helper, removing ~70 lines of duplicate request/packing code.
 
 = 2.1.2 =
@@ -231,6 +233,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.1.3 =
+Critical fix release. Two customer-blocking bugs: (1) generator hard-erroring "Config missing required key: colors" when the AI hit max_tokens mid-stream — now fills defaults; (2) "Invalid PressGo API key" appearing after pasting a new key but before clicking Save Changes — Test Connection now uses the live field value. Plus a new screenshot_url MCP tool.
 
 = 2.1.2 =
 Stability patch. Fixes stats counters showing "0" in headless screenshots, accent_hover defaulting to bright green when user supplies a custom accent, comma handling in stat values, and watch URL drop-zone iframe binding. Adds MCP context guidance so AI clients don't go fishing in the wrong upload folder.
