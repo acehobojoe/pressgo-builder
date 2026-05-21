@@ -53,6 +53,9 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-admin.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-mcp-telemetry.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/mcp/class-pressgo-license.php';
+
+		// Opt-in prompt for anonymized usage telemetry.
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-telemetry-optin.php';
 	}
 
 	private function init_hooks() {
@@ -77,6 +80,7 @@ class PressGo {
 		( new PressGo_MCP_Telemetry() )->init();
 		if ( is_admin() ) {
 			( new PressGo_MCP_Admin() )->init();
+			( new PressGo_Telemetry_Optin() )->init();
 		}
 
 		// Ensure tables exist (idempotent: dbDelta no-ops when current).

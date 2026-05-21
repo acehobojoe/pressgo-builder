@@ -49,7 +49,48 @@ class PressGo_Page_Creator {
 		// Flush Elementor CSS cache for this post.
 		$this->flush_elementor_cache( $post_id );
 
+		// Telemetry: fire-and-forget heartbeat so the backend has real-time
+		// visibility on plugin usage from regular (non-MCP) page creates.
+		$this->send_heartbeat();
+
 		return $post_id;
+	}
+
+	/**
+	 * Fire-and-forget POST to pressgo.app/api/plugin/heartbeat. Reports the
+	 * site identity (hashed home_url) + tier + version. Non-blocking (~0ms
+	 * added to caller). Failures swallowed — telemetry must never break UX.
+	 */
+	private function send_heartbeat() {
+		// Telemetry requires explicit opt-in (WordPress.org guideline #7).
+		if ( ! get_option( 'pressgo_share_telemetry', 0 ) ) {
+			return;
+		}
+
+		global $wp_version;
+
+		$is_pro = class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro();
+		$tier   = $is_pro ? 'pro' : 'free';
+
+		// Increment + read today's create count (atomic-ish, good enough for telemetry).
+		$key   = 'pressgo_free_creates_' . gmdate( 'Y-m-d' );
+		$count = (int) get_option( $key, 0 ) + 1;
+		update_option( $key, $count, false ); // autoload=false to avoid bloating object cache
+
+		wp_remote_post( 'https://pressgo.app/api/plugin/heartbeat', array(
+			'timeout'  => 0.5,
+			'blocking' => false,
+			'headers'  => array(
+				'Content-Type'   => 'application/json',
+				'X-Pressgo-Site' => md5( home_url() ),
+				'X-Pressgo-Tier' => $tier,
+			),
+			'body'     => wp_json_encode( array(
+				'creates_today'  => $count,
+				'plugin_version' => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
+				'wp_version'     => isset( $wp_version ) ? $wp_version : '',
+			) ),
+		) );
 	}
 
 	/**

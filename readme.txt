@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.3
+Stable tag: 2.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -89,6 +89,20 @@ No user data is sent to any service until you explicitly click the Generate butt
 * [Anthropic Privacy Policy](https://www.anthropic.com/policies/privacy)
 * [Anthropic API Usage Policy](https://www.anthropic.com/policies/aup)
 
+**4. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) — OPT-IN ONLY**
+
+On first install you'll see a notice asking whether you want to share anonymous usage data. Nothing is sent until you click "Allow & continue". If you click "Skip" or simply dismiss the notice, no telemetry data is ever transmitted. The opt-in choice can be changed anytime in PressGo &rarr; MCP Server.
+
+When enabled, the plugin sends two kinds of anonymized events:
+
+* After each successful page create from the built-in generator: a hashed site identifier (MD5 of home_url — not the URL itself), the free/pro tier, plugin version, WordPress version, and the number of pages created today.
+* After each MCP tool call: install ID (random 16-byte token, not tied to your WP user account), plugin version, tool name, the section type and variant chosen, request duration, and ok/error status.
+
+The plugin NEVER transmits: your prompt text, the page contents, headlines, images, CTAs, site URL (in plaintext), or any user/account information. All requests are non-blocking and silently dropped on failure.
+
+* [PressGo Privacy Policy](https://pressgo.app/privacy)
+* [PressGo Terms of Service](https://pressgo.app/terms)
+
 == Installation ==
 
 1. Upload the `pressgo-builder` folder to `/wp-content/plugins/`
@@ -138,6 +152,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Live editing (beta) — connect Claude / Cursor / any MCP-capable AI to your site, talk in chat, watch sections appear in the Elementor editor in real time. No reload needed.
 
 == Changelog ==
+
+= 2.1.4 =
+* **Opt-in usage telemetry on the built-in generator.** The MCP path has had opt-in telemetry since 2.0; the built-in text generator did not. With this release, after admins click "Allow & continue" on the one-time opt-in notice, each successful page create sends an anonymized heartbeat: a hashed site identifier (MD5 of home_url, not the URL itself), plugin version, WordPress version, free/pro tier, and a count of pages created today. Users who click "Skip" send nothing. The setting can be changed anytime in PressGo &rarr; MCP Server. No prompt text, page content, or personal data is ever transmitted. The request is non-blocking (500ms timeout) and never affects page generation if it fails.
 
 = 2.1.3 =
 * **Fix: "Config missing required key: colors" hard error in the generator.** The validator was rejecting any AI output that didn't include `colors`, `fonts`, or `layout` at the top level — usually triggered when the AI hit max_tokens mid-stream and the JSON got truncated before those fields were emitted. Validator now fills sensible defaults instead, so the page builds with a neutral palette and the user can edit colors after. Same fallback applied to the six required color tokens (primary, dark_bg, light_bg, white, text_dark, text_muted).
@@ -233,6 +250,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.1.4 =
+Adds opt-in anonymized activation telemetry to the built-in text generator. After a one-time "Allow / Skip" prompt for administrators, opted-in installs send a small heartbeat after each page create. No prompt or page content is transmitted. Skip sends nothing.
 
 = 2.1.3 =
 Critical fix release. Two customer-blocking bugs: (1) generator hard-erroring "Config missing required key: colors" when the AI hit max_tokens mid-stream — now fills defaults; (2) "Invalid PressGo API key" appearing after pasting a new key but before clicking Save Changes — Test Connection now uses the live field value. Plus a new screenshot_url MCP tool.
