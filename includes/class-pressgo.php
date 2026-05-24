@@ -56,6 +56,9 @@ class PressGo {
 
 		// Opt-in prompt for anonymized usage telemetry.
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-telemetry-optin.php';
+
+		// AI Builder (v2.2) — chat-driven page builder.
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-ai-builder.php';
 	}
 
 	private function init_hooks() {
@@ -82,6 +85,10 @@ class PressGo {
 			( new PressGo_MCP_Admin() )->init();
 			( new PressGo_Telemetry_Optin() )->init();
 		}
+		// AI Builder needs front-end hooks too (signed-token preview URLs
+		// fetched by screenshot.pressgo.app hit the public site).
+		// init() itself gates admin-only menu/ajax actions internally.
+		( new PressGo_AI_Builder() )->init();
 
 		// Ensure tables exist (idempotent: dbDelta no-ops when current).
 		add_action( 'plugins_loaded', array( 'PressGo_MCP_Storage', 'maybe_install' ), 20 );

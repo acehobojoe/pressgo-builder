@@ -1,0 +1,655 @@
+/* PressGo AI Builder — fullscreen view (native WP-admin flavor) */
+
+* { box-sizing: border-box; }
+html, body {
+	margin: 0; padding: 0; height: 100%;
+	background: #f0f0f1;
+	color: #1d2327;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+	font-size: 13px;
+}
+.pg-builder-body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* ─── Topbar ────────────────────────────────────────────────────────── */
+.pg-builder-topbar {
+	display: flex; align-items: center; gap: 12px;
+	height: 50px; padding: 0 16px;
+	background: #fff;
+	border-bottom: 1px solid #dcdcde;
+	flex-shrink: 0;
+	box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.pg-builder-back {
+	color: #50575e; text-decoration: none; font-size: 18px;
+	width: 30px; height: 30px;
+	display: inline-flex; align-items: center; justify-content: center;
+	border-radius: 4px;
+	border: 1px solid transparent;
+	transition: background 0.12s ease, border-color 0.12s ease;
+}
+.pg-builder-back:hover { background: #f6f7f7; border-color: #c3c4c7; color: #1d2327; }
+
+.pg-builder-title {
+	font-size: 14px; font-weight: 600; color: #1d2327;
+	flex: 1; min-width: 0;
+	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pg-builder-title::before {
+	content: '';
+	display: inline-block;
+	width: 18px; height: 18px;
+	margin-right: 8px; vertical-align: -4px;
+	background: linear-gradient(135deg, #5b4fff 0%, #b893ff 100%);
+	border-radius: 4px;
+	box-shadow: 0 1px 2px rgba(91,79,255,0.3);
+}
+
+.pg-builder-actions { display: flex; align-items: center; gap: 10px; }
+.pg-credits-pill {
+	font-size: 12px; font-weight: 500;
+	padding: 5px 12px; border-radius: 999px;
+	background: #f0f0f1; color: #50575e;
+	border: 1px solid #dcdcde;
+	transition: background 0.4s ease, color 0.4s ease, transform 0.25s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+.pg-credits-pill.is-flash {
+	background: linear-gradient(90deg, #5b4fff, #b893ff);
+	color: #fff;
+	border-color: transparent;
+	transform: scale(1.08);
+	box-shadow: 0 0 18px rgba(91,79,255,0.45);
+	animation: pg-credit-bump 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pg-credit-bump {
+	0%   { transform: scale(1); }
+	30%  { transform: scale(1.18); }
+	60%  { transform: scale(0.96); }
+	100% { transform: scale(1.08); }
+}
+
+.pg-builder-link {
+	font-size: 12px; font-weight: 500;
+	color: #fff; text-decoration: none;
+	padding: 6px 14px; border-radius: 4px;
+	background: #2271b1;
+	border: 1px solid #2271b1;
+	transition: background 0.12s ease;
+}
+.pg-builder-link:hover { background: #135e96; color: #fff; }
+
+/* Ghost button — secondary action in topbar (Clear chat). */
+.pg-builder-ghost {
+	font-size: 12px; font-weight: 500;
+	color: #50575e;
+	background: transparent;
+	border: 1px solid #dcdcde;
+	padding: 5px 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: inherit;
+	transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.pg-builder-ghost:hover {
+	background: #f6f7f7;
+	border-color: #a7aaad;
+	color: #1d2327;
+}
+.pg-builder-ghost:active { background: #ececef; }
+
+/* ─── Shell ─────────────────────────────────────────────────────────── */
+.pg-builder-shell { display: flex; flex: 1; min-height: 0; }
+
+/* ─── Chat panel ────────────────────────────────────────────────────── */
+.pg-chat {
+	width: 400px; min-width: 340px; max-width: 50%;
+	display: flex; flex-direction: column;
+	background: #fff;
+	border-right: 1px solid #dcdcde;
+}
+.pg-chat-log {
+	flex: 1; overflow-y: auto;
+	padding: 20px;
+	display: flex; flex-direction: column; gap: 14px;
+	scroll-behavior: smooth;
+}
+
+/* Bubble entrance — slide up + fade. Applied to every child of #pg-chat-log */
+@keyframes pg-bubble-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+#pg-chat-log > * {
+	animation: pg-bubble-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pg-msg { max-width: 100%; }
+
+.pg-msg-user {
+	align-self: flex-end;
+	background: linear-gradient(135deg, #2271b1 0%, #3858e9 100%);
+	color: #fff;
+	padding: 10px 14px;
+	border-radius: 14px 14px 4px 14px;
+	font-size: 13px; line-height: 1.5;
+	max-width: 88%;
+	white-space: pre-wrap; word-wrap: break-word;
+	box-shadow: 0 1px 2px rgba(34, 113, 177, 0.2);
+	display: flex; flex-direction: column; gap: 8px;
+}
+.pg-msg-user-image {
+	max-width: 100%;
+	max-height: 240px;
+	border-radius: 8px;
+	border: 1px solid rgba(255,255,255,0.3);
+	display: block;
+}
+
+.pg-msg-assistant {
+	align-self: flex-start;
+	background: #f6f7f7;
+	color: #1d2327;
+	padding: 10px 14px;
+	border-radius: 14px 14px 14px 4px;
+	border: 1px solid #e5e7e9;
+	font-size: 13px; line-height: 1.55;
+	max-width: 92%;
+	white-space: pre-wrap; word-wrap: break-word;
+}
+
+.pg-msg-system {
+	align-self: center;
+	background: transparent;
+	color: #8c8f94;
+	padding: 6px 10px;
+	font-size: 12px;
+	font-style: italic;
+	text-align: center;
+	max-width: 80%;
+	line-height: 1.5;
+}
+
+/* Built bubble — celebrate the moment. Purple accent w/ shimmer + sparkle. */
+@keyframes pg-built-pop {
+	0%   { opacity: 0; transform: scale(0.94) translateY(8px); box-shadow: 0 0 0 rgba(91,79,255,0); }
+	50%  { opacity: 1; transform: scale(1.02) translateY(0);   box-shadow: 0 4px 24px rgba(91,79,255,0.28); }
+	100% { opacity: 1; transform: scale(1);                    box-shadow: 0 1px 3px rgba(91,79,255,0.12); }
+}
+@keyframes pg-built-shimmer {
+	0%   { background-position: -200% 0; }
+	100% { background-position: 200% 0; }
+}
+.pg-msg-built {
+	align-self: stretch;
+	position: relative;
+	background:
+		linear-gradient(#fff, #fff) padding-box,
+		linear-gradient(90deg, #5b4fff 0%, #b893ff 25%, #5b4fff 50%, #b893ff 75%, #5b4fff 100%) border-box;
+	background-size: 100% 100%, 200% 100%;
+	border: 1.5px solid transparent;
+	color: #1d2327;
+	padding: 12px 16px;
+	border-radius: 10px;
+	font-size: 13px; line-height: 1.5;
+	box-shadow: 0 1px 3px rgba(91,79,255,0.12);
+	animation:
+		pg-bubble-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both,
+		pg-built-pop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both,
+		pg-built-shimmer 2.4s ease-in-out 0.3s 1;
+}
+.pg-msg-built::before {
+	content: '✨';
+	display: inline-block;
+	margin-right: 8px;
+	animation: pg-sparkle 1.4s ease-in-out infinite;
+}
+@keyframes pg-sparkle {
+	0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
+	50%      { transform: scale(1.2) rotate(15deg); opacity: 1; }
+}
+.pg-msg-built strong { color: #5b4fff; font-weight: 600; }
+
+/* Error bubble */
+.pg-msg-error {
+	align-self: stretch;
+	background: #fcf0f1;
+	border: 1px solid #f0b3b8;
+	color: #8a1f2a;
+	padding: 10px 14px; border-radius: 8px;
+	font-size: 13px; line-height: 1.5;
+}
+.pg-error-actions {
+	display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.pg-error-btn {
+	display: inline-flex; align-items: center;
+	padding: 6px 14px; border-radius: 6px;
+	font-size: 12px; font-weight: 600;
+	text-decoration: none;
+	background: #fff;
+	color: #8a1f2a;
+	border: 1px solid #f0b3b8;
+	transition: background 0.12s ease, transform 0.08s ease;
+}
+.pg-error-btn:hover { background: #fdf3f4; color: #8a1f2a; }
+.pg-error-btn:active { transform: scale(0.97); }
+.pg-error-btn.is-primary {
+	background: linear-gradient(135deg, #5b4fff, #7b6dff);
+	color: #fff;
+	border-color: transparent;
+	box-shadow: 0 1px 3px rgba(91,79,255,0.3);
+}
+.pg-error-btn.is-primary:hover { background: linear-gradient(135deg, #4a40e0, #6c5fff); color: #fff; }
+
+/* Typing indicator — three breathing dots */
+.pg-typing {
+	align-self: flex-start;
+	background: #f6f7f7;
+	border: 1px solid #e5e7e9;
+	padding: 12px 16px;
+	border-radius: 14px 14px 14px 4px;
+	display: inline-flex; align-items: center; gap: 5px;
+}
+.pg-typing span {
+	width: 7px; height: 7px;
+	background: #8c8f94; border-radius: 50%;
+	animation: pg-typing-bounce 1.2s ease-in-out infinite;
+}
+.pg-typing span:nth-child(2) { animation-delay: 0.15s; }
+.pg-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes pg-typing-bounce {
+	0%, 60%, 100% { transform: translateY(0) scale(0.85); opacity: 0.55; background: #8c8f94; }
+	30%           { transform: translateY(-4px) scale(1); opacity: 1; background: #5b4fff; }
+}
+
+/* ─── Composer ──────────────────────────────────────────────────────── */
+
+/* No standalone preview bar — the attach button itself becomes the
+   thumbnail when an image is staged. */
+
+.pg-chat-input {
+	padding: 12px 16px 16px;
+	border-top: 1px solid #dcdcde;
+	background: #fff;
+	display: flex; gap: 8px;
+	align-items: flex-end;
+}
+/* Attach button — paperclip icon by default; morphs into the thumbnail
+   when an image is staged. Specificity bump (.pg-chat-input .pg-attach-btn)
+   so we beat the .pg-chat-input button rule that styles Send purple. */
+.pg-chat-input .pg-attach-btn,
+.pg-chat-input button.pg-attach-btn {
+	position: relative;
+	background: transparent;
+	border: 1px solid #c3c4c7;
+	color: #50575e;
+	width: 44px; height: 44px;
+	padding: 0;
+	border-radius: 6px;
+	cursor: pointer;
+	display: inline-flex; align-items: center; justify-content: center;
+	flex-shrink: 0;
+	font-weight: 500;
+	overflow: hidden;
+	transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+}
+.pg-chat-input .pg-attach-btn:hover {
+	border-color: #5b4fff; color: #5b4fff; background: #f7f5ff;
+}
+.pg-chat-input .pg-attach-btn:active { background: #ede9ff; transform: scale(0.96); }
+
+/* Thumbnail mode: image fills the button, paperclip hides, hover shows × */
+.pg-attach-btn-thumb {
+	position: absolute; inset: 0;
+	width: 100%; height: 100%;
+	object-fit: cover;
+	display: none;
+	border-radius: 6px;
+}
+.pg-attach-btn-x {
+	position: absolute; inset: 0;
+	display: none;
+	align-items: center; justify-content: center;
+	font-size: 22px; line-height: 1;
+	color: #fff;
+	background: rgba(91, 79, 255, 0.7);
+	border-radius: 6px;
+	font-weight: 300;
+}
+.pg-chat-input .pg-attach-btn.has-image .pg-attach-icon { display: none; }
+.pg-chat-input .pg-attach-btn.has-image .pg-attach-btn-thumb { display: block; }
+.pg-chat-input .pg-attach-btn.has-image { border-color: #5b4fff; border-width: 2px; }
+.pg-chat-input .pg-attach-btn.has-image:hover .pg-attach-btn-x { display: flex; }
+
+/* Drag-and-drop overlay covers the whole chat panel when files are dragged in. */
+.pg-chat { position: relative; }
+.pg-drop-overlay {
+	position: absolute; inset: 12px;
+	background: rgba(91,79,255,0.06);
+	border: 2px dashed #5b4fff;
+	border-radius: 12px;
+	display: none;
+	align-items: center; justify-content: center;
+	pointer-events: none;
+	z-index: 50;
+	color: #5b4fff;
+}
+.pg-chat.is-dragover .pg-drop-overlay { display: flex; }
+.pg-drop-message {
+	display: flex; flex-direction: column; align-items: center; gap: 10px;
+	font-size: 14px; font-weight: 600; color: #4a40e0;
+	text-align: center;
+}
+.pg-chat-input textarea {
+	flex: 1; resize: none;
+	background: #fff;
+	color: #1d2327;
+	border: 1px solid #c3c4c7;
+	border-radius: 6px;
+	padding: 10px 12px;
+	font-size: 13px; font-family: inherit;
+	line-height: 1.5;
+	min-height: 44px; max-height: 200px;
+	transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.pg-chat-input textarea:focus {
+	outline: none;
+	border-color: #5b4fff;
+	box-shadow: 0 0 0 1px #5b4fff;
+}
+.pg-chat-input button {
+	background: #5b4fff;
+	color: #fff;
+	border: 1px solid #5b4fff;
+	padding: 0 18px; height: 44px;
+	border-radius: 6px;
+	font-size: 13px; font-weight: 600;
+	cursor: pointer;
+	transition: background 0.12s ease, transform 0.08s ease;
+}
+.pg-chat-input button:hover:not(:disabled) { background: #4a40e0; border-color: #4a40e0; }
+.pg-chat-input button:active:not(:disabled) { transform: scale(0.98); }
+.pg-chat-input button:disabled {
+	background: #dcdcde;
+	color: #8c8f94;
+	border-color: #dcdcde;
+	cursor: not-allowed;
+}
+
+/* Composer footer — vision toggle lives here under the textarea. */
+.pg-chat-footer {
+	padding: 0 16px 14px;
+	background: #fff;
+	border-top: 0;
+}
+.pg-vision-toggle {
+	display: inline-flex; align-items: center; gap: 10px;
+	cursor: pointer;
+	user-select: none;
+	padding: 6px 8px;
+	border-radius: 6px;
+	transition: background 0.12s ease;
+	position: relative;
+}
+.pg-vision-toggle:hover { background: #f6f7f7; }
+
+/* Custom tooltip — fires on hover after ~400ms, sits above the toggle
+   pointing down. native title= is unreliable on labels that wrap inputs. */
+.pg-vision-toggle[data-tooltip]::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 0;
+	min-width: 240px; max-width: 320px;
+	padding: 8px 12px;
+	background: #1d2327;
+	color: #fff;
+	font-size: 12px; font-weight: 400; line-height: 1.45;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+	opacity: 0;
+	pointer-events: none;
+	transform: translateY(4px);
+	transition: opacity 0.18s ease 0s, transform 0.18s ease 0s;
+	z-index: 100;
+}
+.pg-vision-toggle[data-tooltip]::before {
+	content: '';
+	position: absolute;
+	bottom: calc(100% + 2px);
+	left: 24px;
+	border: 6px solid transparent;
+	border-top-color: #1d2327;
+	opacity: 0;
+	transition: opacity 0.18s ease 0s;
+	z-index: 100;
+}
+.pg-vision-toggle[data-tooltip]:hover::after,
+.pg-vision-toggle[data-tooltip]:hover::before {
+	opacity: 1;
+	transform: translateY(0);
+	transition-delay: 0.4s;
+}
+.pg-vision-input { position: absolute; opacity: 0; pointer-events: none; }
+.pg-vision-track {
+	position: relative;
+	width: 32px; height: 18px;
+	background: #c3c4c7;
+	border-radius: 999px;
+	flex-shrink: 0;
+	transition: background 0.18s ease;
+}
+.pg-vision-thumb {
+	position: absolute;
+	top: 2px; left: 2px;
+	width: 14px; height: 14px;
+	background: #fff;
+	border-radius: 50%;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+	transition: transform 0.18s ease;
+}
+.pg-vision-input:checked + .pg-vision-track {
+	background: linear-gradient(90deg, #5b4fff, #b893ff);
+}
+.pg-vision-input:checked + .pg-vision-track .pg-vision-thumb {
+	transform: translateX(14px);
+}
+.pg-vision-input:focus-visible + .pg-vision-track {
+	box-shadow: 0 0 0 2px #5b4fff44;
+}
+.pg-vision-label {
+	display: inline-flex; align-items: baseline; gap: 8px;
+	font-size: 12px; color: #50575e;
+}
+/* Inline SVG eye icon. Gray when off, PressGo purple when on, with a
+   subtle scale pop on the transition. fill: currentColor lets us control
+   the SVG color via plain CSS color. */
+.pg-vision-icon {
+	display: inline-flex; align-items: center;
+	width: 16px; height: 16px;
+	color: #8c8f94;
+	transition: color 0.18s ease, transform 0.18s ease;
+}
+.pg-vision-icon svg { width: 16px; height: 16px; display: block; }
+.pg-vision-input:checked ~ .pg-vision-label .pg-vision-icon {
+	color: #5b4fff;
+	animation: pg-eyes-on 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pg-eyes-on {
+	0%   { transform: scale(0.85); }
+	50%  { transform: scale(1.3); }
+	100% { transform: scale(1); }
+}
+.pg-vision-name {
+	font-weight: 600; color: #1d2327;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.pg-vision-name em {
+	font-style: italic;
+	font-weight: 600;
+	color: #5b4fff;
+}
+.pg-vision-input:checked ~ .pg-vision-label .pg-vision-name { color: #5b4fff; }
+.pg-vision-input:checked ~ .pg-vision-label .pg-vision-name em { color: #4a40e0; }
+.pg-vision-hint { color: #8c8f94; font-size: 11px; }
+
+/* "Reviewing…" indicator that appears between build and vision-correction. */
+.pg-msg-reviewing {
+	align-self: flex-start;
+	display: inline-flex; align-items: center; gap: 8px;
+	background: #f0eeff;
+	border: 1px solid #d4ccff;
+	color: #4a40e0;
+	padding: 8px 12px;
+	border-radius: 12px 12px 12px 4px;
+	font-size: 12px; font-weight: 500;
+}
+.pg-msg-reviewing::before {
+	content: '👁';
+	font-size: 14px;
+	animation: pg-eye-scan 1.4s ease-in-out infinite;
+}
+@keyframes pg-eye-scan {
+	0%, 100% { transform: translateX(0); }
+	50%      { transform: translateX(3px); }
+}
+
+/* ─── Confirm modal (Clear chat etc.) ─────────────────────────────── */
+.pg-modal-backdrop {
+	position: fixed; inset: 0;
+	background: rgba(15, 23, 42, 0.45);
+	display: flex; align-items: center; justify-content: center;
+	z-index: 1000;
+	animation: pg-modal-fade 0.16s ease-out;
+}
+@keyframes pg-modal-fade {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+.pg-modal {
+	background: #fff;
+	border-radius: 10px;
+	padding: 22px 24px 18px;
+	min-width: 320px;
+	max-width: 440px;
+	box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+	animation: pg-modal-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pg-modal-pop {
+	from { opacity: 0; transform: scale(0.94) translateY(8px); }
+	to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.pg-modal-title { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: #1d2327; }
+.pg-modal-body { margin: 0 0 20px; font-size: 13px; color: #50575e; line-height: 1.5; }
+.pg-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.pg-modal-btn {
+	background: #fff; color: #50575e;
+	border: 1px solid #c3c4c7;
+	padding: 7px 14px; border-radius: 4px;
+	font-size: 13px; font-weight: 500;
+	font-family: inherit; cursor: pointer;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+.pg-modal-btn:hover { background: #f6f7f7; color: #1d2327; }
+.pg-modal-btn.is-danger {
+	background: #d63638; color: #fff; border-color: #d63638;
+}
+.pg-modal-btn.is-danger:hover { background: #b32d2e; border-color: #b32d2e; color: #fff; }
+.pg-modal-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ─── Preview ───────────────────────────────────────────────────────── */
+.pg-preview {
+	flex: 1; min-width: 0;
+	background: #f0f0f1;
+	position: relative;
+	display: flex; flex-direction: column;
+}
+
+/* Viewport switcher toolbar */
+.pg-preview-toolbar {
+	flex-shrink: 0;
+	padding: 10px 16px 0;
+	display: flex; justify-content: center;
+}
+.pg-vp-group {
+	display: inline-flex;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	padding: 3px;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.pg-vp-btn {
+	display: inline-flex; align-items: center; gap: 6px;
+	background: transparent;
+	border: 0;
+	padding: 6px 12px;
+	font-size: 12px; font-weight: 500;
+	color: #50575e;
+	border-radius: 5px;
+	cursor: pointer;
+	font-family: inherit;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+.pg-vp-btn:hover { background: #f6f7f7; color: #1d2327; }
+.pg-vp-btn.is-active {
+	background: linear-gradient(135deg, #5b4fff, #7b6dff);
+	color: #fff;
+	box-shadow: 0 1px 3px rgba(91,79,255,0.3);
+}
+.pg-vp-btn.is-active:hover { color: #fff; }
+.pg-vp-btn svg { flex-shrink: 0; }
+
+/* Stage holds the device-sized frame, centers it horizontally. */
+.pg-preview-stage {
+	flex: 1; min-height: 0;
+	padding: 12px 16px 16px;
+	display: flex;
+	justify-content: center;
+	align-items: stretch;
+	overflow: auto;
+}
+.pg-preview-frame-wrap {
+	width: 100%; height: 100%;
+	background: #fff;
+	border-radius: 8px;
+	border: 1px solid #dcdcde;
+	overflow: hidden;
+	box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+	position: relative;
+	transition: max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.32s ease;
+}
+.pg-preview-frame-wrap[data-viewport="tablet"] {
+	max-width: 820px;
+	box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+}
+.pg-preview-frame-wrap[data-viewport="mobile"] {
+	max-width: 390px;
+	box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+}
+.pg-preview iframe {
+	width: 100%; height: 100%; border: 0; display: block;
+	transition: opacity 0.25s ease, filter 0.4s ease;
+}
+.pg-preview.is-reloading iframe {
+	opacity: 0.45;
+	filter: blur(2px) saturate(0.7);
+}
+
+/* Reload overlay — pulsing gradient sweep + spinner */
+.pg-preview-frame-wrap::after {
+	content: '';
+	position: absolute; inset: 0;
+	background: linear-gradient(90deg, transparent 0%, rgba(91,79,255,0.18) 50%, transparent 100%);
+	background-size: 200% 100%;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s ease;
+}
+.pg-preview.is-reloading .pg-preview-frame-wrap::after {
+	opacity: 1;
+	animation: pg-preview-sweep 1.6s ease-in-out infinite;
+}
+@keyframes pg-preview-sweep {
+	0%   { background-position: -100% 0; }
+	100% { background-position: 200% 0; }
+}

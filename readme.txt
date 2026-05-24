@@ -4,7 +4,7 @@ Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.4
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -153,6 +153,20 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.2.0 =
+* **NEW — AI Builder admin page.** Chat-driven page builder under PressGo &rarr; AI Builder. Page list with screenshot thumbnails, AI-enable toggle on any Elementor page, and a "+ New page" button. Click into a page to open a fullscreen builder with a chat panel on the left and a live preview on the right (no wp-admin chrome, no theme chrome — clean visitor-style preview).
+* **NEW — Iterative chat with streaming.** Send a message, watch tokens stream into the assistant reply live (no more 30-second silent waits). Each successful build produces a "Built:" bubble and the preview iframe hot-reloads. Chat-only messages are free; credits only burn when the AI actually changes the page.
+* **NEW — A(eyes) self-review.** Optional toggle. When on, after every build the AI screenshots the rendered page, vision-reviews it against the user's request, and applies one correction pass if it spots a visual issue. Catches color/styling drift that text-only iteration misses. ~3&times; tokens for noticeably better accuracy.
+* **NEW — Desktop / Tablet / Mobile viewport switcher** in the preview. Standard 1440 / 820 / 390 widths with smooth transitions and centered framing.
+* **NEW — Drop / paste / pick screenshots** into the chat. The attach paperclip morphs into a thumbnail when an image is staged; hover shows X to remove. Drag a competitor's site, paste a Figma palette, or drop a sketch.
+* **NEW — Signed preview tokens** let the screenshot service render draft pages (no more "AI sees a 404" hallucination). Tokens TTL 10 minutes and are scoped per-post.
+* **NEW — Clear chat button** in the topbar resets just the conversation, never the built page.
+* **Features section now config-driven.** AI can change icon position/alignment ('top'/'center'), card top border, gap, background — overrides that were previously hardcoded into the builder.
+* **Out-of-credits error in the AI Builder now includes direct buttons** to the dashboard's Plus subscription and one-time credit-pack checkouts — one click to billing instead of a five-step scavenger hunt.
+* **Aggressive Elementor cache clear** on every build (post meta + on-disk per-post CSS file + WP Rocket + object cache) so successful AI edits actually appear without a hard refresh.
+* **Friendlier error copy.** Network failures now read "Network error — check your connection and try again" instead of the raw "Unexpected token '&lt;'" JS exception.
+* List view: lock column widths so a hovered thumbnail's shadow can't push action buttons off-screen. Add per-column max widths so the table fits at any reasonable viewport.
+
 = 2.1.4 =
 * **Opt-in usage telemetry on the built-in generator.** The MCP path has had opt-in telemetry since 2.0; the built-in text generator did not. With this release, after admins click "Allow & continue" on the one-time opt-in notice, each successful page create sends an anonymized heartbeat: a hashed site identifier (MD5 of home_url, not the URL itself), plugin version, WordPress version, free/pro tier, and a count of pages created today. Users who click "Skip" send nothing. The setting can be changed anytime in PressGo &rarr; MCP Server. No prompt text, page content, or personal data is ever transmitted. The request is non-blocking (500ms timeout) and never affects page generation if it fails.
 
@@ -250,6 +264,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.2.0 =
+Major release — adds the AI Builder admin page (chat-driven page editing with streaming, screenshot self-review, multi-viewport preview, image drop). The existing one-shot generator and MCP server keep working unchanged. Recommended.
 
 = 2.1.4 =
 Adds opt-in anonymized activation telemetry to the built-in text generator. After a one-time "Allow / Skip" prompt for administrators, opted-in installs send a small heartbeat after each page create. No prompt or page content is transmitted. Skip sends nothing.

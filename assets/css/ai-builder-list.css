@@ -1,0 +1,102 @@
+/* PressGo AI Builder — list view styles */
+
+/* Explicit per-column widths so the table never overflows the viewport
+   horizontally — a wide Preview thumbnail used to push the action column
+   off-screen and trap users into horizontal scrolling. */
+.pressgo-ai-list .pressgo-ai-table {
+	margin-top: 20px;
+	table-layout: fixed;
+	width: 100%;
+	max-width: 100%;
+}
+.pressgo-ai-list .pressgo-ai-table th { padding: 12px 14px; }
+.pressgo-ai-list .pressgo-ai-table td { padding: 14px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+/* Preview thumbnail column */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(1),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(1) { width: 130px; }
+/* Page (title) column — flexes to fill */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(2),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(2) { width: auto; }
+/* Status */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(3),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(3) { width: 90px; }
+/* Last edited */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(4),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(4) { width: 130px; }
+/* AI toggle */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(5),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(5) { width: 70px; text-align: center; }
+/* Actions */
+.pressgo-ai-list .pressgo-ai-table th:nth-child(6),
+.pressgo-ai-list .pressgo-ai-table td:nth-child(6) { width: 160px; }
+
+/* Thumbnail column — desktop screenshot of the page, cropped to a card.
+   inline-block + fixed size so it can't expand its parent cell on hover. */
+.pg-thumb-link {
+	display: inline-block;
+	width: 110px; height: 70px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	overflow: hidden;
+	position: relative;
+	vertical-align: middle;
+	transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.pg-thumb-link:hover {
+	border-color: #5b4fff;
+	/* No transform — would reflow row baselines on some browsers. */
+	box-shadow: 0 2px 8px rgba(91, 79, 255, 0.18);
+}
+.pg-thumb {
+	width: 110px; height: 70px; display: block;
+	object-fit: cover;
+	object-position: top center;
+}
+
+/* Empty-state shimmer while the screenshot is being fetched server-side
+   for the first time. Disappears once the real PNG loads (any non-zero
+   intrinsic width). */
+.pg-thumb-link::before {
+	content: '';
+	position: absolute; inset: 0;
+	background: linear-gradient(90deg, #f6f7f7 0%, #ececef 50%, #f6f7f7 100%);
+	background-size: 200% 100%;
+	animation: pg-thumb-shimmer 1.6s ease-in-out infinite;
+	z-index: 0;
+}
+.pg-thumb { position: relative; z-index: 1; }
+@keyframes pg-thumb-shimmer {
+	0%   { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}
+
+.pg-toggle {
+	position: relative;
+	display: inline-block;
+	width: 36px;
+	height: 20px;
+	cursor: pointer;
+}
+.pg-toggle input { opacity: 0; width: 0; height: 0; }
+.pg-toggle-slider {
+	position: absolute;
+	inset: 0;
+	background: #cbd2dc;
+	border-radius: 999px;
+	transition: background 0.15s ease;
+}
+.pg-toggle-slider::before {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	background: #fff;
+	border-radius: 50%;
+	transition: transform 0.15s ease;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.pg-toggle input:checked + .pg-toggle-slider { background: #5b4fff; }
+.pg-toggle input:checked + .pg-toggle-slider::before { transform: translateX(16px); }

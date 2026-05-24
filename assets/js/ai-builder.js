@@ -1,0 +1,571 @@
+/* PressGo AI Builder — fullscreen UI logic */
+(function () {
+	if (!window.PressGoAI) return;
+	var cfg = window.PressGoAI;
+
+	var log    = document.getElementById('pg-chat-log');
+	var form   = document.getElementById('pg-chat-form');
+	var input  = document.getElementById('pg-chat-text');
+	var sendBtn= document.getElementById('pg-chat-send');
+	var frame  = document.getElementById('pg-preview-frame');
+	// The reload-state class lives on .pg-preview (outer wrapper), not the
+	// immediate parent .pg-preview-frame-wrap, so the sweep overlay can paint.
+	var previewWrap = document.querySelector('.pg-preview');
+	var credPill = document.getElementById('pg-credits');
+	var visionInput = document.getElementById('pg-vision');
+	var lastCreditValue = null;
+
+	// ─── Viewport switcher ─────────────────────────────────────────────
+	var stageInner = document.getElementById('pg-preview-stage-inner');
+	document.querySelectorAll('.pg-vp-btn').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var vp = btn.getAttribute('data-viewport');
+			document.querySelectorAll('.pg-vp-btn').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+			if (stageInner) stageInner.setAttribute('data-viewport', vp);
+		});
+	});
+
+	// ─── Image attach: drop, paste, file picker ────────────────────────
+	var attachBtn    = document.getElementById('pg-attach-btn');
+	var attachInput  = document.getElementById('pg-attach-input');
+	var attachThumb  = document.getElementById('pg-attach-thumb');
+	var chatPanel    = document.getElementById('pg-chat');
+	var pendingImage = null; // { dataUrl, mediaType, base64, name }
+
+	function setPendingImage(file) {
+		if (!file || !/^image\//.test(file.type)) return;
+		// 5MB hard cap — bigger files explode admin-ajax + Anthropic input budget.
+		if (file.size > 5 * 1024 * 1024) {
+			append(el('pg-msg-error', 'Image too large (5MB max).'));
+			return;
+		}
+		var reader = new FileReader();
+		reader.onload = function (e) {
+			var dataUrl = e.target.result;
+			var commaIdx = dataUrl.indexOf(',');
+			pendingImage = {
+				dataUrl:   dataUrl,
+				mediaType: file.type,
+				base64:    dataUrl.slice(commaIdx + 1),
+				name:      file.name || 'screenshot.png',
+			};
+			attachThumb.src = dataUrl;
+			attachThumb.hidden = false;
+			attachBtn.classList.add('has-image');
+			attachBtn.title = 'Image attached: ' + pendingImage.name + ' — click to remove';
+		};
+		reader.readAsDataURL(file);
+	}
+	function clearPendingImage() {
+		pendingImage = null;
+		attachThumb.src = '';
+		attachThumb.hidden = true;
+		attachBtn.classList.remove('has-image');
+		attachBtn.title = 'Attach an image (or drag/drop / paste)';
+		attachInput.value = '';
+	}
+
+	// Click attach button: if image staged, clear it; otherwise open picker.
+	attachBtn && attachBtn.addEventListener('click', function () {
+		if (pendingImage) clearPendingImage();
+		else attachInput.click();
+	});
+	attachInput && attachInput.addEventListener('change', function (e) {
+		var f = e.target.files && e.target.files[0];
+		if (f) setPendingImage(f);
+	});
+
+	// Paste from clipboard inside the textarea.
+	input.addEventListener('paste', function (e) {
+		var items = (e.clipboardData && e.clipboardData.items) || [];
+		for (var i = 0; i < items.length; i++) {
+			if (items[i].kind === 'file' && /^image\//.test(items[i].type)) {
+				var file = items[i].getAsFile();
+				if (file) {
+					e.preventDefault();
+					setPendingImage(file);
+					return;
+				}
+			}
+		}
+	});
+
+	// Drag-and-drop over the chat panel.
+	var dragDepth = 0;
+	function preventDefault(e) { e.preventDefault(); e.stopPropagation(); }
+	['dragenter', 'dragover'].forEach(function (ev) {
+		chatPanel.addEventListener(ev, function (e) {
+			preventDefault(e);
+			if (e.dataTransfer && Array.prototype.includes.call(e.dataTransfer.types || [], 'Files')) {
+				dragDepth++;
+				chatPanel.classList.add('is-dragover');
+			}
+		});
+	});
+	chatPanel.addEventListener('dragleave', function (e) {
+		preventDefault(e);
+		dragDepth = Math.max(0, dragDepth - 1);
+		if (dragDepth === 0) chatPanel.classList.remove('is-dragover');
+	});
+	chatPanel.addEventListener('drop', function (e) {
+		preventDefault(e);
+		dragDepth = 0;
+		chatPanel.classList.remove('is-dragover');
+		var files = (e.dataTransfer && e.dataTransfer.files) || [];
+		if (files.length) setPendingImage(files[0]);
+	});
+
+	// Restore vision toggle from localStorage so the user's preference sticks.
+	try {
+		if (localStorage.getItem('pgVision') === '1') visionInput.checked = true;
+	} catch (e) {}
+	visionInput && visionInput.addEventListener('change', function () {
+		try { localStorage.setItem('pgVision', visionInput.checked ? '1' : '0'); } catch (e) {}
+	});
+
+	function typingNode() {
+		var d = document.createElement('div');
+		d.className = 'pg-typing';
+		d.setAttribute('aria-label', 'AI is thinking');
+		d.innerHTML = '<span></span><span></span><span></span>';
+		return d;
+	}
+
+	function flashCredits(newTotal) {
+		if (typeof newTotal !== 'number') return;
+		credPill.textContent = newTotal + ' credits';
+		if (lastCreditValue !== null && newTotal !== lastCreditValue) {
+			credPill.classList.remove('is-flash');
+			// Force reflow so re-adding the class restarts the animation.
+			void credPill.offsetWidth;
+			credPill.classList.add('is-flash');
+			setTimeout(function () { credPill.classList.remove('is-flash'); }, 700);
+		}
+		lastCreditValue = newTotal;
+	}
+
+	function el(cls, text) {
+		var d = document.createElement('div');
+		d.className = cls;
+		if (text != null) d.textContent = text;
+		return d;
+	}
+
+	function append(node) {
+		log.appendChild(node);
+		log.scrollTop = log.scrollHeight;
+	}
+
+	function renderHistory(messages) {
+		log.innerHTML = '';
+		if (!messages || !messages.length) {
+			append(el('pg-msg-system', 'Tell me what kind of page you want — business, vibe, the goal. I\'ll ask 1-2 follow-ups then build a first draft.'));
+			return;
+		}
+		messages.forEach(function (m) {
+			if (m.role === 'user') append(el('pg-msg pg-msg-user', m.content));
+			else if (m.role === 'assistant') {
+				if (m.content) append(el('pg-msg pg-msg-assistant', m.content));
+				if (m.built) {
+					var b = el('pg-msg pg-msg-built');
+					b.innerHTML = '<strong>Built:</strong> ' + escapeHtml(m.summary || '(page updated)');
+					append(b);
+				}
+			}
+		});
+	}
+
+	function escapeHtml(s) {
+		return String(s).replace(/[&<>"']/g, function (c) {
+			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+		});
+	}
+
+	function setBusy(busy) {
+		sendBtn.disabled = busy;
+		input.disabled = busy;
+		sendBtn.textContent = busy ? 'Thinking…' : 'Send';
+	}
+
+	// Saved across reloads so the iframe stays scrolled to whatever section
+	// the user was looking at when they asked for an edit. Without this,
+	// every build snaps them back to the hero and they lose context.
+	var savedScrollY = 0;
+	function reloadPreview(bust) {
+		try {
+			// Capture current scroll position before tearing down the doc.
+			try {
+				if (frame.contentWindow && frame.contentWindow.scrollY !== undefined) {
+					savedScrollY = frame.contentWindow.scrollY;
+				}
+			} catch (e) { /* cross-origin would block; we're same-origin so OK */ }
+			previewWrap.classList.add('is-reloading');
+			var url = cfg.previewBase;
+			var sep = url.indexOf('?') === -1 ? '?' : '&';
+			var fresh = url + sep + 'pg_clean=1&_t=' + (bust || Date.now()) + '&_r=' + Math.random().toString(36).slice(2, 8);
+			try {
+				if (frame.contentWindow && frame.contentWindow.location) {
+					frame.contentWindow.location.replace(fresh);
+				} else {
+					frame.src = fresh;
+				}
+			} catch (e) {
+				frame.src = fresh;
+			}
+		} catch (e) { /* noop */ }
+	}
+
+	// Belt-and-suspenders: even with show_admin_bar(false), some
+	// plugins (Elementor Pro Notes, Elementor Debugger, etc.) inject their
+	// own toolbars. Same-origin iframe means we can reach into its document
+	// and strip them on every load. Also drop the reload overlay here so
+	// the fade-in syncs to "actually rendered" not just "src changed".
+	function onIframeLoad() {
+		try {
+			var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+			if (doc) {
+				var css = doc.createElement('style');
+				css.id = 'pg-iframe-scrub';
+				css.textContent = [
+					'#wpadminbar { display: none !important; }',
+					'html.wp-toolbar { padding-top: 0 !important; }',
+					'html { margin-top: 0 !important; }',
+					'#elementor-editor-wrapper-bar, .e-pro-notes, .e-pro-notes-trigger { display: none !important; }'
+				].join('\n');
+				doc.head && doc.head.appendChild(css);
+				var bar = doc.getElementById('wpadminbar');
+				if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+			}
+		} catch (e) { /* cross-origin — give up */ }
+		// Restore the scroll position the user was at before the rebuild
+		// so they stay anchored on whatever section they were editing.
+		try {
+			if (savedScrollY > 0 && frame.contentWindow) {
+				frame.contentWindow.scrollTo(0, savedScrollY);
+			}
+		} catch (e) { /* cross-origin or detached */ }
+		// Slight delay so the eye sees the sweep + blur before clearing.
+		setTimeout(function () { previewWrap.classList.remove('is-reloading'); }, 180);
+	}
+	frame.addEventListener('load', onIframeLoad);
+
+	function refreshCredits() {
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_credits');
+		fd.append('nonce', cfg.nonce);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.ok ? r.json() : null; })
+			.then(function (j) {
+				if (j && j.success && j.data && typeof j.data.total === 'number') {
+					// Set initial value without flashing (no previous value to diff).
+					credPill.textContent = j.data.total + ' credits';
+					lastCreditValue = j.data.total;
+				}
+			})
+			.catch(function () { /* leave default pill */ });
+	}
+
+	function loadHistory() {
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_get_chat');
+		fd.append('nonce', cfg.nonce);
+		fd.append('post_id', cfg.postId);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.json(); })
+			.then(function (j) {
+				if (j && j.success) renderHistory(j.data.messages || []);
+				else renderHistory([]);
+			})
+			.catch(function () { renderHistory([]); });
+	}
+
+	function sendMessage(text) {
+		// Optimistic user bubble — shows image inline if one was attached.
+		var userBubble = el('pg-msg pg-msg-user');
+		if (pendingImage) {
+			var thumb = document.createElement('img');
+			thumb.src = pendingImage.dataUrl;
+			thumb.className = 'pg-msg-user-image';
+			userBubble.appendChild(thumb);
+		}
+		if (text) {
+			var txt = document.createElement('div');
+			txt.textContent = text;
+			userBubble.appendChild(txt);
+		}
+		append(userBubble);
+		input.value = '';
+		var typing = typingNode();
+		append(typing);
+		setBusy(true);
+
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_chat');
+		fd.append('nonce', cfg.nonce);
+		fd.append('post_id', cfg.postId);
+		fd.append('message', text);
+		if (visionInput && visionInput.checked) fd.append('vision', '1');
+		if (pendingImage) {
+			fd.append('image_base64', pendingImage.base64);
+			fd.append('image_media_type', pendingImage.mediaType);
+			// Clear immediately so a second send doesn't double-attach.
+			clearPendingImage();
+		}
+
+		// Streaming consumer state.
+		var assistantBubble = null;     // current text bubble being filled
+		var visionNotice    = null;     // "A(eyes) reviewing…" pill, if any
+		var streamFailed    = false;
+		var typingDismissed = false;
+		var abortController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+		// Expose so the Clear-chat handler can abort in-flight streams.
+		window.__pgActiveStream = abortController;
+
+		function ensureAssistantBubble() {
+			if (!assistantBubble) {
+				assistantBubble = el('pg-msg pg-msg-assistant', '');
+				append(assistantBubble);
+			}
+			return assistantBubble;
+		}
+		function dismissTypingOnce() {
+			if (!typingDismissed) { typing.remove(); typingDismissed = true; }
+		}
+		function resetAssistantBubble() { assistantBubble = null; }
+
+		function handleEvent(evt) {
+			if (!evt || !evt.type) return;
+			switch (evt.type) {
+				case 'text':
+					dismissTypingOnce();
+					var b = ensureAssistantBubble();
+					b.textContent = (b.textContent || '') + (evt.text || '');
+					log.scrollTop = log.scrollHeight;
+					break;
+				case 'built':
+					dismissTypingOnce();
+					resetAssistantBubble();
+					var built = el('pg-msg pg-msg-built');
+					built.innerHTML = '<strong>Built:</strong> ' + escapeHtml(evt.summary || '(page updated)');
+					append(built);
+					reloadPreview(evt.preview_bust);
+					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
+					break;
+				case 'apply_error':
+					dismissTypingOnce();
+					resetAssistantBubble();
+					append(el('pg-msg-error', 'Build failed: ' + (evt.message || 'unknown')));
+					break;
+				case 'vision_start':
+					dismissTypingOnce();
+					resetAssistantBubble();
+					visionNotice = el('pg-msg-reviewing', 'A(eyes) reviewing…');
+					append(visionNotice);
+					break;
+				case 'vision_built':
+					if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+					resetAssistantBubble();
+					var fix = el('pg-msg pg-msg-built');
+					fix.innerHTML = '<strong>Vision fix:</strong> ' + escapeHtml(evt.summary || '(corrected after self-review)');
+					append(fix);
+					reloadPreview(evt.preview_bust || Date.now());
+					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
+					break;
+				case 'vision_ok':
+					if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+					// During the vision pass, 'text' deltas already streamed
+					// into the current assistantBubble. Only append a fresh
+					// bubble as a fallback if NO text was streamed (e.g. AI
+					// emitted vision_ok via the tool-less branch with text only
+					// in the final event). Otherwise this would duplicate the
+					// reply.
+					if (evt.text && !assistantBubble) {
+						append(el('pg-msg pg-msg-assistant', evt.text));
+					}
+					resetAssistantBubble();
+					break;
+				case 'error':
+					dismissTypingOnce();
+					resetAssistantBubble();
+					streamFailed = true;
+					var errBubble = el('pg-msg-error');
+					var msgText = evt.message || evt.error || 'Chat error';
+					var msgDiv = document.createElement('div');
+					msgDiv.textContent = msgText;
+					errBubble.appendChild(msgDiv);
+					// Render action buttons if backend supplied them (e.g.
+					// INSUFFICIENT_CREDITS → Buy credits / Pay as you go).
+					if (Array.isArray(evt.actions) && evt.actions.length) {
+						var row = document.createElement('div');
+						row.className = 'pg-error-actions';
+						evt.actions.forEach(function (a) {
+							var btn = document.createElement('a');
+							btn.href = a.url;
+							btn.target = '_blank';
+							btn.rel = 'noopener';
+							btn.textContent = a.label;
+							btn.className = 'pg-error-btn' + (a.primary ? ' is-primary' : '');
+							row.appendChild(btn);
+						});
+						errBubble.appendChild(row);
+					}
+					append(errBubble);
+					break;
+				case 'done':
+					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
+					break;
+			}
+		}
+
+		// SSE consumer over fetch(). Streams as bytes arrive; parses
+		// "data: {...}\n\n" events on the fly. No EventSource because we
+		// need to POST with cookies + form fields.
+		fetch(cfg.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: fd,
+			headers: { 'Accept': 'text/event-stream' },
+			signal: abortController ? abortController.signal : undefined,
+		}).then(function (r) {
+			if (!r.ok) {
+				return r.text().then(function (body) {
+					var snippet = (body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+					throw new Error('Upstream error ' + r.status + (snippet ? ' — ' + snippet : '') + ' — try again');
+				});
+			}
+			if (!r.body || !r.body.getReader) {
+				throw new Error('Streaming not supported in this browser.');
+			}
+			var reader  = r.body.getReader();
+			var decoder = new TextDecoder('utf-8');
+			var buf = '';
+			function pump() {
+				return reader.read().then(function (out) {
+					if (out.done) return;
+					buf += decoder.decode(out.value, { stream: true });
+					// Split out complete events terminated by blank line.
+					var idx;
+					while ((idx = buf.indexOf('\n\n')) !== -1) {
+						var raw = buf.slice(0, idx);
+						buf = buf.slice(idx + 2);
+						var lines = raw.split(/\r?\n/);
+						for (var i = 0; i < lines.length; i++) {
+							var line = lines[i];
+							if (line.indexOf('data:') !== 0) continue;
+							var json = line.slice(5).trim();
+							if (!json) continue;
+							try { handleEvent(JSON.parse(json)); } catch (e) { /* skip malformed */ }
+						}
+					}
+					return pump();
+				});
+			}
+			return pump();
+		}).then(function () {
+			dismissTypingOnce();
+			setBusy(false);
+			input.focus();
+		}).catch(function (e) {
+			dismissTypingOnce();
+			if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+			if (!streamFailed) {
+				var raw = (e && e.message) ? e.message : '';
+				var friendly;
+				if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
+					friendly = 'Network error — check your connection and try again.';
+				} else if (/^Upstream error/i.test(raw)) {
+					friendly = raw;
+				} else {
+					friendly = raw || 'Something went wrong — try again.';
+				}
+				append(el('pg-msg-error', friendly));
+			}
+			setBusy(false);
+		});
+	}
+
+	form.addEventListener('submit', function (e) {
+		e.preventDefault();
+		var text = (input.value || '').trim();
+		if (!text) return;
+		sendMessage(text);
+	});
+
+	// Clear-chat button — drops the stored conversation for this page and
+	// wipes the visible log. Does NOT touch the rendered page itself.
+	// Replaced native confirm() with an in-DOM modal so headless test
+	// browsers (which sometimes block native confirm) can interact with
+	// it, AND so we can abort any in-flight chat stream before clearing
+	// (otherwise the stream keeps pumping into a no-longer-existing DOM
+	// for the full upstream window — that was the 45s lock).
+	var clearBtn = document.getElementById('pg-clear-chat');
+	if (clearBtn) {
+		clearBtn.addEventListener('click', function () { openClearConfirm(); });
+	}
+
+	function openClearConfirm() {
+		// Don't double-open.
+		if (document.getElementById('pg-clear-modal')) return;
+		var modal = document.createElement('div');
+		modal.id = 'pg-clear-modal';
+		modal.className = 'pg-modal-backdrop';
+		modal.innerHTML =
+			'<div class="pg-modal" role="dialog" aria-labelledby="pg-clear-modal-title" aria-modal="true">' +
+				'<h3 id="pg-clear-modal-title" class="pg-modal-title">Clear chat history?</h3>' +
+				'<p class="pg-modal-body">Your built page stays exactly as it is — only the conversation gets reset.</p>' +
+				'<div class="pg-modal-actions">' +
+					'<button type="button" class="pg-modal-btn" id="pg-clear-cancel">Cancel</button>' +
+					'<button type="button" class="pg-modal-btn is-danger" id="pg-clear-confirm">Clear chat</button>' +
+				'</div>' +
+			'</div>';
+		document.body.appendChild(modal);
+		var cancel = modal.querySelector('#pg-clear-cancel');
+		var confirmBtn = modal.querySelector('#pg-clear-confirm');
+		function close() { modal.remove(); document.removeEventListener('keydown', onKey); }
+		function onKey(e) {
+			if (e.key === 'Escape') close();
+			if (e.key === 'Enter' && document.activeElement !== cancel) doClear();
+		}
+		document.addEventListener('keydown', onKey);
+		cancel.addEventListener('click', close);
+		modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+		function doClear() {
+			confirmBtn.disabled = true; confirmBtn.textContent = 'Clearing…';
+			// Abort any active chat stream so it doesn't keep pumping into
+			// the cleared DOM and hold the page hostage.
+			try { if (window.__pgActiveStream) window.__pgActiveStream.abort(); } catch (e) {}
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_clear_chat');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.ok ? r.json() : null; })
+				.then(function (j) {
+					close();
+					if (j && j.success) {
+						log.innerHTML = '';
+						append(el('pg-msg-system', 'Chat cleared. The page itself is unchanged — start fresh whenever you want.'));
+					} else {
+						append(el('pg-msg-error', 'Could not clear chat — try again.'));
+					}
+				})
+				.catch(function () {
+					close();
+					append(el('pg-msg-error', 'Could not clear chat — try again.'));
+				});
+		}
+		confirmBtn.addEventListener('click', doClear);
+		setTimeout(function () { confirmBtn.focus(); }, 10);
+	}
+
+	// Enter to send (Shift+Enter for newline)
+	input.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			form.dispatchEvent(new Event('submit', { cancelable: true }));
+		}
+	});
+
+	loadHistory();
+	refreshCredits();
+})();

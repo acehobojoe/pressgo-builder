@@ -832,28 +832,53 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		// ─── Overridable layout knobs ─────────────────────────────────────
+		// The AI can set these from chat ("center the icons", "tighter cards",
+		// "remove top border"). Each falls through to a tasteful default if
+		// not specified, so existing pages render identically.
+		$icon_position = self::feat_str( $f, 'icon_position', 'top' );    // top | left | right
+		$icon_align    = self::feat_str( $f, 'icon_align',    'left' );   // left | center | right
+		$icon_view     = self::feat_str( $f, 'icon_view',     'stacked' );// stacked | framed | default
+		$icon_shape    = self::feat_str( $f, 'icon_shape',    'circle' ); // circle | square
+		$show_top_border = ! ( isset( $f['hide_top_border'] ) ? (bool) $f['hide_top_border'] : false );
+		$top_border_px = isset( $f['top_border_width'] ) ? (int) $f['top_border_width'] : 3;
+		$row_gap_px    = isset( $f['gap'] )              ? (int) $f['gap']              : 24;
+		$section_bg    = isset( $f['background'] )       ? $f['background']             : $c['light_bg'];
+		// ──────────────────────────────────────────────────────────────────
+
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
 			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+			// Per-item overrides win over section-level overrides.
+			$item_icon_position = isset( $item['icon_position'] ) ? $item['icon_position'] : $icon_position;
+			$item_icon_align    = isset( $item['icon_align'] )    ? $item['icon_align']    : $icon_align;
+
 			// Accept 'description' as alias for canonical 'desc'. Force empty
 			// string when neither is set so icon-box doesn't leak its default
 			// Lorem ipsum placeholder.
 			$desc = isset( $item['desc'] ) ? $item['desc']
 				: ( isset( $item['description'] ) ? $item['description'] : '' );
 			$style  = PressGo_Style_Utils::card_style( $cfg );
-			// Accent top border only.
-			$style['border_width'] = array(
-				'unit' => 'px', 'top' => '3', 'right' => '0',
-				'bottom' => '0', 'left' => '0', 'isLinked' => false,
-			);
-			$style['border_color'] = $accent;
+
+			if ( $show_top_border ) {
+				$style['border_width'] = array(
+					'unit' => 'px', 'top' => (string) $top_border_px, 'right' => '0',
+					'bottom' => '0', 'left' => '0', 'isLinked' => false,
+				);
+				$style['border_color'] = $accent;
+			} else {
+				$style['border_width'] = array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '0', 'left' => '0', 'isLinked' => false,
+				);
+			}
 
 			$feature_cols[] = PressGo_Element_Factory::col(
 				array(
 					PressGo_Widget_Helpers::icon_box_w( $cfg,
 						$item['icon'], $item['title'], $desc,
-						$accent, 'top', 'stacked', 'circle',
-						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
+						$accent, $item_icon_position, $icon_view, $icon_shape,
+						PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), $item_icon_align,
 						PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 				),
 				$style
@@ -864,8 +889,27 @@ class PressGo_Section_Builder {
 			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
 
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $feature_cols, 24 ) ) ),
-			$c['light_bg'], null, 60, 80 );
+			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $feature_cols, $row_gap_px ) ) ),
+			$section_bg, null, 60, 80 );
+	}
+
+	/**
+	 * Validating string-enum reader used by the override knobs above.
+	 * Coerces nonsense AI emissions back to the default so a bad config
+	 * field can't break the build.
+	 */
+	private static function feat_str( $f, $key, $default ) {
+		if ( ! isset( $f[ $key ] ) || ! is_string( $f[ $key ] ) ) return $default;
+		$v = strtolower( trim( $f[ $key ] ) );
+		// Whitelist common values per knob; reject everything else.
+		$allow = array(
+			'icon_position' => array( 'top', 'left', 'right' ),
+			'icon_align'    => array( 'left', 'center', 'right' ),
+			'icon_view'     => array( 'stacked', 'framed', 'default' ),
+			'icon_shape'    => array( 'circle', 'square' ),
+		);
+		if ( isset( $allow[ $key ] ) && ! in_array( $v, $allow[ $key ], true ) ) return $default;
+		return $v;
 	}
 
 	// ──────────────────────────────────────────────
