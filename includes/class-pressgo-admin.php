@@ -20,23 +20,21 @@ class PressGo_Admin {
 			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'
 		);
 
+		// Top-level "PressGo" menu. The default submenu (auto-created with
+		// the same slug as the parent) is overridden by PressGo_AI_Builder
+		// in 2.2.x — it now registers itself as `add_submenu_page('pressgo',
+		// ..., 'pressgo', render_list_page)` so clicking the top-level item
+		// lands on the AI Builder list page directly. The old one-shot
+		// "Generate" submenu has been retired since chat-driven editing
+		// covers everything it did.
 		add_menu_page(
 			'PressGo',
 			'PressGo',
 			'manage_options',
 			'pressgo',
-			array( $this, 'render_generator_page' ),
+			array( $this, 'render_generator_page' ), // fallback only — AI Builder overrides
 			$icon_svg,
 			30
-		);
-
-		add_submenu_page(
-			'pressgo',
-			'Generate Page',
-			'Generate',
-			'manage_options',
-			'pressgo',
-			array( $this, 'render_generator_page' )
 		);
 
 		add_submenu_page(

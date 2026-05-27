@@ -195,8 +195,23 @@ class PressGo_AI_Builder {
 	}
 
 	public function register_menu() {
+		// AI Builder is now the *default* landing under the top-level PressGo
+		// menu — register with slug matching the parent so it overrides the
+		// auto-created default submenu (which still points at the legacy
+		// render_generator_page fallback).
 		add_submenu_page(
 			'pressgo',
+			'AI Builder',
+			'AI Builder',
+			'manage_options',
+			'pressgo',
+			array( $this, 'render_list_page' )
+		);
+		// Also expose the original MENU_SLUG so legacy URLs (and the
+		// fullscreen `?page=pressgo-ai-builder&action=edit` interceptor)
+		// keep working without redirects.
+		add_submenu_page(
+			null, // hidden — reachable by URL only
 			'AI Builder',
 			'AI Builder',
 			'manage_options',

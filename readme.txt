@@ -1,34 +1,38 @@
-=== PressGo — AI Page Builder for Elementor (MCP + Generator) ===
+=== PressGo — AI Page Builder for Elementor ===
 Contributors: acehobojoe
 Tags: elementor, ai, page builder, landing page, mcp
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect Claude / Cursor / any MCP client to your WordPress site and build Elementor pages by chat with live preview. Or use the built-in text generator.
+Chat-driven Elementor landing pages. Describe the page you want, watch it build in real time, then iterate by chatting with the AI like a designer.
 
 == Description ==
 
-PressGo gives WordPress two ways to build Elementor landing pages with AI:
+PressGo turns WordPress + Elementor into a chat-driven landing-page builder. Tell the AI what you want, watch it stream the page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, center the icons. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
 
-**1. MCP Server (new in 2.0)** — Connect Claude Desktop, Cursor, claude.ai web, Claude Code, or any Model Context Protocol client to your site. Chat with your AI like a designer ("build me a yoga studio landing page, modern feel, book-a-class CTA"), and watch sections appear in your Elementor editor in real time. You bring your own AI subscription — no per-page cost from us. Free tier: 3 page builds per day. PressGo Pro ($10/mo) lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
+**Two ways to use it:**
 
-**2. Built-in generator** — Type a text prompt in WordPress → PressGo → Generate, and PressGo builds a complete page using either a free PressGo account (3 credits/month included) or your own Anthropic API key. Pay-as-you-go credit packs available for higher volume.
+**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = 10 credits/month. $15 one-time pack = 75 credits. PressGo Plus = $12/mo for 100 credits + unlimited MCP.
+
+**2. MCP Server (advanced — for Claude Desktop / Cursor / claude.ai users)** — Connect any Model Context Protocol client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
 
 **Key Features:**
 
-* MCP server with OAuth 2.1 + 11 tools for chat-driven page building
-* Live Elementor editor sync — chat edits appear in the editor without reloading
+* Chat-driven AI Builder with streaming responses, screenshot self-review, and viewport switching (desktop/tablet/mobile)
+* Drop, paste, or click-to-attach reference screenshots directly into the chat
+* "AI-enable" any existing Elementor page to keep iterating on it via chat
+* MCP server with OAuth 2.1 + 11 tools for power users on Claude Desktop / Cursor
+* Live Elementor editor sync — chat edits appear without reloading
 * Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
 * "Watch URL" — share a live preview link with clients while you build
-* Built-in text generator with image upload + URL import
 * 19 section types with 48 layout variants
 * Every element is native Elementor — fully editable, no shortcodes
 * Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
-* Choose your Claude model: Sonnet 4.5 (default), Opus 4.6, or Haiku 4.5
+* Choose your Claude model: Sonnet 4.5 (default for paid), Opus 4.6, or Haiku 4.5 (free)
 * Works with Elementor Free — no Pro required
 
 **Section Types:**
@@ -55,11 +59,12 @@ PressGo gives WordPress two ways to build Elementor landing pages with AI:
 
 **How It Works:**
 
-1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — or use your own Anthropic key
-2. Enter it in PressGo > Settings
-3. Describe your landing page or upload a design screenshot
-4. Watch the AI stream its progress and build each section live
-5. Click "Edit in Elementor" to add your finishing touches
+1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — you get **10 free credits per month**
+2. Enter the key in PressGo &rarr; Settings
+3. Go to PressGo &rarr; AI Builder and click "+ New page" (or AI-enable an existing page)
+4. Describe the page in chat, drop in reference screenshots if you have them, and watch it build in the live preview
+5. Keep chatting to iterate — change colors, swap sections, rewrite copy. Toggle on **A(eyes)** to have the AI screenshot its own work and self-correct
+6. Click "Edit in Elementor" anytime to drop into the native editor for hands-on tweaks
 
 == External Services ==
 
@@ -107,10 +112,10 @@ The plugin NEVER transmits: your prompt text, the page contents, headlines, imag
 
 1. Upload the `pressgo-builder` folder to `/wp-content/plugins/`
 2. Activate the plugin through the "Plugins" menu in WordPress
-3. Go to PressGo > Settings and choose your API mode:
-   * **PressGo API** (recommended) — Create a free account at [pressgo.app/register](https://pressgo.app/register) and paste your API key
+3. Go to PressGo &rarr; Settings and choose your API mode:
+   * **PressGo API** (recommended) — Create a free account at [pressgo.app/register](https://pressgo.app/register) and paste your API key. 10 free credits/month.
    * **Own API Key** — Enter your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
-4. Navigate to PressGo > Generate to create your first page
+4. Click PressGo in the sidebar — the AI Builder list opens. Click "+ New page" to start your first chat-driven build.
 
 == Support ==
 
@@ -120,11 +125,11 @@ Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.ap
 
 = Do I need an API key? =
 
-Yes. You have two options: (1) Create a free PressGo account at [pressgo.app](https://pressgo.app/register) — you get 3 free credits per month and can buy more as needed. (2) Use your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
+Yes. You have two options: (1) Create a free PressGo account at [pressgo.app](https://pressgo.app/register) — you get **10 free credits per month** and can buy more as needed. (2) Use your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
 
 = How much does it cost per page? =
 
-With a **PressGo API key**, each page costs 1-2 credits depending on the model. You get 3 free credits per month, and credit packs start at $9 for 50 credits. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
+With a **PressGo API key**: 10 free credits/month included. Beyond that, $15 one-time pack = 75 credits, or PressGo Plus = $12/mo for 100 credits + MCP unlimited + Pro features. Each build (or significant chat-driven edit) costs 1 credit; just chatting with the AI is free until it actually changes the page. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
 
 = What data is sent to external servers? =
 
@@ -152,6 +157,10 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Live editing (beta) — connect Claude / Cursor / any MCP-capable AI to your site, talk in chat, watch sections appear in the Elementor editor in real time. No reload needed.
 
 == Changelog ==
+
+= 2.2.1 =
+* **Content cleanup.** Plugin description, FAQ, and How-It-Works rewritten around the AI Builder as the headline flow (the legacy one-shot Generator is no longer the primary path; chat-driven editing covers everything it did). Pricing references updated to the current SKUs (10 free credits/month, $15 one-time pack, $12/mo Plus subscription).
+* **Removed the legacy "Generate" submenu.** Top-level PressGo menu now lands on the AI Builder list directly. The old single-prompt page is still reachable internally as a fallback but no longer surfaces in the sidebar — fewer redundant entry points, one clear way in.
 
 = 2.2.0 =
 * **NEW — AI Builder admin page.** Chat-driven page builder under PressGo &rarr; AI Builder. Page list with screenshot thumbnails, AI-enable toggle on any Elementor page, and a "+ New page" button. Click into a page to open a fullscreen builder with a chat panel on the left and a live preview on the right (no wp-admin chrome, no theme chrome — clean visitor-style preview).
@@ -264,6 +273,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.2.1 =
+Content + menu cleanup. Plugin description and FAQ rewritten around the AI Builder as the default flow. Legacy "Generate" submenu removed — top-level PressGo menu now lands on the AI Builder directly.
 
 = 2.2.0 =
 Major release — adds the AI Builder admin page (chat-driven page editing with streaming, screenshot self-review, multi-viewport preview, image drop). The existing one-shot generator and MCP server keep working unchanged. Recommended.
