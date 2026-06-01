@@ -1,24 +1,26 @@
-=== PressGo — AI Page Builder for Elementor ===
+=== PressGo AI — Landing Page & Website Builder for Elementor ===
 Contributors: acehobojoe
-Tags: elementor, ai, page builder, landing page, mcp
+Tags: elementor, ai page builder, landing page, website builder, ai website builder
 Requires at least: 5.8
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.2.1
+Stable tag: 2.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Chat-driven Elementor landing pages. Describe the page you want, watch it build in real time, then iterate by chatting with the AI like a designer.
+AI page builder for Elementor — describe a landing page, watch it build live, then refine by chat. Every element is a native Elementor widget.
 
 == Description ==
 
 PressGo turns WordPress + Elementor into a chat-driven landing-page builder. Tell the AI what you want, watch it stream the page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, center the icons. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
 
+PressGo is an AI website builder and no-code landing page generator for WordPress: describe your page in plain English through a ChatGPT-style chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required.
+
 **Two ways to use it:**
 
 **1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = 10 credits/month. $15 one-time pack = 75 credits. PressGo Plus = $12/mo for 100 credits + unlimited MCP.
 
-**2. MCP Server (advanced — for Claude Desktop / Cursor / claude.ai users)** — Connect any Model Context Protocol client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
+**2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
 
 **Key Features:**
 
@@ -125,7 +127,7 @@ Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.ap
 
 = Do I need an API key? =
 
-Yes. You have two options: (1) Create a free PressGo account at [pressgo.app](https://pressgo.app/register) — you get **10 free credits per month** and can buy more as needed. (2) Use your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
+Start free — no credit card. Create a free PressGo account at [pressgo.app/register](https://pressgo.app/register) and you get **10 free page credits every month**. From there you have two ways to power it: (1) keep using your free PressGo account (recommended — 10 credits/month, top up anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
 
 = How much does it cost per page? =
 
@@ -149,14 +151,20 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Screenshots ==
 
-1. The PressGo generator — describe your page and click Generate
-2. Live streaming preview — watch the AI build sections in real-time
-3. Generated landing page with hero, features, pricing, and more
-4. Elementor editor — every widget is fully editable
-5. Settings page — enter your Claude API key and choose a model
-8. Live editing (beta) — connect Claude / Cursor / any MCP-capable AI to your site, talk in chat, watch sections appear in the Elementor editor in real time. No reload needed.
+1. The PressGo generator — describe your page in a prompt and click Generate
+2. Live streaming preview — watch the AI build sections in real time
+3. A generated landing page — hero, features, pricing, and more, all native Elementor
+4. The Elementor editor — every widget the AI builds is fully editable
+5. Settings — enter your PressGo or Claude API key and choose a model
+6. A generated page open in the Elementor editor — restyle, swap images, and rewrite anything
+7. Mobile-responsive out of the box — generated pages adapt to tablet and phone automatically
+8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.2.2 =
+* **Listing & discoverability refresh.** Updated the plugin title, tagline, tags, and description so PressGo surfaces for "AI page builder", "landing page builder", and "AI website builder" searches. Corrected the screenshot captions (all eight are now labeled in order). No changes to the builder itself.
+* **Tested up to WordPress 7.0.**
 
 = 2.2.1 =
 * **Content cleanup.** Plugin description, FAQ, and How-It-Works rewritten around the AI Builder as the headline flow (the legacy one-shot Generator is no longer the primary path; chat-driven editing covers everything it did). Pricing references updated to the current SKUs (10 free credits/month, $15 one-time pack, $12/mo Plus subscription).
@@ -273,6 +281,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.2.2 =
+Listing refresh — clearer title, tags, description, and screenshot captions for discoverability, plus tested up to WordPress 7.0. No functional changes.
 
 = 2.2.1 =
 Content + menu cleanup. Plugin description and FAQ rewritten around the AI Builder as the default flow. Legacy "Generate" submenu removed — top-level PressGo menu now lands on the AI Builder directly.
