@@ -9,6 +9,7 @@ $site_host      = wp_parse_url( home_url(), PHP_URL_HOST );
 $enabled        = (int) get_option( 'pressgo_mcp_enabled', 1 );
 $screenshot_url = (string) get_option( 'pressgo_screenshot_url', 'https://pressgo.app/api/screenshot' );
 $share_telem    = (int) get_option( 'pressgo_share_telemetry', 0 );
+$globals_locked = (int) get_option( 'pressgo_globals_locked', 0 );
 $license        = new PressGo_License();
 $license_state  = $license->state();
 $is_pro         = $license->is_pro();
@@ -37,7 +38,7 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 		<!-- Pro upgrade card -->
 		<div class="pressgo-card pressgo-pro-promo">
 			<div class="pressgo-pro-promo-text">
-				<strong style="display:block;font-size:15px;margin-bottom:4px;">Unlock PressGo Pro &mdash; $10/mo</strong>
+				<strong style="display:block;font-size:15px;margin-bottom:4px;">Unlock PressGo Plus &mdash; $12/mo</strong>
 				<span style="opacity:0.9;font-size:13px;">
 					Site-wide header &amp; footer editing across every page. Set them once via Claude,
 					they apply to your whole PressGo site. More Pro features rolling out.
@@ -108,10 +109,16 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:16px;">
 			<?php wp_nonce_field( PressGo_MCP_Admin::NONCE_ACTION ); ?>
 			<input type="hidden" name="action" value="pressgo_mcp_save_settings">
+			<input type="hidden" name="share_telemetry" value="<?php echo esc_attr( $share_telem ); ?>">
 			<label style="display:block;margin-bottom:10px;">
 				<input type="checkbox" name="mcp_enabled" value="1" <?php checked( $enabled ); ?>>
 				MCP server enabled
 			</label>
+			<label style="display:block;margin-bottom:10px;">
+				<input type="checkbox" name="globals_locked" value="1" <?php checked( $globals_locked ); ?>>
+				<strong>Lock global styles</strong> &mdash; stop the AI from changing your site-wide colors, fonts &amp; layout
+			</label>
+			<p class="description" style="margin:-4px 0 10px;">When on, the AI keeps your brand palette and matches it instead of redesigning &mdash; it can still build and edit pages. The user can override per request by telling the AI to change the site-wide design.</p>
 			<label style="display:block;margin-bottom:10px;">
 				Screenshot service URL
 				<input type="url" name="screenshot_url" value="<?php echo esc_attr( $screenshot_url ); ?>" class="regular-text" style="width:100%;max-width:520px;display:block;margin-top:4px;">
@@ -192,6 +199,7 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 			<input type="hidden" name="action" value="pressgo_mcp_save_settings">
 			<input type="hidden" name="mcp_enabled" value="<?php echo esc_attr( $enabled ); ?>">
 			<input type="hidden" name="screenshot_url" value="<?php echo esc_attr( $screenshot_url ); ?>">
+			<input type="hidden" name="globals_locked" value="<?php echo esc_attr( $globals_locked ); ?>">
 			<label style="display:block;margin-bottom:10px;">
 				<input type="checkbox" name="share_telemetry" value="1" <?php checked( $share_telem ); ?>>
 				<strong>Share anonymised tool-call telemetry with PressGo</strong>

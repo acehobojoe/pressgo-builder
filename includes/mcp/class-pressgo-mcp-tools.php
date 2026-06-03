@@ -93,6 +93,7 @@ class PressGo_MCP_Tools {
 						'colors'  => array( 'type' => 'object', 'description' => 'Partial colors block (primary, dark_bg, light_bg, white, text_dark, text_muted, accent, etc.)' ),
 						'fonts'   => array( 'type' => 'object', 'description' => 'Partial fonts block (heading, body)' ),
 						'layout'  => array( 'type' => 'object', 'description' => 'Partial layout block (boxed_width, section_padding, card_radius, button_radius)' ),
+						'force'   => array( 'type' => 'boolean', 'description' => 'Only when the user explicitly asks to change site-wide colors/fonts/layout: set true to override the global-styles lock if one is set.' ),
 					),
 					'required' => array( 'post_id' ),
 				),
@@ -237,7 +238,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide header (logo + nav + primary CTA) for every PressGo page on this site. " .
 					"Pass `items` as ordered nav links and a `cta` for the primary button. The header gets injected " .
-					"as the first section on every PressGo-built page. Requires PressGo Pro ($10/mo).",
+					"as the first section on every PressGo-built page. Requires PressGo Plus ($12/mo).",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -254,7 +255,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide footer for every PressGo page on this site. Pass `brand`, `columns` " .
 					"(link sections), and optional `social`. The footer gets injected as the last section on every " .
-					"PressGo-built page. Requires PressGo Pro ($10/mo).",
+					"PressGo-built page. Requires PressGo Plus ($12/mo).",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -269,12 +270,12 @@ class PressGo_MCP_Tools {
 			),
 			array(
 				'name'        => 'get_header',
-				'description' => "Pro: read the current site-wide header template. Requires PressGo Pro ($10/mo).",
+				'description' => "Pro: read the current site-wide header template. Requires PressGo Plus ($12/mo).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 			array(
 				'name'        => 'get_footer',
-				'description' => "Pro: read the current site-wide footer template. Requires PressGo Pro ($10/mo).",
+				'description' => "Pro: read the current site-wide footer template. Requires PressGo Plus ($12/mo).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 
@@ -416,6 +417,39 @@ class PressGo_MCP_Tools {
 				),
 			),
 			array(
+				'name'        => 'set_brand_foundation',
+				'description' =>
+					"Save the site's BRAND FOUNDATION — the reusable design system every page should follow: " .
+					"brand name, logo, voice/tone, color palette, heading/body fonts, and corner radii. Call this " .
+					"ONCE after your discovery interview (or when the user gives you brand assets / a style " .
+					"reference), and update it whenever the brand changes. It persists across all chats and is " .
+					"auto-injected into your initialize instructions, so future sessions start from the same design " .
+					"system instead of re-deriving colors and fonts from scratch. New pages inherit these tokens by " .
+					"default. All fields optional — pass only what you've established.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'brand_name' => array( 'type' => 'string', 'description' => 'The brand / business name.' ),
+						'logo_url'   => array( 'type' => 'string', 'description' => 'Logo image URL (from upload_media / list_recent_media).' ),
+						'voice'      => array( 'type' => 'string', 'description' => 'Voice & tone in plain text (e.g. "warm, plain, confident; no hype").' ),
+						'colors'     => array( 'type' => 'object', 'description' => 'Palette: primary, accent, dark_bg, light_bg, white, text_dark, text_muted (hex).' ),
+						'fonts'      => array( 'type' => 'object', 'description' => 'Typography: heading, body (Google Font family names).' ),
+						'layout'     => array( 'type' => 'object', 'description' => 'Tokens: boxed_width, section_padding, card_radius, button_radius.' ),
+					),
+				),
+			),
+			array(
+				'name'        => 'get_brand_foundation',
+				'description' =>
+					"Read the saved brand foundation (design system) for this site — brand name, logo, voice, " .
+					"colors, fonts, layout tokens — or empty if none set. You usually don't need to call this; the " .
+					"foundation is auto-injected into your initialize instructions on every connection.",
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => new stdClass(),
+				),
+			),
+			array(
 				'name'        => 'upload_media',
 				'description' =>
 					"Upload an image into the WordPress media library. Provide EITHER `data` (base64-encoded " .
@@ -497,6 +531,8 @@ class PressGo_MCP_Tools {
 			case 'list_recent_media': return self::list_recent_media( $args, $user );
 			case 'set_user_profile': return self::set_user_profile( $args, $user );
 			case 'get_user_profile': return self::get_user_profile( $args, $user );
+			case 'set_brand_foundation': return self::set_brand_foundation( $args, $user );
+			case 'get_brand_foundation': return self::get_brand_foundation( $args, $user );
 
 			// Pro-tier tools — gated by PressGo_License.
 			case 'set_header':
@@ -923,12 +959,37 @@ class PressGo_MCP_Tools {
 		return self::page_summary( $post_id, "Updated section {$index} ({$type}" . ( $variant ? "/{$variant}" : '' ) . ")." );
 	}
 
+	const GLOBALS_LOCK_OPTION = 'pressgo_globals_locked';
+
+	/** Whether the site owner has locked global styles (colors/fonts/layout). */
+	public static function globals_locked() {
+		return (bool) get_option( self::GLOBALS_LOCK_OPTION, false );
+	}
+
+	/**
+	 * Globals lock guard. When the owner locks global styles in
+	 * PressGo > MCP Server, set_globals refuses to overwrite the brand tokens
+	 * unless the user explicitly passes force:true.
+	 */
+	private static function check_globals_lock( $args = array() ) {
+		if ( ! empty( $args['force'] ) ) { return null; }
+		if ( ! self::globals_locked() ) { return null; }
+		return new WP_Error( 'mcp_globals_locked',
+			"This site's global styles (colors, fonts, layout) are LOCKED by the owner " .
+			"(PressGo > MCP Server > Lock global styles). I won't change them — I'll match the " .
+			"existing palette and fonts instead. If the user explicitly asks to change the site-wide " .
+			"design, call set_globals again with force: true."
+		);
+	}
+
 	private static function set_globals( $args, $user ) {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
 		$pause = self::check_pause( $post_id, $args );
 		if ( is_wp_error( $pause ) ) { return $pause; }
+		$lock = self::check_globals_lock( $args );
+		if ( is_wp_error( $lock ) ) { return $lock; }
 
 		// Snapshot prior state so undo can roll back palette/typography changes.
 		self::push_undo( $post_id, 'set_globals' );
@@ -1136,7 +1197,7 @@ class PressGo_MCP_Tools {
 		if ( ! $license->is_pro() ) {
 			$upgrade_url = PressGo_License::upgrade_url();
 			return new WP_Error( 'mcp_pro_required',
-				"`{$name}` requires PressGo Pro ($10/mo). The user can upgrade at {$upgrade_url} — " .
+				"`{$name}` requires PressGo Plus ($12/mo). The user can upgrade at {$upgrade_url} — " .
 				"once they enter their license key in PressGo > MCP Server, this tool unlocks immediately."
 			);
 		}
@@ -1336,19 +1397,45 @@ class PressGo_MCP_Tools {
 			'flex_gap'         => array( 'column' => 12, 'row' => 8, 'isLinked' => false, 'unit' => 'px', 'size' => 12 ),
 		) );
 
-		$row = self::row( array( $logo_col, $nav_col ), array(
-			'flex_align_items' => 'center',
-			'flex_justify_content' => 'space-between',
-		) );
+		// Inner flex row: logo sizes to content, nav pushes to the right via
+		// space-between. Built as a raw container so row() doesn't force the two
+		// columns to equal 50% widths (which is wrong for a header bar).
+		$row = array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'settings' => array(
+				'container_type'       => 'flex',
+				'content_width'        => 'full',
+				'flex_direction'       => 'row',
+				'flex_align_items'     => 'center',
+				'flex_justify_content' => 'space-between',
+				'flex_wrap'            => 'nowrap',
+				'flex_gap'             => array( 'unit' => 'px', 'column' => '16', 'row' => '8', 'isLinked' => false, 'size' => 16 ),
+			),
+			'elements' => array( $logo_col, $nav_col ),
+			'isInner'  => true,
+		);
 
-		$bg = ( 'minimal' === ( $tpl['style'] ?? 'minimal' ) ) ? $colors['white'] : $colors['light_bg'];
-		return self::outer( array( $row ), array(
-			'background_background' => 'classic',
-			'background_color' => $bg,
-			'padding' => array( 'unit' => 'px', 'top' => '14', 'right' => '24', 'bottom' => '14', 'left' => '24', 'isLinked' => false ),
-			'box_shadow_box_shadow_type' => 'yes',
-			'box_shadow_box_shadow' => array( 'horizontal' => 0, 'vertical' => 1, 'blur' => 6, 'spread' => 0, 'color' => 'rgba(0,0,0,0.05)' ),
-		) );
+		$boxed = isset( $globals['layout']['boxed_width'] ) ? $globals['layout']['boxed_width'] : 1200;
+		$cfg   = array( 'layout' => array( 'boxed_width' => $boxed ) );
+		$bg    = ( 'minimal' === ( $tpl['style'] ?? 'minimal' ) ) ? $colors['white'] : $colors['light_bg'];
+
+		// Use the factory's outer() with the correct ($cfg, $children, ...) signature.
+		// Compact header padding + subtle shadow are applied via $extra (merged last).
+		return PressGo_Element_Factory::outer(
+			$cfg,
+			array( $row ),
+			$bg,
+			null,
+			14, 14,
+			array(
+				'padding'        => array( 'unit' => 'px', 'top' => '14', 'right' => '24', 'bottom' => '14', 'left' => '24', 'isLinked' => false ),
+				'padding_tablet' => array( 'unit' => 'px', 'top' => '14', 'right' => '20', 'bottom' => '14', 'left' => '20', 'isLinked' => false ),
+				'padding_mobile' => array( 'unit' => 'px', 'top' => '12', 'right' => '16', 'bottom' => '12', 'left' => '16', 'isLinked' => false ),
+				'box_shadow_box_shadow_type' => 'yes',
+				'box_shadow_box_shadow'      => array( 'horizontal' => 0, 'vertical' => 1, 'blur' => 6, 'spread' => 0, 'color' => 'rgba(0,0,0,0.05)' ),
+			)
+		);
 	}
 
 	private static function widget( $type, $settings ) {
@@ -1356,12 +1443,6 @@ class PressGo_MCP_Tools {
 	}
 	private static function col( $children, $extra = array() ) {
 		return PressGo_Element_Factory::col( $children, $extra );
-	}
-	private static function row( $children, $extra = array() ) {
-		return PressGo_Element_Factory::row( $children, $extra );
-	}
-	private static function outer( $children, $extra = array() ) {
-		return PressGo_Element_Factory::outer( $children, $extra );
 	}
 
 	private static function clone_page( $args, $user ) {
@@ -2241,13 +2322,55 @@ class PressGo_MCP_Tools {
 		do_action( 'clean_post_cache', $post_id, get_post( $post_id ) );
 	}
 
-	public static function get_page_globals( $post_id ) {
-		$saved = get_post_meta( $post_id, '_pressgo_globals', true );
-		if ( is_array( $saved ) && isset( $saved['colors'], $saved['fonts'], $saved['layout'] ) ) {
-			return $saved;
+	const BRAND_FOUNDATION_OPTION = 'pressgo_brand_foundation';
+
+	/** The site's saved brand foundation (design system), or empty array. */
+	public static function brand_foundation() {
+		$f = get_option( self::BRAND_FOUNDATION_OPTION, array() );
+		return is_array( $f ) ? $f : array();
+	}
+
+	/**
+	 * Save / update the brand foundation. Merges partial colors/fonts/layout
+	 * over saved tokens so the AI can build the design system incrementally.
+	 */
+	private static function set_brand_foundation( $args, $user ) {
+		$f = self::brand_foundation();
+		if ( isset( $args['brand_name'] ) && is_string( $args['brand_name'] ) ) { $f['brand_name'] = sanitize_text_field( $args['brand_name'] ); }
+		if ( isset( $args['logo_url'] ) && is_string( $args['logo_url'] ) )     { $f['logo_url']   = esc_url_raw( $args['logo_url'] ); }
+		if ( isset( $args['voice'] ) && is_string( $args['voice'] ) )           { $f['voice']      = sanitize_textarea_field( $args['voice'] ); }
+		foreach ( array( 'colors', 'fonts', 'layout' ) as $k ) {
+			if ( isset( $args[ $k ] ) && is_array( $args[ $k ] ) ) {
+				$cur   = ( isset( $f[ $k ] ) && is_array( $f[ $k ] ) ) ? $f[ $k ] : array();
+				$clean = array();
+				foreach ( $args[ $k ] as $kk => $vv ) {
+					if ( is_array( $vv ) ) { continue; }
+					$clean[ sanitize_key( (string) $kk ) ] = is_numeric( $vv ) ? ( $vv + 0 ) : sanitize_text_field( (string) $vv );
+				}
+				$f[ $k ] = array_merge( $cur, $clean );
+			}
 		}
-		// Defaults — match PressGo_Config_Validator::validate() defaults.
+		$f['updated'] = time();
+		update_option( self::BRAND_FOUNDATION_OPTION, $f );
 		return array(
+			'content' => array( array( 'type' => 'text',
+				'text' => "Brand foundation saved. New pages now default to this palette, fonts, and layout, and every future chat starts from this design system." ) ),
+			'structuredContent' => array( 'brand_foundation' => $f ),
+		);
+	}
+
+	private static function get_brand_foundation( $args, $user ) {
+		$f = self::brand_foundation();
+		return array(
+			'content' => array( array( 'type' => 'text',
+				'text' => $f ? wp_json_encode( $f, JSON_PRETTY_PRINT ) : 'No brand foundation set yet. Run a short discovery interview, then call set_brand_foundation to lock in the design system.' ) ),
+			'structuredContent' => array( 'brand_foundation' => $f ),
+		);
+	}
+
+	/** Hardcoded base globals (validator defaults), overlaid with the brand foundation. */
+	private static function default_globals() {
+		$base = array(
 			'colors' => array(
 				'primary'    => '#0043B3',
 				'dark_bg'    => '#0a0f1e',
@@ -2260,6 +2383,22 @@ class PressGo_MCP_Tools {
 			'fonts'  => array( 'heading' => 'Inter', 'body' => 'Inter' ),
 			'layout' => array( 'boxed_width' => 1200, 'section_padding' => 100, 'card_radius' => 16, 'button_radius' => 10 ),
 		);
+		$f = self::brand_foundation();
+		foreach ( array( 'colors', 'fonts', 'layout' ) as $k ) {
+			if ( ! empty( $f[ $k ] ) && is_array( $f[ $k ] ) ) {
+				$base[ $k ] = array_merge( $base[ $k ], $f[ $k ] );
+			}
+		}
+		return $base;
+	}
+
+	public static function get_page_globals( $post_id ) {
+		$saved = get_post_meta( $post_id, '_pressgo_globals', true );
+		if ( is_array( $saved ) && isset( $saved['colors'], $saved['fonts'], $saved['layout'] ) ) {
+			return $saved;
+		}
+		// No page-specific globals yet → start from the site's brand foundation.
+		return self::default_globals();
 	}
 
 	public static function set_page_globals( $post_id, $globals ) {

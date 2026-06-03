@@ -904,6 +904,39 @@ iframe#f{position:relative;z-index:0}
 			"Don't list them all upfront — surface the right one at the right moment.\n\n---\n\n";
 	}
 
+	/**
+	 * Brand-foundation + globals-lock context. Prepended after the profile
+	 * block so the AI builds from the site's saved design system (instead of
+	 * re-deriving a palette every chat) and respects a globals lock.
+	 */
+	private function build_foundation_block() {
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) { return ''; }
+		$f      = PressGo_MCP_Tools::brand_foundation();
+		$locked = PressGo_MCP_Tools::globals_locked();
+
+		$out = "## Brand foundation (the site's design system)\n\n";
+		if ( ! empty( $f ) ) {
+			$pretty = wp_json_encode( $f, JSON_PRETTY_PRINT );
+			$out .= "This site has a saved brand foundation — treat it as the source of truth for every page:\n" .
+				"```\n{$pretty}\n```\n\n" .
+				"New pages already inherit these colors, fonts, and layout by default, so DON'T re-derive a " .
+				"palette — match this brand. If the user changes the brand (new colors, font, logo, voice), call " .
+				"`set_brand_foundation` to update it so the change carries to every future page and chat.\n\n";
+		} else {
+			$out .= "No brand foundation saved yet. Treat your discovery interview as setting up a *site-wide " .
+				"design system*, not just one page. Once you've established the brand — colors, heading/body " .
+				"fonts, logo, voice — call `set_brand_foundation` ONCE to lock it in. From then on, every page and " .
+				"every future chat starts from that foundation instead of guessing. Offering to build the " .
+				"`/style-guide/` page first is a great way to pin it down.\n\n";
+		}
+		if ( $locked ) {
+			$out .= "**GLOBAL STYLES ARE LOCKED** by the owner. Do NOT call `set_globals` to change the site's " .
+				"colors/fonts/layout — match the existing palette instead. Only use `set_globals` with " .
+				"`force: true` if the user *explicitly* asks to change the site-wide design.\n\n";
+		}
+		return $out . "---\n\n";
+	}
+
 	private function initialize( $params, $user = null ) {
 		// Echo the client's protocol version if we recognise it; otherwise serve our default.
 		$client_proto = isset( $params['protocolVersion'] ) ? (string) $params['protocolVersion'] : '';
@@ -913,7 +946,8 @@ iframe#f{position:relative;z-index:0}
 		$profile = ( $user && class_exists( 'PressGo_MCP_Tools' ) )
 			? PressGo_MCP_Tools::read_user_profile( $user->ID )
 			: null;
-		$profile_block = $this->build_profile_block( $profile );
+		$profile_block    = $this->build_profile_block( $profile );
+		$foundation_block = $this->build_foundation_block();
 
 		return array(
 			'protocolVersion' => $proto,
@@ -930,6 +964,7 @@ iframe#f{position:relative;z-index:0}
 			),
 			'instructions'    =>
 				$profile_block .
+				$foundation_block .
 				"You are a senior web design consultant — not a generator. The person on the other end is " .
 				"hiring you. Behave the way a $200/hr designer would behave: ask before building, propose " .
 				"before deciding, show your reasoning, and push back when their request will hurt them. " .

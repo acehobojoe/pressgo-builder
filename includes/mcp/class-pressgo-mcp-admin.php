@@ -194,6 +194,7 @@ class PressGo_MCP_Admin {
 
 		update_option( 'pressgo_mcp_enabled', isset( $_POST['mcp_enabled'] ) ? 1 : 0 );
 		update_option( 'pressgo_share_telemetry', isset( $_POST['share_telemetry'] ) ? 1 : 0 );
+		update_option( 'pressgo_globals_locked', isset( $_POST['globals_locked'] ) ? 1 : 0 );
 		if ( isset( $_POST['screenshot_url'] ) ) {
 			update_option( 'pressgo_screenshot_url', esc_url_raw( wp_unslash( $_POST['screenshot_url'] ) ) );
 		}
