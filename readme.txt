@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.2.2
+Stable tag: 2.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -162,6 +162,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.2.3 =
+* **Fix: the site-wide header could fatal on PHP 8.** The Plus `set_header` tool built its container with the wrong layout arguments, producing an undefined-index error and a malformed header. Rebuilt so the header renders correctly (logo left, nav + CTA right) on every PressGo page. The footer was unaffected.
+* **NEW — Lock global styles.** A toggle in PressGo &rarr; MCP Server stops the AI from changing your site-wide colors, fonts, and layout. When locked, the AI keeps your brand palette and matches it instead of redesigning — it can still build and edit pages. Override per request by telling it to change the site-wide design.
+* **NEW — Brand foundation.** The AI can save a reusable design system for your site — brand name, logo, voice, colors, fonts, and layout tokens (`set_brand_foundation`). New pages inherit it by default and it loads into every chat, so PressGo stops re-deriving a palette from scratch and builds a consistent site instead of one-off pages.
+* Pricing copy corrected to PressGo Plus ($12/mo).
+
 = 2.2.2 =
 * **Listing & discoverability refresh.** Updated the plugin title, tagline, tags, and description so PressGo surfaces for "AI page builder", "landing page builder", and "AI website builder" searches. Corrected the screenshot captions (all eight are now labeled in order). No changes to the builder itself.
 * **Tested up to WordPress 7.0.**
@@ -281,6 +287,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.2.3 =
+Fixes a broken (PHP 8 fatal) site-wide header in the Plus tools, adds a "Lock global styles" toggle so the AI can't change your brand, and adds a saved Brand Foundation (colors/fonts/voice) that new pages inherit. Recommended.
 
 = 2.2.2 =
 Listing refresh — clearer title, tags, description, and screenshot captions for discoverability, plus tested up to WordPress 7.0. No functional changes.
