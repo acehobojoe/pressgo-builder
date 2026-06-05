@@ -32,6 +32,7 @@ class PressGo {
 		// Generator classes.
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-element-factory.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-icons.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-widget-helpers.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-section-builder.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-generator.php';
@@ -74,6 +75,10 @@ class PressGo {
 		// so initialise it outside the is_admin() gate above.
 		$editor = new PressGo_Editor_Integration();
 		$editor->init();
+
+		// Phosphor icon library — enqueues the bundled webfont on Elementor
+		// pages so remapped icons render front + editor.
+		( new PressGo_Icons() )->init();
 
 		// MCP server — REST routes on the front-end, admin UI in wp-admin.
 		// The enabled flag short-circuits the JSON-RPC handler but discovery

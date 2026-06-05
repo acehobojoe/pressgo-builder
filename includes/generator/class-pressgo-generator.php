@@ -116,6 +116,10 @@ class PressGo_Generator {
 			}
 		}
 
+		// Upgrade mapped FontAwesome icons to Phosphor in one pass over the
+		// finished tree (catches both AI-chosen and hardcoded-default icons).
+		$page = PressGo_Icons::convert_tree( $page );
+
 		return $page;
 	}
 

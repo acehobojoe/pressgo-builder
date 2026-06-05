@@ -166,6 +166,7 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * **Straight into the builder.** Once your API key checks out on the settings page, PressGo now drops you right into the AI Builder with an example prompt already filled in and one-tap starter ideas (Roofing, Yoga studio, SaaS, Dentist, Restaurant). No more landing on a blank screen wondering what to type — edit the example or tap a starter and hit Send.
 * **Bigger pages, fewer cut-offs.** Raised the generation length limit so longer pages finish in one pass. If a page ever does hit the limit, the builder now tells you plainly and suggests how to finish it.
 * **"Thinking… 12s" timer.** The Send button now shows elapsed time during a build (a full page is usually ~30 seconds) so a longer generation doesn't feel stuck.
+* **Cleaner icons.** Pages now build with the modern Phosphor icon set (open-source, MIT) for a more consistent, lighter look than the older FontAwesome style. Brand/social logos and any existing pages are unaffected.
 * Clearer guidance when an attached screenshot is too large to upload.
 
 = 2.2.3 =
