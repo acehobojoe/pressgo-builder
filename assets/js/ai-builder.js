@@ -34,9 +34,11 @@
 
 	function setPendingImage(file) {
 		if (!file || !/^image\//.test(file.type)) return;
-		// 5MB hard cap — bigger files explode admin-ajax + Anthropic input budget.
+		// 5MB hard cap — base64 inflates ~33%, so a bigger file would blow past
+		// the typical WordPress post_max_size (8M) and fail silently in
+		// admin-ajax. Keep it conservative and tell the user how to recover.
 		if (file.size > 5 * 1024 * 1024) {
-			append(el('pg-msg-error', 'Image too large (5MB max).'));
+			append(el('pg-msg-error', 'That image is too big (5MB max). Take a screenshot of just the part you want, or resize/compress it, then drop it in again.'));
 			return;
 		}
 		var reader = new FileReader();
@@ -156,9 +158,44 @@
 		log.scrollTop = log.scrollHeight;
 	}
 
+	// First-run starter prompts. Editable example pre-filled in the box +
+	// one-tap chips to swap the whole idea. Goal: never face a blank box.
+	var STARTERS = [
+		{ chip: 'Roofing company', text: 'A landing page for my roofing company that gets homeowners to book a free roof inspection. Highlight that we\'re local, licensed, and fast. Include reviews and a quote form.' },
+		{ chip: 'Yoga studio', text: 'A landing page for my yoga studio that gets people to sign up for a free intro class. Calm, welcoming vibe with class types, a schedule, and a signup form.' },
+		{ chip: 'SaaS app', text: 'A landing page for my SaaS app that gets visitors to start a free trial. Clear value prop, three key features, social proof, and a strong call to action.' },
+		{ chip: 'Dentist', text: 'A landing page for my dental practice that gets new patients to request an appointment. Friendly and trustworthy, with services, insurance info, and a booking form.' },
+		{ chip: 'Restaurant', text: 'A landing page for my restaurant that drives reservations and online orders. Showcase the menu highlights, atmosphere photos, hours, and location.' },
+	];
+
+	function renderFirstRun() {
+		append(el('pg-msg-system', 'You\'re in — let\'s build your first page. I dropped an example below; tweak it to match your business (or tap a different starter), then hit Send.'));
+		// Starter chips row.
+		var chips = document.createElement('div');
+		chips.className = 'pg-starter-chips';
+		chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 2px;';
+		STARTERS.forEach(function (s) {
+			var b = document.createElement('button');
+			b.type = 'button';
+			b.textContent = s.chip;
+			b.className = 'pg-starter-chip';
+			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
+			b.addEventListener('click', function () {
+				input.value = s.text;
+				input.focus();
+			});
+			chips.appendChild(b);
+		});
+		append(chips);
+		// Pre-fill the box with the first example, ready to edit + Send.
+		input.value = STARTERS[0].text;
+		setTimeout(function () { input.focus(); }, 50);
+	}
+
 	function renderHistory(messages) {
 		log.innerHTML = '';
 		if (!messages || !messages.length) {
+			if (cfg.firstRun) { renderFirstRun(); return; }
 			append(el('pg-msg-system', 'Tell me what kind of page you want — business, vibe, the goal. I\'ll ask 1-2 follow-ups then build a first draft.'));
 			return;
 		}
@@ -184,7 +221,27 @@
 	function setBusy(busy) {
 		sendBtn.disabled = busy;
 		input.disabled = busy;
-		sendBtn.textContent = busy ? 'Thinking…' : 'Send';
+		if (busy) startElapsed();
+		else { stopElapsed(); sendBtn.textContent = 'Send'; }
+	}
+
+	// Lightweight elapsed-time readout on the Send button so a 20–40s build
+	// doesn't feel hung. "~30s typical" sets the expectation.
+	var elapsedTimer = null;
+	function startElapsed() {
+		stopElapsed();
+		var t0 = Date.now();
+		function tick() {
+			var s = Math.round((Date.now() - t0) / 1000);
+			sendBtn.textContent = s < 1 ? 'Thinking…'
+				: 'Thinking… ' + s + 's' + (s < 30 ? '' : ' · almost there');
+		}
+		tick();
+		elapsedTimer = setInterval(tick, 1000);
+		sendBtn.title = 'A full page build usually takes ~30 seconds';
+	}
+	function stopElapsed() {
+		if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
 	}
 
 	// Saved across reloads so the iframe stays scrolled to whatever section
@@ -413,6 +470,11 @@
 					break;
 				case 'done':
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
+					// The model hit the length limit mid-build — the page may be
+					// cut off. Tell the user plainly how to recover.
+					if (evt.truncated) {
+						append(el('pg-msg-warn', 'Heads up — this page may be incomplete (it hit the length limit). Try asking me to "finish the page" or split it into a couple of smaller requests.'));
+					}
 					break;
 			}
 		}

@@ -217,6 +217,14 @@ html, body {
 	padding: 10px 14px; border-radius: 8px;
 	font-size: 13px; line-height: 1.5;
 }
+.pg-msg-warn {
+	align-self: stretch;
+	background: #fff8e6;
+	border: 1px solid #f3d27a;
+	color: #7a5a10;
+	padding: 10px 14px; border-radius: 8px;
+	font-size: 13px; line-height: 1.5;
+}
 .pg-error-actions {
 	display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
 }

@@ -343,8 +343,14 @@ class PressGo_AI_Builder {
 			var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 			var builderBase = <?php echo wp_json_encode( admin_url( 'admin.php?page=' . self::MENU_SLUG . '&action=edit' ) ); ?>;
 
-			document.getElementById('pressgo-ai-new-page').addEventListener('click', function(){
-				var btn = this; btn.disabled = true; btn.textContent = 'Creating…';
+			// firstrun=1 means we just came from a successful key save on the
+			// settings page — auto-create a page and carry the flag through so
+			// the builder opens with a starter prompt + chips.
+			var isFirstRun = /[?&]firstrun=1\b/.test(window.location.search);
+
+			var newPageBtn = document.getElementById('pressgo-ai-new-page');
+			function createPage(){
+				newPageBtn.disabled = true; newPageBtn.textContent = 'Creating…';
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_create_page');
 				fd.append('nonce', nonce);
@@ -352,13 +358,15 @@ class PressGo_AI_Builder {
 					.then(function(r){ return r.json(); })
 					.then(function(j){
 						if (j && j.success && j.data && j.data.post_id) {
-							location.href = builderBase + '&post_id=' + j.data.post_id;
+							location.href = builderBase + '&post_id=' + j.data.post_id + (isFirstRun ? '&firstrun=1' : '');
 						} else {
-							alert('Could not create page'); btn.disabled = false; btn.textContent = '+ New page';
+							alert('Could not create page'); newPageBtn.disabled = false; newPageBtn.textContent = '+ New page';
 						}
 					})
-					.catch(function(){ alert('Could not create page'); btn.disabled = false; btn.textContent = '+ New page'; });
-			});
+					.catch(function(){ alert('Could not create page'); newPageBtn.disabled = false; newPageBtn.textContent = '+ New page'; });
+			}
+			newPageBtn.addEventListener('click', createPage);
+			if (isFirstRun) createPage();
 
 			document.querySelectorAll('.pressgo-ai-toggle').forEach(function(cb){
 				cb.addEventListener('change', function(){
@@ -482,6 +490,7 @@ class PressGo_AI_Builder {
 				nonce:   <?php echo wp_json_encode( $nonce ); ?>,
 				ajaxUrl: <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
 				previewBase: <?php echo wp_json_encode( $preview_url ); ?>,
+				firstRun: <?php echo ! empty( $_GET['firstrun'] ) ? 'true' : 'false'; ?>,
 			};
 			</script>
 			<?php
@@ -709,7 +718,10 @@ class PressGo_AI_Builder {
 			$this->stream_vision_review( $api_key, $post_id, $history, $emit );
 		}
 
-		$emit( 'done', array( 'credits_remaining' => $credits_after ) );
+		$emit( 'done', array(
+			'credits_remaining' => $credits_after,
+			'truncated'         => ! empty( $result['truncated'] ),
+		) );
 		$this->finalize_stream( $emit );
 	}
 
@@ -746,7 +758,7 @@ class PressGo_AI_Builder {
 	 * apply). Returns {text, tool_use, error}.
 	 */
 	private function stream_upstream_to_browser( $api_key, $body, $emit ) {
-		$out = array( 'text' => '', 'tool_use' => null, 'error' => null );
+		$out = array( 'text' => '', 'tool_use' => null, 'error' => null, 'truncated' => false );
 		$sse_buffer = '';
 
 		$ch = curl_init( 'https://pressgo.app/api/plugin/builder/chat' );
@@ -785,8 +797,12 @@ class PressGo_AI_Builder {
 							$out['tool_use'] = $evt;
 						} elseif ( $t === 'error' ) {
 							$out['error'] = $evt['message'] ?? ( $evt['error'] ?? 'chat error' );
+						} elseif ( $t === 'done' ) {
+							// Surface upstream max_tokens cutoff so we can warn the
+							// user the page may be incomplete. Everything else in
+							// the done event is wrapped up by the caller.
+							if ( ! empty( $evt['truncated'] ) ) $out['truncated'] = true;
 						}
-						// 'done' event ignored; we wrap up in caller.
 					}
 				}
 				return strlen( $chunk );

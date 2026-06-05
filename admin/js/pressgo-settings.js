@@ -96,7 +96,16 @@
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				if (data.success) {
-					result.innerHTML = '<span class="pressgo-status-ok">&#10003; ' + data.data.message + '</span>';
+					result.innerHTML = '<span class="pressgo-status-ok">&#10003; ' + data.data.message +
+						' &mdash; opening the AI Builder…</span>';
+					// The One Thing: once the key checks out, don't leave them
+					// parked on a settings screen — drop them straight into a
+					// fresh builder with an example prompt ready to go. firstrun=1
+					// tells the list page to auto-create a page and the builder
+					// to pre-fill the starter prompt + chips.
+					setTimeout(function () {
+						window.location = 'admin.php?page=pressgo-ai-builder&firstrun=1';
+					}, 900);
 				} else {
 					result.innerHTML = '<span class="pressgo-status-error">&#10007; ' + data.data.message + '</span>';
 				}
