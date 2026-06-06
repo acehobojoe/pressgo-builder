@@ -835,13 +835,52 @@ class PressGo_AI_Builder {
 		$png = wp_remote_retrieve_body( $shot );
 		if ( empty( $png ) ) return;
 
-		$wire = $this->sanitize_for_anthropic( $history );
-		$wire[] = array( 'role' => 'user', 'content' => array(
+		// Mirror the desktop grab at a mobile viewport so the reviewer can catch
+		// stacking / overflow / legibility issues that only show on phones.
+		// A failed or empty mobile shot just falls back to desktop-only review.
+		$png_mobile = '';
+		$shot_m = wp_remote_get(
+			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=mobile',
+			array( 'timeout' => 25, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+		);
+		if ( ! is_wp_error( $shot_m ) && wp_remote_retrieve_response_code( $shot_m ) === 200 ) {
+			$png_mobile = wp_remote_retrieve_body( $shot_m );
+		}
+
+		// Concrete pass/fail rubric. The reviewer must check each item and only
+		// correct REAL failures — a clean page should pass untouched so we don't
+		// burn a credit churning a page that's already good.
+		$rubric = "Above are screenshots of the page you just built: the first is desktop, "
+			. ( $png_mobile ? "the second is the same page at a mobile (phone) viewport. " : "" )
+			. "Review it against the user's most recent request using this PASS/FAIL checklist. "
+			. "Go through every item:\n"
+			. "1. Any empty image panel or blank card (a slot where an image/content should be but isn't)?\n"
+			. "2. Any section with a header but no content under it?\n"
+			. "3. Any headline longer than 8 words?\n"
+			. "4. Two sections with the same background color sitting directly next to each other?\n"
+			. "5. A generic CTA button ('Get Started', 'Submit', 'Learn More') that should be outcome-specific (e.g. 'Book My Free Inspection', 'Start My Trial')?\n"
+			. "6. Any text that is hard to read — low contrast or sitting over a busy/clashing background?\n"
+			. "7. Is there exactly one primary CTA above the fold (not zero, not several competing ones)?\n"
+			. "8. Any blank or missing icons?\n"
+			. "9. Any em dashes or en dashes, or AI-cliche copy (Elevate, Unlock, Seamless, Empower, Unleash, Supercharge, Revolutionize, Game-changing, Cutting-edge, or 'Transform' used as filler)?\n"
+			. ( $png_mobile ? "10. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
+			. "\nIf any item FAILS, call set_page_config again with the FULL corrected config, fixing ONLY the real failures and leaving everything else exactly as it is. "
+			. "If every item PASSES, reply with one short sentence confirming it looks good and ask if they want any other changes — do NOT call the tool.";
+
+		$content = array(
 			array( 'type' => 'image', 'source' => array(
 				'type' => 'base64', 'media_type' => 'image/png', 'data' => base64_encode( $png ),
 			) ),
-			array( 'type' => 'text', 'text' => "Above is a screenshot of the page you just built. Critically review it against the user's most recent request. If you spot any visible problems (wrong color on buttons, broken layout, missing content, font issues, etc.), call set_page_config again with the FULL corrected config. If it looks good, reply with one short sentence confirming and ask if they want any other changes — do NOT call the tool." ),
-		) );
+		);
+		if ( $png_mobile ) {
+			$content[] = array( 'type' => 'image', 'source' => array(
+				'type' => 'base64', 'media_type' => 'image/png', 'data' => base64_encode( $png_mobile ),
+			) );
+		}
+		$content[] = array( 'type' => 'text', 'text' => $rubric );
+
+		$wire = $this->sanitize_for_anthropic( $history );
+		$wire[] = array( 'role' => 'user', 'content' => $content );
 
 		$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
 		$decoded = json_decode( wp_unslash( $elementor_raw ), true );

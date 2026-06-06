@@ -176,6 +176,20 @@ class PressGo_Widget_Helpers {
 				$hover_g = max( 0, $rgb['g'] - 20 );
 				$hover_b = max( 0, $rgb['b'] - 20 );
 				$s['button_background_hover_color'] = sprintf( '#%02X%02X%02X', $hover_r, $hover_g, $hover_b );
+
+				// Subtle colored depth — a lifted shadow tinted from the
+				// button's own color (~25% alpha) so the primary CTA reads as
+				// raised, not flat. Hover deepens and widens the lift.
+				$s['button_box_shadow_box_shadow_type'] = 'yes';
+				$s['button_box_shadow_box_shadow']      = array(
+					'horizontal' => 0, 'vertical' => 6, 'blur' => 16,
+					'spread' => 0, 'color' => "rgba({$rgb['r']},{$rgb['g']},{$rgb['b']},0.25)",
+				);
+				$s['button_box_shadow_hover_box_shadow_type'] = 'yes';
+				$s['button_box_shadow_hover_box_shadow']      = array(
+					'horizontal' => 0, 'vertical' => 10, 'blur' => 24,
+					'spread' => 0, 'color' => "rgba({$rgb['r']},{$rgb['g']},{$rgb['b']},0.35)",
+				);
 			}
 		}
 		if ( $text_color ) {
@@ -354,7 +368,7 @@ class PressGo_Widget_Helpers {
 	public static function icon_box_w( $cfg, $icon, $title, $desc, $icon_color = null,
 									   $position = 'top', $view = 'stacked', $shape = 'circle',
 									   $secondary_color = null, $align = 'center',
-									   $title_color = null, $desc_color = null ) {
+									   $title_color = null, $desc_color = null, $vibe = 'tinted_circle' ) {
 		$c     = $cfg['colors'];
 		$fonts = $cfg['fonts'];
 
@@ -403,11 +417,69 @@ class PressGo_Widget_Helpers {
 			'description_typography_line_height' => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
 		);
 
-		if ( in_array( $view, array( 'stacked', 'framed' ), true ) ) {
-			$s['shape'] = $shape;
-			// For stacked/framed: primary = background shape, secondary = icon glyph.
-			$s['primary_color']   = $secondary_color;
-			$s['secondary_color'] = $icon_color;
+		// Icon treatment ("vibe"). The default tinted_circle keeps the existing
+		// look — a 10%-alpha tinted circle behind the glyph. The other vibes
+		// break the templated sameness: a rounded-square chip, a gradient chip,
+		// or a plain accent glyph with no background shape.
+		switch ( $vibe ) {
+			case 'plain':
+				// No background shape — just the colored glyph, larger so it
+				// still anchors the card.
+				$s['view']          = 'default';
+				$s['primary_color'] = $icon_color;
+				$s['icon_size']     = array( 'unit' => 'px', 'size' => 34, 'sizes' => array() );
+				break;
+
+			case 'rounded_square':
+				// Tinted chip with a soft rounded-square shape instead of a circle.
+				$s['view']             = 'stacked';
+				$s['shape']            = 'square';
+				$s['primary_color']    = $secondary_color;
+				$s['secondary_color']  = $icon_color;
+				$s['icon_border_radius'] = array(
+					'unit' => 'px', 'top' => '14', 'right' => '14',
+					'bottom' => '14', 'left' => '14', 'isLinked' => true,
+				);
+				$s['icon_padding'] = array(
+					'unit' => 'px', 'top' => '14', 'right' => '14',
+					'bottom' => '14', 'left' => '14', 'isLinked' => true,
+				);
+				break;
+
+			case 'gradient_chip':
+				// Solid gradient chip — full-color shape with a contrasting
+				// glyph. Reads premium and clearly different from the tint.
+				$accent = isset( $c['accent'] ) && $c['accent'] ? $c['accent'] : $icon_color;
+				$s['view']                       = 'stacked';
+				$s['shape']                      = 'square';
+				$s['primary_color']              = $icon_color;
+				$s['secondary_color']            = PressGo_Style_Utils::text_on_color( $icon_color );
+				$s['icon_border_radius']         = array(
+					'unit' => 'px', 'top' => '16', 'right' => '16',
+					'bottom' => '16', 'left' => '16', 'isLinked' => true,
+				);
+				$s['icon_padding']               = array(
+					'unit' => 'px', 'top' => '16', 'right' => '16',
+					'bottom' => '16', 'left' => '16', 'isLinked' => true,
+				);
+				// Layer a gradient over the solid primary via the icon's own
+				// background control so the chip reads as a gradient, not flat.
+				$s['_icon_background_background'] = 'gradient';
+				$s['_icon_background_color']      = $icon_color;
+				$s['_icon_background_color_b']    = $accent;
+				$s['_icon_background_gradient_angle'] = array( 'unit' => 'deg', 'size' => 135, 'sizes' => array() );
+				break;
+
+			case 'tinted_circle':
+			default:
+				// Current default — tinted circle behind the glyph.
+				if ( in_array( $view, array( 'stacked', 'framed' ), true ) ) {
+					$s['shape'] = $shape;
+					// For stacked/framed: primary = background shape, secondary = icon glyph.
+					$s['primary_color']   = $secondary_color;
+					$s['secondary_color'] = $icon_color;
+				}
+				break;
 		}
 
 		return PressGo_Element_Factory::widget( 'icon-box', $s );
@@ -542,9 +614,62 @@ class PressGo_Widget_Helpers {
 		if ( $image_url ) {
 			$s['testimonial_image'] = array( 'url' => $image_url, 'id' => '', 'alt' => $name );
 			$s['image_size']        = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
+		} else {
+			// No avatar supplied — synthesize a monogram (colored circle + the
+			// person's initials) so the card reads finished instead of showing
+			// an empty/placeholder avatar slot. Rendered as an inline SVG data
+			// URI fed to the native testimonial image so layout is unchanged.
+			$avatar_bg = isset( $c['primary'] ) && $c['primary'] ? $c['primary'] : '#0043B3';
+			$s['testimonial_image'] = array(
+				'url' => self::monogram_data_uri( $name, $avatar_bg ),
+				'id'  => '',
+				'alt' => $name,
+			);
+			$s['image_size'] = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
 		}
 
 		return PressGo_Element_Factory::widget( 'testimonial', $s );
+	}
+
+	/**
+	 * Derive up to two uppercase initials from a person's name.
+	 * "Jane Doe" -> "JD", "cher" -> "C", "" -> "?".
+	 */
+	public static function name_initials( $name ) {
+		$name  = trim( preg_replace( '/\s+/', ' ', (string) $name ) );
+		if ( '' === $name ) {
+			return '?';
+		}
+		$parts    = explode( ' ', $name );
+		$first    = function_exists( 'mb_substr' ) ? mb_substr( $parts[0], 0, 1 ) : substr( $parts[0], 0, 1 );
+		$initials = $first;
+		if ( count( $parts ) > 1 ) {
+			$last      = $parts[ count( $parts ) - 1 ];
+			$initials .= function_exists( 'mb_substr' ) ? mb_substr( $last, 0, 1 ) : substr( $last, 0, 1 );
+		}
+		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $initials ) : strtoupper( $initials );
+	}
+
+	/**
+	 * Build an inline SVG data URI of a colored circle with the name's initials
+	 * centered in readable text — a synthesized avatar for testimonials that
+	 * ship without a photo.
+	 */
+	public static function monogram_data_uri( $name, $bg_color = '#0043B3' ) {
+		$initials = self::name_initials( $name );
+		$text_col = PressGo_Style_Utils::text_on_color( $bg_color );
+		// Escape for safe embedding in SVG/XML attribute and text contexts.
+		$bg_color = esc_attr( $bg_color );
+		$text_col = esc_attr( $text_col );
+		$initials = htmlspecialchars( $initials, ENT_QUOTES, 'UTF-8' );
+
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">'
+			. '<circle cx="60" cy="60" r="60" fill="' . $bg_color . '"/>'
+			. '<text x="60" y="60" dy="0.35em" text-anchor="middle" '
+			. 'font-family="Helvetica, Arial, sans-serif" font-size="48" font-weight="700" '
+			. 'fill="' . $text_col . '">' . $initials . '</text></svg>';
+
+		return 'data:image/svg+xml;base64,' . base64_encode( $svg );
 	}
 
 	/**

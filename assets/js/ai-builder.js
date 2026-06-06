@@ -118,8 +118,15 @@
 	});
 
 	// Restore vision toggle from localStorage so the user's preference sticks.
+	// On the very first build we force it ON regardless of any stored value, so
+	// new users get the self-review QA pass out of the box (they can still turn
+	// it off — the change handler below persists that choice for next time).
 	try {
-		if (localStorage.getItem('pgVision') === '1') visionInput.checked = true;
+		if (cfg.firstRun) {
+			if (visionInput) visionInput.checked = true;
+		} else if (localStorage.getItem('pgVision') === '1') {
+			visionInput.checked = true;
+		}
 	} catch (e) {}
 	visionInput && visionInput.addEventListener('change', function () {
 		try { localStorage.setItem('pgVision', visionInput.checked ? '1' : '0'); } catch (e) {}

@@ -80,6 +80,13 @@ class PressGo_Generator {
 			? $cfg['sections']
 			: array_keys( self::$builders );
 
+		// SECTIONS/DATA RECONCILIATION
+		// The AI's `sections` order and the actual data objects in `$cfg` drift
+		// apart: it lists names with no matching data, and it builds data for
+		// sections it forgot to list. Reconcile both so the page reflects what
+		// was actually generated, not just what was promised.
+		$section_names = self::reconcile_sections( $section_names, $cfg );
+
 		$page = array();
 		foreach ( $section_names as $name ) {
 			if ( ! isset( self::$builders[ $name ] ) ) {
@@ -121,6 +128,134 @@ class PressGo_Generator {
 		$page = PressGo_Icons::convert_tree( $page );
 
 		return $page;
+	}
+
+	/**
+	 * Reconcile the AI's `sections` order against the data objects actually
+	 * present in $cfg.
+	 *
+	 * (a) Drop listed names that have no matching data object — they'd be
+	 *     skipped by the build loop anyway, but dropping them up front keeps the
+	 *     working order honest. `disclaimer` is the one exception: it builds
+	 *     from defaults without a data object, so a listed disclaimer is kept.
+	 * (b) Append data-bearing sections that exist in $cfg but were left out of
+	 *     the list, slotting them by canonical builder order so they land in a
+	 *     sensible spot (footer + disclaimer always trail the rest).
+	 *
+	 * @param array $section_names Ordered section names from the config.
+	 * @param array $cfg           The full page configuration.
+	 * @return array Reconciled, ordered list of section names.
+	 */
+	private static function reconcile_sections( $section_names, $cfg ) {
+		if ( ! is_array( $section_names ) ) {
+			$section_names = array();
+		}
+
+		// (a) Keep only listed names a builder exists for AND that have data
+		// (disclaimer is allowed through without a data object).
+		$kept = array();
+		foreach ( $section_names as $name ) {
+			if ( ! is_string( $name ) || ! isset( self::$builders[ $name ] ) ) {
+				continue;
+			}
+			if ( ! self::section_has_data( $name, $cfg ) ) {
+				continue;
+			}
+			if ( in_array( $name, $kept, true ) ) {
+				continue; // de-dupe defensively.
+			}
+			$kept[] = $name;
+		}
+
+		// (b) Find data-bearing sections that were never listed.
+		$missing = array();
+		foreach ( array_keys( self::$builders ) as $name ) {
+			if ( in_array( $name, $kept, true ) ) {
+				continue;
+			}
+			// Only append sections the AI actually built data for — never
+			// fabricate a disclaimer the page never asked for.
+			if ( isset( $cfg[ $name ] ) && self::section_has_data( $name, $cfg ) ) {
+				$missing[] = $name;
+			}
+		}
+
+		if ( empty( $missing ) ) {
+			return $kept;
+		}
+
+		// Splice each missing section in by canonical builder order. footer and
+		// disclaimer are forced to the tail so trailing chrome stays last.
+		$order = array_keys( self::$builders );
+		foreach ( $missing as $name ) {
+			$kept = self::insert_by_order( $kept, $name, $order );
+		}
+
+		return $kept;
+	}
+
+	/**
+	 * Whether a section name has usable data in $cfg.
+	 *
+	 * A non-empty array under $cfg[$name] counts. `disclaimer` is special: it
+	 * renders from defaults, so it counts as soon as it's referenced.
+	 *
+	 * @param string $name Section name.
+	 * @param array  $cfg  Page configuration.
+	 * @return bool
+	 */
+	private static function section_has_data( $name, $cfg ) {
+		if ( 'disclaimer' === $name ) {
+			return true;
+		}
+		return isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && ! empty( $cfg[ $name ] );
+	}
+
+	/**
+	 * Insert $name into $list at the position implied by canonical $order.
+	 *
+	 * Walks the existing list and drops $name just before the first entry that
+	 * sorts after it in $order. footer/disclaimer land at the very end. If no
+	 * later entry exists, $name is appended.
+	 *
+	 * @param array  $list  Current ordered section names.
+	 * @param string $name  Section to insert.
+	 * @param array  $order Canonical builder order (array of names).
+	 * @return array New ordered list.
+	 */
+	private static function insert_by_order( $list, $name, $order ) {
+		$tail = array( 'footer', 'disclaimer' );
+		if ( in_array( $name, $tail, true ) ) {
+			$list[] = $name; // trailing chrome — append.
+			return $list;
+		}
+
+		$rank = array_search( $name, $order, true );
+		if ( false === $rank ) {
+			$list[] = $name;
+			return $list;
+		}
+
+		$out      = array();
+		$inserted = false;
+		foreach ( $list as $existing ) {
+			if ( ! $inserted ) {
+				$existing_rank = array_search( $existing, $order, true );
+				// Insert before the first existing section that ranks later, and
+				// always before trailing chrome (footer/disclaimer).
+				if ( in_array( $existing, $tail, true )
+					|| ( false !== $existing_rank && $existing_rank > $rank ) ) {
+					$out[]    = $name;
+					$inserted = true;
+				}
+			}
+			$out[] = $existing;
+		}
+		if ( ! $inserted ) {
+			$out[] = $name;
+		}
+
+		return $out;
 	}
 
 	/**

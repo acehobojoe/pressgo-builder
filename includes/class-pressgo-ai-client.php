@@ -74,7 +74,7 @@ class PressGo_AI_Client {
 				'prompt'       => is_array( $user_content ) ? wp_json_encode( $user_content ) : $user_content,
 				'systemPrompt' => $system_prompt,
 				'model'        => $this->model,
-				'maxTokens'    => 8192,
+				'maxTokens'    => 16384,
 			);
 			// Attach image if present.
 			if ( $image ) {
@@ -92,7 +92,7 @@ class PressGo_AI_Client {
 		} elseif ( $this->use_openai_format ) {
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'stream'     => true,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
@@ -106,7 +106,7 @@ class PressGo_AI_Client {
 		} else {
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'stream'     => true,
 				'system'     => $system_prompt,
 				'messages'   => array(
@@ -445,7 +445,7 @@ class PressGo_AI_Client {
 		if ( $this->use_openai_format ) {
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'messages'   => array(
 					array( 'role' => 'system', 'content' => $system_prompt ),
 					array( 'role' => 'user',   'content' => self::convert_content_to_openai( $user_content ) ),
@@ -458,7 +458,7 @@ class PressGo_AI_Client {
 		} else {
 			$body = array(
 				'model'      => $this->model,
-				'max_tokens' => 8192,
+				'max_tokens' => 16384,
 				'system'     => $system_prompt,
 				'messages'   => array(
 					array(

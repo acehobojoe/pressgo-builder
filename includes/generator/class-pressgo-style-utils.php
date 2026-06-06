@@ -33,6 +33,120 @@ class PressGo_Style_Utils {
 	}
 
 	/**
+	 * Convert a hex color to HSL. Returns array('h' => 0-360, 's' => 0-1, 'l' => 0-1).
+	 * Standard RGB-to-HSL math; PHP 7.4 safe.
+	 */
+	public static function hex_to_hsl( $hex_color ) {
+		$rgb = self::hex_to_rgb( $hex_color );
+		$r   = $rgb['r'] / 255;
+		$g   = $rgb['g'] / 255;
+		$b   = $rgb['b'] / 255;
+
+		$max   = max( $r, $g, $b );
+		$min   = min( $r, $g, $b );
+		$delta = $max - $min;
+
+		$l = ( $max + $min ) / 2;
+
+		if ( 0.0 === (float) $delta ) {
+			$h = 0.0;
+			$s = 0.0;
+		} else {
+			$s = $l > 0.5 ? $delta / ( 2 - $max - $min ) : $delta / ( $max + $min );
+
+			if ( $max === $r ) {
+				$h = ( $g - $b ) / $delta + ( $g < $b ? 6 : 0 );
+			} elseif ( $max === $g ) {
+				$h = ( $b - $r ) / $delta + 2;
+			} else {
+				$h = ( $r - $g ) / $delta + 4;
+			}
+			$h *= 60;
+		}
+
+		return array( 'h' => $h, 's' => $s, 'l' => $l );
+	}
+
+	/**
+	 * Convert HSL back to a hex string. Accepts h in 0-360, s and l in 0-1.
+	 */
+	public static function hsl_to_hex( $h, $s, $l ) {
+		// Normalize hue into 0-360.
+		$h = fmod( $h, 360 );
+		if ( $h < 0 ) {
+			$h += 360;
+		}
+		$s = max( 0.0, min( 1.0, (float) $s ) );
+		$l = max( 0.0, min( 1.0, (float) $l ) );
+
+		if ( 0.0 === (float) $s ) {
+			$r = $g = $b = $l;
+		} else {
+			$q = $l < 0.5 ? $l * ( 1 + $s ) : $l + $s - $l * $s;
+			$p = 2 * $l - $q;
+			$h_norm = $h / 360;
+			$r = self::hue_to_rgb( $p, $q, $h_norm + 1 / 3 );
+			$g = self::hue_to_rgb( $p, $q, $h_norm );
+			$b = self::hue_to_rgb( $p, $q, $h_norm - 1 / 3 );
+		}
+
+		return sprintf(
+			'#%02X%02X%02X',
+			(int) round( $r * 255 ),
+			(int) round( $g * 255 ),
+			(int) round( $b * 255 )
+		);
+	}
+
+	/**
+	 * HSL helper — convert a hue fraction back to a single RGB channel (0-1).
+	 */
+	private static function hue_to_rgb( $p, $q, $t ) {
+		if ( $t < 0 ) {
+			$t += 1;
+		}
+		if ( $t > 1 ) {
+			$t -= 1;
+		}
+		if ( $t < 1 / 6 ) {
+			return $p + ( $q - $p ) * 6 * $t;
+		}
+		if ( $t < 1 / 2 ) {
+			return $q;
+		}
+		if ( $t < 2 / 3 ) {
+			return $p + ( $q - $p ) * ( 2 / 3 - $t ) * 6;
+		}
+		return $p;
+	}
+
+	/**
+	 * Derive a harmonious accent color from the brand primary.
+	 *
+	 * Rotates the hue to a complementary-leaning analogous angle (+150°) so the
+	 * accent reads as a clearly different but related color, then nudges
+	 * saturation/lightness toward a confident mid value. Grayscale primaries
+	 * (no saturation) fall back to a fixed friendly blue so the accent never
+	 * comes out as another gray. The config validator may call this to fill a
+	 * missing accent token.
+	 */
+	public static function derive_accent( $primary_hex ) {
+		$hsl = self::hex_to_hsl( $primary_hex );
+
+		// Near-grayscale primary: hue is meaningless, return a safe blue accent.
+		if ( $hsl['s'] < 0.08 ) {
+			return '#0043B3';
+		}
+
+		$h = $hsl['h'] + 150;
+		// Keep the accent vivid but not neon, and in a usable mid-lightness band.
+		$s = max( 0.45, min( 0.85, $hsl['s'] ) );
+		$l = max( 0.40, min( 0.55, $hsl['l'] ) );
+
+		return self::hsl_to_hex( $h, $s, $l );
+	}
+
+	/**
 	 * Pick a readable text color (near-black or white) for a given background.
 	 * Uses relative luminance per WCAG — pages with light primaries (electric
 	 * yellow, blush, etc.) now get dark text on primary backgrounds instead of
@@ -70,7 +184,6 @@ class PressGo_Style_Utils {
 		$c      = $cfg['colors'];
 		$layout = $cfg['layout'];
 		$r      = (string) $layout['card_radius'];
-		$shadow = $layout['card_shadow'];
 		$mob    = (string) max( 16, $pad - 8 );
 
 		return array(
@@ -94,11 +207,21 @@ class PressGo_Style_Utils {
 				'bottom' => '1', 'left' => '1', 'isLinked' => true,
 			),
 			'border_color'                   => $c['border'],
+			// Layered elevation. Elementor's box_shadow control only emits a
+			// single layer, so the control carries the wider AMBIENT layer
+			// (soft, lifts the card off the page). The tighter KEY layer that
+			// gives instant crisp depth — 0 1px 2px rgba(0,0,0,.06) — is added
+			// globally to .e-child.e-con in page-creator generate_custom_css(),
+			// which is a page-level setting that works in Elementor Free (the
+			// per-element custom_css control is Pro-only, so we avoid it).
 			'_box_shadow_box_shadow_type'    => 'yes',
-			'_box_shadow_box_shadow'         => $shadow,
+			'_box_shadow_box_shadow'         => array(
+				'horizontal' => 0, 'vertical' => 8, 'blur' => 24,
+				'spread' => 0, 'color' => 'rgba(0,0,0,0.08)',
+			),
 			'_box_shadow_box_shadow_hover_type' => 'yes',
 			'_box_shadow_box_shadow_hover'   => array(
-				'horizontal' => 0, 'vertical' => 8, 'blur' => 32,
+				'horizontal' => 0, 'vertical' => 12, 'blur' => 32,
 				'spread' => -4, 'color' => 'rgba(0,0,0,0.12)',
 			),
 		);

@@ -44,6 +44,32 @@ class PressGo_Section_Builder {
 	}
 
 	/**
+	 * Constrain a centered widget's measure (line length). Direct children of
+	 * outer() stretch to the full boxed width (~1140px), so a centered subhead
+	 * or description runs 100+ characters per line and reads like a wall. This
+	 * caps the widget at $max_px and centers it via the Elementor flexbox child
+	 * width controls (_element_width:initial + _element_custom_width) plus
+	 * _flex_align_self. The widget keeps its own align:center so the text stays
+	 * centered even where align-self is ignored. Opt-in — only applied to
+	 * centered hero/section subheads.
+	 */
+	private static function measure( $widget, $max_px = 680 ) {
+		if ( ! is_array( $widget ) || ! isset( $widget['settings'] ) ) {
+			return $widget;
+		}
+		$widget['settings']['_element_width']        = 'initial';
+		$widget['settings']['_element_custom_width'] = array(
+			'unit' => 'px', 'size' => $max_px, 'sizes' => array(),
+		);
+		// No mobile override needed: the boxed column is already far narrower
+		// than $max_px on phones, so the cap simply has no effect there (the
+		// widget fills the column). Mixing px/% units on one responsive
+		// control would be fragile in Elementor, so leave it single-unit.
+		$widget['settings']['_flex_align_self'] = 'center';
+		return $widget;
+	}
+
+	/**
 	 * Parse a stat value like "$2,500+" or "98%" into [prefix, number, suffix].
 	 * Commas inside the number are stripped (so "$2,500+" → 2500, not 2).
 	 * Non-numeric values fall back to number=0.
@@ -117,9 +143,9 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.5)', 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['white'], 56, '800', -1.5, 1.15, null, 32, 44 );
+			$c['white'], 68, '800', -1.5, 1.12, null, 32, 44 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 ) );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons grouped + centered (not split to row edges by 50%-cols).
@@ -150,8 +176,17 @@ class PressGo_Section_Builder {
 		// Parse primary color for radial overlay.
 		$rgb = PressGo_Style_Utils::hex_to_rgb( $c['primary'] );
 
+		// Second gradient stop: a deep base tinted ~14% toward the brand
+		// primary. The old #0D1B2A sat right next to dark_bg, so the gradient
+		// was invisible. Tinting toward primary makes it read and gives the
+		// hero a subtle brand wash.
+		$grad_b = sprintf( '#%02X%02X%02X',
+			(int) round( 8 + $rgb['r'] * 0.14 ),
+			(int) round( 11 + $rgb['g'] * 0.14 ),
+			(int) round( 18 + $rgb['b'] * 0.14 ) );
+
 		return PressGo_Element_Factory::outer( $cfg, $children,
-			null, array( $c['dark_bg'], '#0D1B2A', 160 ),
+			null, array( $c['dark_bg'], $grad_b, 160 ),
 			160, 140,
 			array(
 				'background_overlay_background'        => 'gradient',
@@ -161,10 +196,8 @@ class PressGo_Section_Builder {
 				'background_overlay_gradient_position'  => 'center center',
 				'background_overlay_color_stop'        => array( 'unit' => '%', 'size' => 0, 'sizes' => array() ),
 				'background_overlay_color_b_stop'      => array( 'unit' => '%', 'size' => 70, 'sizes' => array() ),
-				'shape_divider_bottom'                 => 'curve',
-				'shape_divider_bottom_color'           => $c['light_bg'],
-				'shape_divider_bottom_negative'        => 'yes',
-				'shape_divider_bottom_height'          => array( 'unit' => 'px', 'size' => 70, 'sizes' => array() ),
+				// Shape divider removed — the dated curve was applied on nearly
+				// every section. Clean flat transition by default.
 			)
 		);
 	}
@@ -192,7 +225,7 @@ class PressGo_Section_Builder {
 			$c['primary'], 12, '600', 4, null, 'uppercase', null, null, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 12 );
 		$left[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'left',
-			$c['text_dark'], 48, '800', -1.5, 1.15, null, 30, 40, 'center' );
+			$c['text_dark'], 64, '800', -1.5, 1.12, null, 30, 40, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $c['text_muted'], 17, 15, 1.7, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 24 );
@@ -247,15 +280,9 @@ class PressGo_Section_Builder {
 
 		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );
 
+		// Shape divider removed — clean flat transition by default.
 		return PressGo_Element_Factory::outer( $cfg, array( $row ),
-			$c['light_bg'], null, 80, 80,
-			array(
-				'shape_divider_bottom'          => 'curve',
-				'shape_divider_bottom_color'    => $c['white'],
-				'shape_divider_bottom_negative' => 'yes',
-				'shape_divider_bottom_height'   => array( 'unit' => 'px', 'size' => 50, 'sizes' => array() ),
-			)
-		);
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -280,10 +307,10 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['white'], 60, '800', -1.5, 1.1, null, 34, 46 );
+			$c['white'], 70, '800', -1.5, 1.08, null, 34, 46 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			'rgba(255,255,255,0.8)', 19, 15 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			'rgba(255,255,255,0.8)', 19, 15 ) );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
 		// CTA buttons grouped + centered.
@@ -309,13 +336,9 @@ class PressGo_Section_Builder {
 			), 'center', 10 );
 		}
 
-		// Build section with background image + dark overlay.
-		$extra = array(
-			'shape_divider_bottom'          => 'curve',
-			'shape_divider_bottom_color'    => $c['light_bg'],
-			'shape_divider_bottom_negative' => 'yes',
-			'shape_divider_bottom_height'   => array( 'unit' => 'px', 'size' => 70, 'sizes' => array() ),
-		);
+		// Build section with background image + dark overlay. Shape divider
+		// removed — clean flat transition by default.
+		$extra = array();
 
 		if ( $img ) {
 			$norm_url = PressGo_Widget_Helpers::normalize_image( $img )['url'];
@@ -324,11 +347,18 @@ class PressGo_Section_Builder {
 				$extra['background_image']             = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
 				$extra['background_position']          = 'center center';
 				$extra['background_size']              = 'cover';
-				// Stronger overlay so hero text stays readable on busy or
-				// bright photos. Was 0.65; 0.78 keeps the image visible
-				// without sacrificing legibility.
-				$extra['background_overlay_background'] = 'classic';
-				$extra['background_overlay_color']     = 'rgba(0,0,0,0.78)';
+				// Vertical gradient scrim, darker through the middle/bottom
+				// where the headline + CTAs sit. Heavier than the old flat
+				// 0.78 slab (top 0.72 → center 0.86) so text stays legible
+				// over busy or bright photos while the image still reads at
+				// the top edge.
+				$extra['background_overlay_background']    = 'gradient';
+				$extra['background_overlay_color']         = 'rgba(0,0,0,0.72)';
+				$extra['background_overlay_color_stop']    = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
+				$extra['background_overlay_color_b']       = 'rgba(0,0,0,0.86)';
+				$extra['background_overlay_color_b_stop']  = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+				$extra['background_overlay_gradient_type'] = 'linear';
+				$extra['background_overlay_gradient_angle'] = array( 'unit' => 'deg', 'size' => 180, 'sizes' => array() );
 			}
 		} else {
 			// Fallback to gradient if no image.
@@ -365,10 +395,10 @@ class PressGo_Section_Builder {
 			$c['primary'], 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['text_dark'], 52, '800', -1.5, 1.15, null, 32, 42 );
+			$c['text_dark'], 66, '800', -1.5, 1.12, null, 32, 42 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			$c['text_muted'], 18, 15 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			$c['text_muted'], 18, 15 ) );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons grouped + centered.
@@ -402,15 +432,9 @@ class PressGo_Section_Builder {
 				(int) $cfg['layout']['card_radius'] );
 		}
 
+		// Shape divider removed — clean flat transition by default.
 		return PressGo_Element_Factory::outer( $cfg, $children,
-			$c['light_bg'], null, 80, 80,
-			array(
-				'shape_divider_bottom'          => 'curve',
-				'shape_divider_bottom_color'    => $c['white'],
-				'shape_divider_bottom_negative' => 'yes',
-				'shape_divider_bottom_height'   => array( 'unit' => 'px', 'size' => 50, 'sizes' => array() ),
-			)
-		);
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -434,10 +458,10 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['white'], 58, '800', -2, 1.1, null, 34, 46 );
+			$c['white'], 70, '800', -2, 1.08, null, 34, 46 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			'rgba(255,255,255,0.8)', 19, 15 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			'rgba(255,255,255,0.8)', 19, 15 ) );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 
 		// CTA buttons grouped + centered. Primary CTA on white background
@@ -508,10 +532,10 @@ class PressGo_Section_Builder {
 			$c['primary'], 13, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['text_dark'], 54, '800', -1.5, 1.15, null, 32, 44 );
+			$c['text_dark'], 66, '800', -1.5, 1.12, null, 32, 44 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		$children[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			$c['text_muted'], 18, 15 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			$c['text_muted'], 18, 15 ) );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons grouped + centered.
@@ -550,7 +574,17 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$raw   = $cfg['stats'];
 		$items = isset( $raw['items'] ) ? $raw['items'] : $raw;
+		// A stats object with a heading but no items list leaves $items as an
+		// assoc array of strings, not stat rows — coerce that to empty so the
+		// guard below skips the section instead of iterating a string value.
+		if ( ! is_array( $items ) || ( ! empty( $items ) && ! is_array( reset( $items ) ) ) ) {
+			$items = array();
+		}
 		$fonts = $cfg['fonts'];
+
+		// No stats → no section (generator skips null), so the page never
+		// renders an empty stat row or an orphaned overlap margin.
+		if ( empty( $items ) ) { return null; }
 
 		$stat_cols = array();
 		foreach ( $items as $item ) {
@@ -626,7 +660,16 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$raw   = $cfg['stats'];
 		$items = isset( $raw['items'] ) ? $raw['items'] : $raw;
+		// A stats object with a heading but no items list leaves $items as an
+		// assoc array of strings, not stat rows — coerce that to empty so the
+		// guard below skips the section instead of iterating a string value.
+		if ( ! is_array( $items ) || ( ! empty( $items ) && ! is_array( reset( $items ) ) ) ) {
+			$items = array();
+		}
 		$fonts = $cfg['fonts'];
+
+		// No stats → no section.
+		if ( empty( $items ) ) { return null; }
 
 		$stat_cols = array();
 		foreach ( $items as $idx => $item ) {
@@ -688,9 +731,11 @@ class PressGo_Section_Builder {
 			);
 		}
 
+		// Second stop deepened to #020617 (was #0F172A, nearly identical to the
+		// usual dark_bg) so the gradient is actually visible.
 		return PressGo_Element_Factory::outer( $cfg,
 			array( PressGo_Element_Factory::row( $cfg, $stat_cols, 20 ) ),
-			null, array( $c['dark_bg'], '#0F172A', 135 ), 60, 60 );
+			null, array( $c['dark_bg'], '#020617', 135 ), 60, 60 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -701,7 +746,16 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$raw   = $cfg['stats'];
 		$items = isset( $raw['items'] ) ? $raw['items'] : $raw;
+		// A stats object with a heading but no items list leaves $items as an
+		// assoc array of strings, not stat rows — coerce that to empty so the
+		// guard below skips the section instead of iterating a string value.
+		if ( ! is_array( $items ) || ( ! empty( $items ) && ! is_array( reset( $items ) ) ) ) {
+			$items = array();
+		}
 		$fonts = $cfg['fonts'];
+
+		// No stats → no section (otherwise just two stacked dividers render).
+		if ( empty( $items ) ) { return null; }
 
 		$stat_cols = array();
 		foreach ( $items as $idx => $item ) {
@@ -832,6 +886,10 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		// No items → no section, so the eyebrow/headline never render above an
+		// empty card grid.
+		if ( empty( $f['items'] ) ) { return null; }
+
 		// ─── Overridable layout knobs ─────────────────────────────────────
 		// The AI can set these from chat ("center the icons", "tighter cards",
 		// "remove top border"). Each falls through to a tasteful default if
@@ -920,6 +978,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		// No items → no section.
+		if ( empty( $f['items'] ) ) { return null; }
+
 		$sections = array();
 
 		// Section header.
@@ -987,6 +1048,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		// No items → no section.
+		if ( empty( $f['items'] ) ) { return null; }
+
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
 			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
@@ -1023,6 +1087,9 @@ class PressGo_Section_Builder {
 	public static function build_features_image_cards( $cfg ) {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
+
+		// No items → no section.
+		if ( empty( $f['items'] ) ) { return null; }
 
 		$r = (string) $cfg['layout']['card_radius'];
 		$feature_cols = array();
@@ -1102,6 +1169,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$f = $cfg['features'];
 
+		// No items → no section.
+		if ( empty( $f['items'] ) ) { return null; }
+
 		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
 			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
 
@@ -1144,6 +1214,9 @@ class PressGo_Section_Builder {
 	public static function build_steps( $cfg ) {
 		$c  = $cfg['colors'];
 		$st = $cfg['steps'];
+
+		// No steps → no section.
+		if ( empty( $st['items'] ) ) { return null; }
 
 		$step_cols = array();
 		foreach ( $st['items'] as $item ) {
@@ -1196,6 +1269,9 @@ class PressGo_Section_Builder {
 	public static function build_steps_compact( $cfg ) {
 		$c  = $cfg['colors'];
 		$st = $cfg['steps'];
+
+		// No steps → no section.
+		if ( empty( $st['items'] ) ) { return null; }
 
 		$anchor = isset( $st['anchor'] ) ? $st['anchor'] : 'how-it-works';
 		$header = PressGo_Style_Utils::section_header( $cfg, $st['eyebrow'], $st['headline'] );
@@ -1251,6 +1327,9 @@ class PressGo_Section_Builder {
 	public static function build_steps_timeline( $cfg ) {
 		$c  = $cfg['colors'];
 		$st = $cfg['steps'];
+
+		// No steps → no section.
+		if ( empty( $st['items'] ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $st['eyebrow'], $st['headline'] );
 
@@ -1310,6 +1389,9 @@ class PressGo_Section_Builder {
 	public static function build_results( $cfg ) {
 		$c = $cfg['colors'];
 		$r = $cfg['results'];
+
+		// No metrics → no section.
+		if ( empty( $r['metrics'] ) ) { return null; }
 
 		// Results uses a dark-gradient section by design. If user-supplied
 		// dark_bg is actually light, white text will be invisible — pick a
@@ -1394,19 +1476,12 @@ class PressGo_Section_Builder {
 				isset( $r['cta']['icon'] ) ? $r['cta']['icon'] : null, 'center' );
 		}
 
+		// Shape dividers removed — clean flat transition by default. Gradient
+		// second stop deepened to #020617 (was #0F172A, nearly identical to the
+		// usual dark_bg) so the gradient actually reads.
 		return PressGo_Element_Factory::outer( $cfg, $children,
-			null, array( $c['dark_bg'], '#0F172A', 135 ),
-			80, 80,
-			array(
-				'shape_divider_top'            => 'curve',
-				'shape_divider_top_color'      => $c['white'],
-				'shape_divider_top_height'     => array( 'unit' => 'px', 'size' => 60, 'sizes' => array() ),
-				'shape_divider_bottom'         => 'curve',
-				'shape_divider_bottom_color'   => $c['light_bg'],
-				'shape_divider_bottom_negative' => 'yes',
-				'shape_divider_bottom_height'  => array( 'unit' => 'px', 'size' => 60, 'sizes' => array() ),
-			)
-		);
+			null, array( $c['dark_bg'], '#020617', 135 ),
+			80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1416,6 +1491,9 @@ class PressGo_Section_Builder {
 	public static function build_results_bars( $cfg ) {
 		$c = $cfg['colors'];
 		$r = $cfg['results'];
+
+		// No metrics → no section.
+		if ( empty( $r['metrics'] ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $r['eyebrow'], $r['headline'],
 			isset( $r['description'] ) ? $r['description'] : null );
@@ -1456,6 +1534,9 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$ce    = $cfg['competitive_edge'];
 		$fonts = $cfg['fonts'];
+
+		// No benefits → no section (the whole right column is the checklist).
+		if ( empty( $ce['benefits'] ) ) { return null; }
 
 		$icon_list_items = array();
 		foreach ( $ce['benefits'] as $b ) {
@@ -1534,6 +1615,9 @@ class PressGo_Section_Builder {
 		$ce    = $cfg['competitive_edge'];
 		$fonts = $cfg['fonts'];
 		$img   = isset( $ce['image'] ) ? $ce['image'] : '';
+
+		// No benefits → no section.
+		if ( empty( $ce['benefits'] ) ) { return null; }
 
 		// Build benefit checklist with icon-list widget.
 		$icon_list_items = array();
@@ -1631,6 +1715,9 @@ class PressGo_Section_Builder {
 		$ce    = $cfg['competitive_edge'];
 		$fonts = $cfg['fonts'];
 
+		// No cards source (rich items OR flat benefits) → no section.
+		if ( empty( $ce['items'] ) && empty( $ce['benefits'] ) ) { return null; }
+
 		$benefit_icons = array(
 			'fas fa-check-circle', 'fas fa-shield-alt', 'fas fa-bolt',
 			'fas fa-chart-line', 'fas fa-star', 'fas fa-trophy',
@@ -1644,9 +1731,9 @@ class PressGo_Section_Builder {
 				13, '600', 4, null, 'uppercase' ),
 			PressGo_Widget_Helpers::spacer_w( 12 ),
 			PressGo_Widget_Helpers::heading_w( $cfg, $ce['headline'], 'h2', 'center',
-				$c['text_dark'], 42, '800', -1, 1.2, null, 28, 36 ),
+				$c['text_dark'], 46, '800', -1, 1.18, null, 28, 36 ),
 			PressGo_Widget_Helpers::spacer_w( 12 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $ce['description'], 'center', $c['text_muted'], 17, 15 ),
+			self::measure( PressGo_Widget_Helpers::text_w( $cfg, $ce['description'], 'center', $c['text_muted'], 17, 15 ) ),
 			PressGo_Widget_Helpers::spacer_w( 32 ),
 		);
 
@@ -1723,6 +1810,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$t = $cfg['testimonials'];
 
+		// No testimonials → no section.
+		if ( empty( $t['items'] ) ) { return null; }
+
 		$testimonial_cols = array();
 		foreach ( $t['items'] as $idx => $item ) {
 			// Skip empty testimonials so the widget's "John Doe / designer"
@@ -1755,16 +1845,10 @@ class PressGo_Section_Builder {
 		$header = PressGo_Style_Utils::section_header( $cfg, $t['eyebrow'], $t['headline'],
 			isset( $t['subheadline'] ) ? $t['subheadline'] : null );
 
+		// Shape divider removed — clean flat transition by default.
 		return PressGo_Element_Factory::outer( $cfg,
 			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $testimonial_cols, 24 ) ) ),
-			$c['white'], null, 80, 80,
-			array(
-				'shape_divider_bottom'          => 'curve',
-				'shape_divider_bottom_color'    => $c['light_bg'],
-				'shape_divider_bottom_negative' => 'yes',
-				'shape_divider_bottom_height'   => array( 'unit' => 'px', 'size' => 50, 'sizes' => array() ),
-			)
-		);
+			$c['white'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1774,6 +1858,10 @@ class PressGo_Section_Builder {
 	public static function build_testimonials_featured( $cfg ) {
 		$c = $cfg['colors'];
 		$t = $cfg['testimonials'];
+
+		// No testimonials → no section (the featured-pick below assumes
+		// items[0] exists).
+		if ( empty( $t['items'] ) ) { return null; }
 
 		$items = $t['items'];
 		// Pick the first (longest) testimonial as the featured one.
@@ -1848,6 +1936,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$t = $cfg['testimonials'];
 
+		// No testimonials → no section.
+		if ( empty( $t['items'] ) ) { return null; }
+
 		$header = PressGo_Style_Utils::section_header( $cfg, $t['eyebrow'], $t['headline'],
 			isset( $t['subheadline'] ) ? $t['subheadline'] : null );
 
@@ -1893,6 +1984,9 @@ class PressGo_Section_Builder {
 		$c = $cfg['colors'];
 		$t = $cfg['testimonials'];
 
+		// No testimonials → no section.
+		if ( empty( $t['items'] ) ) { return null; }
+
 		$children = array();
 
 		// Section eyebrow and headline.
@@ -1900,7 +1994,7 @@ class PressGo_Section_Builder {
 			$c['primary'], 13, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 12 );
 		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $t['headline'], 'h2', 'center',
-			$c['text_dark'], 42, '800', -1, 1.2, null, 28, 36 );
+			$c['text_dark'], 46, '800', -1, 1.18, null, 28, 36 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 40 );
 
 		// Display each testimonial as a centered quote block.
@@ -1943,6 +2037,9 @@ class PressGo_Section_Builder {
 		$f     = $cfg['faq'];
 		$fonts = $cfg['fonts'];
 
+		// No questions → no section (an empty toggle renders as a bare header).
+		if ( empty( $f['items'] ) ) { return null; }
+
 		$tabs = array();
 		foreach ( $f['items'] as $item ) {
 			$tabs[] = array( 'tab_title' => $item['q'], 'tab_content' => $item['a'] );
@@ -1982,6 +2079,9 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$f     = $cfg['faq'];
 		$fonts = $cfg['fonts'];
+
+		// No questions → no section.
+		if ( empty( $f['items'] ) ) { return null; }
 
 		// faq_split's section background is hardcoded to $c['white'] (see
 		// outer() below), so this is effectively a white surface — use
@@ -2141,10 +2241,10 @@ class PressGo_Section_Builder {
 
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $ct['headline'], 'h2', 'center',
-				$on_primary, 44, '800', -1, 1.2, null, 30, 38 ),
+				$on_primary, 46, '800', -1, 1.18, null, 30, 38 ),
 			PressGo_Widget_Helpers::spacer_w( 16 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
-				$muted_alpha, 18, 16 ),
+			self::measure( PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
+				$muted_alpha, 18, 16 ) ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
 			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
 				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
@@ -2167,19 +2267,10 @@ class PressGo_Section_Builder {
 			);
 		}
 
-		// Determine top divider color based on whether blog section precedes this.
-		$sections  = isset( $cfg['sections'] ) ? $cfg['sections'] : array();
-		$top_color = in_array( 'blog', $sections, true ) ? $c['white'] : $c['light_bg'];
-
+		// Shape divider removed — clean flat transition by default.
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			null, array( $c['primary'], '#0052D9', 135 ),
-			90, 90,
-			array(
-				'shape_divider_top'        => 'curve',
-				'shape_divider_top_color'  => $top_color,
-				'shape_divider_top_height' => array( 'unit' => 'px', 'size' => 60, 'sizes' => array() ),
-			)
-		);
+			90, 90 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -2269,10 +2360,10 @@ class PressGo_Section_Builder {
 
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg, $ct['headline'], 'h2', 'center',
-				$c['white'], 44, '800', -1, 1.2, null, 30, 38 ),
+				$c['white'], 46, '800', -1, 1.18, null, 30, 38 ),
 			PressGo_Widget_Helpers::spacer_w( 16 ),
-			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
-				'rgba(255,255,255,0.8)', 18, 16 ),
+			self::measure( PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
+				'rgba(255,255,255,0.8)', 18, 16 ) ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
 			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
 				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
@@ -2315,6 +2406,9 @@ class PressGo_Section_Builder {
 		$fonts = $cfg['fonts'];
 		$p     = $cfg['pricing'];
 		$plans = $p['plans'];
+
+		// No plans → no section.
+		if ( empty( $plans ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $p['eyebrow'], $p['headline'],
 			isset( $p['subheadline'] ) ? $p['subheadline'] : null );
@@ -2441,6 +2535,9 @@ class PressGo_Section_Builder {
 		$p     = $cfg['pricing'];
 		$plans = $p['plans'];
 
+		// No plans → no section.
+		if ( empty( $plans ) ) { return null; }
+
 		$header = PressGo_Style_Utils::section_header( $cfg, $p['eyebrow'], $p['headline'],
 			isset( $p['subheadline'] ) ? $p['subheadline'] : null );
 
@@ -2551,6 +2648,10 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$lb = $cfg['logo_bar'];
 
+		// No logos → no section (a lone "trusted by" headline with no logos
+		// reads as a broken/empty bar).
+		if ( empty( $lb['logos'] ) ) { return null; }
+
 		$children = array();
 		if ( ! empty( $lb['headline'] ) ) {
 			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $lb['headline'], 'h6', 'center',
@@ -2604,6 +2705,9 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$lb = $cfg['logo_bar'];
 
+		// No logos → no section.
+		if ( empty( $lb['logos'] ) ) { return null; }
+
 		$children = array();
 		if ( ! empty( $lb['headline'] ) ) {
 			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $lb['headline'], 'h6', 'center',
@@ -2656,6 +2760,9 @@ class PressGo_Section_Builder {
 	public static function build_team( $cfg ) {
 		$c  = $cfg['colors'];
 		$tm = $cfg['team'];
+
+		// No members → no section.
+		if ( empty( $tm['members'] ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $tm['eyebrow'], $tm['headline'],
 			isset( $tm['subheadline'] ) ? $tm['subheadline'] : null );
@@ -2737,6 +2844,9 @@ class PressGo_Section_Builder {
 	public static function build_team_compact( $cfg ) {
 		$c  = $cfg['colors'];
 		$tm = $cfg['team'];
+
+		// No members → no section.
+		if ( empty( $tm['members'] ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $tm['eyebrow'], $tm['headline'],
 			isset( $tm['subheadline'] ) ? $tm['subheadline'] : null );
@@ -3044,6 +3154,10 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$gl = $cfg['gallery'];
 
+		// No images → no section (an empty gallery widget renders nothing or a
+		// stray header).
+		if ( empty( $gl['images'] ) ) { return null; }
+
 		$header = array();
 		if ( ! empty( $gl['eyebrow'] ) || ! empty( $gl['headline'] ) ) {
 			$header = PressGo_Style_Utils::section_header( $cfg,
@@ -3098,6 +3212,9 @@ class PressGo_Section_Builder {
 		$c  = $cfg['colors'];
 		$gl = $cfg['gallery'];
 
+		// No images → no section.
+		if ( empty( $gl['images'] ) ) { return null; }
+
 		$header = array();
 		if ( ! empty( $gl['eyebrow'] ) || ! empty( $gl['headline'] ) ) {
 			$header = PressGo_Style_Utils::section_header( $cfg,
@@ -3147,7 +3264,12 @@ class PressGo_Section_Builder {
 
 	public static function build_newsletter( $cfg ) {
 		$c  = $cfg['colors'];
-		$nl = $cfg['newsletter'];
+		$nl = isset( $cfg['newsletter'] ) ? $cfg['newsletter'] : array();
+
+		// Nothing configured → no section. Without this the placeholder
+		// "Stay in the Loop / Subscribe" card renders for pages that never
+		// asked for a newsletter.
+		if ( empty( $nl ) ) { return null; }
 
 		$children = array(
 			PressGo_Widget_Helpers::heading_w( $cfg,
@@ -3213,7 +3335,10 @@ class PressGo_Section_Builder {
 
 	public static function build_newsletter_inline( $cfg ) {
 		$c  = $cfg['colors'];
-		$nl = $cfg['newsletter'];
+		$nl = isset( $cfg['newsletter'] ) ? $cfg['newsletter'] : array();
+
+		// Nothing configured → no section.
+		if ( empty( $nl ) ) { return null; }
 
 		// Section sits on a primary gradient. If primary is light (clay,
 		// blush, lime), white text disappears — pick contrast based on

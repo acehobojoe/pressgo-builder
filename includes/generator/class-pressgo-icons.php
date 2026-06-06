@@ -5,8 +5,10 @@
  * The AI keeps emitting FontAwesome class names (which Claude knows well).
  * We transparently upgrade the *look* by remapping the common ones to
  * Phosphor — a modern, consistent open-source set (MIT) we bundle. Anything
- * not in the map (incl. fa-brands logos) falls through to FontAwesome, which
- * Elementor still enqueues, so nothing ever renders blank.
+ * not in the map (incl. fa-brands logos) falls through to FontAwesome. To make
+ * sure those fall-throughs never render blank, enqueue() also pulls in
+ * Elementor's bundled FontAwesome stylesheets (solid/regular/brands) so the
+ * glyphs are always present, mapped or not.
  *
  * Single integration point: PressGo_Generator::generate() runs the finished
  * element tree through convert_tree() before returning it.
@@ -247,6 +249,15 @@ class PressGo_Icons {
 			array(),
 			$ver
 		);
+
+		// Belt-and-suspenders: any icon we don't remap (unmapped fa-solid names,
+		// plus all fa-brands logos) still needs FontAwesome to render. We don't
+		// bundle FA, so pull in Elementor's copy — these handles are registered
+		// by Elementor itself, so we just enqueue them (no double-load of our
+		// Phosphor CSS, which is a separate handle above).
+		wp_enqueue_style( 'elementor-icons-fa-solid' );
+		wp_enqueue_style( 'elementor-icons-fa-brands' );
+		wp_enqueue_style( 'elementor-icons-fa-regular' );
 	}
 
 	/**
@@ -297,7 +308,7 @@ class PressGo_Icons {
 
 		$name = self::fa_base_name( $icon['value'] );
 		if ( '' === $name || ! isset( self::$map[ $name ] ) ) {
-			return $icon; // unmapped → leave as FontAwesome (still enqueued).
+			return $icon; // unmapped → leave as FontAwesome (enqueue() loads Elementor's FA so it renders).
 		}
 
 		$ph     = self::$map[ $name ];
