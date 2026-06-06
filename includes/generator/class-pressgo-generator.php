@@ -127,7 +127,132 @@ class PressGo_Generator {
 		// finished tree (catches both AI-chosen and hardcoded-default icons).
 		$page = PressGo_Icons::convert_tree( $page );
 
+		// Fold spacer widgets into the margin of the adjacent widget so the
+		// output uses real margins (editable on each widget, lighter DOM) instead
+		// of a forest of spacer nodes a designer has to hunt down.
+		$page = self::flatten_spacers( $page );
+
 		return $page;
+	}
+
+	/**
+	 * Recursively replace spacer widgets with margin on their neighbours.
+	 *
+	 * A spacer's height becomes margin-bottom on the PRECEDING sibling (or
+	 * margin-top of the FOLLOWING sibling if the spacer leads the container).
+	 * Visual spacing is identical, but the page ships zero spacer widgets — they
+	 * read as a property of the real widget (Advanced > Margin) instead of a
+	 * separate node, which is what designers expect and far fewer DOM elements.
+	 *
+	 * @param array $elements Elementor elements (a container's children, or the page).
+	 * @return array Same tree with spacers folded away.
+	 */
+	private static function flatten_spacers( $elements ) {
+		if ( ! is_array( $elements ) ) {
+			return $elements;
+		}
+
+		// Depth-first: fold spacers inside nested containers first.
+		foreach ( $elements as &$child ) {
+			if ( is_array( $child ) && ! empty( $child['elements'] ) && is_array( $child['elements'] ) ) {
+				$child['elements'] = self::flatten_spacers( $child['elements'] );
+			}
+		}
+		unset( $child );
+
+		$out         = array();
+		$pending_top = null; // [px, mobile] from a leading spacer, applied to the next widget.
+
+		foreach ( $elements as $el ) {
+			if ( self::is_spacer( $el ) ) {
+				$px  = self::spacer_size( $el, 'space' );
+				$mob = self::spacer_size( $el, 'space_mobile' );
+				if ( ! empty( $out ) ) {
+					$last = count( $out ) - 1;
+					$out[ $last ] = self::add_margin( $out[ $last ], 'bottom', $px, $mob );
+				} else {
+					$pending_top = array( $px, $mob );
+				}
+				continue; // drop the spacer node entirely.
+			}
+
+			if ( null !== $pending_top && is_array( $el ) ) {
+				$el = self::add_margin( $el, 'top', $pending_top[0], $pending_top[1] );
+				$pending_top = null;
+			}
+			$out[] = $el;
+		}
+
+		return $out;
+	}
+
+	private static function is_spacer( $el ) {
+		return is_array( $el )
+			&& isset( $el['widgetType'] )
+			&& 'spacer' === $el['widgetType'];
+	}
+
+	private static function spacer_size( $el, $key ) {
+		if ( isset( $el['settings'][ $key ]['size'] ) && '' !== $el['settings'][ $key ]['size'] ) {
+			return (int) $el['settings'][ $key ]['size'];
+		}
+		return null;
+	}
+
+	/**
+	 * Add a px value to one side of a widget's margin (and the responsive
+	 * _margin_mobile when a mobile value is supplied), preserving any existing
+	 * margin already on that widget.
+	 */
+	private static function add_margin( $el, $side, $px, $mob ) {
+		if ( ! is_array( $el ) || null === $px ) {
+			return $el;
+		}
+		if ( ! isset( $el['settings'] ) || ! is_array( $el['settings'] ) ) {
+			$el['settings'] = array();
+		}
+
+		$el['settings']['_margin'] = self::margin_add(
+			isset( $el['settings']['_margin'] ) ? $el['settings']['_margin'] : null,
+			$side,
+			$px
+		);
+
+		// Only carry a mobile override when the spacer had one (matches the old
+		// spacer_w behaviour, where small spacers had no mobile shrink).
+		if ( null !== $mob ) {
+			$el['settings']['_margin_mobile'] = self::margin_add(
+				isset( $el['settings']['_margin_mobile'] ) ? $el['settings']['_margin_mobile'] : null,
+				$side,
+				$mob
+			);
+		}
+
+		return $el;
+	}
+
+	/**
+	 * Return an Elementor dimensions array with $px added to $side. Values are
+	 * strings (Elementor stores margin controls as strings); links is false so
+	 * each side is independent.
+	 */
+	private static function margin_add( $margin, $side, $px ) {
+		$base = array(
+			'unit'     => 'px',
+			'top'      => '0',
+			'right'    => '0',
+			'bottom'   => '0',
+			'left'     => '0',
+			'isLinked' => false,
+		);
+		if ( is_array( $margin ) ) {
+			$base = array_merge( $base, $margin );
+			$base['isLinked'] = false;
+			$base['unit']     = 'px';
+		}
+		$current      = is_numeric( $base[ $side ] ) ? (int) $base[ $side ] : 0;
+		$base[ $side ] = (string) ( $current + (int) $px );
+		return $base;
 	}
 
 	/**

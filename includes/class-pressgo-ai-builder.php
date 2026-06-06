@@ -32,6 +32,11 @@ class PressGo_AI_Builder {
 		// bar and theme chrome so the preview reads like a real visitor view.
 		add_action( 'init', array( $this, 'maybe_clean_preview' ) );
 
+		// Purge caches after ANY Elementor save (not just AI-builder applies),
+		// so a designer who edits in the native Elementor editor and clicks
+		// Update/Publish sees their changes immediately instead of a stale page.
+		add_action( 'elementor/document/after_save', array( $this, 'purge_on_elementor_save' ), 20 );
+
 		// Ajax endpoints (logged-in users only).
 		add_action( 'wp_ajax_pressgo_ai_chat',         array( $this, 'ajax_chat' ) );
 		add_action( 'wp_ajax_pressgo_ai_toggle',       array( $this, 'ajax_toggle' ) );
@@ -723,6 +728,51 @@ class PressGo_AI_Builder {
 			'truncated'         => ! empty( $result['truncated'] ),
 		) );
 		$this->finalize_stream( $emit );
+	}
+
+	/**
+	 * Fires on elementor/document/after_save. Pulls the post id off the saved
+	 * document and purges every cache layer so native-editor edits go live
+	 * immediately. Best-effort — never throws into Elementor's save flow.
+	 */
+	public function purge_on_elementor_save( $document ) {
+		try {
+			if ( ! is_object( $document ) || ! method_exists( $document, 'get_main_id' ) ) {
+				return;
+			}
+			$post_id = (int) $document->get_main_id();
+			if ( $post_id > 0 ) {
+				$this->purge_post_caches( $post_id );
+			}
+		} catch ( \Throwable $e ) { /* best effort */ }
+	}
+
+	/**
+	 * Clear every layer that can serve a stale page after an edit: Elementor's
+	 * per-post CSS (meta + on-disk file + regenerate), WP Rocket, and the object
+	 * cache. Shared by the AI-builder apply path and the native-save hook.
+	 */
+	public function purge_post_caches( $post_id ) {
+		delete_post_meta( $post_id, '_elementor_css' );
+		delete_post_meta( $post_id, '_elementor_page_assets' );
+
+		$upload   = wp_upload_dir();
+		$css_file = trailingslashit( $upload['basedir'] ) . 'elementor/css/post-' . $post_id . '.css';
+		if ( file_exists( $css_file ) ) {
+			@unlink( $css_file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+
+		if ( did_action( 'elementor/loaded' ) && class_exists( '\\Elementor\\Plugin' ) ) {
+			try {
+				if ( method_exists( \Elementor\Plugin::$instance->files_manager, 'on_save_post' ) ) {
+					\Elementor\Plugin::$instance->files_manager->on_save_post( $post_id, get_post( $post_id ) );
+				}
+			} catch ( \Throwable $e ) { /* best effort */ }
+		}
+
+		if ( function_exists( 'rocket_clean_post' ) )   { rocket_clean_post( $post_id ); }
+		if ( function_exists( 'rocket_clean_domain' ) ) { rocket_clean_domain(); }
+		clean_post_cache( $post_id );
 	}
 
 	private function finalize_stream( $emit ) {

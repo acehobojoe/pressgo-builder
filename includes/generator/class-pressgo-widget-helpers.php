@@ -525,7 +525,9 @@ class PressGo_Widget_Helpers {
 	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left' ) {
 		return PressGo_Element_Factory::widget( 'star-rating', array(
 			'rating'     => $rating,
-			'star_style' => 'star_fontawesome',
+			// Unicode stars, not the old FontAwesome glyphs — cleaner look and no
+			// FontAwesome dependency just to draw five stars.
+			'star_style' => 'star_unicode',
 			'icon_size'  => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
 			'icon_space' => array( 'unit' => 'px', 'size' => 2, 'sizes' => array() ),
 			'stars_color' => $color,
@@ -614,19 +616,11 @@ class PressGo_Widget_Helpers {
 		if ( $image_url ) {
 			$s['testimonial_image'] = array( 'url' => $image_url, 'id' => '', 'alt' => $name );
 			$s['image_size']        = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
-		} else {
-			// No avatar supplied — synthesize a monogram (colored circle + the
-			// person's initials) so the card reads finished instead of showing
-			// an empty/placeholder avatar slot. Rendered as an inline SVG data
-			// URI fed to the native testimonial image so layout is unchanged.
-			$avatar_bg = isset( $c['primary'] ) && $c['primary'] ? $c['primary'] : '#0043B3';
-			$s['testimonial_image'] = array(
-				'url' => self::monogram_data_uri( $name, $avatar_bg ),
-				'id'  => '',
-				'alt' => $name,
-			);
-			$s['image_size'] = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
 		}
+		// No avatar supplied: leave testimonial_image unset. Elementor's native
+		// testimonial widget rejects data-URI images (renders a broken thumb), so
+		// we fall back to its neutral placeholder. A real initials monogram needs
+		// a custom card and is tracked as a follow-up.
 
 		return PressGo_Element_Factory::widget( 'testimonial', $s );
 	}

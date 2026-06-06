@@ -232,15 +232,25 @@ class PressGo_Icons {
 	private static $fill = array();
 
 	public function init() {
-		// Load Phosphor wherever an Elementor page renders (front + editor +
-		// preview iframe). Scoped to Elementor contexts so we don't add CSS to
-		// unrelated theme pages.
-		add_action( 'elementor/frontend/after_enqueue_styles', array( $this, 'enqueue' ) );
-		add_action( 'elementor/editor/after_enqueue_styles', array( $this, 'enqueue' ) );
-		add_action( 'elementor/preview/enqueue_styles', array( $this, 'enqueue' ) );
+		// Front-end: only load Phosphor on pages that actually use it, so a
+		// site's non-PressGo Elementor pages don't pay for 164KB of icon CSS.
+		add_action( 'elementor/frontend/after_enqueue_styles', array( $this, 'enqueue_frontend' ) );
+		// Editor + preview: always load so icons render while building.
+		add_action( 'elementor/editor/after_enqueue_styles', array( $this, 'do_enqueue' ) );
+		add_action( 'elementor/preview/enqueue_styles', array( $this, 'do_enqueue' ) );
+		// NOTE: we intentionally do NOT force-enqueue FontAwesome. Elementor's
+		// own Icons_Manager enqueues the exact FA sub-set (solid/brands) only
+		// when an unmapped FA icon is actually present on the page — loading all
+		// three FA sets on every page was pure dead weight.
 	}
 
-	public function enqueue() {
+	public function enqueue_frontend() {
+		if ( $this->page_uses_phosphor() ) {
+			$this->do_enqueue();
+		}
+	}
+
+	public function do_enqueue() {
 		$path = PRESSGO_PLUGIN_DIR . 'assets/icons/phosphor/phosphor.css';
 		$ver  = file_exists( $path ) ? filemtime( $path ) : PRESSGO_VERSION;
 		wp_enqueue_style(
@@ -249,15 +259,23 @@ class PressGo_Icons {
 			array(),
 			$ver
 		);
+	}
 
-		// Belt-and-suspenders: any icon we don't remap (unmapped fa-solid names,
-		// plus all fa-brands logos) still needs FontAwesome to render. We don't
-		// bundle FA, so pull in Elementor's copy — these handles are registered
-		// by Elementor itself, so we just enqueue them (no double-load of our
-		// Phosphor CSS, which is a separate handle above).
-		wp_enqueue_style( 'elementor-icons-fa-solid' );
-		wp_enqueue_style( 'elementor-icons-fa-brands' );
-		wp_enqueue_style( 'elementor-icons-fa-regular' );
+	/**
+	 * Does the page being rendered actually contain a Phosphor icon? Reads the
+	 * queried post's Elementor data once. Unknown context → true (load to be
+	 * safe rather than risk a blank glyph).
+	 */
+	private function page_uses_phosphor() {
+		$id = get_queried_object_id();
+		if ( ! $id ) {
+			return true;
+		}
+		$data = get_post_meta( $id, '_elementor_data', true );
+		if ( ! is_string( $data ) || '' === $data ) {
+			return false;
+		}
+		return ( false !== strpos( $data, 'ph ph-' ) ) || ( false !== strpos( $data, 'phosphor' ) );
 	}
 
 	/**

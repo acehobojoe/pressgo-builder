@@ -168,6 +168,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * **Smarter design defaults.** Font pairings are chosen by industry (no more Inter on Inter), accent colors are derived from your brand instead of a fixed green, cards get layered depth, heroes use larger display type, and the dated curved section dividers are gone.
 * **Human copy, enforced.** Built-in guardrails strip em dashes, AI cliches (Elevate, Unlock, Seamless, etc.), and generic CTAs, cap headline and feature lengths, and stop the AI from inventing fake testimonials for a brand-new business.
 * **Sharper self-review.** A(eyes) is now a concrete pass/fail checklist and reviews the mobile layout too, and it runs automatically on your first build.
+* **Real margins, not a forest of spacers.** Vertical spacing now lives as margins on the widgets themselves (editable under Advanced) instead of dozens of separate spacer widgets, so pages are far easier to tweak in Elementor and ship lighter HTML.
+* **Lighter pages.** Modern unicode star ratings (no FontAwesome dependency), and the Phosphor icon CSS now loads only on pages that actually use it instead of every Elementor page.
+* **Edits go live immediately.** Editing a page in the native Elementor editor and clicking Update now purges the caches, so you see your changes right away instead of the old version.
 
 = 2.2.4 =
 * **Straight into the builder.** Once your API key checks out on the settings page, PressGo now drops you right into the AI Builder with an example prompt already filled in and one-tap starter ideas (Roofing, Yoga studio, SaaS, Dentist, Restaurant). No more landing on a blank screen wondering what to type — edit the example or tap a starter and hit Send.
