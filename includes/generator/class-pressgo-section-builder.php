@@ -70,6 +70,21 @@ class PressGo_Section_Builder {
 	}
 
 	/**
+	 * Does a hero/section image field hold a real image? Accepts either a plain
+	 * URL string or a media object {url}. Used to downgrade image-dependent hero
+	 * variants to a no-image variant rather than render an empty panel.
+	 *
+	 * @param mixed $img String URL or array with a 'url' key.
+	 * @return bool
+	 */
+	private static function has_real_image( $img ) {
+		if ( is_array( $img ) ) {
+			$img = isset( $img['url'] ) ? $img['url'] : '';
+		}
+		return is_string( $img ) && '' !== trim( $img );
+	}
+
+	/**
 	 * Parse a stat value like "$2,500+" or "98%" into [prefix, number, suffix].
 	 * Commas inside the number are stripped (so "$2,500+" → 2500, not 2).
 	 * Non-numeric values fall back to number=0.
@@ -213,6 +228,13 @@ class PressGo_Section_Builder {
 		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
 		$img  = isset( $h['image'] ) ? $h['image'] : '';
 
+		// The split hero reserves a right-hand image column. With no real image
+		// it renders an empty panel (or a broken img from an invented URL), so
+		// fall back to the default centered hero, which needs no image.
+		if ( ! self::has_real_image( $img ) ) {
+			return self::build_hero( $cfg );
+		}
+
 		// Left column: text + buttons.
 		$left = array();
 
@@ -295,6 +317,13 @@ class PressGo_Section_Builder {
 		$cta1 = $h['cta_primary'];
 		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
 		$img  = isset( $h['image'] ) ? $h['image'] : '';
+
+		// Full-bleed background-image hero is meaningless without a real image
+		// (flat slab, or a broken invented URL). Fall back to the gradient hero,
+		// which is a strong standalone no-image hero.
+		if ( ! self::has_real_image( $img ) ) {
+			return self::build_hero_gradient( $cfg );
+		}
 
 		$children = array();
 

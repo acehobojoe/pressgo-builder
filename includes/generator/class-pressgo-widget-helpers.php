@@ -372,6 +372,14 @@ class PressGo_Widget_Helpers {
 		$c     = $cfg['colors'];
 		$fonts = $cfg['fonts'];
 
+		// Belt-and-suspenders: if the AI omitted an icon (or sent an empty one),
+		// fall back to a neutral check glyph (which remaps to Phosphor) so the
+		// card never renders an empty circle. The schema marks icon required, but
+		// a weak model still drops it sometimes.
+		if ( empty( $icon ) || ( is_array( $icon ) && empty( $icon['value'] ) ) ) {
+			$icon = 'fas fa-check';
+		}
+
 		if ( null === $icon_color ) {
 			$icon_color = $c['primary'];
 		}
