@@ -569,6 +569,12 @@ class PressGo_AI_Builder {
 	 */
 	public function ajax_chat() {
 		$this->check_auth();
+		// Never let a stray PHP notice/warning (e.g. an optional config key the
+		// generator reads) echo into the SSE stream — on a WP_DEBUG_DISPLAY site
+		// that would corrupt the event JSON and break the builder. Warnings still
+		// go to the error log; they just can't pollute the stream.
+		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet,WordPress.PHP.NoSilencedErrors
+
 		$post_id  = absint( $_POST['post_id'] ?? 0 );
 		$user_msg = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
 		$vision   = ! empty( $_POST['vision'] );

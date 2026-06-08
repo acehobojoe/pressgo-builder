@@ -156,6 +156,18 @@ class PressGo_Config_Validator {
 			}
 		}
 
+		// The section builders read $section['eyebrow'] directly, so default it to
+		// '' for any present content section. Prevents "Undefined array key"
+		// warnings (which can leak into the SSE stream on WP_DEBUG_DISPLAY sites).
+		// Empty string = no eyebrow rendered, never generic placeholder copy.
+		foreach ( array( 'stats', 'social_proof', 'features', 'steps', 'results',
+			'competitive_edge', 'testimonials', 'faq', 'pricing', 'logo_bar',
+			'team', 'gallery', 'newsletter' ) as $sec ) {
+			if ( isset( $config[ $sec ] ) && is_array( $config[ $sec ] ) && ! isset( $config[ $sec ]['eyebrow'] ) ) {
+				$config[ $sec ]['eyebrow'] = '';
+			}
+		}
+
 		// Fill in defaults for sections that need them.
 		//
 		// We deliberately DO NOT inject empty items/benefits/plans/members/
