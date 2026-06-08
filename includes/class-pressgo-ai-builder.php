@@ -698,12 +698,12 @@ class PressGo_AI_Builder {
 		$image_note = '';
 		$avail = $this->page_image_urls( $post_id );
 		if ( ! empty( $avail ) ) {
-			$image_note .= "\n\nReal images available in this page's media library — use these EXACT URLs for any image field (hero.image, feature item images, gallery images). Do NOT invent image URLs:\n";
+			$image_note .= "\n\nImages available in the user's WordPress media library — use these EXACT URLs for image fields (hero.image, feature item images, gallery images). Do NOT invent image URLs. Use ONLY the ones that clearly fit this page; ignore any that look unrelated:\n";
 			foreach ( $avail as $a ) {
 				$image_note .= '- ' . $a['url'] . ( $a['alt'] ? ' (' . $a['alt'] . ')' : '' ) . "\n";
 			}
 			if ( count( $avail ) > 1 ) {
-				$image_note .= "Place these across the page where they fit best — a gallery is great for multiple photos, and use the strongest one for the hero.\n";
+				$image_note .= "When several fit, spread them across the page (a gallery is great for multiple photos; use the strongest for the hero).\n";
 			}
 		}
 
@@ -936,27 +936,56 @@ class PressGo_AI_Builder {
 	 * Image URLs the user has uploaded for this page (attachments parented to
 	 * it), newest first. Feeds the AI a pool of real images to place.
 	 */
-	private function page_image_urls( $post_id, $limit = 12 ) {
-		if ( ! $post_id ) {
-			return array();
-		}
-		$atts = get_posts( array(
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'post_status'    => 'inherit',
-			'post_parent'    => (int) $post_id,
-			'posts_per_page' => $limit,
-			'orderby'        => 'date',
-			'order'          => 'DESC',
-		) );
-		$out = array();
-		foreach ( $atts as $a ) {
-			$url = wp_get_attachment_url( $a->ID );
-			if ( ! $url ) {
-				continue;
+	private function page_image_urls( $post_id, $limit = 16 ) {
+		$out  = array();
+		$seen = array();
+
+		$collect = function ( $atts ) use ( &$out, &$seen, $limit ) {
+			foreach ( $atts as $a ) {
+				if ( count( $out ) >= $limit || isset( $seen[ $a->ID ] ) ) {
+					continue;
+				}
+				$url = wp_get_attachment_url( $a->ID );
+				if ( ! $url ) {
+					continue;
+				}
+				$seen[ $a->ID ] = true;
+				$alt = get_post_meta( $a->ID, '_wp_attachment_image_alt', true );
+				if ( ! $alt ) {
+					$alt = $a->post_title;
+				}
+				// "PressGo upload" is our placeholder title — not a useful label.
+				if ( $alt && stripos( $alt, 'pressgo upload' ) !== false ) {
+					$alt = '';
+				}
+				$out[] = array( 'url' => $url, 'alt' => $alt ? $alt : '' );
 			}
-			$alt   = get_post_meta( $a->ID, '_wp_attachment_image_alt', true );
-			$out[] = array( 'url' => $url, 'alt' => $alt ? $alt : '' );
+		};
+
+		// 1) Images uploaded for THIS page (most relevant), newest first.
+		if ( $post_id ) {
+			$collect( get_posts( array(
+				'post_type'      => 'attachment',
+				'post_mime_type' => 'image',
+				'post_status'    => 'inherit',
+				'post_parent'    => (int) $post_id,
+				'posts_per_page' => $limit,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			) ) );
+		}
+		// 2) Fill with the user's RECENT media-library images so the AI can also
+		//    use photos they uploaded elsewhere (wp-admin, other pages), not just
+		//    ones attached to this page.
+		if ( count( $out ) < $limit ) {
+			$collect( get_posts( array(
+				'post_type'      => 'attachment',
+				'post_mime_type' => 'image',
+				'post_status'    => 'inherit',
+				'posts_per_page' => $limit,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			) ) );
 		}
 		return $out;
 	}
