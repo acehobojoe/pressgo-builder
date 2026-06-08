@@ -132,7 +132,40 @@ class PressGo_Generator {
 		// of a forest of spacer nodes a designer has to hunt down.
 		$page = self::flatten_spacers( $page );
 
+		// Defensive: ensure every url field is a string. A nested image object
+		// ({url:{url:...}}) reaching Elementor's image widget makes it call
+		// esc_url() on an array and FATAL the whole page render (which can even
+		// trip WP's fatal-protection and deactivate Elementor). One pass fixes it
+		// regardless of which builder produced it.
+		$page = self::stringify_urls( $page );
+
 		return $page;
+	}
+
+	/**
+	 * Recursively coerce any url-bearing object's `url` to a string. Catches
+	 * image / background_image / link / testimonial_image fields where the AI (or
+	 * a builder) passed a nested object instead of a plain URL string.
+	 *
+	 * @param array $elements Elementor elements (or a sub-tree).
+	 * @return array
+	 */
+	private static function stringify_urls( $elements ) {
+		if ( ! is_array( $elements ) ) {
+			return $elements;
+		}
+		foreach ( $elements as $k => $v ) {
+			if ( ! is_array( $v ) ) {
+				continue;
+			}
+			if ( array_key_exists( 'url', $v ) && is_array( $v['url'] ) ) {
+				$v['url'] = ( isset( $v['url']['url'] ) && is_string( $v['url']['url'] ) )
+					? $v['url']['url']
+					: '';
+			}
+			$elements[ $k ] = self::stringify_urls( $v );
+		}
+		return $elements;
 	}
 
 	/**

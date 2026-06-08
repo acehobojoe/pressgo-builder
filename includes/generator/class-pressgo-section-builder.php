@@ -836,7 +836,7 @@ class PressGo_Section_Builder {
 
 		// Build pill buttons — wrap on mobile so pills flow naturally.
 		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
-		$chunks  = array_chunk( $categories, $per_row );
+		$chunks  = $per_row > 0 ? array_chunk( $categories, $per_row ) : array();
 		foreach ( $chunks as $chunk ) {
 			$cols = array();
 			foreach ( $chunk as $cat ) {
@@ -882,7 +882,7 @@ class PressGo_Section_Builder {
 
 		// Build pill buttons — wrap on mobile so pills flow naturally.
 		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
-		$chunks  = array_chunk( $categories, $per_row );
+		$chunks  = $per_row > 0 ? array_chunk( $categories, $per_row ) : array();
 		foreach ( $chunks as $chunk ) {
 			$cols = array();
 			foreach ( $chunk as $cat ) {
