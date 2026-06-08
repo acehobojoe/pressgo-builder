@@ -423,13 +423,13 @@ class PressGo_AI_Builder {
 			<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
+					<div class="pg-attach-strip" id="pg-attach-strip" hidden></div>
 					<form class="pg-chat-input" id="pg-chat-form">
-						<button type="button" class="pg-attach-btn" id="pg-attach-btn" title="Attach an image (or drag/drop / paste)" aria-label="Attach image">
+						<button type="button" class="pg-attach-btn" id="pg-attach-btn" title="Attach images (or drag/drop / paste — you can add several)" aria-label="Attach images">
 							<svg class="pg-attach-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-							<img class="pg-attach-btn-thumb" id="pg-attach-thumb" alt="" hidden>
-							<span class="pg-attach-btn-x" aria-hidden="true">&times;</span>
+							<span class="pg-attach-count" id="pg-attach-count" hidden>0</span>
 						</button>
-						<input type="file" id="pg-attach-input" accept="image/*" hidden>
+						<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
 						<textarea
 							id="pg-chat-text"
 							rows="2"
@@ -572,15 +572,35 @@ class PressGo_AI_Builder {
 		$user_msg = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
 		$vision   = ! empty( $_POST['vision'] );
 
-		// Optional inline image (drag/drop, paste, or file picker).
-		$image_b64   = isset( $_POST['image_base64'] ) ? preg_replace( '/\s+/', '', (string) $_POST['image_base64'] ) : '';
-		$image_mime  = isset( $_POST['image_media_type'] ) ? sanitize_text_field( (string) $_POST['image_media_type'] ) : '';
-		if ( $image_b64 && ! preg_match( '#^image/(png|jpe?g|gif|webp)$#', $image_mime ) ) {
-			$image_b64 = '';
+		// Optional inline images (drag/drop, paste, or file picker). Supports a
+		// JSON `images` array [{base64, mediaType}] for multi-select, and falls
+		// back to the legacy single image_base64/image_media_type fields.
+		$images = array();
+		if ( ! empty( $_POST['images'] ) ) {
+			$decoded_imgs = json_decode( wp_unslash( (string) $_POST['images'] ), true );
+			if ( is_array( $decoded_imgs ) ) {
+				foreach ( $decoded_imgs as $im ) {
+					if ( count( $images ) >= 8 ) break; // sane cap
+					if ( ! is_array( $im ) || empty( $im['base64'] ) ) continue;
+					$b64  = preg_replace( '/\s+/', '', (string) $im['base64'] );
+					$mime = isset( $im['mediaType'] ) ? sanitize_text_field( (string) $im['mediaType'] ) : '';
+					if ( $b64 && preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
+						$images[] = array( 'base64' => $b64, 'mime' => $mime );
+					}
+				}
+			}
 		}
+		if ( empty( $images ) ) {
+			$b64  = isset( $_POST['image_base64'] ) ? preg_replace( '/\s+/', '', (string) $_POST['image_base64'] ) : '';
+			$mime = isset( $_POST['image_media_type'] ) ? sanitize_text_field( (string) $_POST['image_media_type'] ) : '';
+			if ( $b64 && preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
+				$images[] = array( 'base64' => $b64, 'mime' => $mime );
+			}
+		}
+		$has_images = ! empty( $images );
 
 		// Allow image-only sends (e.g. "match this style" with just a drop).
-		if ( ! $post_id || ( $user_msg === '' && $image_b64 === '' ) ) {
+		if ( ! $post_id || ( $user_msg === '' && ! $has_images ) ) {
 			wp_send_json_error( 'bad request', 400 );
 		}
 
@@ -620,8 +640,9 @@ class PressGo_AI_Builder {
 		$history = get_post_meta( $post_id, self::META_AI_CHAT, true );
 		if ( ! is_array( $history ) ) $history = array();
 		$stored_text = $user_msg;
-		if ( $image_b64 ) {
-			$stored_text = ( $user_msg ? $user_msg . "\n\n" : '' ) . '[image attached]';
+		if ( $has_images ) {
+			$n = count( $images );
+			$stored_text = ( $user_msg ? $user_msg . "\n\n" : '' ) . '[' . $n . ' image' . ( $n > 1 ? 's' : '' ) . ' attached]';
 		}
 		$history[] = array( 'role' => 'user', 'content' => $stored_text );
 
@@ -638,54 +659,51 @@ class PressGo_AI_Builder {
 		}
 		$wire_messages = $this->sanitize_for_anthropic( $history );
 
-		// Import an attached image into the WP media library so the AI can both
-		// analyze it AND place it on the page (and the user keeps a reusable
-		// copy). The image is parented to this page so it shows up in the
-		// page's available-images list.
-		$uploaded_url = null;
-		if ( $image_b64 ) {
-			$imp = $this->import_image_to_media( $image_b64, $image_mime, $post_id );
-			if ( $imp ) {
-				$uploaded_url = $imp['url'];
+		// Import every attached image into the WP media library (parented to this
+		// page) so the AI can place them AND the user keeps reusable copies.
+		// Build vision blocks too (capped) so the model can actually see them.
+		$vision_blocks = array();
+		foreach ( $images as $im ) {
+			$this->import_image_to_media( $im['base64'], $im['mime'], $post_id );
+			if ( count( $vision_blocks ) < 6 ) {
+				$vision_blocks[] = array(
+					'type'   => 'image',
+					'source' => array(
+						'type'       => 'base64',
+						'media_type' => $im['mime'] ? $im['mime'] : 'image/jpeg',
+						'data'       => $im['base64'],
+					),
+				);
 			}
 		}
 
 		// Tell the AI which REAL images it can use (everything uploaded for this
-		// page). This is what lets it put genuine images on the page instead of
-		// inventing broken URLs.
+		// page — includes the ones just imported above). This is what lets it put
+		// genuine images on the page instead of inventing broken URLs.
 		$image_note = '';
-		if ( $uploaded_url ) {
-			$image_note .= "\n\nThe image I just attached has been saved to my media library at: " . $uploaded_url . "\nUse it on the page where it fits best (the hero image, a feature, or a gallery).";
-		}
 		$avail = $this->page_image_urls( $post_id );
 		if ( ! empty( $avail ) ) {
 			$image_note .= "\n\nReal images available in this page's media library — use these EXACT URLs for any image field (hero.image, feature item images, gallery images). Do NOT invent image URLs:\n";
 			foreach ( $avail as $a ) {
 				$image_note .= '- ' . $a['url'] . ( $a['alt'] ? ' (' . $a['alt'] . ')' : '' ) . "\n";
 			}
+			if ( count( $avail ) > 1 ) {
+				$image_note .= "Place these across the page where they fit best — a gallery is great for multiple photos, and use the strongest one for the hero.\n";
+			}
 		}
 
-		// If the user attached an image with their latest message, replace
-		// the last user turn's plain-text content with a multi-part block
-		// array (image + text) — that's how Anthropic accepts inline images.
-		if ( $image_b64 && ! empty( $wire_messages ) ) {
+		// Attach the image blocks (vision) + the available-images note to the
+		// latest user turn — that's how Anthropic accepts inline images.
+		if ( ! empty( $vision_blocks ) && ! empty( $wire_messages ) ) {
 			$last = end( $wire_messages );
 			$last_key = key( $wire_messages );
 			if ( $last && $last['role'] === 'user' ) {
-				$wire_messages[ $last_key ]['content'] = array(
-					array(
-						'type'   => 'image',
-						'source' => array(
-							'type'       => 'base64',
-							'media_type' => $image_mime ?: 'image/png',
-							'data'       => $image_b64,
-						),
-					),
-					array(
-						'type' => 'text',
-						'text' => ( $user_msg !== '' ? $user_msg : 'See the attached image — use it as a visual reference and place it on the page.' ) . $image_note,
-					),
+				$blocks   = $vision_blocks;
+				$blocks[] = array(
+					'type' => 'text',
+					'text' => ( $user_msg !== '' ? $user_msg : 'See the attached image(s) — use them as a visual reference and place them on the page.' ) . $image_note,
 				);
+				$wire_messages[ $last_key ]['content'] = $blocks;
 			}
 		} elseif ( $image_note !== '' && ! empty( $wire_messages ) ) {
 			// No new image this turn, but real images are available — append the

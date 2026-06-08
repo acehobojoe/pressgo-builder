@@ -28,12 +28,19 @@
 	// ─── Image attach: drop, paste, file picker ────────────────────────
 	var attachBtn    = document.getElementById('pg-attach-btn');
 	var attachInput  = document.getElementById('pg-attach-input');
-	var attachThumb  = document.getElementById('pg-attach-thumb');
+	var attachStrip  = document.getElementById('pg-attach-strip');
+	var attachCount  = document.getElementById('pg-attach-count');
 	var chatPanel    = document.getElementById('pg-chat');
-	var pendingImage = null; // { dataUrl, mediaType, base64, name }
+	var pendingImages = []; // [{ dataUrl, mediaType, base64, name, id }]
+	var MAX_IMAGES = 8;
+	var imgSeq = 0;
 
-	function setPendingImage(file) {
+	function addPendingImage(file) {
 		if (!file || !/^image\//.test(file.type)) return;
+		if (pendingImages.length >= MAX_IMAGES) {
+			append(el('pg-msg-error', 'You can attach up to ' + MAX_IMAGES + ' images at once.'));
+			return;
+		}
 		// Generous raw cap just to avoid browser-memory blowups — anything under
 		// this gets DOWNSCALED below, so the upload payload stays tiny.
 		if (file.size > 30 * 1024 * 1024) {
@@ -45,17 +52,10 @@
 		// needs to see layout/style, so a ~1600px JPEG (~200-500KB) is plenty and
 		// works on every host. Falls back to the raw file if canvas resize fails.
 		resizeImage(file, 1600, 0.85, function (resized) {
-			if (resized) {
-				pendingImage = resized;
-			} else {
-				pendingImage = null; // resize failed; let readRaw populate it
-				readRaw(file);
-				return;
-			}
-			attachThumb.src = pendingImage.dataUrl;
-			attachThumb.hidden = false;
-			attachBtn.classList.add('has-image');
-			attachBtn.title = 'Image attached: ' + pendingImage.name + ' — click to remove';
+			if (!resized) { readRaw(file); return; }
+			resized.id = 'img' + (++imgSeq);
+			pendingImages.push(resized);
+			renderStrip();
 		});
 	}
 
@@ -96,58 +96,86 @@
 		} catch (e) { cb(null); }
 	}
 
-	// Raw fallback: send the original bytes (used only when canvas resize fails,
-	// e.g. an exotic format). Keeps the prior behaviour for those edge cases.
+	// Raw fallback: keep the original bytes (used only when canvas resize fails,
+	// e.g. an exotic format).
 	function readRaw(file) {
+		if (pendingImages.length >= MAX_IMAGES) return;
 		var reader = new FileReader();
 		reader.onload = function (e) {
 			var dataUrl = e.target.result;
 			var commaIdx = dataUrl.indexOf(',');
-			pendingImage = {
+			pendingImages.push({
 				dataUrl:   dataUrl,
 				mediaType: file.type,
 				base64:    dataUrl.slice(commaIdx + 1),
 				name:      file.name || 'screenshot.png',
-			};
-			attachThumb.src = dataUrl;
-			attachThumb.hidden = false;
-			attachBtn.classList.add('has-image');
-			attachBtn.title = 'Image attached: ' + pendingImage.name + ' — click to remove';
+				id:        'img' + (++imgSeq),
+			});
+			renderStrip();
 		};
 		reader.readAsDataURL(file);
 	}
-	function clearPendingImage() {
-		pendingImage = null;
-		attachThumb.src = '';
-		attachThumb.hidden = true;
-		attachBtn.classList.remove('has-image');
-		attachBtn.title = 'Attach an image (or drag/drop / paste)';
-		attachInput.value = '';
+	function removePendingImage(id) {
+		pendingImages = pendingImages.filter(function (im) { return im.id !== id; });
+		renderStrip();
+	}
+	function clearPendingImages() {
+		pendingImages = [];
+		if (attachInput) attachInput.value = '';
+		renderStrip();
+	}
+	// Render the thumbnail strip (each thumb has a remove ×) + the count badge.
+	function renderStrip() {
+		if (!attachStrip) return;
+		attachStrip.innerHTML = '';
+		if (!pendingImages.length) {
+			attachStrip.hidden = true;
+			if (attachCount) attachCount.hidden = true;
+			attachBtn && attachBtn.classList.remove('has-image');
+			return;
+		}
+		attachStrip.hidden = false;
+		pendingImages.forEach(function (im) {
+			var cell = document.createElement('div');
+			cell.className = 'pg-attach-thumb-cell';
+			var thumb = document.createElement('img');
+			thumb.src = im.dataUrl;
+			thumb.alt = im.name || '';
+			cell.appendChild(thumb);
+			var x = document.createElement('button');
+			x.type = 'button';
+			x.className = 'pg-attach-thumb-x';
+			x.setAttribute('aria-label', 'Remove image');
+			x.innerHTML = '&times;';
+			x.addEventListener('click', function () { removePendingImage(im.id); });
+			cell.appendChild(x);
+			attachStrip.appendChild(cell);
+		});
+		if (attachCount) { attachCount.textContent = String(pendingImages.length); attachCount.hidden = false; }
+		attachBtn && attachBtn.classList.add('has-image');
 	}
 
-	// Click attach button: if image staged, clear it; otherwise open picker.
+	// Click attach button: open the picker (add more — remove via the strip ×).
 	attachBtn && attachBtn.addEventListener('click', function () {
-		if (pendingImage) clearPendingImage();
-		else attachInput.click();
+		attachInput.click();
 	});
 	attachInput && attachInput.addEventListener('change', function (e) {
-		var f = e.target.files && e.target.files[0];
-		if (f) setPendingImage(f);
+		var files = e.target.files || [];
+		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
+		attachInput.value = ''; // allow re-picking the same file
 	});
 
-	// Paste from clipboard inside the textarea.
+	// Paste from clipboard inside the textarea (adds each pasted image).
 	input.addEventListener('paste', function (e) {
 		var items = (e.clipboardData && e.clipboardData.items) || [];
+		var added = false;
 		for (var i = 0; i < items.length; i++) {
 			if (items[i].kind === 'file' && /^image\//.test(items[i].type)) {
 				var file = items[i].getAsFile();
-				if (file) {
-					e.preventDefault();
-					setPendingImage(file);
-					return;
-				}
+				if (file) { addPendingImage(file); added = true; }
 			}
 		}
+		if (added) e.preventDefault();
 	});
 
 	// Drag-and-drop over the chat panel.
@@ -172,7 +200,7 @@
 		dragDepth = 0;
 		chatPanel.classList.remove('is-dragover');
 		var files = (e.dataTransfer && e.dataTransfer.files) || [];
-		if (files.length) setPendingImage(files[0]);
+		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
 	});
 
 	// Restore vision toggle from localStorage so the user's preference sticks.
@@ -402,13 +430,15 @@
 	}
 
 	function sendMessage(text) {
-		// Optimistic user bubble — shows image inline if one was attached.
+		// Optimistic user bubble — shows any attached images inline.
 		var userBubble = el('pg-msg pg-msg-user');
-		if (pendingImage) {
-			var thumb = document.createElement('img');
-			thumb.src = pendingImage.dataUrl;
-			thumb.className = 'pg-msg-user-image';
-			userBubble.appendChild(thumb);
+		if (pendingImages.length) {
+			pendingImages.forEach(function (im) {
+				var thumb = document.createElement('img');
+				thumb.src = im.dataUrl;
+				thumb.className = 'pg-msg-user-image';
+				userBubble.appendChild(thumb);
+			});
 		}
 		if (text) {
 			var txt = document.createElement('div');
@@ -427,11 +457,12 @@
 		fd.append('post_id', cfg.postId);
 		fd.append('message', text);
 		if (visionInput && visionInput.checked) fd.append('vision', '1');
-		if (pendingImage) {
-			fd.append('image_base64', pendingImage.base64);
-			fd.append('image_media_type', pendingImage.mediaType);
+		if (pendingImages.length) {
+			fd.append('images', JSON.stringify(pendingImages.map(function (im) {
+				return { base64: im.base64, mediaType: im.mediaType };
+			})));
 			// Clear immediately so a second send doesn't double-attach.
-			clearPendingImage();
+			clearPendingImages();
 		}
 
 		// Streaming consumer state.
