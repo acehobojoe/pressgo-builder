@@ -638,6 +638,33 @@ class PressGo_AI_Builder {
 		}
 		$wire_messages = $this->sanitize_for_anthropic( $history );
 
+		// Import an attached image into the WP media library so the AI can both
+		// analyze it AND place it on the page (and the user keeps a reusable
+		// copy). The image is parented to this page so it shows up in the
+		// page's available-images list.
+		$uploaded_url = null;
+		if ( $image_b64 ) {
+			$imp = $this->import_image_to_media( $image_b64, $image_mime, $post_id );
+			if ( $imp ) {
+				$uploaded_url = $imp['url'];
+			}
+		}
+
+		// Tell the AI which REAL images it can use (everything uploaded for this
+		// page). This is what lets it put genuine images on the page instead of
+		// inventing broken URLs.
+		$image_note = '';
+		if ( $uploaded_url ) {
+			$image_note .= "\n\nThe image I just attached has been saved to my media library at: " . $uploaded_url . "\nUse it on the page where it fits best (the hero image, a feature, or a gallery).";
+		}
+		$avail = $this->page_image_urls( $post_id );
+		if ( ! empty( $avail ) ) {
+			$image_note .= "\n\nReal images available in this page's media library — use these EXACT URLs for any image field (hero.image, feature item images, gallery images). Do NOT invent image URLs:\n";
+			foreach ( $avail as $a ) {
+				$image_note .= '- ' . $a['url'] . ( $a['alt'] ? ' (' . $a['alt'] . ')' : '' ) . "\n";
+			}
+		}
+
 		// If the user attached an image with their latest message, replace
 		// the last user turn's plain-text content with a multi-part block
 		// array (image + text) — that's how Anthropic accepts inline images.
@@ -656,9 +683,17 @@ class PressGo_AI_Builder {
 					),
 					array(
 						'type' => 'text',
-						'text' => $user_msg !== '' ? $user_msg : 'See the attached screenshot — match this style or use it as reference.',
+						'text' => ( $user_msg !== '' ? $user_msg : 'See the attached image — use it as a visual reference and place it on the page.' ) . $image_note,
 					),
 				);
+			}
+		} elseif ( $image_note !== '' && ! empty( $wire_messages ) ) {
+			// No new image this turn, but real images are available — append the
+			// list to the last user message so the AI uses them.
+			$last = end( $wire_messages );
+			$last_key = key( $wire_messages );
+			if ( $last && $last['role'] === 'user' && is_string( $last['content'] ) ) {
+				$wire_messages[ $last_key ]['content'] .= $image_note;
 			}
 		}
 
@@ -779,6 +814,76 @@ class PressGo_AI_Builder {
 	 * collapse empty assistant turns to short summaries so Anthropic doesn't
 	 * reject the message array.
 	 */
+	/**
+	 * Save a base64 image into the WP media library, parented to the page so it
+	 * surfaces in the page's available-images list. Returns ['id','url'] or null.
+	 */
+	private function import_image_to_media( $base64, $mime, $post_id = 0 ) {
+		$bytes = base64_decode( $base64 );
+		if ( ! $bytes ) {
+			return null;
+		}
+		$exts = array(
+			'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png',
+			'image/gif'  => 'gif', 'image/webp' => 'webp',
+		);
+		$mime = $mime ? $mime : 'image/jpeg';
+		$ext  = isset( $exts[ $mime ] ) ? $exts[ $mime ] : 'jpg';
+		$filename = 'pressgo-' . gmdate( 'Ymd-His' ) . '-' . wp_generate_password( 5, false ) . '.' . $ext;
+
+		$upload = wp_upload_bits( $filename, null, $bytes );
+		if ( ! empty( $upload['error'] ) || empty( $upload['file'] ) ) {
+			return null;
+		}
+
+		$attach_id = wp_insert_attachment( array(
+			'post_mime_type' => $mime,
+			'post_title'     => 'PressGo upload',
+			'post_status'    => 'inherit',
+			'post_parent'    => (int) $post_id,
+		), $upload['file'], (int) $post_id );
+		if ( is_wp_error( $attach_id ) || ! $attach_id ) {
+			return null;
+		}
+
+		if ( ! function_exists( 'wp_generate_attachment_metadata' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+		}
+		$meta = wp_generate_attachment_metadata( $attach_id, $upload['file'] );
+		wp_update_attachment_metadata( $attach_id, $meta );
+
+		return array( 'id' => $attach_id, 'url' => wp_get_attachment_url( $attach_id ) );
+	}
+
+	/**
+	 * Image URLs the user has uploaded for this page (attachments parented to
+	 * it), newest first. Feeds the AI a pool of real images to place.
+	 */
+	private function page_image_urls( $post_id, $limit = 12 ) {
+		if ( ! $post_id ) {
+			return array();
+		}
+		$atts = get_posts( array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'post_status'    => 'inherit',
+			'post_parent'    => (int) $post_id,
+			'posts_per_page' => $limit,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		) );
+		$out = array();
+		foreach ( $atts as $a ) {
+			$url = wp_get_attachment_url( $a->ID );
+			if ( ! $url ) {
+				continue;
+			}
+			$alt   = get_post_meta( $a->ID, '_wp_attachment_image_alt', true );
+			$out[] = array( 'url' => $url, 'alt' => $alt ? $alt : '' );
+		}
+		return $out;
+	}
+
 	private function sanitize_for_anthropic( $history ) {
 		$out = array();
 		foreach ( $history as $msg ) {

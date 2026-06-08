@@ -45,6 +45,20 @@ class PressGo_Admin {
 			'pressgo-settings',
 			array( $this, 'render_settings_page' )
 		);
+
+		// The auto-generated first submenu mirrors the top-level "PressGo" label,
+		// but that page now opens the AI Builder list — relabel it "AI Builder"
+		// (the slug stays 'pressgo'). Done by editing $submenu directly so we
+		// don't re-register the slug (which double-bound the page hook before).
+		global $submenu;
+		if ( ! empty( $submenu['pressgo'] ) ) {
+			foreach ( $submenu['pressgo'] as $i => $item ) {
+				if ( isset( $item[2] ) && 'pressgo' === $item[2] ) {
+					$submenu['pressgo'][ $i ][0] = 'AI Builder';
+					break;
+				}
+			}
+		}
 	}
 
 	public function register_settings() {
