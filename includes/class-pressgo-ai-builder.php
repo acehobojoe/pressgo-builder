@@ -21,7 +21,8 @@ class PressGo_AI_Builder {
 
 	const MENU_SLUG       = 'pressgo-ai-builder';
 	const META_AI_ENABLED = '_pressgo_ai_enabled';
-	const META_AI_CHAT    = '_pressgo_ai_chat'; // serialised message history
+	const META_AI_CHAT    = '_pressgo_ai_chat';   // serialised message history
+	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
 
 	public function init() {
 		add_action( 'admin_menu',    array( $this, 'register_menu' ), 11 );
@@ -646,11 +647,19 @@ class PressGo_AI_Builder {
 		}
 		$history[] = array( 'role' => 'user', 'content' => $stored_text );
 
-		// Build pageContext + sanitize messages for Anthropic.
+		// Build pageContext + sanitize messages for Anthropic. Prefer the stored
+		// CONFIG (clean, readable — business/sections/colors right there) so the
+		// AI knows it's editing and never re-interrogates. Fall back to the
+		// rendered Elementor JSON for pages built before config-storage existed.
 		$mode = '';
 		$page_context = null;
+		$stored_config = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 		$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
-		if ( $elementor_raw ) {
+		if ( $stored_config ) {
+			$mode = 'edit';
+			$cfg_decoded = json_decode( wp_unslash( $stored_config ), true );
+			$page_context = array( 'config' => is_array( $cfg_decoded ) ? $cfg_decoded : null );
+		} elseif ( $elementor_raw ) {
 			$mode = 'edit';
 			$decoded = json_decode( wp_unslash( $elementor_raw ), true );
 			$page_context = array( 'elements' => is_array( $decoded ) ? $decoded : array() );
@@ -832,6 +841,39 @@ class PressGo_AI_Builder {
 	 * collapse empty assistant turns to short summaries so Anthropic doesn't
 	 * reject the message array.
 	 */
+	/**
+	 * Snapshot the page's CURRENT Elementor data as a revision before a build
+	 * overwrites it, so the change is reversible from Elementor's History panel.
+	 * Best-effort: never blocks the build.
+	 */
+	private function snapshot_revision( $post_id ) {
+		try {
+			$current = get_post_meta( $post_id, '_elementor_data', true );
+			if ( empty( $current ) ) {
+				return; // brand-new page — nothing to snapshot yet.
+			}
+			$post = get_post( $post_id );
+			if ( ! $post || ! post_type_supports( $post->post_type, 'revisions' ) ) {
+				return;
+			}
+			// _wp_put_post_revision forces a revision row even when post_content is
+			// unchanged (Elementor edits live in postmeta, not content). We then
+			// attach the current _elementor_data so Elementor's History lists it.
+			if ( ! function_exists( '_wp_put_post_revision' ) ) {
+				require_once ABSPATH . WPINC . '/revision.php';
+			}
+			$revision_id = _wp_put_post_revision( $post );
+			if ( $revision_id && ! is_wp_error( $revision_id ) ) {
+				update_metadata( 'post', (int) $revision_id, '_elementor_data', wp_slash( $current ) );
+				update_metadata( 'post', (int) $revision_id, '_elementor_edit_mode', 'builder' );
+				$cfg = get_post_meta( $post_id, self::META_AI_CONFIG, true );
+				if ( $cfg ) {
+					update_metadata( 'post', (int) $revision_id, self::META_AI_CONFIG, wp_slash( $cfg ) );
+				}
+			}
+		} catch ( \Throwable $e ) { /* best effort — never break the build */ }
+	}
+
 	/**
 	 * Save a base64 image into the WP media library, parented to the page so it
 	 * surfaces in the page's available-images list. Returns ['id','url'] or null.
@@ -1170,6 +1212,17 @@ class PressGo_AI_Builder {
 		if ( empty( $elements ) ) {
 			return array( 'ok' => false, 'error' => 'generator returned empty' );
 		}
+
+		// Versioning: snapshot the CURRENT page as an Elementor revision BEFORE we
+		// overwrite it, so this AI change can be rolled back from Elementor's
+		// History > Revisions panel.
+		$this->snapshot_revision( $post_id );
+
+		// Store the source config so future EDITS get a clean, readable config
+		// (not the verbose rendered Elementor JSON). This is what lets the AI know
+		// it's editing an existing page — business, sections, colors are all
+		// right there — instead of interrogating from scratch.
+		update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
 
 		// Use page-creator's writer if available; otherwise raw write + cache clear.
 		$encoded = wp_json_encode( $elements );
