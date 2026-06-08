@@ -889,6 +889,17 @@ class PressGo_AI_Builder {
 		if ( ! $bytes ) {
 			return null;
 		}
+		// Reject degenerate images (a broken client-side resize can produce a
+		// blank ~24px square). Importing those would hand the AI a real URL to a
+		// useless image, so an empty hero looks "placed but broken". Drop them
+		// instead — the available-images list just won't include them.
+		if ( strlen( $bytes ) < 1500 ) {
+			return null;
+		}
+		$dims = @getimagesizefromstring( $bytes ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( is_array( $dims ) && ( $dims[0] < 64 || $dims[1] < 64 ) ) {
+			return null;
+		}
 		$exts = array(
 			'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png',
 			'image/gif'  => 'gif', 'image/webp' => 'webp',

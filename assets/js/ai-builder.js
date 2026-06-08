@@ -63,33 +63,49 @@
 	// export as JPEG. Returns { dataUrl, base64, mediaType, name } via cb, or
 	// null on failure (caller falls back to the raw file).
 	function resizeImage(file, maxDim, quality, cb) {
+		var name = (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
+		function drawAndExport(source, w, h) {
+			try {
+				if (!w || !h) { cb(null); return; }
+				var scale = Math.min(1, maxDim / Math.max(w, h));
+				var cw = Math.max(1, Math.round(w * scale));
+				var ch = Math.max(1, Math.round(h * scale));
+				var canvas = document.createElement('canvas');
+				canvas.width = cw; canvas.height = ch;
+				var ctx = canvas.getContext('2d');
+				if (!ctx) { cb(null); return; }
+				ctx.drawImage(source, 0, 0, cw, ch);
+				var dataUrl = canvas.toDataURL('image/jpeg', quality);
+				var commaIdx = dataUrl.indexOf(',');
+				// Guard against a blank decode: a real photo exports far more than
+				// a few hundred bytes of base64. If it's tiny, treat as failure so
+				// the caller falls back to the raw file.
+				if (commaIdx < 0 || (dataUrl.length - commaIdx) < 800) { cb(null); return; }
+				cb({ dataUrl: dataUrl, mediaType: 'image/jpeg', base64: dataUrl.slice(commaIdx + 1), name: name });
+			} catch (e) { cb(null); }
+		}
+		// Prefer createImageBitmap: it decodes the file's bytes on call, so it is
+		// immune to the file-input being cleared mid-decode (which on WebKit
+		// invalidated the blob URL and produced blank images on multi-select).
+		if (typeof createImageBitmap === 'function') {
+			createImageBitmap(file).then(function (bmp) {
+				var w = bmp.width, h = bmp.height;
+				drawAndExport(bmp, w, h);
+				if (bmp.close) { try { bmp.close(); } catch (e) {} }
+			}).catch(function () { resizeViaImage(file, maxDim, quality, name, drawAndExport, cb); });
+			return;
+		}
+		resizeViaImage(file, maxDim, quality, name, drawAndExport, cb);
+	}
+
+	// Fallback decode via <img> + object URL (older browsers without createImageBitmap).
+	function resizeViaImage(file, maxDim, quality, name, drawAndExport, cb) {
 		try {
 			var url = URL.createObjectURL(file);
 			var img = new Image();
 			img.onload = function () {
-				try {
-					URL.revokeObjectURL(url);
-					var w = img.naturalWidth || img.width;
-					var h = img.naturalHeight || img.height;
-					if (!w || !h) { cb(null); return; }
-					var scale = Math.min(1, maxDim / Math.max(w, h));
-					var cw = Math.max(1, Math.round(w * scale));
-					var ch = Math.max(1, Math.round(h * scale));
-					var canvas = document.createElement('canvas');
-					canvas.width = cw; canvas.height = ch;
-					var ctx = canvas.getContext('2d');
-					if (!ctx) { cb(null); return; }
-					ctx.drawImage(img, 0, 0, cw, ch);
-					var dataUrl = canvas.toDataURL('image/jpeg', quality);
-					var commaIdx = dataUrl.indexOf(',');
-					if (commaIdx < 0) { cb(null); return; }
-					cb({
-						dataUrl:   dataUrl,
-						mediaType: 'image/jpeg',
-						base64:    dataUrl.slice(commaIdx + 1),
-						name:      (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg',
-					});
-				} catch (e) { cb(null); }
+				URL.revokeObjectURL(url);
+				drawAndExport(img, img.naturalWidth || img.width, img.naturalHeight || img.height);
 			};
 			img.onerror = function () { try { URL.revokeObjectURL(url); } catch (e) {} cb(null); };
 			img.src = url;
