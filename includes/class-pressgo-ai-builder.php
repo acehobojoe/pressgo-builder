@@ -200,21 +200,11 @@ class PressGo_AI_Builder {
 	}
 
 	public function register_menu() {
-		// AI Builder is now the *default* landing under the top-level PressGo
-		// menu — register with slug matching the parent so it overrides the
-		// auto-created default submenu (which still points at the legacy
-		// render_generator_page fallback).
-		add_submenu_page(
-			'pressgo',
-			'AI Builder',
-			'AI Builder',
-			'manage_options',
-			'pressgo',
-			array( $this, 'render_list_page' )
-		);
-		// Also expose the original MENU_SLUG so legacy URLs (and the
-		// fullscreen `?page=pressgo-ai-builder&action=edit` interceptor)
-		// keep working without redirects.
+		// The top-level PressGo menu page itself now renders the AI Builder list
+		// (PressGo_Admin::render_generator_page delegates here), so we do NOT
+		// re-register the 'pressgo' slug — doing so double-bound the page hook and
+		// let the retired Generate UI win. We only need the hidden MENU_SLUG page
+		// for the fullscreen builder + legacy `?page=pressgo-ai-builder` URLs.
 		add_submenu_page(
 			null, // hidden — reachable by URL only
 			'AI Builder',
@@ -248,8 +238,10 @@ class PressGo_AI_Builder {
 	}
 
 	public function enqueue_assets( $hook ) {
-		// Only on the list view — fullscreen builder enqueues its own.
-		if ( strpos( $hook, self::MENU_SLUG ) === false ) return;
+		// List view assets. The list renders both at the hidden MENU_SLUG page
+		// AND at the top-level 'pressgo' menu (hook 'toplevel_page_pressgo'), so
+		// match either. The fullscreen builder enqueues its own.
+		if ( strpos( $hook, self::MENU_SLUG ) === false && 'toplevel_page_pressgo' !== $hook ) return;
 
 		wp_enqueue_style(
 			'pressgo-ai-list',

@@ -171,6 +171,8 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 * **Real margins, not a forest of spacers.** Vertical spacing now lives as margins on the widgets themselves (editable under Advanced) instead of dozens of separate spacer widgets, so pages are far easier to tweak in Elementor and ship lighter HTML.
 * **Lighter pages.** Modern unicode star ratings (no FontAwesome dependency), and the Phosphor icon CSS now loads only on pages that actually use it instead of every Elementor page.
 * **Edits go live immediately.** Editing a page in the native Elementor editor and clicking Update now purges the caches, so you see your changes right away instead of the old version.
+* **Attach any photo.** Reference images you drop into the builder are now resized in your browser before upload, so large photos attach instantly instead of failing with an upload error.
+* **Streamlined menu.** The top-level PressGo menu now opens the AI Builder directly. The old one-shot "Generate" page is retired — the chat builder does everything it did, and more.
 
 = 2.2.4 =
 * **Straight into the builder.** Once your API key checks out on the settings page, PressGo now drops you right into the AI Builder with an example prompt already filled in and one-tap starter ideas (Roofing, Yoga studio, SaaS, Dentist, Restaurant). No more landing on a blank screen wondering what to type — edit the example or tap a starter and hit Send.

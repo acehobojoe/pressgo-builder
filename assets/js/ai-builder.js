@@ -34,13 +34,71 @@
 
 	function setPendingImage(file) {
 		if (!file || !/^image\//.test(file.type)) return;
-		// 5MB hard cap — base64 inflates ~33%, so a bigger file would blow past
-		// the typical WordPress post_max_size (8M) and fail silently in
-		// admin-ajax. Keep it conservative and tell the user how to recover.
-		if (file.size > 5 * 1024 * 1024) {
-			append(el('pg-msg-error', 'That image is too big (5MB max). Take a screenshot of just the part you want, or resize/compress it, then drop it in again.'));
+		// Generous raw cap just to avoid browser-memory blowups — anything under
+		// this gets DOWNSCALED below, so the upload payload stays tiny.
+		if (file.size > 30 * 1024 * 1024) {
+			append(el('pg-msg-error', 'That image is huge (30MB max). Try a smaller photo or a screenshot.'));
 			return;
 		}
+		// Downscale before upload. A full-res photo (often 5-15MB) would blow past
+		// a typical host's post_max_size (8M) and 413 on the way up; the AI only
+		// needs to see layout/style, so a ~1600px JPEG (~200-500KB) is plenty and
+		// works on every host. Falls back to the raw file if canvas resize fails.
+		resizeImage(file, 1600, 0.85, function (resized) {
+			if (resized) {
+				pendingImage = resized;
+			} else {
+				pendingImage = null; // resize failed; let readRaw populate it
+				readRaw(file);
+				return;
+			}
+			attachThumb.src = pendingImage.dataUrl;
+			attachThumb.hidden = false;
+			attachBtn.classList.add('has-image');
+			attachBtn.title = 'Image attached: ' + pendingImage.name + ' — click to remove';
+		});
+	}
+
+	// Draw the image onto a canvas scaled so its longest side <= maxDim, then
+	// export as JPEG. Returns { dataUrl, base64, mediaType, name } via cb, or
+	// null on failure (caller falls back to the raw file).
+	function resizeImage(file, maxDim, quality, cb) {
+		try {
+			var url = URL.createObjectURL(file);
+			var img = new Image();
+			img.onload = function () {
+				try {
+					URL.revokeObjectURL(url);
+					var w = img.naturalWidth || img.width;
+					var h = img.naturalHeight || img.height;
+					if (!w || !h) { cb(null); return; }
+					var scale = Math.min(1, maxDim / Math.max(w, h));
+					var cw = Math.max(1, Math.round(w * scale));
+					var ch = Math.max(1, Math.round(h * scale));
+					var canvas = document.createElement('canvas');
+					canvas.width = cw; canvas.height = ch;
+					var ctx = canvas.getContext('2d');
+					if (!ctx) { cb(null); return; }
+					ctx.drawImage(img, 0, 0, cw, ch);
+					var dataUrl = canvas.toDataURL('image/jpeg', quality);
+					var commaIdx = dataUrl.indexOf(',');
+					if (commaIdx < 0) { cb(null); return; }
+					cb({
+						dataUrl:   dataUrl,
+						mediaType: 'image/jpeg',
+						base64:    dataUrl.slice(commaIdx + 1),
+						name:      (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg',
+					});
+				} catch (e) { cb(null); }
+			};
+			img.onerror = function () { try { URL.revokeObjectURL(url); } catch (e) {} cb(null); };
+			img.src = url;
+		} catch (e) { cb(null); }
+	}
+
+	// Raw fallback: send the original bytes (used only when canvas resize fails,
+	// e.g. an exotic format). Keeps the prior behaviour for those edge cases.
+	function readRaw(file) {
 		var reader = new FileReader();
 		reader.onload = function (e) {
 			var dataUrl = e.target.result;

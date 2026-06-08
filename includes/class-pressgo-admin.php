@@ -201,22 +201,16 @@ class PressGo_Admin {
 	}
 
 	public function render_generator_page() {
-		if ( ! PressGo::is_elementor_active() ) {
-			echo '<div class="wrap"><h1>PressGo</h1>';
-			echo '<div class="notice notice-error"><p>Elementor must be installed and activated to use PressGo.</p></div>';
-			echo '</div>';
+		// The old one-shot "Generate / Import" page is retired — the chat-driven
+		// AI Builder covers everything it did. The top-level PressGo menu now
+		// lands on the AI Builder list. (Kept this method name because it is the
+		// registered top-level callback.)
+		if ( class_exists( 'PressGo_AI_Builder' ) ) {
+			( new PressGo_AI_Builder() )->render_list_page();
 			return;
 		}
-
-		if ( ! self::has_api_configured() ) {
-			$settings_url = esc_url( admin_url( 'admin.php?page=pressgo-settings' ) );
-			echo '<div class="wrap"><h1>PressGo</h1>';
-			echo '<div class="notice notice-warning"><p>Please <a href="' . $settings_url . '">configure your API key</a> before generating pages.</p></div>';
-			echo '</div>';
-			return;
-		}
-
-		include PRESSGO_PLUGIN_DIR . 'admin/partials/admin-page.php';
+		// Defensive fallback if the AI Builder class somehow isn't loaded.
+		echo '<div class="wrap"><h1>PressGo</h1><p>Open the <a href="' . esc_url( admin_url( 'admin.php?page=pressgo-ai-builder' ) ) . '">AI Builder</a> to get started.</p></div>';
 	}
 
 	public function render_settings_page() {
