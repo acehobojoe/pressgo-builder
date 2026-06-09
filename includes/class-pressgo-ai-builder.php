@@ -71,11 +71,25 @@ class PressGo_AI_Builder {
 		$cache_key = 'pgthumb_' . $post_id . '_' . md5( $post->post_modified_gmt );
 		$png = get_transient( $cache_key );
 		if ( $png === false ) {
+			// A builder list with N pages fires N of these at once. Each does a
+			// synchronous screenshot (seconds), so without a cap they all block a
+			// PHP-FPM worker and saturate the pool — that's what hung the site.
+			// Generate at most THUMB_GEN_MAX at a time; over the cap, return the
+			// placeholder now and let the card fill in on a later load (by which
+			// point the first batch is cached). Also a per-post lock so the same
+			// thumb isn't generated twice concurrently.
+			$lock_key = 'pgthumb_lock_' . $post_id;
+			if ( get_transient( $lock_key ) || ! $this->thumb_acquire_slot() ) {
+				$this->thumb_placeholder(); // exits
+			}
+			set_transient( $lock_key, 1, 30 );
 			$preview = $this->signed_preview_url( $post_id );
 			$resp = wp_remote_get(
 				'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=desktop',
-				array( 'timeout' => 20, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+				array( 'timeout' => 10, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
 			);
+			$this->thumb_release_slot();
+			delete_transient( $lock_key );
 			if ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 ) {
 				$png = '';
 			} else {
@@ -87,14 +101,40 @@ class PressGo_AI_Builder {
 		}
 
 		if ( ! $png ) {
-			// Tiny transparent PNG so the img tag doesn't show a broken icon.
-			header( 'Content-Type: image/png' );
-			echo base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' );
-			exit;
+			$this->thumb_placeholder(); // exits
 		}
 		header( 'Content-Type: image/png' );
 		header( 'Cache-Control: max-age=86400' );
 		echo $png; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — raw PNG bytes
+		exit;
+	}
+
+	/** Max thumbnails that may be generated (screenshotted) concurrently, so a
+	 * page full of uncached cards can't drown the PHP-FPM pool. */
+	const THUMB_GEN_MAX = 3;
+
+	/** Soft semaphore for concurrent thumbnail generation. Returns false when the
+	 * cap is reached (caller should serve a placeholder). The 30s TTL means a
+	 * crashed request can never permanently leak a slot. */
+	private function thumb_acquire_slot() {
+		$count = (int) get_transient( 'pgthumb_active' );
+		if ( $count >= self::THUMB_GEN_MAX ) {
+			return false;
+		}
+		set_transient( 'pgthumb_active', $count + 1, 30 );
+		return true;
+	}
+
+	private function thumb_release_slot() {
+		$count = (int) get_transient( 'pgthumb_active' );
+		set_transient( 'pgthumb_active', max( 0, $count - 1 ), 30 );
+	}
+
+	/** A 1×1 transparent PNG — returned instantly when a thumb isn't cached and
+	 * we're at the generation cap (the card fills in on a later load). */
+	private function thumb_placeholder() {
+		header( 'Content-Type: image/png' );
+		echo base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' );
 		exit;
 	}
 
@@ -668,7 +708,11 @@ class PressGo_AI_Builder {
 		} elseif ( $elementor_raw ) {
 			$mode = 'edit';
 			$decoded = json_decode( wp_unslash( $elementor_raw ), true );
-			$page_context = array( 'elements' => is_array( $decoded ) ? $decoded : array() );
+			// No stored config (page predates config-storage). Don't dump raw
+			// Elementor JSON at the model — it can't read it and rebuilds blind.
+			// Hand it a readable summary of the existing copy + images so it
+			// edits in place and preserves what's there.
+			$page_context = array( 'summary' => is_array( $decoded ) ? $this->summarize_page( $decoded ) : '' );
 		} else {
 			$mode = 'new';
 		}
@@ -730,15 +774,67 @@ class PressGo_AI_Builder {
 			}
 		}
 
+		// Progressive render: as sections stream in, render the page so the user
+		// watches it build instead of waiting on a spinner. State accumulates
+		// across section events; render_partial is throttled so a big page doesn't
+		// thrash. The final authoritative build still runs on tool_use below.
+		$prog = (object) array(
+			'order' => array(), 'brand' => array(), 'data' => array(),
+			'last_render' => 0.0, 'renders' => 0, 'snapshotted' => false,
+		);
+		$progress_cb = function ( $type, $evt ) use ( &$prog, $post_id, $emit ) {
+			if ( 'plan' === $type ) {
+				if ( ! empty( $evt['sections'] ) && is_array( $evt['sections'] ) ) {
+					$prog->order = array_values( array_filter( array_map( function ( $s ) {
+						return is_string( $s ) ? $s : ( is_array( $s ) ? ( $s['type'] ?? '' ) : '' );
+					}, $evt['sections'] ) ) );
+				}
+				if ( ! empty( $evt['colors'] ) ) $prog->brand['colors'] = $evt['colors'];
+				if ( ! empty( $evt['fonts'] ) )  $prog->brand['fonts']  = $evt['fonts'];
+				if ( ! empty( $evt['generationId'] ) ) $prog->gen_id = $evt['generationId'];
+				return;
+			}
+			if ( 'section' !== $type || empty( $evt['name'] ) ) return;
+			$prog->data[ $evt['name'] ] = isset( $evt['data'] ) && is_array( $evt['data'] ) ? $evt['data'] : array();
+			// Throttle: render the first section immediately (fast first paint),
+			// then at most one render per ~2.5s, capped, so the preview visibly
+			// grows without hammering the renderer.
+			$now      = microtime( true );
+			$is_first = ( 1 === count( $prog->data ) );
+			if ( ! $is_first && ( $now - $prog->last_render < 2.5 || $prog->renders >= 5 ) ) return;
+			$partial = $this->assemble_partial_config( $prog );
+			if ( empty( $partial['sections'] ) ) return;
+			if ( ! $prog->snapshotted ) { $this->snapshot_revision( $post_id ); $prog->snapshotted = true; }
+			if ( $this->render_partial( $post_id, $partial ) ) {
+				$prog->last_render = $now;
+				$prog->renders++;
+				$emit( 'section_preview', array( 'preview_bust' => time(), 'count' => count( $prog->data ) ) );
+			}
+		};
+
 		// Stream upstream, re-emit text events live, buffer tool_use config.
+		// Progressive (multi-call) build: the backend runs a fast plan call then
+		// parallel per-section calls, emitting each section as it returns so the
+		// page assembles live. ONLY for genuine NEW builds — never on an edit,
+		// where a stray partial render would wipe the existing page mid-stream
+		// before the authoritative apply.
+		$progressive = ( 'new' === $mode );
+		$prog->gen_id = '';   // captured from the plan event for interruption refunds
 		$result = $this->stream_upstream_to_browser( $api_key, array(
-			'messages'    => $wire_messages,
-			'pageContext' => $page_context,
-			'mode'        => $mode,
-		), $emit );
+			'messages'                  => $wire_messages,
+			'pageContext'               => $page_context,
+			'mode'                      => $mode,
+			'clientSupportsProgressive' => $progressive,
+		), $emit, $progressive ? $progress_cb : null );
 
 		if ( ! empty( $result['error'] ) ) {
 			$emit( 'error', array( 'message' => $result['error'] ) );
+			// A progressive build that errored AFTER rendering partials but before
+			// the authoritative tool_use leaves a half-built page that was already
+			// charged at plan time — reverse the charge so the user isn't billed.
+			if ( $prog->renders > 0 && ! empty( $prog->gen_id ) ) {
+				$this->request_refund( $api_key, $prog->gen_id );
+			}
 			$this->finalize_stream( $emit );
 			return;
 		}
@@ -750,8 +846,21 @@ class PressGo_AI_Builder {
 		$preview_bust   = null;
 		$credits_after  = null;
 
-		if ( $tool_use && ! empty( $tool_use['config'] ) ) {
-			$apply = $this->apply_config_to_post( $post_id, $tool_use['config'] );
+		// A targeted edit arrives as a PATCH (only the changed config keys); a
+		// build/full-rewrite arrives as a complete config. Apply accordingly.
+		// The backend always sets mode ('patch' or 'full') — trust it. Only fall
+		// back to changes-presence for a hypothetical older backend with no mode.
+		$is_patch = isset( $tool_use['mode'] ) ? ( 'patch' === $tool_use['mode'] ) : ! empty( $tool_use['changes'] );
+		if ( $tool_use && $is_patch && ! empty( $tool_use['changes'] ) ) {
+			$apply = $this->apply_patch_to_post( $post_id, $tool_use['changes'] );
+		} elseif ( $tool_use && ! empty( $tool_use['config'] ) ) {
+			// If progressive rendering already snapshotted the original page, don't
+			// snapshot again here (that would capture an intermediate frame).
+			$apply = $this->apply_config_to_post( $post_id, $tool_use['config'], $prog->snapshotted );
+		} else {
+			$apply = null;
+		}
+		if ( $apply ) {
 			if ( ! empty( $apply['ok'] ) ) {
 				$applied      = true;
 				$preview_bust = time();
@@ -765,6 +874,12 @@ class PressGo_AI_Builder {
 			} else {
 				$apply_error = $apply['error'] ?? 'unknown apply error';
 				$emit( 'apply_error', array( 'message' => $apply_error ) );
+				// The backend charged a credit when the model emitted the tool
+				// call, but our local apply failed — reverse it so the user isn't
+				// billed for a page that never rendered.
+				if ( ! empty( $tool_use['generationId'] ) && ! empty( $tool_use['creditsCharged'] ) ) {
+					$this->request_refund( $api_key, $tool_use['generationId'] );
+				}
 			}
 		}
 
@@ -777,8 +892,11 @@ class PressGo_AI_Builder {
 		$history[] = $entry;
 		update_post_meta( $post_id, self::META_AI_CHAT, $history );
 
-		// Optional vision self-review pass.
-		if ( $vision && $applied ) {
+		// Optional vision self-review pass. Skip it for targeted PATCH edits —
+		// they're small, low-risk changes, and a vision pass would re-screenshot
+		// and regenerate the whole page, throwing away the speed win the patch
+		// just bought. Vision still runs on full builds (where it matters most).
+		if ( $vision && $applied && ! $is_patch ) {
 			$emit( 'vision_start' );
 			$this->stream_vision_review( $api_key, $post_id, $history, $emit );
 		}
@@ -990,6 +1108,54 @@ class PressGo_AI_Builder {
 		return $out;
 	}
 
+	/**
+	 * Build a readable summary of an existing page from its Elementor tree, for
+	 * edit-mode context when no stored config exists (AI-enabled Elementor pages,
+	 * or pages built outside the chat). The raw widget JSON is too verbose for the
+	 * model to parse, so it would rebuild blind and lose the content. This pulls
+	 * the copy + image URLs so the model can preserve them when it regenerates.
+	 */
+	private function summarize_page( $elements ) {
+		$texts  = array();
+		$images = array();
+		$walk = function ( $els ) use ( &$walk, &$texts, &$images ) {
+			if ( ! is_array( $els ) ) {
+				return;
+			}
+			foreach ( $els as $el ) {
+				if ( ! is_array( $el ) ) {
+					continue;
+				}
+				$s = ( isset( $el['settings'] ) && is_array( $el['settings'] ) ) ? $el['settings'] : array();
+				foreach ( array( 'title', 'editor', 'text', 'description_text', 'testimonial_content', 'testimonial_name', 'tab_title', 'tab_content' ) as $k ) {
+					if ( ! empty( $s[ $k ] ) && is_string( $s[ $k ] ) ) {
+						$t = trim( wp_strip_all_tags( $s[ $k ] ) );
+						if ( '' !== $t ) {
+							$texts[] = $t;
+						}
+					}
+				}
+				foreach ( array( 'image', 'background_image' ) as $k ) {
+					if ( isset( $s[ $k ]['url'] ) && is_string( $s[ $k ]['url'] ) && '' !== $s[ $k ]['url'] ) {
+						$images[] = $s[ $k ]['url'];
+					}
+				}
+				if ( ! empty( $el['elements'] ) ) {
+					$walk( $el['elements'] );
+				}
+			}
+		};
+		$walk( $elements );
+
+		$texts   = array_slice( array_values( array_unique( $texts ) ), 0, 70 );
+		$images  = array_slice( array_values( array_unique( $images ) ), 0, 16 );
+		$summary = "Current page copy (preserve all of this — business, headlines, services, testimonials):\n- " . implode( "\n- ", $texts );
+		if ( $images ) {
+			$summary .= "\n\nImages already on the page (reuse these EXACT URLs, do not drop them):\n- " . implode( "\n- ", $images );
+		}
+		return $summary;
+	}
+
 	private function sanitize_for_anthropic( $history ) {
 		$out = array();
 		foreach ( $history as $msg ) {
@@ -1010,9 +1176,15 @@ class PressGo_AI_Builder {
 	 * browser immediately; tool_use is buffered (we need the full JSON to
 	 * apply). Returns {text, tool_use, error}.
 	 */
-	private function stream_upstream_to_browser( $api_key, $body, $emit ) {
+	private function stream_upstream_to_browser( $api_key, $body, $emit, $progress_cb = null ) {
 		$out = array( 'text' => '', 'tool_use' => null, 'error' => null, 'truncated' => false );
 		$sse_buffer = '';
+
+		// Capability flag: tells the backend this plugin build understands patch
+		// (partial-config) edits, so it can offer the patch_page_config tool.
+		// Older installs omit it and keep getting full-config builds only — they
+		// can't apply a patch, so the backend must not hand them one.
+		$body['clientSupportsPatch'] = true;
 
 		$ch = curl_init( 'https://pressgo.app/api/plugin/builder/chat' );
 		curl_setopt_array( $ch, array(
@@ -1027,7 +1199,7 @@ class PressGo_AI_Builder {
 			CURLOPT_HEADER         => false,
 			CURLOPT_TIMEOUT        => 120,
 			CURLOPT_CONNECTTIMEOUT => 10,
-			CURLOPT_WRITEFUNCTION  => function ( $ch, $chunk ) use ( &$sse_buffer, &$out, $emit ) {
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $chunk ) use ( &$sse_buffer, &$out, $emit, $progress_cb ) {
 				$sse_buffer .= $chunk;
 				// Process every complete event (terminated by \n\n).
 				while ( ( $pos = strpos( $sse_buffer, "\n\n" ) ) !== false ) {
@@ -1048,6 +1220,30 @@ class PressGo_AI_Builder {
 							$emit( 'text', array( 'text' => $piece ) );
 						} elseif ( $t === 'tool_use' ) {
 							$out['tool_use'] = $evt;
+						} elseif ( $t === 'ping' ) {
+							// Keepalive from the backend during silent tool-JSON
+							// streaming. Forward it so the browser watchdog (which
+							// clears a stuck "thinking/reviewing" state) stays armed
+							// but doesn't fire mid-build.
+							$emit( 'ping' );
+						} elseif ( $t === 'plan' ) {
+							// Progressive build: the ordered section list (+ palette)
+							// is known. Forward to the browser for the live checklist
+							// skeleton; hand to the progress builder for rendering.
+							$emit( 'plan', array(
+								'sections' => $evt['sections'] ?? array(),
+								'colors'   => $evt['colors'] ?? null,
+							) );
+							if ( $progress_cb ) $progress_cb( 'plan', $evt );
+						} elseif ( $t === 'section' ) {
+							// One section finished streaming. Tell the browser to
+							// tick it in the checklist (name only — the heavy data
+							// stays server-side for the progressive render).
+							$emit( 'section', array(
+								'name'  => $evt['name'] ?? '',
+								'index' => $evt['index'] ?? 0,
+							) );
+							if ( $progress_cb ) $progress_cb( 'section', $evt );
 						} elseif ( $t === 'error' ) {
 							$out['error'] = $evt['message'] ?? ( $evt['error'] ?? 'chat error' );
 						} elseif ( $t === 'done' ) {
@@ -1080,21 +1276,31 @@ class PressGo_AI_Builder {
 	 */
 	private function stream_vision_review( $api_key, $post_id, &$history, $emit ) {
 		$preview = $this->signed_preview_url( $post_id );
+		// Heartbeat before each blocking call. The client runs a watchdog that
+		// clears the "reviewing…" pill if the stream goes silent too long; these
+		// pings (and the per-token pings below) keep a healthy-but-slow review
+		// from tripping it. Timeouts are tight so a hung screenshot service can't
+		// stall the whole pass.
+		$emit( 'vision_progress' );
 		$shot = wp_remote_get(
 			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=desktop',
-			array( 'timeout' => 25, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+			array( 'timeout' => 20, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
 		);
-		if ( is_wp_error( $shot ) || wp_remote_retrieve_response_code( $shot ) !== 200 ) return;
+		// Every exit path MUST emit a terminal vision event so the browser clears
+		// the "reviewing…" pill. A bare return here (screenshot service down/slow)
+		// was what left the pill spinning until a manual refresh.
+		if ( is_wp_error( $shot ) || wp_remote_retrieve_response_code( $shot ) !== 200 ) { $emit( 'vision_ok' ); return; }
 		$png = wp_remote_retrieve_body( $shot );
-		if ( empty( $png ) ) return;
+		if ( empty( $png ) ) { $emit( 'vision_ok' ); return; }
 
 		// Mirror the desktop grab at a mobile viewport so the reviewer can catch
 		// stacking / overflow / legibility issues that only show on phones.
 		// A failed or empty mobile shot just falls back to desktop-only review.
+		$emit( 'vision_progress' );
 		$png_mobile = '';
 		$shot_m = wp_remote_get(
 			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=mobile',
-			array( 'timeout' => 25, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+			array( 'timeout' => 20, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
 		);
 		if ( ! is_wp_error( $shot_m ) && wp_remote_retrieve_response_code( $shot_m ) === 200 ) {
 			$png_mobile = wp_remote_retrieve_body( $shot_m );
@@ -1135,46 +1341,91 @@ class PressGo_AI_Builder {
 		$wire = $this->sanitize_for_anthropic( $history );
 		$wire[] = array( 'role' => 'user', 'content' => $content );
 
-		$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
-		$decoded = json_decode( wp_unslash( $elementor_raw ), true );
-		$page_context = array( 'elements' => is_array( $decoded ) ? $decoded : array() );
+		$stored_config = get_post_meta( $post_id, self::META_AI_CONFIG, true );
+		if ( $stored_config ) {
+			$cfg_decoded  = json_decode( wp_unslash( $stored_config ), true );
+			$page_context = array( 'config' => is_array( $cfg_decoded ) ? $cfg_decoded : null );
+		} else {
+			$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
+			$decoded       = json_decode( wp_unslash( $elementor_raw ), true );
+			$page_context  = array( 'summary' => is_array( $decoded ) ? $this->summarize_page( $decoded ) : '' );
+		}
 
+		// The vision review's reasoning (the pass/fail checklist) is INTERNAL QA —
+		// it must never stream into the user's chat. Swap each hidden 'text'
+		// token for a contentless 'vision_progress' heartbeat (keeps the client
+		// watchdog alive without leaking the checklist); pass outcome events
+		// (vision_built / errors) straight through.
+		$silent = function ( $type, array $data = array() ) use ( $emit ) {
+			if ( 'text' === $type ) { $emit( 'vision_progress' ); return; }
+			$emit( $type, $data );
+		};
+		$emit( 'vision_progress' );
 		$result = $this->stream_upstream_to_browser( $api_key, array(
 			'messages'    => $wire,
 			'pageContext' => $page_context,
 			'mode'        => 'edit',
-		), $emit );
-		if ( ! empty( $result['error'] ) ) return;
+		), $silent );
+		if ( ! empty( $result['error'] ) ) { $emit( 'vision_ok' ); return; }
 
 		$text = $result['text'];
-		if ( ! empty( $result['tool_use'] ) && ! empty( $result['tool_use']['config'] ) ) {
-			$apply = $this->apply_config_to_post( $post_id, $result['tool_use']['config'] );
+		// The reviewer is offered both tools (it's an edit-mode call), so a fix
+		// may come back as a patch (only the corrected sections) or a full config.
+		$tu      = $result['tool_use'] ?? null;
+		$vfix    = null;
+		if ( $tu && ! empty( $tu['changes'] ) ) {
+			$vfix = $this->apply_patch_to_post( $post_id, $tu['changes'] );
+		} elseif ( $tu && ! empty( $tu['config'] ) ) {
+			$vfix = $this->apply_config_to_post( $post_id, $tu['config'] );
+		}
+		if ( $vfix ) {
+			$apply = $vfix;
 			if ( ! empty( $apply['ok'] ) ) {
+				$summary = $result['tool_use']['summary'] ?? '';
 				$emit( 'vision_built', array(
-					'summary'           => $result['tool_use']['summary'] ?? '',
+					'summary'           => $summary,
 					'preview_bust'      => time(),
 					'credits_remaining' => $result['tool_use']['creditsRemaining'] ?? null,
 				) );
+				// Store only the short correction summary in visible history — not
+				// the full internal review reasoning.
 				$history[] = array(
 					'role'    => 'assistant',
-					'content' => $text,
+					'content' => '',
 					'built'   => true,
-					'summary' => $result['tool_use']['summary'] ?? '',
+					'summary' => $summary,
 					'vision_correction' => true,
 				);
 				update_post_meta( $post_id, self::META_AI_CHAT, $history );
 				return;
 			}
+			// The reviewer's fix was charged but failed to apply locally — refund.
+			if ( ! empty( $tu['generationId'] ) && ! empty( $tu['creditsCharged'] ) ) {
+				$this->request_refund( $api_key, $tu['generationId'] );
+			}
 		}
-		if ( $text !== '' ) {
-			$emit( 'vision_ok', array( 'text' => $text ) );
-			$history[] = array(
-				'role'    => 'assistant',
-				'content' => $text,
-				'vision_review' => true,
-			);
-			update_post_meta( $post_id, self::META_AI_CHAT, $history );
+		// No correction needed — the page passed review. Signal completion
+		// WITHOUT surfacing the checklist; nothing is added to visible history.
+		$emit( 'vision_ok', array() );
+	}
+
+	/**
+	 * Ask the backend to reverse a page-generation charge whose local apply
+	 * failed. Fire-and-forget; the endpoint is idempotent and only refunds a real,
+	 * un-refunded charge tagged with this generationId.
+	 */
+	private function request_refund( $api_key, $generation_id ) {
+		if ( empty( $api_key ) || empty( $generation_id ) ) {
+			return;
 		}
+		wp_remote_post( 'https://pressgo.app/api/plugin/builder/refund', array(
+			'timeout' => 8,
+			'headers' => array(
+				'Content-Type'  => 'application/json',
+				'X-PressGo-Key' => $api_key,
+			),
+			'body'    => wp_json_encode( array( 'generationId' => $generation_id ) ),
+		) );
 	}
 
 
@@ -1215,7 +1466,204 @@ class PressGo_AI_Builder {
 		return $data;
 	}
 
-	private function apply_config_to_post( $post_id, $config ) {
+	/**
+	 * Apply a targeted PATCH (only the changed top-level config keys) by merging
+	 * it onto the stored config, then re-rendering via the normal full path. The
+	 * model generates only the changed sections — that's the latency/cost win —
+	 * but the local Elementor re-render from the merged config stays cheap.
+	 *
+	 * Falls back to a full apply if there's no stored config to merge onto.
+	 */
+	private function apply_patch_to_post( $post_id, $changes ) {
+		if ( empty( $changes ) || ! is_array( $changes ) ) {
+			return array( 'ok' => false, 'error' => 'empty patch' );
+		}
+		$stored = get_post_meta( $post_id, self::META_AI_CONFIG, true );
+		$base   = $stored ? json_decode( wp_unslash( $stored ), true ) : null;
+		if ( ! is_array( $base ) || empty( $base ) ) {
+			// No clean config to patch against — treat the changes as a full
+			// config so we still produce a page instead of erroring.
+			return $this->apply_config_to_post( $post_id, $changes );
+		}
+		$merged = $this->merge_patch( $base, $changes );
+		return $this->apply_config_to_post( $post_id, $merged );
+	}
+
+	/** Every section type the Generator knows how to build. Used to scope the
+	 * patch key allow-list and the orphan-prune so a removed section's data can't
+	 * be resurrected by the Generator's reconcile step. */
+	const SECTION_TYPES = array(
+		'hero', 'stats', 'social_proof', 'features', 'steps', 'results',
+		'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing', 'logo_bar',
+		'team', 'gallery', 'newsletter', 'cta_final', 'map', 'footer', 'disclaimer',
+	);
+
+	/**
+	 * Merge a patch onto a base config.
+	 *
+	 * The `sections` key (when present) is treated as AUTHORITATIVE membership +
+	 * order — whether the model sent a string array or inline objects. We:
+	 *   1. Build the new order strictly from the patch's sequence (so reorders
+	 *      actually reorder, and removed sections are dropped from the order).
+	 *   2. Extract any inline section DATA into flat keys (a reorder-only object
+	 *      with no fields leaves the base data untouched).
+	 *   3. After merging, PRUNE every section-type data key not in the new order,
+	 *      so the Generator's reconcile step can't splice a removed section back.
+	 * A content-only patch (no `sections` key) keeps the base order/membership.
+	 * Finally we drop any unknown top-level keys the model may have injected.
+	 */
+	private function merge_patch( $base, $changes ) {
+		$patch_sets_order = isset( $changes['sections'] ) && is_array( $changes['sections'] ) && ! empty( $changes['sections'] );
+		if ( $patch_sets_order ) {
+			$order = array();
+			foreach ( $changes['sections'] as $sec ) {
+				if ( is_string( $sec ) && '' !== $sec ) {
+					$order[] = $sec;
+					continue;
+				}
+				if ( is_array( $sec ) && ! empty( $sec['type'] ) ) {
+					$type = $sec['type'];
+					unset( $sec['type'] );
+					// Only carry inline DATA if the object actually has fields and
+					// the patch didn't already supply that section via a flat key.
+					if ( ! empty( $sec ) && ! isset( $changes[ $type ] ) ) {
+						$changes[ $type ] = $this->normalize_section_fields( $type, $sec );
+					}
+					$order[] = $type;
+				}
+			}
+			$changes['sections'] = array_values( array_unique( $order ) );
+		}
+
+		$merged = $this->deep_merge( $base, $changes );
+
+		if ( $patch_sets_order && isset( $merged['sections'] ) && is_array( $merged['sections'] ) ) {
+			$keep = $merged['sections'];
+			foreach ( self::SECTION_TYPES as $t ) {
+				if ( isset( $merged[ $t ] ) && ! in_array( $t, $keep, true ) ) {
+					unset( $merged[ $t ] ); // orphan: removed from order, drop its data
+				}
+			}
+		}
+
+		return $this->whitelist_config_keys( $merged );
+	}
+
+	/** Drop any top-level key that isn't a recognised config key, so a model can't
+	 * accumulate junk in the stored config (which is re-fed to the model on every
+	 * future edit and would eventually evict real sections from the context). */
+	private function whitelist_config_keys( $config ) {
+		if ( ! is_array( $config ) ) {
+			return $config;
+		}
+		$allowed = array_merge(
+			array( 'business_name', 'industry', 'colors', 'fonts', 'layout', 'sections' ),
+			self::SECTION_TYPES
+		);
+		foreach ( array_keys( $config ) as $k ) {
+			if ( ! in_array( $k, $allowed, true ) ) {
+				unset( $config[ $k ] );
+			}
+		}
+		return $config;
+	}
+
+	/**
+	 * Recursive merge used for patches. Objects (associative arrays) merge key by
+	 * key so a partial patch keeps the base's other fields — e.g. a
+	 * {"colors":{"accent":"#14B8A6"}} patch only changes the accent and preserves
+	 * primary/dark_bg/etc. Contract:
+	 *   - patch value null            → DELETE the key (documented removal path).
+	 *   - patch value empty {} or []  → no-op, keep base (stops a stray {} from
+	 *                                   wiping a whole section).
+	 *   - base object + patch scalar  → keep base (rejects a model schema slip
+	 *                                   like hero:"text" that would blank a section).
+	 *   - both objects                → recurse.
+	 *   - otherwise (lists, scalars)  → patch replaces (index-merging a list would
+	 *                                   corrupt it, so lists replace wholesale).
+	 */
+	private function deep_merge( $base, $patch ) {
+		if ( ! ( $this->is_assoc( $base ) && $this->is_assoc( $patch ) ) ) {
+			return $patch;
+		}
+		foreach ( $patch as $k => $v ) {
+			if ( is_null( $v ) ) {
+				unset( $base[ $k ] );
+				continue;
+			}
+			if ( is_array( $v ) && empty( $v ) ) {
+				continue; // empty {} / [] → keep base
+			}
+			if ( ! array_key_exists( $k, $base ) ) {
+				$base[ $k ] = $v;
+				continue;
+			}
+			if ( $this->is_assoc( $base[ $k ] ) && ! is_array( $v ) ) {
+				continue; // don't let a scalar overwrite an existing object
+			}
+			$base[ $k ] = $this->deep_merge( $base[ $k ], $v );
+		}
+		return $base;
+	}
+
+	/** True for an associative array (object), false for a sequential list. PHP 7.4-safe. */
+	private function is_assoc( $arr ) {
+		if ( ! is_array( $arr ) || array() === $arr ) {
+			return false;
+		}
+		return array_keys( $arr ) !== range( 0, count( $arr ) - 1 );
+	}
+
+	/**
+	 * Build the partial config to render mid-stream from accumulated progressive
+	 * state. Sections are ordered by the plan (filtered to those received), with
+	 * any not-yet-planned arrivals appended.
+	 */
+	private function assemble_partial_config( $prog ) {
+		$cfg = array();
+		if ( ! empty( $prog->brand['colors'] ) ) $cfg['colors'] = $prog->brand['colors'];
+		if ( ! empty( $prog->brand['fonts'] ) )  $cfg['fonts']  = $prog->brand['fonts'];
+		$order = array();
+		foreach ( $prog->order as $t ) {
+			if ( isset( $prog->data[ $t ] ) && ! in_array( $t, $order, true ) ) $order[] = $t;
+		}
+		foreach ( array_keys( $prog->data ) as $t ) {
+			if ( ! in_array( $t, $order, true ) ) $order[] = $t;
+		}
+		$cfg['sections'] = $order;
+		foreach ( $order as $t ) {
+			$cfg[ $t ] = $prog->data[ $t ];
+		}
+		return $cfg;
+	}
+
+	/**
+	 * Lightweight render used DURING the stream for progressive previews: validate
+	 * + generate + write _elementor_data + drop the CSS cache so the preview
+	 * reload restyles. Deliberately skips the revision snapshot (done once up
+	 * front) and storing _pressgo_ai_config (the final apply writes the
+	 * authoritative one). Returns true on success.
+	 */
+	private function render_partial( $post_id, $config ) {
+		if ( empty( $config['sections'] ) ) return false;
+		if ( class_exists( 'PressGo_Config_Validator' ) ) {
+			$validated = PressGo_Config_Validator::validate( $config );
+			if ( is_wp_error( $validated ) ) return false;
+			$config = $validated;
+		}
+		if ( ! class_exists( 'PressGo_Generator' ) ) return false;
+		$generator = new PressGo_Generator();
+		$elements  = $generator->generate( $config );
+		if ( empty( $elements ) ) return false;
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
+		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
+		delete_post_meta( $post_id, '_elementor_css' );
+		return true;
+	}
+
+	private function apply_config_to_post( $post_id, $config, $skip_snapshot = false ) {
 		if ( empty( $config ) || ! is_array( $config ) ) {
 			return array( 'ok' => false, 'error' => 'empty config' );
 		}
@@ -1241,6 +1689,20 @@ class PressGo_AI_Builder {
 			}
 		}
 
+		// Field-name coercion for EVERY present section (cta_primary_text -> cta_primary{text},
+		// heading -> headline, etc.). The branch above only runs when sections arrive
+		// as objects; the progressive path sends them as flat type-string keys, which
+		// would otherwise skip this safety net (and a writer-omitted alias would render
+		// an empty CTA/headline). normalize_section_fields is idempotent, so running it
+		// again on already-normalized sections is harmless.
+		if ( isset( $config['sections'] ) && is_array( $config['sections'] ) ) {
+			foreach ( $config['sections'] as $t ) {
+				if ( is_string( $t ) && isset( $config[ $t ] ) && is_array( $config[ $t ] ) ) {
+					$config[ $t ] = $this->normalize_section_fields( $t, $config[ $t ] );
+				}
+			}
+		}
+
 		// Validate / coerce. Validator returns sanitized array or WP_Error.
 		if ( class_exists( 'PressGo_Config_Validator' ) ) {
 			$validated = PressGo_Config_Validator::validate( $config );
@@ -1261,8 +1723,12 @@ class PressGo_AI_Builder {
 
 		// Versioning: snapshot the CURRENT page as an Elementor revision BEFORE we
 		// overwrite it, so this AI change can be rolled back from Elementor's
-		// History > Revisions panel.
-		$this->snapshot_revision( $post_id );
+		// History > Revisions panel. Skipped when a progressive build already
+		// snapshotted the original pre-build state (avoids a redundant revision of
+		// an intermediate progressive frame).
+		if ( ! $skip_snapshot ) {
+			$this->snapshot_revision( $post_id );
+		}
 
 		// Store the source config so future EDITS get a clean, readable config
 		// (not the verbose rendered Elementor JSON). This is what lets the AI know

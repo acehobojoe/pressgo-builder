@@ -88,12 +88,16 @@ class PressGo_Config_Validator {
 			$config['fonts']['body'] = $pairing['body'];
 		}
 		// Guardrail: never let both resolve to Inter (the tell we're avoiding).
-		// If the AI sent Inter for both, give the heading a distinct partner.
+		// If the AI sent Inter for both, swap in a full distinct pairing — set
+		// BOTH heading and body, not just heading. (Old bug: only the heading was
+		// replaced, so every defaulted page kept an Inter body — the literal
+		// "fonts feel locked in" symptom.)
 		if ( 'Inter' === $config['fonts']['heading'] && 'Inter' === $config['fonts']['body'] ) {
 			if ( null === $pairing ) {
 				$pairing = self::pick_font_pairing( $config );
 			}
 			$config['fonts']['heading'] = $pairing['heading'];
+			$config['fonts']['body']    = $pairing['body'];
 		}
 
 		// Validate layout.
@@ -232,9 +236,9 @@ class PressGo_Config_Validator {
 		// Done last so it also catches anything earlier defaults wrote.
 		$config = self::lint_copy_recursive( $config );
 
-		// Copy-length caps — keep marketing copy tight. Hero headline > 8 words,
-		// feature desc > 20 words, button text > 4 words all read as padded /
-		// AI-generated. We trim where a clean cut exists, otherwise leave as-is.
+		// Render-safety length ceilings only (NOT marketing-tight targets — the
+		// prompt handles those). Catches egregious overflow that would break the
+		// mobile layout; leaves normal short copy untouched. See cap_copy_lengths.
 		self::cap_copy_lengths( $config );
 
 		return $config;
@@ -265,42 +269,82 @@ class PressGo_Config_Validator {
 			array(
 				'heading'  => 'Playfair Display',
 				'body'     => 'Source Sans Pro',
-				'keywords' => array( 'restaurant', 'hospitality', 'cafe', 'dining', 'hotel', 'luxury', 'fashion', 'beauty', 'spa', 'wedding', 'editorial', 'elegant' ),
+				'keywords' => array( 'restaurant', 'hospitality', 'cafe', 'dining', 'hotel', 'luxury', 'fashion', 'wedding', 'editorial', 'elegant' ),
+			),
+			array(
+				'heading'  => 'Cormorant Garamond',
+				'body'     => 'Mulish',
+				'keywords' => array( 'beauty', 'spa', 'salon', 'aesthetic', 'jewelry', 'boutique', 'interior', 'florist' ),
 			),
 			array(
 				'heading'  => 'Poppins',
 				'body'     => 'Inter',
-				'keywords' => array( 'saas', 'tech', 'software', 'app', 'startup', 'ai', 'digital', 'cloud', 'platform' ),
+				'keywords' => array( 'saas', 'tech', 'software', 'app', 'startup', 'ai', 'cloud', 'platform' ),
+			),
+			array(
+				'heading'  => 'Sora',
+				'body'     => 'Inter',
+				'keywords' => array( 'fintech', 'crypto', 'data', 'analytics', 'developer', 'api', 'security', 'automation' ),
 			),
 			array(
 				'heading'  => 'Montserrat',
 				'body'     => 'Open Sans',
-				'keywords' => array( 'agency', 'marketing', 'creative', 'design', 'media', 'consulting', 'business', 'corporate' ),
+				'keywords' => array( 'agency', 'marketing', 'creative', 'media', 'consulting', 'corporate' ),
+			),
+			array(
+				'heading'  => 'Bricolage Grotesque',
+				'body'     => 'Inter',
+				'keywords' => array( 'design', 'branding', 'studio', 'product', 'modern', 'innovative' ),
 			),
 			array(
 				'heading'  => 'DM Serif Display',
 				'body'     => 'Karla',
-				'keywords' => array( 'law', 'legal', 'finance', 'accounting', 'wealth', 'advisory', 'insurance', 'professional' ),
+				'keywords' => array( 'law', 'legal', 'attorney', 'advisory', 'insurance', 'notary', 'mediation' ),
+			),
+			array(
+				'heading'  => 'Libre Baskerville',
+				'body'     => 'Source Sans Pro',
+				'keywords' => array( 'finance', 'accounting', 'wealth', 'bank', 'investment', 'tax', 'audit' ),
 			),
 			array(
 				'heading'  => 'Manrope',
 				'body'     => 'Inter',
-				'keywords' => array( 'fitness', 'gym', 'wellness', 'health', 'coaching', 'sports', 'training', 'nutrition' ),
+				'keywords' => array( 'fitness', 'gym', 'sports', 'training', 'crossfit', 'athletic' ),
+			),
+			array(
+				'heading'  => 'Outfit',
+				'body'     => 'Mulish',
+				'keywords' => array( 'wellness', 'coaching', 'nutrition', 'yoga', 'meditation', 'lifestyle' ),
 			),
 			array(
 				'heading'  => 'Lora',
 				'body'     => 'Nunito Sans',
-				'keywords' => array( 'healthcare', 'medical', 'clinic', 'dental', 'therapy', 'care', 'nonprofit', 'charity', 'community', 'education', 'school', 'course' ),
+				'keywords' => array( 'healthcare', 'medical', 'clinic', 'dental', 'therapy', 'care', 'pediatric', 'vision' ),
+			),
+			array(
+				'heading'  => 'Fraunces',
+				'body'     => 'Nunito Sans',
+				'keywords' => array( 'nonprofit', 'charity', 'community', 'education', 'school', 'course', 'church', 'foundation' ),
 			),
 			array(
 				'heading'  => 'Work Sans',
 				'body'     => 'Roboto',
-				'keywords' => array( 'construction', 'real estate', 'realty', 'home', 'contractor', 'roofing', 'plumbing', 'hvac', 'moving', 'automotive', 'logistics', 'service' ),
+				'keywords' => array( 'construction', 'contractor', 'roofing', 'plumbing', 'hvac', 'electrician', 'landscaping', 'tree', 'concrete', 'remodeling' ),
+			),
+			array(
+				'heading'  => 'Archivo',
+				'body'     => 'Inter',
+				'keywords' => array( 'real estate', 'realty', 'home', 'moving', 'automotive', 'logistics', 'auto', 'dealership', 'service' ),
 			),
 			array(
 				'heading'  => 'Space Grotesk',
 				'body'     => 'Inter',
-				'keywords' => array( 'portfolio', 'photographer', 'artist', 'studio', 'architecture', 'modern', 'product', 'ecommerce', 'retail', 'shop' ),
+				'keywords' => array( 'portfolio', 'photographer', 'artist', 'architecture', 'product', 'modern' ),
+			),
+			array(
+				'heading'  => 'Syne',
+				'body'     => 'Work Sans',
+				'keywords' => array( 'ecommerce', 'retail', 'shop', 'apparel', 'streetwear', 'brand', 'merch' ),
 			),
 		);
 	}
@@ -340,7 +384,11 @@ class PressGo_Config_Validator {
 			foreach ( $pairings as $i => $pairing ) {
 				$score = 0;
 				foreach ( $pairing['keywords'] as $kw ) {
-					if ( false !== strpos( $haystack, $kw ) ) {
+					// Word-boundary match so "service" doesn't fire on every
+					// "services"/"professional" substring and collapse most
+					// businesses onto one pairing. \b handles multi-word keywords
+					// like "real estate" too.
+					if ( preg_match( '/\b' . preg_quote( $kw, '/' ) . '\b/', $haystack ) ) {
 						$score++;
 					}
 				}
@@ -483,17 +531,20 @@ class PressGo_Config_Validator {
 	 * surrounding sentence intact while killing the tell.
 	 */
 	private static function cliche_replacements() {
+		// Only swaps that are grammatically safe in their common slot AND have no
+		// frequent literal meaning. Words with literal collisions are NOT
+		// auto-swapped here (they'd mangle real copy: "unlock your account",
+		// "Revolutionary War exhibit", "elevate the affected limb" is borderline
+		// but rare) — those stay banned in the generation PROMPT instead, where
+		// the model can avoid them without us mutilating legitimate text.
 		return array(
 			'elevate'        => 'improve',
-			'unlock'         => 'get',
 			'seamless'       => 'smooth',
 			'seamlessly'     => 'smoothly',
 			'empower'        => 'help',
 			'empowering'     => 'helping',
-			'unleash'        => 'put to work',
+			'unleash'        => 'use',          // one-word verb; "put to work" broke word order
 			'supercharge'    => 'boost',
-			'revolutionize'  => 'change',
-			'revolutionary'  => 'new',
 			'game-changing'  => 'powerful',
 			'game changing'  => 'powerful',
 			'cutting-edge'   => 'modern',
@@ -557,6 +608,11 @@ class PressGo_Config_Validator {
 		// Collapse any double commas / stray double spaces the swaps introduced.
 		$value = preg_replace( '/,\s*,/', ',', $value );
 		$value = preg_replace( '/\s{2,}/', ' ', $value );
+		// Safety net: a swap can leave a doubled function word (e.g. a verb swap
+		// before "to" yielding "use to to grow"). Collapse ONLY repeated function
+		// words — never arbitrary repeats, which would eat legitimate copy like
+		// "New York, New York" or "so so".
+		$value = preg_replace( '/\b(to|the|a|an|of|your|and|for|with)\s+\1\b/i', '$1', $value );
 		return trim( $value );
 	}
 
@@ -633,26 +689,34 @@ class PressGo_Config_Validator {
 	}
 
 	/**
-	 * Copy-length caps. Trims hero headline (>8 words), feature item desc
-	 * (>20 words) and button text (>4 words). Operates in place on $config by
-	 * reference. Conservative: only touches fields that actually exceed.
+	 * Render-safety ceilings ONLY. These are NOT the marketing-tight targets —
+	 * the generation prompt steers copy toward short, punchy lines (~8-word
+	 * headlines, ~20-word feature descriptions, 2-5-word CTAs). Here we only
+	 * catch egregious overflow that would actually break the Elementor layout on
+	 * a 375px phone, and we cut at a clean clause boundary so trimmed copy stays
+	 * a complete thought. Ceilings sit one tier ABOVE the prompt targets so
+	 * normal output is never touched — only genuine runaways get reshaped.
 	 */
 	private static function cap_copy_lengths( &$config ) {
-		// Hero headline: max 8 words.
+		// Hero headline ceiling: 12 words (prompt target ~8). A 9-11 word
+		// benefit headline still wraps cleanly on mobile and now ships intact.
 		if ( ! empty( $config['hero']['headline'] ) && is_string( $config['hero']['headline'] ) ) {
-			$config['hero']['headline'] = self::trim_to_words( $config['hero']['headline'], 8 );
+			$config['hero']['headline'] = self::trim_to_words( $config['hero']['headline'], 12 );
 		}
 
-		// Feature descriptions: max 20 words (field is `desc`).
+		// Feature description ceiling: 32 words (prompt target ~20). A complete
+		// 22-28 word sentence survives instead of being chopped to a fragment.
 		if ( isset( $config['features']['items'] ) && is_array( $config['features']['items'] ) ) {
 			foreach ( $config['features']['items'] as $i => $item ) {
 				if ( is_array( $item ) && ! empty( $item['desc'] ) && is_string( $item['desc'] ) ) {
-					$config['features']['items'][ $i ]['desc'] = self::trim_to_words( $item['desc'], 20 );
+					$config['features']['items'][ $i ]['desc'] = self::trim_to_words( $item['desc'], 32 );
 				}
 			}
 		}
 
-		// Button text: max 4 words. Cover the known CTA locations.
+		// Button-text ceiling: 6 words (prompt target 2-5). Outcome-specific CTAs
+		// like "Book My Free Roof Inspection" (5) now pass; only a sentence-as-a-
+		// button gets clipped. Cover the known CTA locations.
 		$button_paths = array(
 			array( 'hero', 'cta_primary' ),
 			array( 'hero', 'cta_secondary' ),
@@ -664,7 +728,7 @@ class PressGo_Config_Validator {
 			$section = $path[0];
 			$cta_key = $path[1];
 			if ( isset( $config[ $section ][ $cta_key ]['text'] ) && is_string( $config[ $section ][ $cta_key ]['text'] ) ) {
-				$config[ $section ][ $cta_key ]['text'] = self::trim_to_words( $config[ $section ][ $cta_key ]['text'], 4 );
+				$config[ $section ][ $cta_key ]['text'] = self::trim_to_words( $config[ $section ][ $cta_key ]['text'], 6 );
 			}
 		}
 	}

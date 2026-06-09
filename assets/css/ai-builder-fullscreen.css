@@ -297,7 +297,7 @@ html, body {
 	display: inline-flex; align-items: center; justify-content: center;
 	flex-shrink: 0;
 	font-weight: 500;
-	overflow: hidden;
+	overflow: visible; /* let the count badge sit outside the corner without clipping */
 	transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease, transform 0.08s ease;
 }
 .pg-chat-input .pg-attach-btn:hover {
@@ -316,7 +316,11 @@ html, body {
 	background: #5b4fff; color: #fff;
 	font-size: 10px; font-weight: 700; line-height: 1;
 	border-radius: 999px;
+	box-shadow: 0 0 0 2px #fff; /* clean separation from the button edge */
 }
+/* The [hidden] attribute must win over display:flex, or the badge shows "0"
+   with no images attached (and gets clipped into a stray blob). */
+.pg-attach-count[hidden] { display: none; }
 .pg-chat-input .pg-attach-btn.has-image { border-color: #5b4fff; border-width: 2px; }
 
 /* Thumbnail strip above the input — selected images, each with a remove ×. */
@@ -479,7 +483,7 @@ html, body {
 	box-shadow: 0 0 0 2px #5b4fff44;
 }
 .pg-vision-label {
-	display: inline-flex; align-items: baseline; gap: 8px;
+	display: inline-flex; align-items: center; gap: 8px;
 	font-size: 12px; color: #50575e;
 }
 /* Inline SVG eye icon. Gray when off, PressGo purple when on, with a
@@ -533,6 +537,48 @@ html, body {
 @keyframes pg-eye-scan {
 	0%, 100% { transform: translateX(0); }
 	50%      { transform: translateX(3px); }
+}
+
+/* ─── Progressive build checklist ─────────────────────────────────── */
+.pg-build-list {
+	align-self: flex-start;
+	min-width: 220px;
+	background: #f7f6ff;
+	border: 1px solid #e3def9;
+	border-radius: 12px 12px 12px 4px;
+	padding: 12px 14px;
+	display: flex; flex-direction: column; gap: 7px;
+}
+.pg-build-head {
+	font-size: 12px; font-weight: 600; color: #4a40e0;
+	margin-bottom: 2px;
+}
+.pg-build-row {
+	display: flex; align-items: center; gap: 9px;
+	font-size: 13px; line-height: 1.2;
+	transition: color 0.2s ease;
+}
+.pg-build-dot {
+	width: 15px; height: 15px; flex: 0 0 15px;
+	border-radius: 50%;
+	display: inline-flex; align-items: center; justify-content: center;
+	transition: all 0.2s ease;
+}
+.pg-build-row.is-pending .pg-build-label { color: #9a93b8; }
+.pg-build-row.is-pending .pg-build-dot {
+	border: 2px solid #d4ccff;
+	animation: pg-build-pulse 1.2s ease-in-out infinite;
+}
+.pg-build-row.is-done .pg-build-label { color: #1f2937; }
+.pg-build-row.is-done .pg-build-dot {
+	background: #16a34a; border: 2px solid #16a34a;
+}
+.pg-build-row.is-done .pg-build-dot::after {
+	content: '✓'; color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+}
+@keyframes pg-build-pulse {
+	0%, 100% { opacity: 0.5; }
+	50%      { opacity: 1; }
 }
 
 /* ─── Confirm modal (Clear chat etc.) ─────────────────────────────── */

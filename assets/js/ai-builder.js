@@ -267,6 +267,19 @@
 		log.scrollTop = log.scrollHeight;
 	}
 
+	// Friendly labels for the progressive build checklist.
+	var SECTION_LABELS = {
+		hero: 'Hero', stats: 'Stats', social_proof: 'Social proof', features: 'Features',
+		steps: 'How it works', results: 'Results', competitive_edge: 'Why us',
+		testimonials: 'Testimonials', faq: 'FAQ', blog: 'Blog', pricing: 'Pricing',
+		logo_bar: 'Logos', team: 'Team', gallery: 'Gallery', newsletter: 'Newsletter',
+		cta_final: 'Call to action', map: 'Map', footer: 'Footer', disclaimer: 'Disclaimer'
+	};
+	function sectionLabel(name) {
+		if (SECTION_LABELS[name]) return SECTION_LABELS[name];
+		return String(name || '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+	}
+
 	// First-run starter prompts. Editable example pre-filled in the box +
 	// one-tap chips to swap the whole idea. Goal: never face a blank box.
 	var STARTERS = [
@@ -484,11 +497,43 @@
 		// Streaming consumer state.
 		var assistantBubble = null;     // current text bubble being filled
 		var visionNotice    = null;     // "A(eyes) reviewing…" pill, if any
+		var buildList       = null;     // progressive "building…" checklist element
+		var buildRows       = {};       // section name -> row element
 		var streamFailed    = false;
 		var typingDismissed = false;
 		var abortController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
 		// Expose so the Clear-chat handler can abort in-flight streams.
 		window.__pgActiveStream = abortController;
+
+		// Stream watchdog. The server holds the connection open through slow
+		// phases (a full build streams the config silently; the A(eyes) pass
+		// fetches screenshots then reviews). Both now send heartbeats ('ping' /
+		// 'vision_progress') at least every few seconds. If we go fully silent
+		// past STALL_MS the stream has died (server hang, dropped socket) — so we
+		// abort and clear the UI instead of spinning forever. This is the fix for
+		// "A(eyes) just kept checking til I refreshed."
+		var STALL_MS = 40000;
+		var lastEventAt = Date.now();
+		var builtOnce = false;
+		var watchdogAborted = false;
+		var watchdog = null;
+		function clearWatchdog() { if (watchdog) { clearInterval(watchdog); watchdog = null; } }
+		function checkStall() {
+			if (Date.now() - lastEventAt < STALL_MS) return;
+			clearWatchdog();
+			watchdogAborted = true;
+			try { if (abortController) abortController.abort(); } catch (e) {}
+			dismissTypingOnce();
+			if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+			clearBuildList();
+			// If the page already built, a stalled review is harmless — finish
+			// quietly. Otherwise the build itself stalled; tell the user how to
+			// recover.
+			if (!streamFailed && !builtOnce) {
+				append(el('pg-msg-warn', 'That stalled before finishing. Your page may have saved anyway — refresh the preview, or send your request again.'));
+			}
+			setBusy(false);
+		}
 
 		function ensureAssistantBubble() {
 			if (!assistantBubble) {
@@ -502,9 +547,60 @@
 		}
 		function resetAssistantBubble() { assistantBubble = null; }
 
+		// Progressive build checklist — shows sections appearing as the page builds.
+		function renderPlan(sections) {
+			if (buildList || !sections || !sections.length) return;
+			dismissTypingOnce();
+			buildList = el('pg-build-list');
+			var head = el('pg-build-head', 'Building your page…');
+			buildList.appendChild(head);
+			sections.forEach(function (name) {
+				var row = el('pg-build-row is-pending');
+				row.innerHTML = '<span class="pg-build-dot"></span><span class="pg-build-label">' + escapeHtml(sectionLabel(name)) + '</span>';
+				buildRows[name] = row;
+				buildList.appendChild(row);
+			});
+			append(buildList);
+		}
+		function tickSection(name) {
+			// If a section arrives we didn't plan for, add a row on the fly.
+			if (!buildList) renderPlan([name]);
+			var row = buildRows[name];
+			if (!row && buildList) {
+				row = el('pg-build-row is-pending');
+				row.innerHTML = '<span class="pg-build-dot"></span><span class="pg-build-label">' + escapeHtml(sectionLabel(name)) + '</span>';
+				buildRows[name] = row;
+				buildList.appendChild(row);
+			}
+			if (row) { row.className = 'pg-build-row is-done'; }
+			if (log) log.scrollTop = log.scrollHeight;
+		}
+		function clearBuildList() {
+			if (buildList) { buildList.remove(); buildList = null; }
+			buildRows = {};
+		}
+
 		function handleEvent(evt) {
 			if (!evt || !evt.type) return;
+			lastEventAt = Date.now();   // any event (incl. heartbeats) keeps the watchdog armed
 			switch (evt.type) {
+				case 'ping':
+				case 'vision_progress':
+					// Heartbeat only — server is alive mid-build/review. No UI.
+					return;
+				case 'plan':
+					// Ordered section list known — lay out the live checklist.
+					renderPlan(evt.sections || []);
+					return;
+				case 'section':
+					// A section finished generating — tick it.
+					tickSection(evt.name);
+					return;
+				case 'section_preview':
+					// The plugin rendered the page so far — refresh the preview so
+					// the user watches it grow section by section.
+					reloadPreview(evt.preview_bust || Date.now());
+					return;
 				case 'text':
 					dismissTypingOnce();
 					var b = ensureAssistantBubble();
@@ -514,6 +610,8 @@
 				case 'built':
 					dismissTypingOnce();
 					resetAssistantBubble();
+					clearBuildList();
+					builtOnce = true;
 					var built = el('pg-msg pg-msg-built');
 					built.innerHTML = '<strong>Built:</strong> ' + escapeHtml(evt.summary || '(page updated)');
 					append(built);
@@ -534,6 +632,7 @@
 				case 'vision_built':
 					if (visionNotice) { visionNotice.remove(); visionNotice = null; }
 					resetAssistantBubble();
+					builtOnce = true;
 					var fix = el('pg-msg pg-msg-built');
 					fix.innerHTML = '<strong>Vision fix:</strong> ' + escapeHtml(evt.summary || '(corrected after self-review)');
 					append(fix);
@@ -581,6 +680,13 @@
 					append(errBubble);
 					break;
 				case 'done':
+					// Stream finished. Guarantee the "A(eyes) reviewing…" pill is
+					// gone even if the vision pass returned without a terminal
+					// vision_ok/vision_built (e.g. its screenshot timed out). The
+					// watchdog only catches a SILENT stall, not a clean finish
+					// with an orphaned pill — this is that backstop.
+					if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+					clearBuildList();
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
 					// The model hit the length limit mid-build — the page may be
 					// cut off. Tell the user plainly how to recover.
@@ -590,6 +696,11 @@
 					break;
 			}
 		}
+
+		// Arm the watchdog now — covers the whole request, including first-token
+		// latency before any event arrives.
+		lastEventAt = Date.now();
+		watchdog = setInterval(checkStall, 5000);
 
 		// SSE consumer over fetch(). Streams as bytes arrive; parses
 		// "data: {...}\n\n" events on the fly. No EventSource because we
@@ -636,12 +747,21 @@
 			}
 			return pump();
 		}).then(function () {
+			clearWatchdog();
 			dismissTypingOnce();
+			// Final safety net: never leave the review pill or build checklist
+			// hanging after the stream resolves, whatever events arrived.
+			if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+			clearBuildList();
 			setBusy(false);
 			input.focus();
 		}).catch(function (e) {
+			clearWatchdog();
+			// The watchdog already aborted and reported — don't double-message.
+			if (watchdogAborted) { setBusy(false); return; }
 			dismissTypingOnce();
 			if (visionNotice) { visionNotice.remove(); visionNotice = null; }
+			clearBuildList();
 			if (!streamFailed) {
 				var raw = (e && e.message) ? e.message : '';
 				var friendly;

@@ -384,7 +384,9 @@ class PressGo_Widget_Helpers {
 			$icon_color = $c['primary'];
 		}
 		if ( null === $secondary_color ) {
-			$secondary_color = PressGo_Style_Utils::hex_to_rgba( $icon_color, 0.1 );
+			// A 0.1 tint of a dark navy reads as near-white — the #1 "templated"
+			// signal. 0.15 gives the chip a visible, modern presence.
+			$secondary_color = PressGo_Style_Utils::hex_to_rgba( $icon_color, 0.15 );
 		}
 		// Default title/desc to text_dark/text_muted (fine on light section
 		// backgrounds). Card-using callers should pass card_text() /
@@ -406,7 +408,7 @@ class PressGo_Widget_Helpers {
 			'view'           => $view,
 			'primary_color'  => $icon_color,
 			'title_size'     => 'h4',
-			'icon_size'      => array( 'unit' => 'px', 'size' => 28, 'sizes' => array() ),
+			'icon_size'      => array( 'unit' => 'px', 'size' => 30, 'sizes' => array() ),
 			'icon_space'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
 			'title_bottom_space' => array( 'unit' => 'px', 'size' => 8, 'sizes' => array() ),
 			'title_color'    => $title_color,

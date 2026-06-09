@@ -77,11 +77,153 @@ class PressGo_Section_Builder {
 	 * @param mixed $img String URL or array with a 'url' key.
 	 * @return bool
 	 */
+	/**
+	 * Normalize a CTA node into a clean { text, url, icon } array, or null.
+	 * Accepts a plain string ("Book a Call"), an object, or nothing. When a
+	 * $fallback_text is given (use for REQUIRED CTAs like a hero/cta_final
+	 * primary), an empty/missing node returns that fallback instead of null —
+	 * so a builder that unconditionally renders the primary button can never
+	 * fatal on `$cta['text']` (the #1 crash class: the validator strips an
+	 * empty-text CTA, leaving the key undefined).
+	 */
+	private static function resolve_cta( $node, $fallback_text = '' ) {
+		if ( is_string( $node ) && '' !== trim( $node ) ) {
+			return array( 'text' => trim( $node ), 'url' => '#', 'icon' => null );
+		}
+		if ( is_array( $node ) && ! empty( $node['text'] ) ) {
+			return array(
+				'text' => $node['text'],
+				'url'  => isset( $node['url'] ) ? $node['url'] : '#',
+				'icon' => isset( $node['icon'] ) ? $node['icon'] : null,
+			);
+		}
+		if ( '' !== $fallback_text ) {
+			return array( 'text' => $fallback_text, 'url' => '#', 'icon' => null );
+		}
+		return null;
+	}
+
+	/**
+	 * Lay card columns out in balanced rows of $per. The final partial row is
+	 * padded with invisible ghost columns so the real cards keep their fractional
+	 * width and align under the row above — instead of one orphaned card
+	 * stretching full-width (the #1 "templated" tell). Returns an array of row +
+	 * spacer elements to splice into a section's children.
+	 */
+	private static function card_grid( $cfg, $cols, $per, $gap = 24 ) {
+		$per = max( 1, (int) $per );
+		$n   = count( $cols );
+		if ( 0 === $n ) {
+			return array();
+		}
+		if ( $n <= $per ) {
+			return array( PressGo_Element_Factory::row( $cfg, $cols, $gap ) );
+		}
+		$out   = array();
+		$first = true;
+		foreach ( array_chunk( $cols, $per ) as $chunk ) {
+			while ( count( $chunk ) < $per ) {
+				$chunk[] = self::ghost_col();
+			}
+			if ( ! $first ) {
+				$out[] = PressGo_Widget_Helpers::spacer_w( $gap );
+			}
+			$out[] = PressGo_Element_Factory::row( $cfg, $chunk, $gap );
+			$first = false;
+		}
+		return $out;
+	}
+
+	/**
+	 * An empty flex-grow child. Placed inside an equal-height card column (rows
+	 * stretch by default), it absorbs the leftover vertical space so whatever
+	 * follows it — a pricing CTA — pins to the card's bottom edge, keeping the
+	 * buttons aligned across cards with unequal feature-list lengths. On mobile
+	 * the cards size to their own content, so the grow child collapses to 0.
+	 */
+	private static function grow_spacer() {
+		return array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'settings' => array(
+				'container_type' => 'flex',
+				'content_width'  => 'full',
+				'flex_direction' => 'column',
+				// Elementor flex-item: the bare `grow` value only emits CSS when
+				// size=custom; the `grow` preset sets --flex-grow:1 directly.
+				'_flex_size'     => 'grow',
+				'min_height'     => array( 'unit' => 'px', 'size' => 0, 'sizes' => array() ),
+			),
+			'elements' => array(),
+			'isInner'  => true,
+		);
+	}
+
+	/** An empty, invisible column that pads a partial card-grid row so real cards
+	 * keep their fractional width instead of stretching to fill. */
+	private static function ghost_col() {
+		return array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'settings' => array(
+				'container_type' => 'flex',
+				'content_width'  => 'full',
+				'flex_direction' => 'column',
+				'hide_mobile'    => 'hidden',
+			),
+			'elements' => array(),
+			'isInner'  => true,
+		);
+	}
+
+	/** A step's display number — accepts `num`, falls back to `number`, then the
+	 * 1-based position, so a numbered-steps section never renders blank badges. */
+	private static function step_num( $item, $i ) {
+		if ( isset( $item['num'] ) && '' !== (string) $item['num'] ) return (string) $item['num'];
+		if ( isset( $item['number'] ) && '' !== (string) $item['number'] ) return (string) $item['number'];
+		return (string) ( (int) $i + 1 );
+	}
+
+	/**
+	 * One logo-bar item. Accepts a plain string (logo NAME), or an object with
+	 * url/name/alt. Renders the image when a real image URL is present, otherwise
+	 * a styled text wordmark — so a "trusted by" bar never crashes or renders a
+	 * broken image when the model gives names instead of uploaded logos.
+	 */
+	private static function logo_item( $cfg, $logo, $text_color ) {
+		$url = '';
+		$name = '';
+		if ( is_string( $logo ) ) {
+			$name = $logo;
+		} elseif ( is_array( $logo ) ) {
+			$url  = isset( $logo['url'] ) && is_string( $logo['url'] ) ? $logo['url'] : '';
+			$name = isset( $logo['name'] ) ? $logo['name'] : ( isset( $logo['alt'] ) ? $logo['alt'] : '' );
+		}
+		if ( self::has_real_image( $url ) ) {
+			return PressGo_Widget_Helpers::image_w( $url, $name, 140, 0, false, 'center' );
+		}
+		return PressGo_Widget_Helpers::heading_w( $cfg, $name, 'h5', 'center', $text_color, 19, '700' );
+	}
+
 	private static function has_real_image( $img ) {
 		if ( is_array( $img ) ) {
 			$img = isset( $img['url'] ) ? $img['url'] : '';
 		}
-		return is_string( $img ) && '' !== trim( $img );
+		if ( ! is_string( $img ) ) {
+			return false;
+		}
+		$img = trim( $img );
+		if ( '' === $img ) {
+			return false;
+		}
+		// Must be a real URL, a root-relative path, or a numeric media ID — NOT a
+		// bare token the model hallucinated (e.g. "fuidI"). Bare tokens render as a
+		// broken image, so treat them as "no image" and let the section downgrade
+		// to its image-free variant.
+		if ( ctype_digit( $img ) ) {
+			return true;
+		}
+		return (bool) preg_match( '#^(https?:)?//#i', $img ) || '/' === $img[0];
 	}
 
 	/**
@@ -143,8 +285,8 @@ class PressGo_Section_Builder {
 	public static function build_hero( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 
 		$children = array();
 
@@ -224,8 +366,8 @@ class PressGo_Section_Builder {
 	public static function build_hero_split( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 		$img  = isset( $h['image'] ) ? $h['image'] : '';
 
 		// The split hero reserves a right-hand image column. With no real image
@@ -314,8 +456,8 @@ class PressGo_Section_Builder {
 	public static function build_hero_image( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 		$img  = isset( $h['image'] ) ? $h['image'] : '';
 
 		// Full-bleed background-image hero is meaningless without a real image
@@ -410,8 +552,8 @@ class PressGo_Section_Builder {
 	public static function build_hero_video( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 
 		$children = array();
 
@@ -473,8 +615,8 @@ class PressGo_Section_Builder {
 	public static function build_hero_gradient( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 
 		$children = array();
 
@@ -546,8 +688,8 @@ class PressGo_Section_Builder {
 	public static function build_hero_minimal( $cfg ) {
 		$c    = $cfg['colors'];
 		$h    = $cfg['hero'];
-		$cta1 = $h['cta_primary'];
-		$cta2 = isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null;
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
 
 		$children = array();
 
@@ -834,31 +976,39 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 		);
 
-		// Build pill buttons — wrap on mobile so pills flow naturally.
-		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
-		$chunks  = $per_row > 0 ? array_chunk( $categories, $per_row ) : array();
-		foreach ( $chunks as $chunk ) {
-			$cols = array();
-			foreach ( $chunk as $cat ) {
-				$cols[] = PressGo_Element_Factory::col(
-					array( self::pill_button( $cfg, $cat, $c['white'], $c['text_dark'], $c['border'] ) ),
-					array(
-						'vertical_align' => 'middle',
-						'width_mobile'   => array(
-							'unit' => '%', 'size' => 45, 'sizes' => array(),
-						),
-					)
-				);
-			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8, array(
-				'flex_direction_mobile' => 'row',
-				'flex_wrap'            => 'wrap',
-				'flex_wrap_mobile'     => 'wrap',
-				'flex_justify_content' => 'center',
-			) );
+		// Pills as DIRECT flex children of one wrapping, centered container so each
+		// sizes to its own content and they flow into even rows like a tag cloud.
+		// (Wrapping each pill in a col() — as the old code did — forced equal
+		// percentage widths and made them stagger 3-then-1-then-1.)
+		$pills = array();
+		foreach ( $categories as $cat ) {
+			$pills[] = self::pill_button( $cfg, $cat, $c['white'], $c['text_dark'], $c['border'] );
+		}
+		if ( $pills ) {
+			$children[] = self::pill_cloud( $pills );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 24 );
+	}
+
+	/** A centered, wrapping flex container holding pill buttons directly (no
+	 * percentage-width column wrappers), so they flow like a tag cloud. */
+	private static function pill_cloud( $pill_widgets ) {
+		return array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'settings' => array(
+				'container_type'       => 'flex',
+				'content_width'        => 'full',
+				'flex_direction'       => 'row',
+				'flex_wrap'            => 'wrap',
+				'flex_justify_content' => 'center',
+				'flex_align_items'     => 'center',
+				'flex_gap'             => array( 'unit' => 'px', 'column' => '10', 'row' => '10', 'isLinked' => true ),
+			),
+			'elements' => $pill_widgets,
+			'isInner'  => true,
+		);
 	}
 
 	// ──────────────────────────────────────────────
@@ -880,28 +1030,14 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 16 ),
 		);
 
-		// Build pill buttons — wrap on mobile so pills flow naturally.
-		$per_row = count( $categories ) <= 3 ? count( $categories ) : 4;
-		$chunks  = $per_row > 0 ? array_chunk( $categories, $per_row ) : array();
-		foreach ( $chunks as $chunk ) {
-			$cols = array();
-			foreach ( $chunk as $cat ) {
-				$cols[] = PressGo_Element_Factory::col(
-					array( self::pill_button( $cfg, $cat, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.1)' ) ),
-					array(
-						'vertical_align' => 'middle',
-						'width_mobile'   => array(
-							'unit' => '%', 'size' => 45, 'sizes' => array(),
-						),
-					)
-				);
-			}
-			$children[] = PressGo_Element_Factory::row( $cfg, $cols, 8, array(
-				'flex_direction_mobile' => 'row',
-				'flex_wrap'            => 'wrap',
-				'flex_wrap_mobile'     => 'wrap',
-				'flex_justify_content' => 'center',
-			) );
+		// Pills as direct flex children of one wrapping, centered container (see
+		// build_social_proof / pill_cloud) so they flow instead of staggering.
+		$pills = array();
+		foreach ( $categories as $cat ) {
+			$pills[] = self::pill_button( $cfg, $cat, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.1)' );
+		}
+		if ( $pills ) {
+			$children[] = self::pill_cloud( $pills );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['dark_bg'], null, 0, 24 );
@@ -935,7 +1071,7 @@ class PressGo_Section_Builder {
 
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
-			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
 			// Per-item overrides win over section-level overrides.
 			$item_icon_position = isset( $item['icon_position'] ) ? $item['icon_position'] : $icon_position;
 			$item_icon_align    = isset( $item['icon_align'] )    ? $item['icon_align']    : $icon_align;
@@ -975,8 +1111,13 @@ class PressGo_Section_Builder {
 		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
 			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
 
+		// Balanced rows via card_grid (pads the last row with ghost cols so cards
+		// keep even widths): 1-3 → one row; 4 → 2x2; 5+ → rows of 3.
+		$n   = count( $feature_cols );
+		$per = $n <= 3 ? $n : ( 4 === $n ? 2 : 3 );
+
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $feature_cols, $row_gap_px ) ) ),
+			array_merge( $header, self::card_grid( $cfg, $feature_cols, $per, $row_gap_px ) ),
 			$section_bg, null, 60, 80 );
 	}
 
@@ -1018,7 +1159,7 @@ class PressGo_Section_Builder {
 		$sections = array_merge( $sections, $header );
 
 		foreach ( $f['items'] as $idx => $item ) {
-			$accent   = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+			$accent   = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
 			$img_url  = isset( $item['image'] ) ? $item['image'] : '';
 			$is_even  = ( $idx % 2 === 0 );
 
@@ -1082,7 +1223,7 @@ class PressGo_Section_Builder {
 
 		$feature_cols = array();
 		foreach ( $f['items'] as $item ) {
-			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
 
 			$feature_cols[] = PressGo_Element_Factory::col(
 				array(
@@ -1119,6 +1260,17 @@ class PressGo_Section_Builder {
 
 		// No items → no section.
 		if ( empty( $f['items'] ) ) { return null; }
+
+		// image_cards puts a photo at the top of each card. With NO real images
+		// the cards render as tall empty-topped boxes (the exact "packed, empty"
+		// look). Fall back to the icon-card default, which uses each item's icon.
+		$has_img = false;
+		foreach ( $f['items'] as $it ) {
+			if ( ! empty( $it['image'] ) && self::has_real_image( $it['image'] ) ) { $has_img = true; break; }
+		}
+		if ( ! $has_img ) {
+			return self::build_features( $cfg );
+		}
 
 		$r = (string) $cfg['layout']['card_radius'];
 		$feature_cols = array();
@@ -1204,36 +1356,162 @@ class PressGo_Section_Builder {
 		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
 			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
 
-		$items    = $f['items'];
-		$rows     = array();
-		$row_cols = array();
-		foreach ( $items as $idx => $item ) {
-			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['primary'];
+		$cols = array();
+		foreach ( $f['items'] as $item ) {
+			$accent = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
+			$icon   = isset( $item['icon'] ) ? $item['icon'] : '';
+			$title  = isset( $item['title'] ) ? $item['title'] : '';
+			$desc   = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
 
 			$widgets = array(
 				PressGo_Widget_Helpers::icon_box_w( $cfg,
-					$item['icon'], $item['title'], $item['desc'],
+					$icon, $title, $desc,
 					$accent, 'left', 'stacked', 'circle',
 					PressGo_Style_Utils::hex_to_rgba( $accent, 0.1 ), 'left',
 					PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
 			);
 
-			$style = PressGo_Style_Utils::card_style( $cfg, 28 );
-			$row_cols[] = PressGo_Element_Factory::col( $widgets, $style );
-
-			// 2 items per row.
-			if ( count( $row_cols ) === 2 || $idx === count( $items ) - 1 ) {
-				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 24 );
-				if ( $idx < count( $items ) - 1 ) {
-					$rows[] = PressGo_Widget_Helpers::spacer_w( 24 );
-				}
-				$row_cols = array();
-			}
+			$cols[] = PressGo_Element_Factory::col( $widgets, PressGo_Style_Utils::card_style( $cfg, 28 ) );
 		}
 
+		// Balanced 2-up rows; the last partial row is ghost-padded so the final
+		// card keeps its half-width instead of stretching full-bleed.
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, $rows ),
+			array_merge( $header, self::card_grid( $cfg, $cols, 2, 24 ) ),
 			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 4f. Features Bento (asymmetric tile grid)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Bento-style feature grid: one large accent-gradient hero tile beside a
+	 * stack of smaller white tiles, with any overflow flowing into balanced 3-up
+	 * rows below. The asymmetry is the "modern SaaS" signature the symmetric
+	 * card grids lack. Needs >= 3 features to read as a bento; fewer falls back
+	 * to the standard features grid so it never renders a lopsided single tile.
+	 */
+	public static function build_features_bento( $cfg ) {
+		$c = $cfg['colors'];
+		$f = $cfg['features'];
+
+		if ( empty( $f['items'] ) ) { return null; }
+
+		$items = array_values( $f['items'] );
+		// Bento only reads as bento with enough tiles; otherwise use the plain grid.
+		if ( count( $items ) < 3 ) { return self::build_features( $cfg ); }
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
+			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
+
+		$hero = array_shift( $items ); // first feature → big tile
+		$rest = $items;                // everything after the hero
+
+		// Distribute so the layout is never lopsided: when 3 or fewer tiles
+		// remain they all stack beside the hero (no overflow row); only with 4+
+		// remaining does an overflow row appear, sized to its real count so a
+		// trailing tile is never a lonely third-width card.
+		if ( count( $rest ) <= 3 ) {
+			$stack_items = $rest;
+			$overflow    = array();
+		} else {
+			$stack_items = array_slice( $rest, 0, 2 );
+			$overflow    = array_slice( $rest, 2 );
+		}
+
+		// Right stack: small tiles that grow to fill the hero tile's height.
+		$stack = array();
+		foreach ( $stack_items as $i => $it ) {
+			if ( $i > 0 ) { $stack[] = PressGo_Widget_Helpers::spacer_w( 20 ); }
+			$stack[] = self::bento_feature_small( $cfg, $it, true );
+		}
+		$right_col = PressGo_Element_Factory::col( $stack, array(
+			'width' => array( 'unit' => '%', 'size' => 40, 'sizes' => array() ),
+		) );
+
+		$children = array_merge( $header, array(
+			PressGo_Element_Factory::row( $cfg,
+				array( self::bento_feature_big( $cfg, $hero ), $right_col ), 20 ),
+		) );
+
+		// Overflow tiles flow into a balanced row sized to their count (2 → halves,
+		// 3 → thirds), ghost-padded so nothing stretches full-bleed.
+		if ( ! empty( $overflow ) ) {
+			$over_cols = array();
+			foreach ( $overflow as $it ) {
+				$over_cols[] = self::bento_feature_small( $cfg, $it, false );
+			}
+			$per = min( 3, count( $over_cols ) );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$children = array_merge( $children, self::card_grid( $cfg, $over_cols, $per, 20 ) );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 60, 80 );
+	}
+
+	/** Large bento tile: accent→primary gradient card with white content. */
+	private static function bento_feature_big( $cfg, $item ) {
+		$c     = $cfg['colors'];
+		$acc   = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
+		$icon  = isset( $item['icon'] ) ? $item['icon'] : 'fas fa-bolt';
+		$title = isset( $item['title'] ) ? $item['title'] : '';
+		$desc  = isset( $item['desc'] ) ? $item['desc']
+			: ( isset( $item['description'] ) ? $item['description'] : '' );
+		$r     = (string) $cfg['layout']['card_radius'];
+
+		$content = array(
+			PressGo_Widget_Helpers::icon_w( $icon, $c['white'], 40, 'default' ),
+			PressGo_Widget_Helpers::spacer_w( 22 ),
+			PressGo_Widget_Helpers::heading_w( $cfg, $title, 'h3', 'left',
+				$c['white'], 30, '800', -0.5, 1.18, null, 24, 26 ),
+			PressGo_Widget_Helpers::spacer_w( 12 ),
+			PressGo_Widget_Helpers::text_w( $cfg, $desc, 'left',
+				'rgba(255,255,255,0.88)', 17, 15, 1.65 ),
+		);
+
+		// gradient end uses the brand's dark/primary so it works on any palette
+		// (a hand-darkened accent could collapse to invisible on dark themes).
+		$end = isset( $c['primary'] ) ? $c['primary'] : $c['dark_bg'];
+
+		return PressGo_Element_Factory::col( $content, array(
+			'width'                     => array( 'unit' => '%', 'size' => 60, 'sizes' => array() ),
+			'flex_justify_content'      => 'center',
+			'background_background'      => 'gradient',
+			'background_color'          => $acc,
+			'background_color_b'         => $end,
+			'background_gradient_angle' => array( 'unit' => 'deg', 'size' => 135, 'sizes' => array() ),
+			'border_radius'             => array( 'unit' => 'px', 'top' => $r, 'right' => $r, 'bottom' => $r, 'left' => $r, 'isLinked' => true ),
+			'padding'                   => array( 'unit' => 'px', 'top' => '40', 'right' => '40', 'bottom' => '40', 'left' => '40', 'isLinked' => true ),
+			'padding_mobile'            => array( 'unit' => 'px', 'top' => '28', 'right' => '24', 'bottom' => '28', 'left' => '24', 'isLinked' => false ),
+			'min_height'                => array( 'unit' => 'px', 'size' => 300, 'sizes' => array() ),
+		) );
+	}
+
+	/** Small white bento tile (icon-box card). Optionally grows to fill the
+	 * stacked column's height so paired tiles split the hero tile's height. */
+	private static function bento_feature_small( $cfg, $item, $grow = false ) {
+		$c     = $cfg['colors'];
+		$acc   = isset( $item['accent'] ) ? $item['accent'] : $c['accent'];
+		$icon  = isset( $item['icon'] ) ? $item['icon'] : '';
+		$title = isset( $item['title'] ) ? $item['title'] : '';
+		$desc  = isset( $item['desc'] ) ? $item['desc']
+			: ( isset( $item['description'] ) ? $item['description'] : '' );
+
+		$widgets = array(
+			PressGo_Widget_Helpers::icon_box_w( $cfg, $icon, $title, $desc, $acc,
+				'top', 'stacked', 'circle',
+				PressGo_Style_Utils::hex_to_rgba( $acc, 0.12 ), 'left',
+				PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text_muted() ),
+		);
+
+		$style = PressGo_Style_Utils::card_style( $cfg, 26 );
+		if ( $grow ) {
+			$style['_flex_size']           = 'grow';
+			$style['flex_justify_content'] = 'center';
+		}
+		return PressGo_Element_Factory::col( $widgets, $style );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1248,13 +1526,13 @@ class PressGo_Section_Builder {
 		if ( empty( $st['items'] ) ) { return null; }
 
 		$step_cols = array();
-		foreach ( $st['items'] as $item ) {
+		foreach ( $st['items'] as $idx => $item ) {
 			$gold = isset( $c['gold'] ) ? $c['gold'] : $c['primary'];
 			$desc = isset( $item['desc'] ) ? $item['desc']
 				: ( isset( $item['description'] ) ? $item['description'] : '' );
 			$step_cols[] = PressGo_Element_Factory::col(
 				array(
-					PressGo_Widget_Helpers::heading_w( $cfg, $item['num'], 'h3', 'center',
+					PressGo_Widget_Helpers::heading_w( $cfg, self::step_num( $item, $idx ), 'h3', 'center',
 						$gold, 48, '800', -1, 1.0 ),
 					PressGo_Widget_Helpers::spacer_w( 12 ),
 					PressGo_Widget_Helpers::heading_w( $cfg, $item['title'], 'h4', 'center',
@@ -1315,7 +1593,7 @@ class PressGo_Section_Builder {
 				. 'width:48px; height:48px; margin:0 auto; border-radius:12px; '
 				. 'background:' . $c['primary'] . '; color:' . $c['white'] . '; '
 				. 'font-weight:800; font-size:18px; line-height:1;">'
-				. esc_html( $item['num'] ) . '</div>';
+				. esc_html( self::step_num( $item, $idx ) ) . '</div>';
 
 			$step_cols[] = PressGo_Element_Factory::col(
 				array(
@@ -1375,7 +1653,7 @@ class PressGo_Section_Builder {
 				. 'background:' . $num_bg . '; color:' . $c['white'] . '; '
 				. 'font-weight:800; font-size:22px; '
 				. 'box-shadow:0 4px 12px ' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.3 ) . ';">'
-				. $item['num'] . '</span></div>';
+				. esc_html( self::step_num( $item, $idx ) ) . '</span></div>';
 
 			// Connecting line (except after last item).
 			if ( $idx < count( $st['items'] ) - 1 ) {
@@ -1420,7 +1698,7 @@ class PressGo_Section_Builder {
 		$r = $cfg['results'];
 
 		// No metrics → no section.
-		if ( empty( $r['metrics'] ) ) { return null; }
+		$r['metrics'] = ! empty( $r['metrics'] ) ? $r['metrics'] : ( isset( $r['items'] ) ? $r['items'] : array() ); if ( empty( $r['metrics'] ) ) { return null; }
 
 		// Results uses a dark-gradient section by design. If user-supplied
 		// dark_bg is actually light, white text will be invisible — pick a
@@ -1522,7 +1800,7 @@ class PressGo_Section_Builder {
 		$r = $cfg['results'];
 
 		// No metrics → no section.
-		if ( empty( $r['metrics'] ) ) { return null; }
+		$r['metrics'] = ! empty( $r['metrics'] ) ? $r['metrics'] : ( isset( $r['items'] ) ? $r['items'] : array() ); if ( empty( $r['metrics'] ) ) { return null; }
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $r['eyebrow'], $r['headline'],
 			isset( $r['description'] ) ? $r['description'] : null );
@@ -1562,6 +1840,7 @@ class PressGo_Section_Builder {
 	public static function build_competitive_edge( $cfg ) {
 		$c     = $cfg['colors'];
 		$ce    = $cfg['competitive_edge'];
+		$ce_cta = self::resolve_cta( isset( $ce['cta'] ) ? $ce['cta'] : null, 'Learn More' );
 		$fonts = $cfg['fonts'];
 
 		// No benefits → no section (the whole right column is the checklist).
@@ -1590,10 +1869,10 @@ class PressGo_Section_Builder {
 							PressGo_Widget_Helpers::spacer_w( 16 ),
 							PressGo_Widget_Helpers::text_w( $cfg, $ce['description'], 'left', $c['text_muted'], 16, null, 1.7, 'center' ),
 							PressGo_Widget_Helpers::spacer_w( 24 ),
-							PressGo_Widget_Helpers::btn_w( $cfg, $ce['cta']['text'],
-								isset( $ce['cta']['url'] ) ? $ce['cta']['url'] : '#',
+							PressGo_Widget_Helpers::btn_w( $cfg, $ce_cta['text'],
+								$ce_cta['url'],
 								$c['primary'], $c['white'], null,
-								isset( $ce['cta']['icon'] ) ? $ce['cta']['icon'] : null,
+								$ce_cta['icon'],
 								'', 'center' ),
 						),
 						array(
@@ -1642,11 +1921,19 @@ class PressGo_Section_Builder {
 	public static function build_competitive_edge_image( $cfg ) {
 		$c     = $cfg['colors'];
 		$ce    = $cfg['competitive_edge'];
+		$ce_cta = self::resolve_cta( isset( $ce['cta'] ) ? $ce['cta'] : null, 'Learn More' );
 		$fonts = $cfg['fonts'];
 		$img   = isset( $ce['image'] ) ? $ce['image'] : '';
 
 		// No benefits → no section.
 		if ( empty( $ce['benefits'] ) ) { return null; }
+
+		// No real image → the right column would render as an empty white panel
+		// beside the text. Downgrade to the default text + checklist layout,
+		// which is a complete two-column composition without any image.
+		if ( ! self::has_real_image( $img ) ) {
+			return self::build_competitive_edge( $cfg );
+		}
 
 		// Build benefit checklist with icon-list widget.
 		$icon_list_items = array();
@@ -1684,10 +1971,10 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 20 ),
 			$icon_list,
 			PressGo_Widget_Helpers::spacer_w( 24 ),
-			PressGo_Widget_Helpers::btn_w( $cfg, $ce['cta']['text'],
-				isset( $ce['cta']['url'] ) ? $ce['cta']['url'] : '#',
+			PressGo_Widget_Helpers::btn_w( $cfg, $ce_cta['text'],
+				$ce_cta['url'],
 				$c['primary'], $c['white'], null,
-				isset( $ce['cta']['icon'] ) ? $ce['cta']['icon'] : null,
+				$ce_cta['icon'],
 				'', 'center' ),
 		);
 
@@ -1742,6 +2029,7 @@ class PressGo_Section_Builder {
 	public static function build_competitive_edge_cards( $cfg ) {
 		$c     = $cfg['colors'];
 		$ce    = $cfg['competitive_edge'];
+		$ce_cta = self::resolve_cta( isset( $ce['cta'] ) ? $ce['cta'] : null, 'Learn More' );
 		$fonts = $cfg['fonts'];
 
 		// No cards source (rich items OR flat benefits) → no section.
@@ -1821,10 +2109,10 @@ class PressGo_Section_Builder {
 
 		// CTA button.
 		$rows[] = PressGo_Widget_Helpers::spacer_w( 32 );
-		$rows[] = PressGo_Widget_Helpers::btn_w( $cfg, $ce['cta']['text'],
-			isset( $ce['cta']['url'] ) ? $ce['cta']['url'] : '#',
+		$rows[] = PressGo_Widget_Helpers::btn_w( $cfg, $ce_cta['text'],
+			$ce_cta['url'],
 			$c['primary'], $c['white'], null,
-			isset( $ce['cta']['icon'] ) ? $ce['cta']['icon'] : null, 'center' );
+			$ce_cta['icon'], 'center' );
 
 		return PressGo_Element_Factory::outer( $cfg,
 			array_merge( $header, $rows ),
@@ -1892,11 +2180,16 @@ class PressGo_Section_Builder {
 		// items[0] exists).
 		if ( empty( $t['items'] ) ) { return null; }
 
-		$items = $t['items'];
-		// Pick the first (longest) testimonial as the featured one.
+		// Only keep testimonials that actually have a quote, so a blank item
+		// can't render a stray quote glyph / empty card or fatal on strlen(null).
+		$items = array_values( array_filter( $t['items'], function ( $i ) {
+			return is_array( $i ) && ! empty( $i['quote'] );
+		} ) );
+		if ( empty( $items ) ) { return null; }
+		// Pick the longest testimonial as the featured one.
 		$featured = $items[0];
 		foreach ( $items as $item ) {
-			if ( strlen( $item['quote'] ) > strlen( $featured['quote'] ) ) {
+			if ( strlen( (string) $item['quote'] ) > strlen( (string) $featured['quote'] ) ) {
 				$featured = $item;
 			}
 		}
@@ -1971,37 +2264,32 @@ class PressGo_Section_Builder {
 		$header = PressGo_Style_Utils::section_header( $cfg, $t['eyebrow'], $t['headline'],
 			isset( $t['subheadline'] ) ? $t['subheadline'] : null );
 
-		$items   = $t['items'];
-		$columns = count( $items ) <= 2 ? count( $items ) : 2;
+		$items = array_values( array_filter( $t['items'], function ( $i ) {
+			return is_array( $i ) && ! empty( $i['quote'] );
+		} ) );
+		if ( empty( $items ) ) { return null; }
+		$columns = count( $items ) === 3 ? 3 : ( count( $items ) <= 2 ? count( $items ) : 2 );
 
-		// Build rows of testimonial cards.
-		$rows     = array();
-		$row_cols = array();
-		foreach ( $items as $idx => $item ) {
+		$cols = array();
+		foreach ( $items as $item ) {
 			$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
+			$name = isset( $item['name'] ) ? $item['name'] : '';
+			$role = isset( $item['role'] ) ? $item['role'] : '';
 
 			$card_widgets = array(
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
 				PressGo_Widget_Helpers::spacer_w( 12 ),
 				PressGo_Widget_Helpers::testimonial_w( $cfg, $item['quote'],
-					$item['name'], $item['role'], $image_url, 'left' ),
+					$name, $role, $image_url, 'left' ),
 			);
 
-			$row_cols[] = PressGo_Element_Factory::col( $card_widgets,
+			$cols[] = PressGo_Element_Factory::col( $card_widgets,
 				PressGo_Style_Utils::card_style( $cfg, 24 ) );
-
-			// Every N columns, create a row.
-			if ( count( $row_cols ) === $columns || $idx === count( $items ) - 1 ) {
-				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 20 );
-				if ( $idx < count( $items ) - 1 ) {
-					$rows[] = PressGo_Widget_Helpers::spacer_w( 20 );
-				}
-				$row_cols = array();
-			}
 		}
 
+		// Ghost-padded rows so a trailing odd card keeps its column width.
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, $rows ),
+			array_merge( $header, self::card_grid( $cfg, $cols, $columns, 20 ) ),
 			$c['light_bg'], null, 80, 80 );
 	}
 
@@ -2026,8 +2314,15 @@ class PressGo_Section_Builder {
 			$c['text_dark'], 46, '800', -1, 1.18, null, 28, 36 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 40 );
 
+		// Only quote-bearing testimonials, so a blank item can't render a lone
+		// quote glyph + empty <em> + divider.
+		$items = array_values( array_filter( $t['items'], function ( $i ) {
+			return is_array( $i ) && ! empty( $i['quote'] );
+		} ) );
+		if ( empty( $items ) ) { return null; }
+
 		// Display each testimonial as a centered quote block.
-		foreach ( $t['items'] as $idx => $item ) {
+		foreach ( $items as $idx => $item ) {
 			// Large opening quote mark.
 			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, "\xe2\x80\x9c", 'h2', 'center',
 				PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.2 ), 48, '400',
@@ -2040,13 +2335,17 @@ class PressGo_Section_Builder {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 
 			// Author name and role.
-			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['name'], 'h5', 'center',
-				$c['text_dark'], 16, '700' );
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $item['role'], 'center',
-				$c['text_muted'], 14 );
+			if ( ! empty( $item['name'] ) ) {
+				$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['name'], 'h5', 'center',
+					$c['text_dark'], 16, '700' );
+			}
+			if ( ! empty( $item['role'] ) ) {
+				$children[] = PressGo_Widget_Helpers::text_w( $cfg, $item['role'], 'center',
+					$c['text_muted'], 14 );
+			}
 
 			// Divider between quotes (except last).
-			if ( $idx < count( $t['items'] ) - 1 ) {
+			if ( $idx < count( $items ) - 1 ) {
 				$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
 				$children[] = PressGo_Widget_Helpers::divider_w( $c['border'] );
 				$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
@@ -2257,6 +2556,7 @@ class PressGo_Section_Builder {
 	public static function build_cta_final( $cfg ) {
 		$c  = $cfg['colors'];
 		$ct = $cfg['cta_final'];
+		$ct_cta = self::resolve_cta( isset( $ct['cta'] ) ? $ct['cta'] : null, 'Get Started' );
 
 		// Pick text color based on primary's luminance — pages with light
 		// primaries (electric yellow, blush, light violet) were rendering
@@ -2275,10 +2575,10 @@ class PressGo_Section_Builder {
 			self::measure( PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
 				$muted_alpha, 18, 16 ) ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
-			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
-				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
+			PressGo_Widget_Helpers::btn_w( $cfg, $ct_cta['text'],
+				$ct_cta['url'],
 				$btn_bg, $btn_text, null,
-				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
+				$ct_cta['icon'], 'center' ),
 		);
 
 		if ( ! empty( $ct['trust_line'] ) ) {
@@ -2309,6 +2609,7 @@ class PressGo_Section_Builder {
 	public static function build_cta_final_card( $cfg ) {
 		$c  = $cfg['colors'];
 		$ct = $cfg['cta_final'];
+		$ct_cta = self::resolve_cta( isset( $ct['cta'] ) ? $ct['cta'] : null, 'Get Started' );
 
 		// Card sits on a white background. text_dark/text_muted invert on
 		// dark-themed pages and disappear; use the fixed card text tokens.
@@ -2323,10 +2624,10 @@ class PressGo_Section_Builder {
 			PressGo_Widget_Helpers::spacer_w( 12 ),
 			PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center', $card_text_muted, 17, 15 ),
 			PressGo_Widget_Helpers::spacer_w( 24 ),
-			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
-				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
+			PressGo_Widget_Helpers::btn_w( $cfg, $ct_cta['text'],
+				$ct_cta['url'],
 				$c['primary'], $btn_label, null,
-				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
+				$ct_cta['icon'], 'center' ),
 		);
 
 		if ( ! empty( $ct['trust_line'] ) ) {
@@ -2385,6 +2686,7 @@ class PressGo_Section_Builder {
 	public static function build_cta_final_image( $cfg ) {
 		$c   = $cfg['colors'];
 		$ct  = $cfg['cta_final'];
+		$ct_cta = self::resolve_cta( isset( $ct['cta'] ) ? $ct['cta'] : null, 'Get Started' );
 		$img = isset( $ct['image'] ) ? $ct['image'] : '';
 
 		$children = array(
@@ -2394,10 +2696,10 @@ class PressGo_Section_Builder {
 			self::measure( PressGo_Widget_Helpers::text_w( $cfg, $ct['description'], 'center',
 				'rgba(255,255,255,0.8)', 18, 16 ) ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
-			PressGo_Widget_Helpers::btn_w( $cfg, $ct['cta']['text'],
-				isset( $ct['cta']['url'] ) ? $ct['cta']['url'] : '#',
+			PressGo_Widget_Helpers::btn_w( $cfg, $ct_cta['text'],
+				$ct_cta['url'],
 				$c['accent'], $c['white'], null,
-				isset( $ct['cta']['icon'] ) ? $ct['cta']['icon'] : null, 'center' ),
+				$ct_cta['icon'], 'center' ),
 		);
 
 		if ( ! empty( $ct['trust_line'] ) ) {
@@ -2407,7 +2709,7 @@ class PressGo_Section_Builder {
 		}
 
 		$extra = array();
-		if ( $img ) {
+		if ( self::has_real_image( $img ) ) {
 			$norm_url = PressGo_Widget_Helpers::normalize_image( $img )['url'];
 			if ( $norm_url ) {
 				$extra['background_background']        = 'classic';
@@ -2513,6 +2815,10 @@ class PressGo_Section_Builder {
 			) );
 
 			$widgets[] = PressGo_Widget_Helpers::spacer_w( 20 );
+
+			// Absorb leftover height so the CTA pins to the bottom of every card,
+			// keeping buttons aligned across plans with different feature counts.
+			$widgets[] = self::grow_spacer();
 
 			// CTA button — full width on all screens.
 			$cta = isset( $plan['cta'] ) ? $plan['cta'] : array( 'text' => 'Get Started', 'url' => '#' );
@@ -2680,6 +2986,7 @@ class PressGo_Section_Builder {
 		// No logos → no section (a lone "trusted by" headline with no logos
 		// reads as a broken/empty bar).
 		if ( empty( $lb['logos'] ) ) { return null; }
+		$logo_text = $c['text_muted'];
 
 		$children = array();
 		if ( ! empty( $lb['headline'] ) ) {
@@ -2692,10 +2999,9 @@ class PressGo_Section_Builder {
 		if ( count( $logos ) > 0 ) {
 			$logo_cols = array();
 			foreach ( $logos as $logo ) {
-				$alt = isset( $logo['alt'] ) ? $logo['alt'] : '';
 				$logo_cols[] = PressGo_Element_Factory::col(
 					array(
-						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, 140, 0, false, 'center' ),
+						self::logo_item( $cfg, $logo, $logo_text ),
 					),
 					array(
 						'vertical_align' => 'middle',
@@ -2736,6 +3042,7 @@ class PressGo_Section_Builder {
 
 		// No logos → no section.
 		if ( empty( $lb['logos'] ) ) { return null; }
+		$logo_text = 'rgba(255,255,255,0.65)';
 
 		$children = array();
 		if ( ! empty( $lb['headline'] ) ) {
@@ -2748,10 +3055,9 @@ class PressGo_Section_Builder {
 		if ( count( $logos ) > 0 ) {
 			$logo_cols = array();
 			foreach ( $logos as $logo ) {
-				$alt = isset( $logo['alt'] ) ? $logo['alt'] : '';
 				$logo_cols[] = PressGo_Element_Factory::col(
 					array(
-						PressGo_Widget_Helpers::image_w( $logo['url'], $alt, 140, 0, false, 'center' ),
+						self::logo_item( $cfg, $logo, $logo_text ),
 					),
 					array(
 						'vertical_align' => 'middle',
@@ -2862,7 +3168,7 @@ class PressGo_Section_Builder {
 		}
 
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $member_cols, 24 ) ) ),
+			array_merge( $header, self::card_grid( $cfg, $member_cols, 3, 24 ) ),
 			$c['white'], null, 80, 80 );
 	}
 
@@ -2928,7 +3234,7 @@ class PressGo_Section_Builder {
 		}
 
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $member_cols, 20 ) ) ),
+			array_merge( $header, self::card_grid( $cfg, $member_cols, 4, 20 ) ),
 			$c['light_bg'], null, 80, 80 );
 	}
 
@@ -2984,9 +3290,10 @@ class PressGo_Section_Builder {
 				: ( isset( $lc['items'] ) && is_array( $lc['items'] ) ? $lc['items'] : array() );
 
 			foreach ( $col_links as $link ) {
-				if ( ! isset( $link['text'] ) ) { continue; }
+				$ltext = is_string( $link ) ? $link : ( isset( $link['text'] ) ? $link['text'] : '' );
+				if ( '' === $ltext ) { continue; }
 				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					esc_html( $link['text'] ), 'left', 'rgba(255,255,255,0.6)', 14, null, 1.4 );
+					esc_html( $ltext ), 'left', 'rgba(255,255,255,0.6)', 14, null, 1.4 );
 			}
 
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
@@ -3104,9 +3411,13 @@ class PressGo_Section_Builder {
 				$c['text_dark'], 14, '700' );
 			$col_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
-			foreach ( $lc['links'] as $link ) {
+			$col_links = isset( $lc['links'] ) && is_array( $lc['links'] ) ? $lc['links']
+				: ( isset( $lc['items'] ) && is_array( $lc['items'] ) ? $lc['items'] : array() );
+			foreach ( $col_links as $link ) {
+				$ltext = is_string( $link ) ? $link : ( isset( $link['text'] ) ? $link['text'] : '' );
+				if ( '' === $ltext ) { continue; }
 				$col_widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					esc_html( $link['text'] ), 'left', $c['text_muted'], 14, null, 1.4 );
+					esc_html( $ltext ), 'left', $c['text_muted'], 14, null, 1.4 );
 			}
 
 			$cols[] = PressGo_Element_Factory::col( $col_widgets );
@@ -3255,11 +3566,14 @@ class PressGo_Section_Builder {
 		$images = isset( $gl['images'] ) ? $gl['images'] : array();
 		$radius = (int) $cfg['layout']['card_radius'];
 
-		// Build rows of 2 image cards with captions.
-		$rows     = array();
-		$row_cols = array();
-		foreach ( $images as $idx => $img ) {
-			$url = is_array( $img ) ? $img['url'] : $img;
+		// Collect only real-image cards, then lay them out 2-up via card_grid so a
+		// trailing odd tile keeps its half-width instead of stretching full-bleed.
+		$cols = array();
+		foreach ( $images as $img ) {
+			$url = is_array( $img ) ? ( isset( $img['url'] ) ? $img['url'] : '' ) : $img;
+			// Skip images with no real URL so a url-less object can't crash or
+			// render a broken tile.
+			if ( ! self::has_real_image( $url ) ) { continue; }
 			$alt = is_array( $img ) && isset( $img['alt'] ) ? $img['alt'] : '';
 
 			$widgets = array(
@@ -3271,19 +3585,14 @@ class PressGo_Section_Builder {
 					$c['text_muted'], 13 );
 			}
 
-			$row_cols[] = PressGo_Element_Factory::col( $widgets );
-
-			if ( count( $row_cols ) === 2 || $idx === count( $images ) - 1 ) {
-				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 20 );
-				if ( $idx < count( $images ) - 1 ) {
-					$rows[] = PressGo_Widget_Helpers::spacer_w( 20 );
-				}
-				$row_cols = array();
-			}
+			$cols[] = PressGo_Element_Factory::col( $widgets );
 		}
 
+		// Every image was skipped (none had a real URL) → no section.
+		if ( empty( $cols ) ) { return null; }
+
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, $rows ),
+			array_merge( $header, self::card_grid( $cfg, $cols, 2, 20 ) ),
 			$c['light_bg'], null, 60, 60 );
 	}
 

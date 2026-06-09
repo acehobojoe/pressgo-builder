@@ -53,6 +53,7 @@ class PressGo_Generator {
 		'features.minimal'              => 'build_features_minimal',
 		'features.image_cards'          => 'build_features_image_cards',
 		'features.grid'                 => 'build_features_grid',
+		'features.bento'                => 'build_features_bento',
 		'testimonials.grid'             => 'build_testimonials_grid',
 		'faq.split'                     => 'build_faq_split',
 		'team.compact'                  => 'build_team_compact',

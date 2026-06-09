@@ -78,6 +78,28 @@ class PressGo_Icons {
 		'tools'              => 'wrench',
 		'lightbulb'          => 'lightbulb',
 		'brain'              => 'brain',
+		// FontAwesome 6 renamed many FA5 glyphs; Elementor bundles FA5, so an
+		// unmapped FA6 name renders a blank box. Map the common ones the model
+		// reaches for to a Phosphor glyph already proven above.
+		'shield-halved'        => 'shield-check',
+		'wand-magic-sparkles'  => 'magic-wand',
+		'wand-magic'           => 'magic-wand',
+		'wand-sparkles'        => 'magic-wand',
+		'arrow-right-long'     => 'arrow-right',
+		'arrow-trend-up'       => 'chart-line-up',
+		'arrow-up-right-dots'  => 'chart-line-up',
+		'money-bill-trend-up'  => 'chart-line-up',
+		'chart-column'         => 'chart-bar',
+		'screwdriver-wrench'   => 'wrench',
+		'gears'                => 'gear-six',
+		'user-group'           => 'users',
+		'people-group'         => 'users',
+		'circle-xmark'         => 'x-circle',
+		'circle-info'          => 'info',
+		'building-columns'     => 'buildings',
+		'clock-rotate-left'    => 'arrows-clockwise',
+		'square-check'         => 'check',
+		'envelope-open-text'   => 'envelope-open',
 		// business
 		'briefcase'          => 'briefcase',
 		'handshake'          => 'handshake',
