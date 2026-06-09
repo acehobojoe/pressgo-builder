@@ -53,6 +53,12 @@ class PressGo_Widget_Helpers {
 									   $line_height = null, $transform = null, $size_mobile = null,
 									   $size_tablet = null, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
+		// An array/object here would stringify to the literal word "Array" and
+		// render on the page. Blank it instead (Elementor suppresses empty
+		// headings at render).
+		if ( ! is_scalar( $text ) ) {
+			$text = '';
+		}
 		// Strip HTML — headings render via the title setting which Elementor
 		// outputs raw. Without this, a user passing <script> in the headline
 		// would land as a literal tag in the page DOM.
@@ -100,6 +106,10 @@ class PressGo_Widget_Helpers {
 	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16,
 								   $size_mobile = null, $line_height = 1.7, $align_mobile = null ) {
 		$fonts = $cfg['fonts'];
+		// Non-scalar input would stringify to the literal word "Array".
+		if ( ! is_scalar( $html ) ) {
+			$html = '';
+		}
 		// Allow safe inline tags (<strong>, <em>, links) but strip scripts /
 		// iframes / event handlers. wp_kses_post is the standard WP filter
 		// for user-supplied rich content.
@@ -349,10 +359,10 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Divider widget.
 	 */
-	public static function divider_w( $color = 'rgba(0,0,0,0.08)', $width = 100, $align = 'center' ) {
+	public static function divider_w( $color = 'rgba(0,0,0,0.08)', $width = 100, $align = 'center', $weight = 1 ) {
 		$s = array(
 			'color'  => $color,
-			'weight' => array( 'unit' => 'px', 'size' => 1, 'sizes' => array() ),
+			'weight' => array( 'unit' => 'px', 'size' => $weight, 'sizes' => array() ),
 		);
 		if ( $width < 100 ) {
 			$s['width'] = array( 'unit' => '%', 'size' => $width, 'sizes' => array() );
@@ -759,20 +769,30 @@ class PressGo_Widget_Helpers {
 			'prefix'          => $prefix,
 			'title'           => $title,
 			'duration'        => 2000,
-			'align'           => $align,
+			// NOTE: $align is accepted for signature compatibility but not
+			// emitted — the counter widget has no 'align' control (alignment is
+			// title_position/number_position); its default CSS centers, which is
+			// what every call site wants.
 			'number_color'    => $color ? $color : $c['text_dark'],
 			'title_color'     => $c['text_muted'],
-			'typography_typography'          => 'custom',
-			'typography_font_family'         => $fonts['heading'],
-			'typography_font_weight'         => '800',
-			'typography_font_size'           => array( 'unit' => 'px', 'size' => $number_size, 'sizes' => array() ),
-			'typography_font_size_tablet'    => array( 'unit' => 'px', 'size' => $tab_size, 'sizes' => array() ),
-			'typography_font_size_mobile'    => array( 'unit' => 'px', 'size' => $mob_size, 'sizes' => array() ),
-			'typography_line_height'         => array( 'unit' => 'em', 'size' => 1.1, 'sizes' => array() ),
-			'title_typography_typography'     => 'custom',
-			'title_typography_font_family'   => $fonts['body'],
-			'title_typography_font_size'     => array( 'unit' => 'px', 'size' => $title_size, 'sizes' => array() ),
-			'title_typography_font_weight'   => '500',
+			// NOTE: the counter widget's typography groups are named
+			// `typography_number` / `typography_title` (NOT the bare `typography`
+			// / `title_typography` most widgets use). The old keys were silently
+			// inert and counters rendered in the theme's default font.
+			'typography_number_typography'    => 'custom',
+			'typography_number_font_family'   => $fonts['heading'],
+			'typography_number_font_weight'   => '800',
+			'typography_number_font_size'     => array( 'unit' => 'px', 'size' => $number_size, 'sizes' => array() ),
+			'typography_number_font_size_tablet' => array( 'unit' => 'px', 'size' => $tab_size, 'sizes' => array() ),
+			'typography_number_font_size_mobile' => array( 'unit' => 'px', 'size' => $mob_size, 'sizes' => array() ),
+			'typography_number_line_height'   => array( 'unit' => 'em', 'size' => 1.1, 'sizes' => array() ),
+			'typography_title_typography'     => 'custom',
+			'typography_title_font_family'    => $fonts['body'],
+			'typography_title_font_size'      => array( 'unit' => 'px', 'size' => $title_size, 'sizes' => array() ),
+			'typography_title_font_weight'    => '500',
+			// Without this, wrapped titles inherit the theme's loose line height
+			// and render with a visible gap between lines.
+			'typography_title_line_height'    => array( 'unit' => 'em', 'size' => 1.45, 'sizes' => array() ),
 		);
 
 		return PressGo_Element_Factory::widget( 'counter', $s );

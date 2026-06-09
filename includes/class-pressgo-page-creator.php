@@ -125,28 +125,34 @@ class PressGo_Page_Creator {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Image loading — reserve space to prevent layout shift */
-.elementor-widget-image .elementor-image {
+/* Image loading — reserve space to prevent layout shift. Selectors target the
+   img directly (NOT the .elementor-image wrapper): Elementor's optimized DOM
+   no longer renders that wrapper, which silently disabled these rules — unsized
+   lazy images then collapsed to 0x0, never triggered lazy-load, and gallery
+   cards rendered as bare floating captions in screenshots/vision QA. */
+.elementor-widget-image:has(img[src*='pexels']),
+.elementor-widget-image:has(img[src*='unsplash']) {
     min-height: 40px;
     background-color: #f3f4f6;
     border-radius: inherit;
 }
-.elementor-widget-image .elementor-image img {
+.elementor-widget-image img {
     transition: transform 0.4s ease;
     aspect-ratio: auto;
 }
-.elementor-widget-image .elementor-image img[src*='pexels'] {
+.elementor-widget-image img[src*='pexels'],
+.elementor-widget-image img[src*='unsplash'] {
     aspect-ratio: 3 / 2;
     object-fit: cover;
     width: 100%;
     height: auto;
 }
-.elementor-widget-image:hover .elementor-image img {
+.elementor-widget-image:hover img {
     transform: scale(1.03);
 }
 /* Hide broken images gracefully */
-.elementor-widget-image .elementor-image img[src=''],
-.elementor-widget-image .elementor-image img:not([src]) {
+.elementor-widget-image img[src=''],
+.elementor-widget-image img:not([src]) {
     display: none;
 }
 

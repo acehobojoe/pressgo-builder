@@ -50,6 +50,7 @@ class PressGo_Generator {
 		'competitive_edge.image'        => 'build_competitive_edge_image',
 		'cta_final.card'                => 'build_cta_final_card',
 		'cta_final.image'               => 'build_cta_final_image',
+		'cta_final.split'               => 'build_cta_final_split',
 		'features.minimal'              => 'build_features_minimal',
 		'features.image_cards'          => 'build_features_image_cards',
 		'features.grid'                 => 'build_features_grid',

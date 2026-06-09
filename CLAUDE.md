@@ -99,10 +99,11 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | features | `minimal` | `build_features_minimal` | Clean icons with text, no cards |
 | features | `image_cards` | `build_features_image_cards` | Image on top of each card |
 | features | `grid` | `build_features_grid` | 2-column card grid for 4+ features |
+| features | `bento` | `build_features_bento` | Asymmetric bento: big gradient hero tile + stacked tiles (first item = big tile, 4-6 items, no images; <3 items falls back to default features) |
 | testimonials | _(default)_ | `build_testimonials` | 3-column cards with star ratings |
 | testimonials | `featured` | `build_testimonials_featured` | Single large quote + small cards |
 | testimonials | `grid` | `build_testimonials_grid` | 2-column card grid with avatars |
-| testimonials | `minimal` | `build_testimonials_minimal` | Centered quotes with dividers, no cards |
+| testimonials | `minimal` | `build_testimonials_minimal` | Editorial spotlight: first quote large + accent rule, rest 2-up below, card-free |
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
@@ -119,10 +120,11 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | cta_final | _(default)_ | `build_cta_final` | Gradient bar with centered text |
 | cta_final | `card` | `build_cta_final_card` | White card on light background |
 | cta_final | `image` | `build_cta_final_image` | Background image with dark overlay |
+| cta_final | `split` | `build_cta_final_split` | Headline+CTA left, frosted `bullets` checklist card right, dark bg (needs bullets; falls back to default) |
 | newsletter | _(default)_ | `build_newsletter` | Email capture card with CTA |
 | newsletter | `inline` | `build_newsletter_inline` | Gradient bar with headline + button |
 | results | _(default)_ | `build_results` | Dark gradient with counter cards |
-| results | `bars` | `build_results_bars` | Light bg with animated progress bars |
+| results | `bars` | `build_results_bars` | Light bg with bold metric cards (counters keep real value shape, accent top border) |
 | team | _(default)_ | `build_team` | Photo + name + role + bio + social cards |
 | team | `compact` | `build_team_compact` | Small photos, name + role only, no cards |
 | pricing | _(default)_ | `build_pricing` | 2-4 column plan cards with feature lists |
@@ -135,7 +137,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 | footer | `light` | `build_footer_light` | White/light bg footer with colored icons |
 
-### Section Types (19 types, 48 builder methods)
+### Section Types (19 types, 50 builder methods)
 hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, gallery, newsletter, cta_final, map, footer, disclaimer
 
 ## Responsive / Mobile
@@ -174,9 +176,9 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 - Background images on containers: set `background_image`, `background_position`, `background_size` in container settings
 
 ## Brain / Knowledge Base
-- Located at `/opt/pressgo-ops/brain.json` on the server
-- Also at `brain.json` in the plugin root (v3.0)
-- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules, complete section_variants (all 48 builders)
+- Canonical copy: `brain.json` in the plugin root — this is what `get_brain` and the `pressgo://brain` MCP resource serve
+- (`/opt/pressgo-ops/brain.json` on the server is a synced mirror only; nothing consumes it)
+- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules, complete section_variants (all 50 builders)
 - Derived from analysis of 588 Elementor template kits (10,624 JSON files) at `/opt/elementor-builder/templates/`
 - Key insight: `image` is the #2 most used widget (3,732 uses) — pages need images
 

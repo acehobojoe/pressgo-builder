@@ -47,6 +47,12 @@ $cases = array(
   array('results items-key', 'results', array('headline'=>'R','items'=>array(array('value'=>'3x','label'=>'lift')))),
   array('features no-icon', 'features', array('headline'=>'F','items'=>array(array('title'=>'A','desc'=>'x')))),
   array('pricing no-cta', 'pricing', array('headline'=>'Plans','plans'=>array(array('name'=>'Pro','price'=>'$9','features'=>array('a'))))),
+  array('features/bento 2-items (fallback)', 'features', array('variant'=>'bento','headline'=>'F','items'=>array(array('icon'=>'fas fa-bolt','title'=>'A','desc'=>'x'), array('title'=>'B')))),
+  array('cta_final/split no-bullets (fallback)', 'cta_final', array('variant'=>'split','headline'=>'Ready?','description'=>'x','cta'=>array('text'=>'Go'))),
+  array('cta_final/split blank+obj bullets', 'cta_final', array('variant'=>'split','headline'=>'Ready?','cta'=>'Book','bullets'=>array('', '  ', array('text'=>'Free consult'), array('no_text'=>1), 'Fast turnaround'))),
+  array('results/bars string-cta', 'results', array('variant'=>'bars','headline'=>'R','metrics'=>array(array('value'=>'340%','label'=>'lift')),'cta'=>'See more')),
+  array('results/bars non-numeric value', 'results', array('variant'=>'bars','headline'=>'R','metrics'=>array(array('value'=>'Doubled','label'=>'output'), array('value'=>'$2.5M','label'=>'revenue')))),
+  array('testimonials/minimal single quote', 'testimonials', array('variant'=>'minimal','headline'=>'Reviews','items'=>array(array('quote'=>'Great','name'=>'A')))),
 );
 
 $gen = new PressGo_Generator();

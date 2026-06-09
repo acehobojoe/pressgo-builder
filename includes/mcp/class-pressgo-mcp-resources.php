@@ -32,7 +32,7 @@ class PressGo_MCP_Resources {
 				'name'        => 'PressGo design brain',
 				'description' =>
 					'Layout patterns, widget frequency, typography combos, color palettes, and the full ' .
-					'48-variant catalogue derived from analysing 588 Elementor template kits.',
+					'variant catalogue derived from analysing 588 Elementor template kits.',
 				'mimeType'    => 'application/json',
 			),
 		);
@@ -51,6 +51,13 @@ class PressGo_MCP_Resources {
 
 	public static function read( $uri, $user ) {
 		if ( 'pressgo://schema' === $uri ) {
+			// Prefer the plugin-root copy (canonical spec, same root-first order
+			// as get_brain); the prompts mirror is the fallback for builds that
+			// exclude the root file.
+			$root = PRESSGO_PLUGIN_DIR . 'config-schema.json';
+			if ( file_exists( $root ) ) {
+				return self::read_file( $root, $uri );
+			}
 			return self::read_file( PRESSGO_PLUGIN_DIR . 'includes/prompts/config-schema.json', $uri );
 		}
 		if ( 'pressgo://brain' === $uri ) {
