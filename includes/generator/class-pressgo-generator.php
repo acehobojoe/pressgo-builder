@@ -69,6 +69,12 @@ class PressGo_Generator {
 		'gallery.cards'                 => 'build_gallery_cards',
 		'logo_bar.dark'                 => 'build_logo_bar_dark',
 		'social_proof.dark'             => 'build_social_proof_dark',
+		'pricing.list'                  => 'build_pricing_list',
+		'map.contact'                   => 'build_map_contact',
+		'gallery.before_after'          => 'build_gallery_before_after',
+		'gallery.videos'                => 'build_gallery_videos',
+		'competitive_edge.comparison'   => 'build_competitive_edge_comparison',
+		'team.spotlight'                => 'build_team_spotlight',
 	);
 
 	/**
@@ -110,7 +116,14 @@ class PressGo_Generator {
 				? self::$variants[ $variant_key ]
 				: self::$builders[ $name ];
 
-			$result = PressGo_Section_Builder::$method( $cfg );
+			// One malformed section must never kill the whole page build —
+			// treat a throwing builder exactly like one that returned null.
+			try {
+				$result = PressGo_Section_Builder::$method( $cfg );
+			} catch ( \Throwable $e ) {
+				error_log( sprintf( 'PressGo: section "%s" (%s) failed to build: %s', $name, $method, $e->getMessage() ) );
+				$result = null;
+			}
 
 			if ( null !== $result ) {
 				// Auto-inject section anchor ID for smooth scrolling.
@@ -247,8 +260,16 @@ class PressGo_Generator {
 			$el['settings'] = array();
 		}
 
-		$el['settings']['_margin'] = self::margin_add(
-			isset( $el['settings']['_margin'] ) ? $el['settings']['_margin'] : null,
+		// Widgets take margin via the advanced `_margin` control; CONTAINERS
+		// use the un-prefixed `margin` control. Folding onto `_margin` on a
+		// container is silently inert — every spacer adjacent to a row/col
+		// (card-grid row gaps, list group gaps) was being dropped entirely.
+		$is_container = isset( $el['elType'] ) && 'container' === $el['elType'];
+		$key   = $is_container ? 'margin' : '_margin';
+		$key_m = $is_container ? 'margin_mobile' : '_margin_mobile';
+
+		$el['settings'][ $key ] = self::margin_add(
+			isset( $el['settings'][ $key ] ) ? $el['settings'][ $key ] : null,
 			$side,
 			$px
 		);
@@ -256,8 +277,8 @@ class PressGo_Generator {
 		// Only carry a mobile override when the spacer had one (matches the old
 		// spacer_w behaviour, where small spacers had no mobile shrink).
 		if ( null !== $mob ) {
-			$el['settings']['_margin_mobile'] = self::margin_add(
-				isset( $el['settings']['_margin_mobile'] ) ? $el['settings']['_margin_mobile'] : null,
+			$el['settings'][ $key_m ] = self::margin_add(
+				isset( $el['settings'][ $key_m ] ) ? $el['settings'][ $key_m ] : null,
 				$side,
 				$mob
 			);

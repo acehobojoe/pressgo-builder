@@ -107,6 +107,7 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | competitive_edge | _(default)_ | `build_competitive_edge` | Text + icon-list checklist |
 | competitive_edge | `image` | `build_competitive_edge_image` | Text + checkmarks left, image right |
 | competitive_edge | `cards` | `build_competitive_edge_cards` | Benefit cards with icons in 3-col grid |
+| competitive_edge | `comparison` | `build_competitive_edge_comparison` | Us-vs-them cards (them_points/us_label/them_label; falls back to default) |
 | social_proof | _(default)_ | `build_social_proof` | Industry pill badges on light bg |
 | social_proof | `dark` | `build_social_proof_dark` | Industry pill badges on dark bg |
 | stats | _(default)_ | `build_stats` | White cards with icons, overlaps hero |
@@ -127,17 +128,22 @@ The generator supports multiple layout variants per section type. Set `variant` 
 | results | `bars` | `build_results_bars` | Light bg with bold metric cards (counters keep real value shape, accent top border) |
 | team | _(default)_ | `build_team` | Photo + name + role + bio + social cards |
 | team | `compact` | `build_team_compact` | Small photos, name + role only, no cards |
+| team | `spotlight` | `build_team_spotlight` | Single-person editorial profile (credentials/cta; auto-routed when 1 member) |
 | pricing | _(default)_ | `build_pricing` | 2-4 column plan cards with feature lists |
 | pricing | `compact` | `build_pricing_compact` | Left-aligned cards, smaller price, bordered highlight |
+| pricing | `list` | `build_pricing_list` | Editorial service/menu price list (items name/price/desc/category, grouped; falls back to plan cards) |
 | logo_bar | _(default)_ | `build_logo_bar` | "Trusted by" logo row |
 | logo_bar | `dark` | `build_logo_bar_dark` | Dark bg logo row |
 | map | _(default)_ | `build_map` | Google Maps embed with optional header |
+| map | `contact` | `build_map_contact` | 'Visit Us': contact card (tel:/mailto:/hours/note/CTA) + map split (falls back to bare map) |
 | gallery | _(default)_ | `build_gallery` | Image grid with lightbox |
 | gallery | `cards` | `build_gallery_cards` | 2-col image cards with optional captions |
+| gallery | `before_after` | `build_gallery_before_after` | Labeled BEFORE/AFTER pairs + result line (drops incomplete pairs) |
+| gallery | `videos` | `build_gallery_videos` | 2-up YouTube/Vimeo embed cards |
 | footer | _(default)_ | `build_footer` | Multi-column dark footer with brand/links/contact |
 | footer | `light` | `build_footer_light` | White/light bg footer with colored icons |
 
-### Section Types (19 types, 50 builder methods)
+### Section Types (19 types, 56 builder methods)
 hero, stats, social_proof, features, steps, results, competitive_edge, testimonials, faq, blog, pricing, logo_bar, team, gallery, newsletter, cta_final, map, footer, disclaimer
 
 ## Responsive / Mobile
@@ -178,7 +184,7 @@ hero, stats, social_proof, features, steps, results, competitive_edge, testimoni
 ## Brain / Knowledge Base
 - Canonical copy: `brain.json` in the plugin root — this is what `get_brain` and the `pressgo://brain` MCP resource serve
 - (`/opt/pressgo-ops/brain.json` on the server is a synced mirror only; nothing consumes it)
-- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules, complete section_variants (all 50 builders)
+- Contains: layout patterns, widget frequency, typography combos, color palettes, section rules, complete section_variants (all 56 builders)
 - Derived from analysis of 588 Elementor template kits (10,624 JSON files) at `/opt/elementor-builder/templates/`
 - Key insight: `image` is the #2 most used widget (3,732 uses) — pages need images
 

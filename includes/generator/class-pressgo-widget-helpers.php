@@ -754,7 +754,7 @@ class PressGo_Widget_Helpers {
 	 */
 	public static function counter_w( $cfg, $number, $suffix = '', $prefix = '',
 									   $title = '', $color = null, $number_size = 48,
-									   $title_size = 15, $align = 'center' ) {
+									   $title_size = 15, $align = 'center', $title_color = null ) {
 		$fonts = $cfg['fonts'];
 		$c     = $cfg['colors'];
 
@@ -774,7 +774,9 @@ class PressGo_Widget_Helpers {
 			// title_position/number_position); its default CSS centers, which is
 			// what every call site wants.
 			'number_color'    => $color ? $color : $c['text_dark'],
-			'title_color'     => $c['text_muted'],
+			'title_color'     => $title_color ? $title_color : $c['text_muted'],
+			'thousand_separator'      => 'yes',
+			'thousand_separator_char' => ',',
 			// NOTE: the counter widget's typography groups are named
 			// `typography_number` / `typography_title` (NOT the bare `typography`
 			// / `title_typography` most widgets use). The old keys were silently

@@ -70,6 +70,18 @@ class PressGo_Style_Utils {
 	/**
 	 * Convert HSL back to a hex string. Accepts h in 0-360, s and l in 0-1.
 	 */
+
+	/**
+	 * A light SOLID tint of a brand color (l=0.92) for avatar circles and
+	 * chips. wp_kses strips rgba() from inline `background:` styles, so
+	 * rgba-tinted inline-HTML circles silently rendered with no background —
+	 * a solid hex survives sanitization.
+	 */
+	public static function light_tint( $hex_color, $l = 0.92 ) {
+		$hsl = self::hex_to_hsl( $hex_color );
+		return self::hsl_to_hex( $hsl['h'], min( $hsl['s'], 0.45 ), $l );
+	}
+
 	public static function hsl_to_hex( $h, $s, $l ) {
 		// Normalize hue into 0-360.
 		$h = fmod( $h, 360 );

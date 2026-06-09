@@ -244,9 +244,17 @@ html {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Mobile typography scale */
+/* Mobile typography scale. break-word everywhere long unbroken tokens land —
+   emails in footer icon-lists, URLs in FAQ answers, compound words — not just
+   headings, or one long email drags the page into horizontal scroll. */
 @media (max-width: 767px) {
-    .elementor-widget-heading .elementor-heading-title {
+    .elementor-widget-heading .elementor-heading-title,
+    .elementor-icon-list-text,
+    .elementor-tab-title,
+    .elementor-tab-content,
+    .elementor-widget-text-editor,
+    .elementor-testimonial__text,
+    .elementor-testimonial-content {
         word-wrap: break-word;
         overflow-wrap: break-word;
     }

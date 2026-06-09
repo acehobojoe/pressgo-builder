@@ -613,6 +613,40 @@ class PressGo_Config_Validator {
 		// words — never arbitrary repeats, which would eat legitimate copy like
 		// "New York, New York" or "so so".
 		$value = preg_replace( '/\b(to|the|a|an|of|your|and|for|with)\s+\1\b/i', '$1', $value );
+
+		// Strip pictographic emoji — a system-font glyph inside display type is
+		// the clearest "not hand-designed" tell. (Keeps ASCII symbols intact.)
+		$value = preg_replace( '/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0E}\x{FE0F}\x{2B00}-\x{2BFF}]/u', '', $value );
+
+		// ALL-CAPS input ("JOE'S TOWING FAST 24/7 SERVICE") reads shouty at
+		// display sizes and tracks wider. Title-case words of 5+ letters,
+		// lowercase short function words, and leave 2-4 letter tokens alone so
+		// acronyms (LLC, HVAC, USA) survive. Only fires on 4+ word strings whose
+		// letters are entirely uppercase.
+		$letters = preg_replace( '/[^a-zA-Z]/', '', $value );
+		if ( strlen( $letters ) >= 8 && strtoupper( $letters ) === $letters && self::word_count( $value ) >= 4 ) {
+			$small = array( 'A', 'AN', 'AND', 'AS', 'AT', 'BUT', 'BY', 'FOR', 'IN', 'OF', 'ON', 'OR', 'THE', 'TO', 'VS', 'WITH' );
+			$words = preg_split( '/(\s+)/', $value, -1, PREG_SPLIT_DELIM_CAPTURE );
+			$out   = array();
+			$first = true;
+			foreach ( $words as $w ) {
+				if ( '' === trim( $w ) ) { $out[] = $w; continue; }
+				$bare = preg_replace( '/[^A-Z]/', '', $w );
+				if ( strlen( $bare ) >= 5 ) {
+					$out[] = ucfirst( strtolower( $w ) );
+				} elseif ( ! $first && in_array( $bare, $small, true ) ) {
+					$out[] = strtolower( $w );
+				} elseif ( strlen( $bare ) >= 2 && strlen( $bare ) <= 4 ) {
+					$out[] = $w; // probable acronym — keep.
+				} else {
+					$out[] = ucfirst( strtolower( $w ) );
+				}
+				$first = false;
+			}
+			$value = implode( '', $out );
+		}
+
+		$value = preg_replace( '/\s{2,}/', ' ', $value );
 		return trim( $value );
 	}
 
@@ -729,6 +763,27 @@ class PressGo_Config_Validator {
 			$cta_key = $path[1];
 			if ( isset( $config[ $section ][ $cta_key ]['text'] ) && is_string( $config[ $section ][ $cta_key ]['text'] ) ) {
 				$config[ $section ][ $cta_key ]['text'] = self::trim_to_words( $config[ $section ][ $cta_key ]['text'], 6 );
+			}
+		}
+
+		// Testimonial quotes: strip ONE wrapping quote pair (users paste reviews
+		// verbatim and the builders add their own decorative marks — nested
+		// ""quotes"" read as a typo), then cap at 45 words so a rambling wall
+		// never lands in 22-30px spotlight type.
+		if ( isset( $config['testimonials']['items'] ) && is_array( $config['testimonials']['items'] ) ) {
+			foreach ( $config['testimonials']['items'] as $i => $item ) {
+				if ( ! is_array( $item ) || empty( $item['quote'] ) || ! is_string( $item['quote'] ) ) {
+					continue;
+				}
+				$q = trim( $item['quote'] );
+				if ( strlen( $q ) > 1 ) {
+					$first = substr( $q, 0, 1 );
+					$last  = substr( $q, -1 );
+					if ( ( '"' === $first && '"' === $last ) || ( "'" === $first && "'" === $last ) ) {
+						$q = trim( substr( $q, 1, -1 ) );
+					}
+				}
+				$config['testimonials']['items'][ $i ]['quote'] = self::trim_to_words( $q, 45 );
 			}
 		}
 	}
