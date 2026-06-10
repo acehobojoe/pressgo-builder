@@ -400,6 +400,17 @@ class PressGo_AI_Builder {
 		}
 
 		if ( empty( $_GET['pg_clean'] ) ) return;
+
+		// FOUC kill: builder previews and screenshot-service fetches happen
+		// RIGHT after an apply wiped the per-post CSS file — racing Elementor's
+		// regeneration produced flash-of-unstyled previews (and A(eyes) then
+		// "fixed" pages that were fine). Inline print method embeds the CSS in
+		// the HTML for THIS request, so there is no external file to race.
+		// Live visitors keep the normal external-file method.
+		add_filter( 'pre_option_elementor_css_print_method', function () {
+			return 'internal';
+		} );
+
 		add_filter( 'show_admin_bar', '__return_false', 99 );
 		// Hard belt-and-suspenders: strip the admin-bar styles/scripts and
 		// nuke the bar via CSS in case a theme re-enables it.
