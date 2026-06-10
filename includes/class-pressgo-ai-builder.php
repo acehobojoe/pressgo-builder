@@ -48,6 +48,27 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_clear_chat',   array( $this, 'ajax_clear_chat' ) );
 		add_action( 'wp_ajax_pressgo_ai_versions',     array( $this, 'ajax_versions' ) );
 		add_action( 'wp_ajax_pressgo_ai_restore',      array( $this, 'ajax_restore' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_toggle', array( $this, 'ajax_brand_toggle' ) );
+	}
+
+	/**
+	 * Continuous branding: the site-wide brand foundation (shared with the MCP
+	 * tools). Returns array( 'brand' => array|null, 'enabled' => bool ).
+	 */
+	private function site_brand_state() {
+		$brand = class_exists( 'PressGo_MCP_Tools' ) ? PressGo_MCP_Tools::brand_foundation() : array();
+		unset( $brand['updated'] );
+		return array(
+			'brand'   => ! empty( $brand ) ? $brand : null,
+			'enabled' => '1' === get_option( 'pressgo_use_site_brand', '1' ),
+		);
+	}
+
+	/** Persist the Site Brand toggle (site-wide, not per page). */
+	public function ajax_brand_toggle() {
+		$this->check_auth();
+		update_option( 'pressgo_use_site_brand', ! empty( $_POST['enabled'] ) ? '1' : '0', false );
+		wp_send_json_success();
 	}
 
 	/**
@@ -737,12 +758,18 @@ class PressGo_AI_Builder {
 				</main>
 			</div>
 			<script>
+			<?php $brand_state = $this->site_brand_state(); ?>
 			window.PressGoAI = {
 				postId:  <?php echo (int) $post_id; ?>,
 				nonce:   <?php echo wp_json_encode( $nonce ); ?>,
 				ajaxUrl: <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
 				previewBase: <?php echo wp_json_encode( $preview_url ); ?>,
 				firstRun: <?php echo ! empty( $_GET['firstrun'] ) ? 'true' : 'false'; ?>,
+				brand: <?php echo wp_json_encode( array(
+					'exists'  => (bool) $brand_state['brand'],
+					'enabled' => $brand_state['enabled'],
+					'name'    => isset( $brand_state['brand']['brand_name'] ) ? $brand_state['brand']['brand_name'] : '',
+				) ); ?>,
 			};
 			</script>
 			<?php
@@ -1013,6 +1040,8 @@ class PressGo_AI_Builder {
 			}
 		}
 
+		$brand_state = $this->site_brand_state();
+
 		// Progressive render: as sections stream in, render the page so the user
 		// watches it build instead of waiting on a spinner. State accumulates
 		// across section events; render_partial is throttled so a big page doesn't
@@ -1072,6 +1101,10 @@ class PressGo_AI_Builder {
 			'siteCapabilities'          => array(
 				'elementorPro' => PressGo::is_elementor_pro_active(),
 			),
+			// Continuous branding: when the Site Brand toggle is on and a
+			// foundation exists, the AI reuses the established palette/fonts/
+			// identity for new pages instead of inventing fresh ones.
+			'siteBrand'                 => ( $brand_state['enabled'] && $brand_state['brand'] ) ? $brand_state['brand'] : null,
 		), $emit, $progressive ? $progress_cb : null );
 
 		if ( ! empty( $result['error'] ) ) {
@@ -1138,6 +1171,37 @@ class PressGo_AI_Builder {
 					$this->request_refund( $api_key, $tool_use['generationId'] );
 				}
 			}
+		}
+
+		// Continuous branding bookkeeping after a successful apply:
+		//  - no foundation yet -> LEARN this page's brand (first build wins);
+		//  - foundation exists, toggle on, and this edit explicitly changed
+		//    colors/fonts -> sync the foundation so the NEXT page follows.
+		if ( $applied && class_exists( 'PressGo_MCP_Tools' ) && '1' === get_option( 'pressgo_use_site_brand', '1' ) ) {
+			try {
+				$stored_now = json_decode( wp_unslash( (string) get_post_meta( $post_id, self::META_AI_CONFIG, true ) ), true );
+				if ( is_array( $stored_now ) ) {
+					if ( ! $brand_state['brand'] ) {
+						PressGo_MCP_Tools::merge_brand_foundation( array(
+							'brand_name' => isset( $stored_now['business_name'] ) && is_scalar( $stored_now['business_name'] ) ? (string) $stored_now['business_name'] : '',
+							'industry'   => isset( $stored_now['industry'] ) && is_scalar( $stored_now['industry'] ) ? (string) $stored_now['industry'] : '',
+							'colors'     => isset( $stored_now['colors'] ) && is_array( $stored_now['colors'] ) ? $stored_now['colors'] : array(),
+							'fonts'      => isset( $stored_now['fonts'] ) && is_array( $stored_now['fonts'] ) ? $stored_now['fonts'] : array(),
+							'layout'     => isset( $stored_now['layout'] ) && is_array( $stored_now['layout'] ) ? $stored_now['layout'] : array(),
+						) );
+					} elseif ( $is_patch && is_array( $tool_use['changes'] ?? null ) ) {
+						$sync = array();
+						foreach ( array( 'colors', 'fonts' ) as $bk ) {
+							if ( isset( $tool_use['changes'][ $bk ] ) && is_array( $tool_use['changes'][ $bk ] ) ) {
+								$sync[ $bk ] = $tool_use['changes'][ $bk ];
+							}
+						}
+						if ( ! empty( $sync ) ) {
+							PressGo_MCP_Tools::merge_brand_foundation( $sync );
+						}
+					}
+				}
+			} catch ( \Throwable $e ) { /* branding must never break a build */ }
 		}
 
 		// Persist assistant turn.

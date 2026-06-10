@@ -892,6 +892,42 @@
 		setTimeout(function () { confirmBtn.focus(); }, 10);
 	}
 
+	// ===== Continuous branding toggle =====
+	// Renders only once a brand foundation exists (auto-learned from the first
+	// build, or set via MCP). ON = new pages reuse the site's palette/fonts/
+	// identity; OFF = each page gets a fresh brand.
+	(function () {
+		var b = cfg.brand;
+		if (!b || !b.exists) return;
+		var footer = document.querySelector('.pg-chat-footer');
+		if (!footer) return;
+		var label = document.createElement('label');
+		label.className = 'pg-vision-toggle';
+		label.setAttribute('data-tooltip', 'Site brand: new pages reuse this site\'s saved colors, fonts, and business identity' + (b.name ? ' (' + b.name + ')' : '') + '. Turn off to give a page its own fresh look.');
+		label.style.marginTop = '6px';
+		var input = document.createElement('input');
+		input.type = 'checkbox';
+		input.className = 'pg-vision-input';
+		input.checked = !!b.enabled;
+		var track = document.createElement('span');
+		track.className = 'pg-vision-track';
+		track.innerHTML = '<span class="pg-vision-thumb"></span>';
+		var name = document.createElement('span');
+		name.className = 'pg-vision-label';
+		name.innerHTML = '<span class="pg-vision-name">Site brand</span><span class="pg-vision-hint">' + (b.name ? escapeHtml(b.name) : 'consistent pages') + '</span>';
+		label.appendChild(input);
+		label.appendChild(track);
+		label.appendChild(name);
+		footer.appendChild(label);
+		input.addEventListener('change', function () {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_brand_toggle');
+			fd.append('nonce', cfg.nonce);
+			fd.append('enabled', input.checked ? '1' : '');
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+		});
+	})();
+
 	// ===== Version history (design snapshots) =====
 	// Every AI change snapshots the previous design as a WP revision (visible in
 	// Elementor's History too). This panel surfaces those snapshots right in the

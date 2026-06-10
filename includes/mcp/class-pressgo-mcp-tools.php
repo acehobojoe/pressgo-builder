@@ -2334,9 +2334,15 @@ class PressGo_MCP_Tools {
 	 * Save / update the brand foundation. Merges partial colors/fonts/layout
 	 * over saved tokens so the AI can build the design system incrementally.
 	 */
-	private static function set_brand_foundation( $args, $user ) {
+	/**
+	 * Merge brand fields into the site-wide foundation. Shared by the MCP
+	 * set_brand_foundation tool AND the AI Builder's continuous-branding
+	 * auto-learn — ONE brand store for both paths. Returns the saved array.
+	 */
+	public static function merge_brand_foundation( $args ) {
 		$f = self::brand_foundation();
 		if ( isset( $args['brand_name'] ) && is_string( $args['brand_name'] ) ) { $f['brand_name'] = sanitize_text_field( $args['brand_name'] ); }
+		if ( isset( $args['industry'] ) && is_string( $args['industry'] ) )     { $f['industry']   = sanitize_text_field( $args['industry'] ); }
 		if ( isset( $args['logo_url'] ) && is_string( $args['logo_url'] ) )     { $f['logo_url']   = esc_url_raw( $args['logo_url'] ); }
 		if ( isset( $args['voice'] ) && is_string( $args['voice'] ) )           { $f['voice']      = sanitize_textarea_field( $args['voice'] ); }
 		foreach ( array( 'colors', 'fonts', 'layout' ) as $k ) {
@@ -2352,6 +2358,11 @@ class PressGo_MCP_Tools {
 		}
 		$f['updated'] = time();
 		update_option( self::BRAND_FOUNDATION_OPTION, $f );
+		return $f;
+	}
+
+	private static function set_brand_foundation( $args, $user ) {
+		$f = self::merge_brand_foundation( $args );
 		return array(
 			'content' => array( array( 'type' => 'text',
 				'text' => "Brand foundation saved. New pages now default to this palette, fonts, and layout, and every future chat starts from this design system." ) ),
