@@ -124,7 +124,7 @@ class PressGo_Config_Validator {
 		if ( ! isset( $config['sections'] ) || empty( $config['sections'] ) ) {
 			// Auto-detect sections from config keys.
 			$known_sections = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
-				'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
+				'schedule', 'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
 				'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final', 'footer',
 				'disclaimer' );
 			$detected = array();
@@ -184,7 +184,7 @@ class PressGo_Config_Validator {
 		// '' for any present content section. Prevents "Undefined array key"
 		// warnings (which can leak into the SSE stream on WP_DEBUG_DISPLAY sites).
 		// Empty string = no eyebrow rendered, never generic placeholder copy.
-		foreach ( array( 'stats', 'social_proof', 'features', 'steps', 'results',
+		foreach ( array( 'stats', 'social_proof', 'features', 'steps', 'schedule', 'results',
 			'competitive_edge', 'testimonials', 'faq', 'pricing', 'logo_bar',
 			'team', 'gallery', 'newsletter' ) as $sec ) {
 			foreach ( self::keys_of_type( $config, $sec ) as $k ) {
@@ -233,6 +233,7 @@ class PressGo_Config_Validator {
 			'features'     => 'items',
 			'testimonials' => 'items',
 			'steps'        => 'items',
+			'schedule'     => 'items',
 			'faq'          => 'items',
 			'pricing'      => 'plans',
 			'team'         => 'members',
@@ -884,7 +885,7 @@ class PressGo_Config_Validator {
 			return;
 		}
 		$known = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
-			'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
+			'schedule', 'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
 			'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final', 'footer',
 			'disclaimer' );
 		$counts = array();

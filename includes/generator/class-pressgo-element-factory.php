@@ -41,6 +41,17 @@ class PressGo_Element_Factory {
 	 */
 	public static function outer( $cfg, $children, $bg_color = null, $bg_gradient = null,
 								   $pad_top = 100, $pad_bot = 100, $extra = null ) {
+		// layout.section_padding is a global density scale (100 = designed rhythm,
+		// 64 ≈ compact, 140 ≈ airy): each builder's padding multiplies by
+		// clamp(sp/100, 0.5, 1.5). Default 100 is byte-identical to before, and the
+		// tablet/mobile derivations below run AFTER the scale (knob.spacing_density).
+		$sp = isset( $cfg['layout']['section_padding'] ) && is_numeric( $cfg['layout']['section_padding'] )
+			? (float) $cfg['layout']['section_padding'] : 100.0;
+		$scale = max( 0.5, min( 1.5, $sp / 100 ) );
+		if ( 1.0 !== $scale ) {
+			$pad_top = (int) round( $pad_top * $scale );
+			$pad_bot = (int) round( $pad_bot * $scale );
+		}
 		$tab_top = (string) max( 50, intdiv( $pad_top * 3, 4 ) );
 		$tab_bot = (string) max( 50, intdiv( $pad_bot * 3, 4 ) );
 

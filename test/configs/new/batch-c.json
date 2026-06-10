@@ -1,0 +1,94 @@
+{
+  "business_name": "Riverbend Commons",
+  "industry": "church community",
+  "colors": {
+    "primary": "#2C6E63",
+    "dark_bg": "#13211D",
+    "light_bg": "#F6F4EE",
+    "white": "#FFFFFF",
+    "text_dark": "#1F2933",
+    "text_muted": "#5B6B66",
+    "accent": "#C98A2D"
+  },
+  "fonts": {"heading": "Fraunces", "body": "Nunito Sans"},
+  "layout": {"boxed_width": 1140, "card_radius": 14, "button_radius": 10},
+  "sections": ["hero", "schedule", "schedule#2", "steps", "pricing", "cta_final", "footer"],
+  "hero": {
+    "eyebrow": "A CHURCH FOR THE NEIGHBORHOOD",
+    "headline": "Come as You Are. Stay for the People.",
+    "subheadline": "Riverbend Commons is a church and community hub on the east side. Sunday gatherings, weekday groups, and a Foundations workshop twice a year.",
+    "cta_primary": {"text": "Plan Your Visit", "url": "#schedule"},
+    "cta_secondary": {"text": "See the Workshop", "url": "#schedule-2"},
+    "trust_line": "Meeting on the east side since 2014"
+  },
+  "schedule": {
+    "variant": "times",
+    "eyebrow": "GATHER WITH US",
+    "headline": "When We Meet",
+    "subheadline": "Three regular gatherings every week. Show up to any of them, no signup needed.",
+    "items": [
+      {"title": "Sunday Worship", "time": "9:00 & 11:00 AM", "desc": "Full service with music and teaching. Childcare at both services."},
+      {"title": "Wednesday Bible Study", "time": "6:30 PM", "desc": "Verse-by-verse study in the fellowship hall. All ages welcome."},
+      {"title": "Youth Night", "time": "Fri 7:00 PM", "desc": "Grades 6 through 12. Games, food, and a short talk."}
+    ]
+  },
+  "schedule#2": {
+    "eyebrow": "FOUNDATIONS WEEKEND",
+    "headline": "Workshop Schedule",
+    "subheadline": "Two days, one room, no fluff. Here is exactly how the weekend runs.",
+    "items": [
+      {"day": "Day 1 · Saturday", "time": "9:00 AM", "title": "Registration & Coffee", "location": "Main Lobby"},
+      {"day": "Day 1 · Saturday", "time": "9:30 AM", "title": "Why Community Still Matters", "speaker": "Pastor Dana Whitfield", "location": "Main Hall", "tag": "Keynote", "desc": "Where the weekend is headed and why we built this workshop in the first place."},
+      {"day": "Day 1 · Saturday", "time": "11:00 AM", "title": "Reading Scripture Together", "speaker": "Dr. Samuel Obi", "location": "Room 201", "desc": "A simple method for reading in groups that keeps everyone in the conversation."},
+      {"day": "Day 1 · Saturday", "time": "1:30 PM", "title": "Small Groups That Actually Work", "speaker": "Maria Castillo", "location": "Room 204", "tag": "Breakout"},
+      {"day": "Day 2 · Sunday", "time": "9:30 AM", "title": "Prayer as a Daily Practice", "speaker": "Pastor Dana Whitfield", "location": "Main Hall"},
+      {"day": "Day 2 · Sunday", "time": "11:00 AM", "title": "Serving Your Neighborhood", "speaker": "James Holt", "location": "Room 201", "tag": "Breakout", "desc": "Practical ways to plug into local outreach without burning out."},
+      {"day": "Day 2 · Sunday", "time": "12:30 PM", "title": "Lunch & Sending", "location": "Courtyard"}
+    ],
+    "cta": {"text": "Save Your Seat", "url": "#cta-final"}
+  },
+  "steps": {
+    "variant": "modules",
+    "eyebrow": "THE FOUNDATIONS COURSE",
+    "headline": "What You Will Work Through",
+    "subheadline": "The workshop follows our four-module Foundations course. Each module stands on its own, so missing one is not a dealbreaker.",
+    "items": [
+      {"title": "Foundations of Faith", "desc": "The core story of scripture and why it still holds up. No prior background assumed.", "duration": "4 lessons · 60 min"},
+      {"title": "Habits That Hold", "desc": "Prayer, reading, and rest as repeatable weekly habits instead of guilt trips.", "duration": "3 lessons · 45 min"},
+      {"title": "Community and Belonging", "desc": "Why faith was never meant to be a solo project, and how to find your people here.", "duration": "3 lessons · 50 min"},
+      {"title": "Serving Where You Are", "desc": "Matching what you are good at with what the neighborhood actually needs.", "duration": "2 lessons · 40 min"}
+    ]
+  },
+  "pricing": {
+    "variant": "donation",
+    "eyebrow": "GIVE",
+    "headline": "Support the Work",
+    "subheadline": "Everything we run, from youth night to the food pantry, is funded by people who call this place home.",
+    "plans": [
+      {"price": "$25", "name": "Neighbor", "description": "Stocks the food pantry shelf for one family for a week."},
+      {"price": "$50", "name": "Supporter", "description": "Covers materials and meals for one student through a full youth night season.", "badge": "Most Common", "highlighted": true},
+      {"price": "$100", "name": "Builder", "description": "Funds a Foundations workshop seat, including the course workbook, for someone who could not otherwise attend."}
+    ],
+    "cta": {"text": "Give Now", "url": "#give"},
+    "trust_line": "Riverbend Commons is a registered 501(c)(3) nonprofit. Every gift is tax-deductible."
+  },
+  "cta_final": {
+    "variant": "card",
+    "headline": "New Here? Start This Sunday",
+    "description": "Pick a service, come ten minutes early, and someone at the door will walk you through the rest.",
+    "cta": {"text": "Plan Your Visit", "url": "#schedule"},
+    "trust_line": "Sundays at 9:00 & 11:00 AM"
+  },
+  "footer": {
+    "variant": "light",
+    "brand": {
+      "name": "Riverbend Commons",
+      "description": "A church and community hub on the east side. Sunday gatherings, weekday groups, and room at the table for whoever shows up."
+    },
+    "columns": [
+      {"title": "Gather", "links": [{"text": "Sunday Worship"}, {"text": "Wednesday Bible Study"}, {"text": "Youth Night"}]},
+      {"title": "Grow", "links": [{"text": "Foundations Workshop"}, {"text": "Small Groups"}, {"text": "Serve Teams"}]}
+    ],
+    "copyright": "© 2026 Riverbend Commons. All rights reserved."
+  }
+}

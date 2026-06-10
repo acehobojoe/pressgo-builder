@@ -1771,7 +1771,7 @@ class PressGo_AI_Builder {
 	 * patch key allow-list and the orphan-prune so a removed section's data can't
 	 * be resurrected by the Generator's reconcile step. */
 	const SECTION_TYPES = array(
-		'hero', 'stats', 'social_proof', 'features', 'steps', 'results',
+		'hero', 'stats', 'social_proof', 'features', 'steps', 'schedule', 'results',
 		'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing', 'logo_bar',
 		'team', 'gallery', 'newsletter', 'cta_final', 'map', 'footer', 'disclaimer',
 	);
