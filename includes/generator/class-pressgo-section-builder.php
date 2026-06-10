@@ -6193,16 +6193,72 @@ class PressGo_Section_Builder {
 		// ── Right: the form card ──
 		// Field set: config-driven when provided, else the proven default
 		// (name/phone/email/message). Labels are STRUCTURE, not content.
-		$defaults = array(
+		$form_widget = self::lead_form_widget( $cfg, $cta, array(
+			'on_dark_card' => PressGo_Style_Utils::$dark_theme,
+		) );
+		if ( ! $form_widget ) {
+			return self::build_cta_final( $cfg );
+		}
+
+		$card = PressGo_Element_Factory::col(
+			array( $form_widget ),
+			array_merge(
+				PressGo_Style_Utils::card_style( $cfg, 32 ),
+				array(
+					'width'            => array( 'unit' => '%', 'size' => 46, 'sizes' => array() ),
+					'_flex_align_self' => 'center', // content-height card, no stretch gap
+				)
+			)
+		);
+		$pitch = PressGo_Element_Factory::col( $left, array(
+			'width'          => array( 'unit' => '%', 'size' => 54, 'sizes' => array() ),
+			'vertical_align' => 'middle',
+			'padding'        => array( 'unit' => 'px', 'top' => 0, 'right' => 48, 'bottom' => 0, 'left' => 0, 'isLinked' => false ),
+			'padding_mobile' => array( 'unit' => 'px', 'top' => 0, 'right' => 0, 'bottom' => 32, 'left' => 0, 'isLinked' => false ),
+		) );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array( PressGo_Element_Factory::row( $cfg, array( $pitch, $card ), 0 ) ),
+			isset( $c['dark_bg'] ) ? $c['dark_bg'] : '#0F172A', null, 90, 90 );
+	}
+
+	/**
+	 * THE shared lead-form engine (Elementor PRO Form widget). Every form
+	 * placement (cta_final.form, hero.form, newsletter capture) builds its
+	 * fields, branding, and email wiring here, so design choices adapt in ONE
+	 * place:
+	 *   - LIGHT context: tinted fills, hairline borders, dark text.
+	 *   - DARK/frosted context (opts on_dark_card): translucent fields, light
+	 *     borders, white text — matches the frosted card it sits in.
+	 *   - Radius follows layout.button_radius; button follows the accent.
+	 *
+	 * $sec supplies form_fields / form_recipient / cta.text; $opts:
+	 *   on_dark_card  bool   dark/frosted styling
+	 *   default_fields array fallback field spec (default: name/phone/email/message)
+	 *   button_text   string overrides $sec['cta']['text']
+	 *   subject       string email subject (default "New lead from {biz}: [name]")
+	 *
+	 * Returns the form widget array, or null (no Pro / no usable fields) —
+	 * callers fall back to their free sibling.
+	 */
+	private static function lead_form_widget( $cfg, $sec, $opts = array() ) {
+		if ( ! class_exists( 'PressGo' ) || ! PressGo::is_elementor_pro_active() ) {
+			return null;
+		}
+		$c       = $cfg['colors'];
+		$on_dark = ! empty( $opts['on_dark_card'] );
+
+		$defaults = isset( $opts['default_fields'] ) && is_array( $opts['default_fields'] ) ? $opts['default_fields'] : array(
 			array( 'label' => 'Name',    'type' => 'text',     'required' => true,  'width' => '50' ),
 			array( 'label' => 'Phone',   'type' => 'tel',      'required' => true,  'width' => '50' ),
 			array( 'label' => 'Email',   'type' => 'email',    'required' => false, 'width' => '100' ),
 			array( 'label' => 'Message', 'type' => 'textarea', 'required' => false, 'width' => '100' ),
 		);
-		$spec  = isset( $cta['form_fields'] ) && is_array( $cta['form_fields'] ) && ! empty( $cta['form_fields'] ) ? $cta['form_fields'] : $defaults;
+		$spec  = isset( $sec['form_fields'] ) && is_array( $sec['form_fields'] ) && ! empty( $sec['form_fields'] ) ? $sec['form_fields'] : $defaults;
 		$types = array( 'text' => 'text', 'tel' => 'tel', 'phone' => 'tel', 'email' => 'email', 'textarea' => 'textarea', 'select' => 'select' );
 		$form_fields = array();
 		$email_field_id = '';
+		$name_field = false;
 		foreach ( array_slice( $spec, 0, 7 ) as $i => $f ) {
 			if ( ! is_array( $f ) || empty( $f['label'] ) || ! is_scalar( $f['label'] ) ) { continue; }
 			$label = self::trim_words( trim( (string) $f['label'] ), 6 );
@@ -6222,11 +6278,11 @@ class PressGo_Section_Builder {
 				$row['field_type'] = $type;
 			}
 			if ( 'select' === $type && ! empty( $f['options'] ) && is_array( $f['options'] ) ) {
-				$opts = array();
+				$opts_list = array();
 				foreach ( array_slice( $f['options'], 0, 10 ) as $o ) {
-					if ( is_scalar( $o ) && '' !== trim( (string) $o ) ) { $opts[] = trim( (string) $o ); }
+					if ( is_scalar( $o ) && '' !== trim( (string) $o ) ) { $opts_list[] = trim( (string) $o ); }
 				}
-				$row['field_options'] = implode( "\n", $opts );
+				$row['field_options'] = implode( "\n", $opts_list );
 			}
 			if ( 'textarea' === $type ) {
 				$row['rows'] = 4;
@@ -6234,66 +6290,149 @@ class PressGo_Section_Builder {
 			if ( 'email' === $type && '' === $email_field_id ) {
 				$email_field_id = 'fld_' . $cid;
 			}
+			if ( 'name' === $cid ) {
+				$name_field = true;
+			}
 			$form_fields[] = $row;
 		}
 		if ( empty( $form_fields ) ) {
-			return self::build_cta_final( $cfg );
+			return null;
 		}
 
 		// Recipient: config-provided real email, else the ADMIN email. Never an
 		// invented address — leads must land somewhere the user actually reads.
-		$recipient = isset( $cta['form_recipient'] ) && is_scalar( $cta['form_recipient'] ) && is_email( trim( (string) $cta['form_recipient'] ) )
-			? trim( (string) $cta['form_recipient'] )
+		$recipient = isset( $sec['form_recipient'] ) && is_scalar( $sec['form_recipient'] ) && is_email( trim( (string) $sec['form_recipient'] ) )
+			? trim( (string) $sec['form_recipient'] )
 			: get_option( 'admin_email' );
 		$host = preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
 		$biz  = isset( $cfg['business_name'] ) && is_scalar( $cfg['business_name'] ) ? (string) $cfg['business_name'] : 'your website';
 
+		$subject = isset( $opts['subject'] ) && '' !== $opts['subject'] ? $opts['subject']
+			: 'New lead from ' . $biz . ( $name_field ? ': [field id="name"]' : '' );
+		$button  = isset( $opts['button_text'] ) && '' !== $opts['button_text'] ? $opts['button_text']
+			: ( ! empty( $sec['cta']['text'] ) && is_scalar( $sec['cta']['text'] ) ? (string) $sec['cta']['text'] : 'Send My Request' );
+
 		$form_settings = array(
 			'form_name'      => 'PressGo Lead Form',
 			'form_fields'    => $form_fields,
-			// Placeholder-only fields: label + identical placeholder reads
-			// redundant and template-y; modern lead forms let placeholders
-			// carry it (matches our production reference).
+			// Placeholder-only fields (matches our production reference).
 			'show_labels'    => '',
-			'button_text'    => ! empty( $cta['cta']['text'] ) && is_scalar( $cta['cta']['text'] ) ? (string) $cta['cta']['text'] : 'Send My Request',
+			'button_text'    => $button,
 			'button_size'    => 'md',
 			'button_background_color' => $c['accent'],
 			'button_color'   => $c['white'],
 			'button_border_radius' => array( 'unit' => 'px', 'size' => (int) $cfg['layout']['button_radius'], 'sizes' => array() ),
-			// Brand the fields: soft tinted fill, hairline border, card-family
-			// radius — instead of Elementor's bare default inputs.
-			'field_background_color' => '#F8FAFC',
-			'field_border_color'     => '#E2E8F0',
-			'field_border_width'     => array( 'unit' => 'px', 'top' => '1', 'right' => '1', 'bottom' => '1', 'left' => '1', 'isLinked' => true ),
-			'field_border_radius'    => array( 'unit' => 'px', 'size' => max( 6, min( 12, (int) $cfg['layout']['button_radius'] ) ), 'sizes' => array() ),
-			'field_text_color'       => $c['text_dark'],
+			'field_border_width'  => array( 'unit' => 'px', 'top' => '1', 'right' => '1', 'bottom' => '1', 'left' => '1', 'isLinked' => true ),
+			'field_border_radius' => array( 'unit' => 'px', 'size' => max( 6, min( 12, (int) $cfg['layout']['button_radius'] ) ), 'sizes' => array() ),
 			'submit_actions' => array( 'email' ),
 			'email_to'       => $recipient,
-			'email_subject'  => 'New lead from ' . $biz . ': [field id="name"]',
+			'email_subject'  => $subject,
 			'email_content'  => '[all-fields]',
 			'email_from'     => 'wordpress@' . $host,
 			'email_from_name' => $biz,
 			'column_gap'     => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 			'row_gap'        => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
 		);
+		if ( $on_dark ) {
+			// Frosted-dark context: translucent fields, light text. (rgba is
+			// legal in widget SETTINGS — only kses-filtered inline styles ban it.)
+			$form_settings['field_background_color'] = 'rgba(255,255,255,0.08)';
+			$form_settings['field_border_color']     = 'rgba(255,255,255,0.22)';
+			$form_settings['field_text_color']       = '#FFFFFF';
+		} else {
+			$form_settings['field_background_color'] = '#F8FAFC';
+			$form_settings['field_border_color']     = '#E2E8F0';
+			$form_settings['field_text_color']       = $c['text_dark'];
+		}
 		if ( $email_field_id ) {
 			// Shape from the production reference: 'field_' + the field's _id.
 			$form_settings['email_reply_to'] = 'field_' . $email_field_id;
 		}
 
-		$card = PressGo_Element_Factory::col(
-			array( PressGo_Element_Factory::widget( 'form', $form_settings ) ),
-			array_merge(
-				PressGo_Style_Utils::card_style( $cfg, 32 ),
-				array( 'width' => array( 'unit' => '%', 'size' => 46, 'sizes' => array() ) )
-			)
-		);
+		return PressGo_Element_Factory::widget( 'form', $form_settings );
+	}
+
+	/**
+	 * hero variant 'form' (Elementor PRO): the classic lead-gen hero — pitch
+	 * left, lead form card right, ABOVE THE FOLD. The highest-converting
+	 * local-trade pattern (quote request before any scrolling). Dark band;
+	 * the card is white on light themes and frosted on colors.theme 'dark'.
+	 * Falls back to the default hero without Pro or usable fields.
+	 *
+	 * hero fields reused: eyebrow/headline/subheadline/bullets/trust_line +
+	 * form_fields/form_recipient/cta (submit label) like cta_final.form.
+	 */
+	public static function build_hero_form( $cfg ) {
+		$c     = $cfg['colors'];
+		$h     = $cfg['hero'];
+		$fonts = $cfg['fonts'];
+
+		$form_widget = self::lead_form_widget( $cfg, $h, array(
+			'on_dark_card' => PressGo_Style_Utils::$dark_theme,
+			'button_text'  => ! empty( $h['cta_primary']['text'] ) && is_scalar( $h['cta_primary']['text'] ) ? (string) $h['cta_primary']['text'] : 'Get My Free Quote',
+		) );
+		if ( ! $form_widget ) {
+			return self::build_hero( $cfg );
+		}
+
+		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( isset( $h['headline'] ) ? $h['headline'] : '', 52, 30, 40 );
+
+		$left = array();
+		if ( ! empty( $h['eyebrow'] ) && is_scalar( $h['eyebrow'] ) ) {
+			$left[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'left',
+				$c['accent'], 13, '700', 2.5, null, 'uppercase' );
+			$left[] = PressGo_Widget_Helpers::spacer_w( 14 );
+		}
+		$left[] = PressGo_Widget_Helpers::heading_w( $cfg,
+			isset( $h['headline'] ) ? $h['headline'] : '', 'h1', 'left',
+			$c['white'], $hh_d, '800', -1.5, 1.12, null, $hh_m, $hh_t, 'center' );
+		if ( ! empty( $h['subheadline'] ) && is_scalar( $h['subheadline'] ) ) {
+			$left[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left',
+				'rgba(255,255,255,0.78)', 18, 1.6, 'center' );
+		}
+		$bullets = self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() );
+		if ( ! empty( $bullets ) ) {
+			$rows = array();
+			foreach ( array_slice( $bullets, 0, 5 ) as $bl ) {
+				$rows[] = array(
+					'text'          => $bl,
+					'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+			$left[] = PressGo_Widget_Helpers::spacer_w( 22 );
+			$left[] = PressGo_Element_Factory::widget( 'icon-list', array(
+				'icon_list'     => $rows,
+				'icon_color'    => $c['accent'],
+				'text_color'    => 'rgba(255,255,255,0.88)',
+				'icon_size'     => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+				'text_indent'   => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+				'space_between' => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+			) );
+		}
+		if ( ! empty( $h['trust_line'] ) && is_scalar( $h['trust_line'] ) ) {
+			$left[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+				'rgba(255,255,255,0.55)', 14, null, 'center' );
+		}
+
 		$pitch = PressGo_Element_Factory::col( $left, array(
-			'width'          => array( 'unit' => '%', 'size' => 54, 'sizes' => array() ),
+			'width'          => array( 'unit' => '%', 'size' => 55, 'sizes' => array() ),
 			'vertical_align' => 'middle',
 			'padding'        => array( 'unit' => 'px', 'top' => 0, 'right' => 48, 'bottom' => 0, 'left' => 0, 'isLinked' => false ),
 			'padding_mobile' => array( 'unit' => 'px', 'top' => 0, 'right' => 0, 'bottom' => 32, 'left' => 0, 'isLinked' => false ),
 		) );
+		$card = PressGo_Element_Factory::col(
+			array( $form_widget ),
+			array_merge(
+				PressGo_Style_Utils::card_style( $cfg, 28 ),
+				array(
+					'width'            => array( 'unit' => '%', 'size' => 45, 'sizes' => array() ),
+					'_flex_align_self' => 'center', // content-height card, no stretch gap
+				)
+			)
+		);
 
 		return PressGo_Element_Factory::outer( $cfg,
 			array( PressGo_Element_Factory::row( $cfg, array( $pitch, $card ), 0 ) ),
@@ -6427,10 +6566,28 @@ class PressGo_Section_Builder {
 				isset( $nl['description'] ) ? $nl['description'] : 'Get the latest updates delivered to your inbox.',
 				'center', PressGo_Style_Utils::card_text_muted(), 16 ),
 			PressGo_Widget_Helpers::spacer_w( 24 ),
-			PressGo_Widget_Helpers::btn_w( $cfg, $nl_cta['text'], $nl_cta['url'],
-				$c['primary'], $c['white'], null,
-				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'center' ),
 		);
+
+		// With Elementor Pro, a newsletter whose button has no real destination
+		// becomes a WORKING email-capture form (subscribers email the admin)
+		// instead of a dead '#' button. A real cta url (external signup page,
+		// embedded provider) always wins — never hijack a real destination.
+		$dead_url = empty( $nl_cta['url'] ) || '#' === $nl_cta['url'] || 0 === strpos( (string) $nl_cta['url'], '#' );
+		$capture  = $dead_url ? self::lead_form_widget( $cfg, $nl, array(
+			'on_dark_card'   => PressGo_Style_Utils::$dark_theme,
+			'button_text'    => $nl_cta['text'],
+			'subject'        => 'New newsletter signup: [field id="email"]',
+			'default_fields' => array(
+				array( 'label' => 'Email', 'type' => 'email', 'required' => true, 'width' => '100' ),
+			),
+		) ) : null;
+		if ( $capture ) {
+			$children[] = $capture;
+		} else {
+			$children[] = PressGo_Widget_Helpers::btn_w( $cfg, $nl_cta['text'], $nl_cta['url'],
+				$c['primary'], $c['white'], null,
+				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'center' );
+		}
 
 		if ( ! empty( $nl['note'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 12 );

@@ -51,11 +51,13 @@ class PressGo_Generator {
 	 */
 	private static $pro_variants = array(
 		'cta_final.form' => true,
+		'hero.form'      => true,
 	);
 
 	private static $variants = array(
 		'hero.split'                    => 'build_hero_split',
 		'cta_final.form'                => 'build_cta_final_form',
+		'hero.form'                     => 'build_hero_form',
 		'hero.image'                    => 'build_hero_image',
 		'hero.video'                    => 'build_hero_video',
 		'hero.gradient'                 => 'build_hero_gradient',
