@@ -4634,6 +4634,12 @@ class PressGo_Section_Builder {
 		}
 
 		$address      = self::flatten_address( isset( $map['address'] ) ? $map['address'] : '' );
+		// A model-invented placeholder ("123 Main Street, Your City, ST 12345")
+		// passes the format heuristic below but breaks Google's geocoder — the
+		// embed renders "maps.google.com unexpectedly closed the connection".
+		if ( $address && self::is_placeholder_contact( $address ) ) {
+			$address = '';
+		}
 		$height       = isset( $map['height'] ) && is_scalar( $map['height'] ) ? (int) $map['height'] : 400;
 		$zoom         = isset( $map['zoom'] ) && is_scalar( $map['zoom'] ) ? (int) $map['zoom'] : 14;
 		$height_mob   = max( 200, intdiv( $height * 5, 8 ) );
@@ -4647,11 +4653,15 @@ class PressGo_Section_Builder {
 
 		if ( $looks_complete ) {
 			$children[] = PressGo_Widget_Helpers::google_map_w( $address, $height, $zoom, $height_mob );
+		} elseif ( $address ) {
+			// Real-looking but incomplete address — say what's missing (actionable).
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'Map unavailable — address needs a city or ZIP to embed (got: "' . $address . '").',
+				'center', $c['text_muted'], 14 );
 		} else {
-			$msg = $address
-				? 'Map unavailable — address needs a city or ZIP to embed (got: "' . $address . '").'
-				: 'Map unavailable — no address provided.';
-			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $msg, 'center', $c['text_muted'], 14 );
+			// No usable address at all: skip the section entirely. A live page
+			// with a "Map unavailable" band is worse than no map section.
+			return null;
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -4792,6 +4802,11 @@ class PressGo_Section_Builder {
 		$map = $cfg['map'];
 
 		$address = self::flatten_address( isset( $map['address'] ) ? $map['address'] : '' );
+		// Invented placeholder addresses break the Google embed AND look fake
+		// on the card — drop them (the card centers alone, no broken map pane).
+		if ( $address && self::is_placeholder_contact( $address ) ) {
+			$address = '';
+		}
 		$phone   = isset( $map['phone'] ) && is_scalar( $map['phone'] ) && ! self::is_placeholder_contact( $map['phone'] ) ? trim( (string) $map['phone'] ) : '';
 		$email   = isset( $map['email'] ) && is_scalar( $map['email'] ) && ! self::is_placeholder_contact( $map['email'] ) ? trim( (string) $map['email'] ) : '';
 		$hours   = self::bullet_texts( isset( $map['hours'] ) ? $map['hours'] : array() );
