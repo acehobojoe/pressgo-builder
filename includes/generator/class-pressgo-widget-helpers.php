@@ -248,6 +248,16 @@ class PressGo_Widget_Helpers {
 	public static function badge_w( $cfg, $text, $style = 'dark', $align = 'center' ) {
 		$c = $cfg['colors'];
 
+		// An object badge ({text:'New'}) passed !empty() at every hero call site
+		// and printed the literal word "Array" in the pill (guard.badge-array-pill).
+		if ( is_array( $text ) && isset( $text['text'] ) && is_scalar( $text['text'] ) ) {
+			$text = $text['text'];
+		}
+		if ( ! is_scalar( $text ) || '' === trim( (string) $text ) ) {
+			return null; // pill omitted; generator strips null elements.
+		}
+		$text = esc_html( trim( (string) $text ) );
+
 		if ( 'light' === $style ) {
 			$bg    = PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.08 );
 			$color = $c['primary'];
@@ -308,18 +318,37 @@ class PressGo_Widget_Helpers {
 	 * Image widget.
 	 */
 	/**
-	 * Normalize an image field that may be either a plain URL string or a
-	 * media object {url, alt, id} (the brain documents the object form).
-	 * Returns array('url' => string, 'alt' => string).
+	 * Normalize an image field that may be either a plain URL string, a bare
+	 * numeric media-library ID, or a media object {url, alt, id} (the brain
+	 * documents the object form). Returns array('url', 'alt', 'id') — all strings.
 	 */
 	public static function normalize_image( $value ) {
+		$out = array( 'url' => '', 'alt' => '', 'id' => '' );
 		if ( is_array( $value ) ) {
-			return array(
-				'url' => isset( $value['url'] ) ? (string) $value['url'] : '',
-				'alt' => isset( $value['alt'] ) ? (string) $value['alt'] : '',
-			);
+			$out['url'] = isset( $value['url'] ) ? (string) $value['url'] : '';
+			$out['alt'] = isset( $value['alt'] ) ? (string) $value['alt'] : '';
+			$out['id']  = isset( $value['id'] ) && is_scalar( $value['id'] ) ? (string) $value['id'] : '';
+		} else {
+			$out['url'] = is_scalar( $value ) ? trim( (string) $value ) : '';
 		}
-		return array( 'url' => (string) $value, 'alt' => '' );
+		// Bare numeric media-library ID (MCP upload_media / user uploads): resolve
+		// to the attachment URL — previously the digits went straight into the img
+		// src and rendered a broken tile. Unresolvable ID → url '' so every
+		// existing has_real_image() downgrade path fires instead.
+		if ( '' !== $out['url'] && ctype_digit( $out['url'] ) ) {
+			$attach_id = (int) $out['url'];
+			$resolved  = wp_get_attachment_image_url( $attach_id, 'full' );
+			if ( $resolved ) {
+				$out['url'] = $resolved;
+				$out['id']  = (string) $attach_id;
+				if ( '' === $out['alt'] ) {
+					$out['alt'] = (string) get_post_meta( $attach_id, '_wp_attachment_image_alt', true );
+				}
+			} else {
+				$out['url'] = '';
+			}
+		}
+		return $out;
 	}
 
 	public static function image_w( $url, $alt = '', $width = null, $radius = 0,
@@ -333,7 +362,9 @@ class PressGo_Widget_Helpers {
 			$alt = $norm['alt'];
 		}
 		$s = array(
-			'image'      => array( 'url' => $url, 'id' => '', 'alt' => $alt, 'source' => 'library' ),
+			// Carry a resolved attachment id when one exists (media-library images
+			// keep their native srcset/lightbox binding); '' for external URLs.
+			'image'      => array( 'url' => $url, 'id' => $norm['id'], 'alt' => $alt, 'source' => 'library' ),
 			'image_size' => 'full',
 			'align'      => $align,
 		);
@@ -715,6 +746,12 @@ class PressGo_Widget_Helpers {
 		if ( preg_match( '#vimeo\.com#i', $url ) ) {
 			$s['video_type'] = 'vimeo';
 			$s['vimeo_url']  = $url;
+		} elseif ( preg_match( '#\.(mp4|webm|m4v|mov)(\?|$)#i', $url ) ) {
+			// Direct media-file URL (media-library upload): hosted mode — routing
+			// it into youtube_url rendered an empty player (guard.hosted-video).
+			$s['video_type']   = 'hosted';
+			$s['insert_url']   = 'yes';
+			$s['external_url'] = array( 'url' => $url );
 		} else {
 			$s['youtube_url'] = $url;
 		}
@@ -750,7 +787,8 @@ class PressGo_Widget_Helpers {
 			'title'                        => $title,
 			'percent'                      => array( 'unit' => '%', 'size' => $percent, 'sizes' => array() ),
 			'progress_type'                => '',
-			'display_percentage'           => 'yes',
+			// The switcher's return_value is 'show' — 'yes' silently never rendered the % chip.
+			'display_percentage'           => 'show',
 			'inner_text'                   => $inner_text,
 			'bar_color'                    => $color,
 			'bar_bg_color'                 => PressGo_Style_Utils::hex_to_rgba( $color, 0.1 ),

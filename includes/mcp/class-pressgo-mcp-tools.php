@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PressGo_MCP_Tools {
 
 	const VALID_SECTION_TYPES = array(
-		'hero', 'stats', 'social_proof', 'features', 'steps', 'results',
+		'hero', 'stats', 'social_proof', 'features', 'steps', 'schedule', 'results',
 		'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
 		'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final',
 		'sticky_bar', 'footer', 'disclaimer',

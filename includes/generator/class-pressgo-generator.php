@@ -18,6 +18,7 @@ class PressGo_Generator {
 		'social_proof'     => 'build_social_proof',
 		'features'         => 'build_features',
 		'steps'            => 'build_steps',
+		'schedule'         => 'build_schedule',
 		'results'          => 'build_results',
 		'competitive_edge' => 'build_competitive_edge',
 		'testimonials'     => 'build_testimonials',
@@ -99,6 +100,10 @@ class PressGo_Generator {
 		'features.tabs'                 => 'build_features_tabs',
 		'hero.split_screen'             => 'build_hero_split_screen',
 		'stats.ticker'                  => 'build_stats_ticker',
+		'schedule.times'                => 'build_schedule_times',
+		'schedule.tabs'                 => 'build_schedule_tabs',
+		'pricing.donation'              => 'build_pricing_donation',
+		'steps.modules'                 => 'build_steps_modules',
 	);
 
 	/**

@@ -317,6 +317,23 @@ class PressGo_Section_Builder {
 	}
 
 	/**
+	 * A plan's badge as a plain string. The model sometimes emits the badge as
+	 * an object ({text:'Most Popular'}) — !empty() passed it through and
+	 * strtoupper(array) fataled the whole build on PHP 8
+	 * (guard.pricing-badge-fatal). Returns '' when no usable badge.
+	 */
+	private static function plan_badge( $plan ) {
+		if ( ! isset( $plan['badge'] ) ) { return ''; }
+		if ( is_scalar( $plan['badge'] ) ) {
+			return trim( (string) $plan['badge'] );
+		}
+		if ( is_array( $plan['badge'] ) && isset( $plan['badge']['text'] ) && is_scalar( $plan['badge']['text'] ) ) {
+			return trim( (string) $plan['badge']['text'] );
+		}
+		return '';
+	}
+
+	/**
 	 * Length-adaptive price type: [desktop, mobile, tablet] px. Free-form
 	 * prices like "from $99/mo + setup" wrapped as two lines of 48px display
 	 * type inside a ~330px card.
@@ -351,6 +368,11 @@ class PressGo_Section_Builder {
 			$i['quote'] = trim( $i['quote'] );
 			$i['name']  = isset( $i['name'] ) && is_scalar( $i['name'] ) ? trim( (string) $i['name'] ) : '';
 			$i['role']  = isset( $i['role'] ) && is_scalar( $i['role'] ) ? trim( (string) $i['role'] ) : '';
+			// Honest stars (guard.testimonial-honest-stars): a per-review rating
+			// (1-5, fractional ok) renders as supplied; absent → null and the
+			// builders keep the legacy 5-star treatment (zero visual regression).
+			$i['rating'] = isset( $i['rating'] ) && is_numeric( $i['rating'] )
+				? max( 1.0, min( 5.0, (float) $i['rating'] ) ) : null;
 			$out[] = $i;
 		}
 		return $out;
@@ -435,6 +457,9 @@ class PressGo_Section_Builder {
 	 * "500+ five-star reviews") — beside "Licensed & insured" or an event date
 	 * they read as a fabricated rating. */
 	private static function trust_line_has_rating( $text ) {
+		// Non-scalar trust_line would warn on the (string) cast and stringify to
+		// "Array" (guard.badge-array-pill companion fix).
+		if ( ! is_scalar( $text ) ) { return false; }
 		return (bool) preg_match( '/\b(rated?|ratings?|reviews?|stars?|google|yelp|trustpilot|facebook|tripadvisor|bbb|angi|houzz|zillow|g2|capterra|avvo)\b|[0-5][.,]\d|\d+(\.\d+)?\s*\/\s*(5|10)\b/i', (string) $text );
 	}
 
@@ -525,8 +550,10 @@ class PressGo_Section_Builder {
 
 		$left_widgets = array();
 		if ( '' !== $brand ) {
+			// 14px on phones — a long uppercase business name at 18px/800 wrapped
+			// into a 4-line block in the ~140px col (guard.topbar-long-brand-mobile).
 			$left_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $brand, 'h5', 'left',
-				$text_color, 18, '800', 0.5, 1.2, 'uppercase' );
+				$text_color, 18, '800', 0.5, 1.2, 'uppercase', 14 );
 		}
 		$right_widgets = array();
 		if ( '' !== $phone ) {
@@ -537,8 +564,15 @@ class PressGo_Section_Builder {
 				array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ), 'right' );
 		}
 		if ( $cta ) {
-			$right_widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'], $cta['url'],
+			$cta_btn = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'], $cta['url'],
 				$c['accent'], $c['white'], null, null, 'right' );
+			if ( '' !== $phone ) {
+				// Phone + CTA don't both fit beside the brand on a 375px phone —
+				// keep only brand + tap-to-call there; the hero primary CTA sits
+				// just below anyway (guard.topbar-long-brand-mobile).
+				$cta_btn['settings']['hide_mobile'] = 'hidden-mobile';
+			}
+			$right_widgets[] = $cta_btn;
 		}
 
 		$left_col = PressGo_Element_Factory::col( $left_widgets, array(
@@ -553,6 +587,14 @@ class PressGo_Section_Builder {
 			)
 		);
 		$cols = $left_widgets ? array( $left_col, $right_col ) : array( $right_col );
+		if ( 2 === count( $cols ) ) {
+			// 50/50 on phones so the brand gets breathing room beside the phone
+			// link (guard.topbar-long-brand-mobile).
+			foreach ( $cols as &$tb_col ) {
+				$tb_col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => 50, 'sizes' => array() );
+			}
+			unset( $tb_col );
+		}
 
 		// Stay a row on mobile (phone stays reachable); brand never wraps badly
 		// because it is the only left item.
@@ -618,7 +660,11 @@ class PressGo_Section_Builder {
 		// broken image, so treat them as "no image" and let the section downgrade
 		// to its image-free variant.
 		if ( ctype_digit( $img ) ) {
-			return true;
+			// Media-library ID counts as real only when it resolves — an
+			// unresolvable ID must take the image-free downgrade paths instead of
+			// shipping <img src="123"> (guard.media-id-images; normalize_image()
+			// performs the same resolution for the actual render).
+			return (bool) wp_get_attachment_image_url( (int) $img, 'full' );
 		}
 		return (bool) preg_match( '#^(https?:)?//#i', $img ) || '/' === $img[0];
 	}
@@ -1341,11 +1387,17 @@ class PressGo_Section_Builder {
 			) ), 'center', 10 );
 		}
 
-		// Video embed below the CTA.
-		if ( ! empty( $h['video'] ) ) {
+		// Video embed below the CTA — only embeddable URLs (YouTube/Vimeo, or a
+		// direct media file video_w can host). A TikTok/Wistia URL in youtube_url
+		// rendered a large EMPTY rounded box under the CTAs; skipping the block
+		// keeps the hero complete (guard.hero-video-url-validation).
+		$hero_video = isset( $h['video'] ) && is_string( $h['video'] ) ? trim( $h['video'] ) : '';
+		if ( '' !== $hero_video
+			&& ( preg_match( '#(youtube\.com/(watch\?|shorts/|embed/)|youtu\.be/[\w-]{6,}|vimeo\.com/(?:[a-z][a-z/]*)?\d{6,11})#i', $hero_video )
+				|| preg_match( '#\.(mp4|webm|m4v|mov)(\?|$)#i', $hero_video ) ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 40 );
 			$overlay = isset( $h['image'] ) ? $h['image'] : '';
-			$children[] = PressGo_Widget_Helpers::video_w( $h['video'], $overlay,
+			$children[] = PressGo_Widget_Helpers::video_w( $hero_video, $overlay,
 				(int) $cfg['layout']['card_radius'] );
 		}
 
@@ -1620,17 +1672,32 @@ class PressGo_Section_Builder {
 			);
 		}
 
-		return PressGo_Element_Factory::outer( $cfg,
-			array( PressGo_Element_Factory::row( $cfg, $stat_cols, 20 ) ),
-			$c['light_bg'], null, 0, 80,
-			array(
-				'margin'  => array(
-					'unit' => 'px', 'top' => '-80', 'right' => '0',
-					'bottom' => '0', 'left' => '0', 'isLinked' => false,
-				),
-				'z_index' => 2,
-			)
-		);
+		// Count-adaptive (guard.stats-extreme-counts): one stat centers at ~40%
+		// between ghost cols instead of a full-width slab; 5+ flow into balanced
+		// ghost-padded rows of 4 instead of clipping in one row.
+		$n = count( $stat_cols );
+		if ( 1 === $n ) {
+			$stat_cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 40, 'sizes' => array() );
+			$grid = array( PressGo_Element_Factory::row( $cfg,
+				array( self::ghost_col(), $stat_cols[0], self::ghost_col() ), 0 ) );
+		} elseif ( $n > 4 ) {
+			$grid = self::card_grid( $cfg, $stat_cols, 4, 20 );
+		} else {
+			$grid = array( PressGo_Element_Factory::row( $cfg, $stat_cols, 20 ) );
+		}
+
+		// The -80px hero overlap only fits a single-row layout — a 2-row grid
+		// double-collides with the hero content.
+		$extra = array( 'z_index' => 2 );
+		if ( $n <= 4 ) {
+			$extra['margin'] = array(
+				'unit' => 'px', 'top' => '-80', 'right' => '0',
+				'bottom' => '0', 'left' => '0', 'isLinked' => false,
+			);
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $grid,
+			$c['light_bg'], null, 0, 80, $extra );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1681,10 +1748,22 @@ class PressGo_Section_Builder {
 			);
 		}
 
+		// Count-adaptive (guard.stats-extreme-counts): 1 stat ghost-centers,
+		// 5+ wrap into ghost-padded rows of 4.
+		$n = count( $stat_cols );
+		if ( 1 === $n ) {
+			$stat_cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 40, 'sizes' => array() );
+			$grid = array( PressGo_Element_Factory::row( $cfg,
+				array( self::ghost_col(), $stat_cols[0], self::ghost_col() ), 0 ) );
+		} elseif ( $n > 4 ) {
+			$grid = self::card_grid( $cfg, $stat_cols, 4, 20 );
+		} else {
+			$grid = array( PressGo_Element_Factory::row( $cfg, $stat_cols, 20 ) );
+		}
+
 		// Second stop deepened to #020617 (was #0F172A, nearly identical to the
 		// usual dark_bg) so the gradient is actually visible.
-		return PressGo_Element_Factory::outer( $cfg,
-			array( PressGo_Element_Factory::row( $cfg, $stat_cols, 20 ) ),
+		return PressGo_Element_Factory::outer( $cfg, $grid,
 			null, array( $c['dark_bg'], '#020617', 135 ), 60, 60 );
 	}
 
@@ -1714,13 +1793,30 @@ class PressGo_Section_Builder {
 			);
 		}
 
+		// Count-adaptive (guard.stats-extreme-counts): 1 stat ghost-centers,
+		// 5+ wrap into ghost-padded rows of 4 between the rule lines.
+		$n = count( $stat_cols );
+		if ( 1 === $n ) {
+			$stat_cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 40, 'sizes' => array() );
+			$grid = array( PressGo_Element_Factory::row( $cfg,
+				array( self::ghost_col(), $stat_cols[0], self::ghost_col() ), 0 ) );
+		} elseif ( $n > 4 ) {
+			$grid = self::card_grid( $cfg, $stat_cols, 4, 16 );
+		} else {
+			$grid = array( PressGo_Element_Factory::row( $cfg, $stat_cols, 16 ) );
+		}
+
 		return PressGo_Element_Factory::outer( $cfg,
-			array(
-				PressGo_Widget_Helpers::divider_w(),
-				PressGo_Widget_Helpers::spacer_w( 8 ),
-				PressGo_Element_Factory::row( $cfg, $stat_cols, 16 ),
-				PressGo_Widget_Helpers::spacer_w( 8 ),
-				PressGo_Widget_Helpers::divider_w(),
+			array_merge(
+				array(
+					PressGo_Widget_Helpers::divider_w(),
+					PressGo_Widget_Helpers::spacer_w( 8 ),
+				),
+				$grid,
+				array(
+					PressGo_Widget_Helpers::spacer_w( 8 ),
+					PressGo_Widget_Helpers::divider_w(),
+				)
 			),
 			$c['white'], null, 20, 20 );
 	}
@@ -2620,8 +2716,13 @@ class PressGo_Section_Builder {
 		$anchor = isset( $st['anchor'] ) ? $st['anchor'] : 'how-it-works';
 		$header = PressGo_Style_Utils::section_header( $cfg, $st['eyebrow'], $st['headline'] );
 
+		// Count-adaptive grid: 6-8 steps crammed one flex row into ~130px columns
+		// (guard.steps-count-adaptive-grid); 1-4 render exactly as before.
+		$n   = count( $step_cols );
+		$per = $n <= 4 ? $n : 3;
+
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $step_cols, 32 ) ) ),
+			array_merge( $header, self::card_grid( $cfg, $step_cols, $per, 32 ) ),
 			$c['white'], null, 100, 60,
 			array( '_element_id' => $anchor ) );
 	}
@@ -2677,13 +2778,18 @@ class PressGo_Section_Builder {
 			);
 		}
 
+		// Count-adaptive grid (guard.steps-count-adaptive-grid): 5+ steps wrap into
+		// balanced ghost-padded rows of 3 instead of one over-crammed flex row.
+		$n   = count( $step_cols );
+		$per = $n <= 4 ? $n : 3;
+
 		// Divider line between header and steps for visual separation.
 		$children = array_merge( $header,
 			array(
 				PressGo_Widget_Helpers::divider_w(),
 				PressGo_Widget_Helpers::spacer_w( 24 ),
-				PressGo_Element_Factory::row( $cfg, $step_cols, 20 ),
-			)
+			),
+			self::card_grid( $cfg, $step_cols, $per, 20 )
 		);
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
@@ -2764,6 +2870,7 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// ──────────────────────────────────────────────
 	// 5d. Steps Editorial (oversized ghost numerals, alternating sides)
 	// ──────────────────────────────────────────────
 
@@ -2841,6 +2948,508 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::outer( $cfg,
 			array_merge( $header, $rows ),
 			$c['white'], null, 100, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 5d. Steps Modules (course-curriculum list)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Curriculum/syllabus list for courses, coaching programs, bootcamps and
+	 * workshop tracks: numbered module cards stacked vertically at a readable
+	 * measure — zero-padded accent numeral (01/02/03), module title + desc, and
+	 * an optional muted `duration` meta line ("3 lessons · 45 min", rendered
+	 * VERBATIM only when supplied — never computed or fabricated). Fewer than 2
+	 * modules isn't a curriculum, so it falls back to the default steps layout.
+	 */
+	public static function build_steps_modules( $cfg ) {
+		$c  = $cfg['colors'];
+		$st = $cfg['steps'];
+
+		// norm_items: strings → title-only, junk dropped (0 items → build_steps
+		// returns null via its own guard).
+		$items = self::norm_items( isset( $st['items'] ) ? $st['items'] : array() );
+		if ( count( $items ) < 2 ) {
+			return self::build_steps( $cfg );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $st['eyebrow'], $st['headline'],
+			isset( $st['subheadline'] ) ? $st['subheadline'] : null );
+
+		$card_text       = PressGo_Style_Utils::card_text();
+		$card_text_muted = PressGo_Style_Utils::card_text_muted();
+
+		$rows = array();
+		foreach ( $items as $idx => $item ) {
+			// Zero-pad single digits so the rail reads as a designed index
+			// (01/02/03), not a stray number.
+			$num = self::step_num( $item, $idx );
+			if ( ctype_digit( $num ) && 1 === strlen( $num ) ) {
+				$num = '0' . $num;
+			}
+			$desc = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
+			// `duration` is the canonical meta field; `meta` accepted as alias.
+			// Rendered only when supplied — no "0 lessons" ever.
+			$duration = isset( $item['duration'] ) && is_scalar( $item['duration'] ) ? trim( (string) $item['duration'] )
+				: ( isset( $item['meta'] ) && is_scalar( $item['meta'] ) ? trim( (string) $item['meta'] ) : '' );
+
+			$content = array(
+				PressGo_Widget_Helpers::heading_w( $cfg, isset( $item['title'] ) ? $item['title'] : '', 'h4', 'left',
+					$card_text, 19, '700' ),
+			);
+			if ( is_scalar( $desc ) && '' !== trim( (string) $desc ) ) {
+				$content[] = PressGo_Widget_Helpers::spacer_w( 6 );
+				$content[] = PressGo_Widget_Helpers::text_w( $cfg, $desc, 'left',
+					$card_text_muted, 15, null, 1.6 );
+			}
+			if ( '' !== $duration ) {
+				$content[] = PressGo_Widget_Helpers::spacer_w( 8 );
+				$content[] = PressGo_Widget_Helpers::heading_w( $cfg, $duration, 'h6', 'left',
+					$card_text_muted, 12, '600', 1.5, null, 'uppercase' );
+			}
+
+			// Accent numeral rail — wide tracking gives the monospace-ish index
+			// feel without a font swap.
+			$num_col = PressGo_Element_Factory::col(
+				array(
+					PressGo_Widget_Helpers::heading_w( $cfg, $num, 'h3', 'left',
+						$c['accent'], 30, '800', 1, 1.0, null, 24, 26 ),
+				),
+				array(
+					'width'        => array( 'unit' => '%', 'size' => 14, 'sizes' => array() ),
+					'width_mobile' => array( 'unit' => '%', 'size' => 18, 'sizes' => array() ),
+				)
+			);
+			$content_col = PressGo_Element_Factory::col( $content, array(
+				'width'        => array( 'unit' => '%', 'size' => 86, 'sizes' => array() ),
+				'width_mobile' => array( 'unit' => '%', 'size' => 82, 'sizes' => array() ),
+			) );
+
+			if ( $idx > 0 ) {
+				$rows[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			}
+			// Module number stays beside the content on mobile too — stacking
+			// loses the number-module association.
+			$rows[] = PressGo_Element_Factory::col(
+				array( PressGo_Element_Factory::row( $cfg, array( $num_col, $content_col ), 12, array(
+					'flex_direction_mobile' => 'row',
+				) ) ),
+				PressGo_Style_Utils::card_style( $cfg, 24 )
+			);
+		}
+
+		// Stack at a readable measure between ghost columns (pricing_list idiom).
+		$list_col = PressGo_Element_Factory::col( $rows, array(
+			'width'        => array( 'unit' => '%', 'size' => 76, 'sizes' => array() ),
+			'width_tablet' => array( 'unit' => '%', 'size' => 92, 'sizes' => array() ),
+		) );
+		$children = array_merge( $header, array(
+			PressGo_Element_Factory::row( $cfg, array( self::ghost_col(), $list_col, self::ghost_col() ), 0 ),
+		) );
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 5e. Schedule (time-rail agenda — events, churches, courses)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Normalize schedule items: strings become title-only sessions; junk and
+	 * title-less entries drop; time/desc/speaker/location/tag/day coerce to
+	 * trimmed strings ('' when absent) so reads downstream can't warn or print
+	 * "Array". `description` is accepted as alias for `desc`.
+	 */
+	private static function sched_items( $items ) {
+		$out = array();
+		if ( ! is_array( $items ) ) {
+			return $out;
+		}
+		foreach ( $items as $it ) {
+			if ( is_string( $it ) ) {
+				if ( '' === trim( $it ) ) { continue; }
+				$it = array( 'title' => trim( $it ) );
+			} elseif ( ! is_array( $it ) ) {
+				continue;
+			}
+			$title = isset( $it['title'] ) && is_scalar( $it['title'] ) ? trim( (string) $it['title'] ) : '';
+			if ( '' === $title ) { continue; }
+			$it['title'] = $title;
+			foreach ( array( 'time', 'desc', 'speaker', 'location', 'tag', 'day' ) as $k ) {
+				$it[ $k ] = isset( $it[ $k ] ) && is_scalar( $it[ $k ] ) ? trim( (string) $it[ $k ] ) : '';
+			}
+			if ( '' === $it['desc'] && isset( $it['description'] ) && is_scalar( $it['description'] ) ) {
+				$it['desc'] = trim( (string) $it['description'] );
+			}
+			$out[] = $it;
+		}
+		return $out;
+	}
+
+	/**
+	 * Inline session meta line — speaker (fa-user) · location (fa-map-marker-alt)
+	 * · tag (fa-tag) as one inline icon-list (the hero_meta_list idiom). Absent
+	 * fields simply don't appear; returns null when nothing is usable.
+	 */
+	private static function sched_meta_list( $cfg, $it ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$meta  = array();
+		$pairs = array(
+			array( $it['speaker'],  'fas fa-user' ),
+			array( $it['location'], 'fas fa-map-marker-alt' ),
+			array( $it['tag'],      'fas fa-tag' ),
+		);
+		foreach ( $pairs as $p ) {
+			if ( '' === $p[0] ) { continue; }
+			$meta[] = array(
+				'text'          => $p[0],
+				'selected_icon' => array( 'value' => $p[1], 'library' => 'fa-solid' ),
+				'link'          => array( 'url' => '' ),
+			);
+		}
+		if ( empty( $meta ) ) { return null; }
+		return PressGo_Element_Factory::widget( 'icon-list', array(
+			'icon_list'                   => $meta,
+			'view'                        => 'inline',
+			'icon_color'                  => $c['accent'],
+			'text_color'                  => $c['text_muted'],
+			'icon_size'                   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+			'text_indent'                 => array( 'unit' => 'px', 'size' => 6, 'sizes' => array() ),
+			'space_between'               => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'icon_typography_typography'  => 'custom',
+			'icon_typography_font_family' => $fonts['body'],
+			'icon_typography_font_size'   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+			'icon_typography_font_weight' => '600',
+		) );
+	}
+
+	/**
+	 * Time-rail agenda: optional uppercase day-label group headers, then each
+	 * session as a hairline-divided row — bold accent time left (~20% col),
+	 * title + inline speaker/location/tag meta + desc right — centered at a
+	 * readable measure between ghost columns (build_pricing_list idiom). The
+	 * block conferences, churches, retreats and open-house events need. Items
+	 * without a time render full-width (no empty rail); no `day` values → flat
+	 * list, no group headers; no usable items → null.
+	 */
+	public static function build_schedule( $cfg ) {
+		$c  = $cfg['colors'];
+		$sc = $cfg['schedule'];
+
+		$items = self::sched_items( isset( $sc['items'] ) ? $sc['items'] : array() );
+		if ( empty( $items ) ) { return null; }
+
+		$header = PressGo_Style_Utils::section_header( $cfg,
+			isset( $sc['eyebrow'] ) ? $sc['eyebrow'] : '',
+			isset( $sc['headline'] ) ? $sc['headline'] : '',
+			isset( $sc['subheadline'] ) ? $sc['subheadline'] : null );
+
+		// Group by day, preserving first-appearance order. Sessions without a
+		// day land under the '' group (no header), so a flat agenda stays flat.
+		$groups = array();
+		foreach ( $items as $it ) {
+			$groups[ $it['day'] ][] = $it;
+		}
+
+		$list = array();
+		$first_group = true;
+		foreach ( $groups as $day => $group ) {
+			if ( ! $first_group ) { $list[] = PressGo_Widget_Helpers::spacer_w( 48 ); }
+			$first_group = false;
+			if ( '' !== $day ) {
+				// Uppercase eyebrow-style day header.
+				$list[] = PressGo_Widget_Helpers::heading_w( $cfg, $day, 'h6', 'left',
+					$c['accent'], 13, '700', 3, null, 'uppercase' );
+				$list[] = PressGo_Widget_Helpers::spacer_w( 16 );
+			}
+			$last = count( $group ) - 1;
+			foreach ( $group as $gi => $it ) {
+				$right = array(
+					PressGo_Widget_Helpers::heading_w( $cfg, $it['title'], 'h4', 'left',
+						$c['text_dark'], 18, '700' ),
+				);
+				$meta = self::sched_meta_list( $cfg, $it );
+				if ( $meta ) {
+					$right[] = PressGo_Widget_Helpers::spacer_w( 6 );
+					$right[] = $meta;
+				}
+				if ( '' !== $it['desc'] ) {
+					$right[] = PressGo_Widget_Helpers::spacer_w( 6 );
+					$right[] = PressGo_Widget_Helpers::text_w( $cfg, $it['desc'], 'left',
+						$c['text_muted'], 14, null, 1.55 );
+				}
+
+				if ( '' !== $it['time'] ) {
+					// Rows stay side-by-side on mobile (the rail widens to ~30%)
+					// so the time-session association survives stacking; the
+					// inline meta list wraps on its own.
+					$cols = array(
+						PressGo_Element_Factory::col(
+							array(
+								PressGo_Widget_Helpers::heading_w( $cfg, $it['time'], 'h5', 'left',
+									$c['accent'], 16, '800', null, 1.45 ),
+							),
+							array(
+								'width'        => array( 'unit' => '%', 'size' => 20, 'sizes' => array() ),
+								'width_mobile' => array( 'unit' => '%', 'size' => 30, 'sizes' => array() ),
+							)
+						),
+						PressGo_Element_Factory::col( $right, array(
+							'width'        => array( 'unit' => '%', 'size' => 80, 'sizes' => array() ),
+							'width_mobile' => array( 'unit' => '%', 'size' => 70, 'sizes' => array() ),
+						) ),
+					);
+					$list[] = PressGo_Element_Factory::row( $cfg, $cols, 16, array(
+						'flex_direction_mobile' => 'row',
+					) );
+				} else {
+					// No time → title runs full-width; never an empty rail.
+					$list[] = PressGo_Element_Factory::row( $cfg,
+						array( PressGo_Element_Factory::col( $right ) ), 16 );
+				}
+				if ( $gi !== $last ) {
+					$list[] = PressGo_Widget_Helpers::spacer_w( 14 );
+					$list[] = PressGo_Widget_Helpers::divider_w( $c['border'] );
+					$list[] = PressGo_Widget_Helpers::spacer_w( 14 );
+				}
+			}
+		}
+
+		// Center the agenda at a readable measure between ghost columns.
+		$list_col = PressGo_Element_Factory::col( $list, array(
+			'width'        => array( 'unit' => '%', 'size' => 70, 'sizes' => array() ),
+			'width_tablet' => array( 'unit' => '%', 'size' => 88, 'sizes' => array() ),
+		) );
+		$children = array_merge( $header, array(
+			PressGo_Element_Factory::row( $cfg, array( self::ghost_col(), $list_col, self::ghost_col() ), 0 ),
+		) );
+
+		// Optional section CTA ("Register", "Get tickets") — centered.
+		$sc_cta = self::resolve_cta( isset( $sc['cta'] ) ? $sc['cta'] : null );
+		if ( $sc_cta ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 36 );
+			$children[] = PressGo_Widget_Helpers::btn_w( $cfg, $sc_cta['text'], $sc_cta['url'],
+				$c['primary'], $c['white'], null, $sc_cta['icon'], 'center' );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 5f. Schedule Times (service-times card grid)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Service-times card grid — the church "when we meet" block (also gym
+	 * classes, clinic walk-in hours, happy hours): 2-4 white cards with a
+	 * tinted clock-icon chip, the time as display type, the gathering label,
+	 * and an optional muted note. Items lacking BOTH time and title drop; if
+	 * NO item carries a time at all, the default time-rail layout serves
+	 * better than label-only cards, so it routes there.
+	 */
+	public static function build_schedule_times( $cfg ) {
+		$c  = $cfg['colors'];
+		$sc = $cfg['schedule'];
+
+		// Re-read items as cards: title = label ('Sunday Worship'), time =
+		// display time, desc = note, optional per-item icon (default clock).
+		$raw      = isset( $sc['items'] ) && is_array( $sc['items'] ) ? $sc['items'] : array();
+		$cards    = array();
+		$has_time = false;
+		foreach ( $raw as $it ) {
+			if ( is_string( $it ) ) { $it = array( 'title' => $it ); }
+			if ( ! is_array( $it ) ) { continue; }
+			$title = isset( $it['title'] ) && is_scalar( $it['title'] ) ? trim( (string) $it['title'] ) : '';
+			$time  = isset( $it['time'] ) && is_scalar( $it['time'] ) ? trim( (string) $it['time'] ) : '';
+			$note  = isset( $it['desc'] ) && is_scalar( $it['desc'] ) ? trim( (string) $it['desc'] )
+				: ( isset( $it['description'] ) && is_scalar( $it['description'] ) ? trim( (string) $it['description'] ) : '' );
+			if ( '' === $title && '' === $time ) { continue; }
+			if ( '' !== $time ) { $has_time = true; }
+			$cards[] = array(
+				'title' => $title,
+				'time'  => $time,
+				'note'  => $note,
+				'icon'  => isset( $it['icon'] ) && is_string( $it['icon'] ) && '' !== $it['icon'] ? $it['icon'] : 'fas fa-clock',
+			);
+		}
+		if ( empty( $cards ) ) { return null; }
+		if ( ! $has_time ) {
+			return self::build_schedule( $cfg );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg,
+			isset( $sc['eyebrow'] ) ? $sc['eyebrow'] : '',
+			isset( $sc['headline'] ) ? $sc['headline'] : '',
+			isset( $sc['subheadline'] ) ? $sc['subheadline'] : null );
+
+		// Cards are white regardless of theme — fixed card text tokens.
+		$card_text       = PressGo_Style_Utils::card_text();
+		$card_text_muted = PressGo_Style_Utils::card_text_muted();
+
+		$cols = array();
+		foreach ( $cards as $card ) {
+			$widgets = array(
+				PressGo_Widget_Helpers::icon_w( $card['icon'],
+					PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 ),
+					24, 'stacked', 'circle', $c['primary'] ),
+				PressGo_Widget_Helpers::spacer_w( 14 ),
+			);
+			if ( '' !== $card['time'] ) {
+				// 30px display time, dropping to 24px on phones.
+				$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $card['time'], 'h3', 'center',
+					$card_text, 30, '800', -0.5, 1.15, null, 24, 26 );
+			}
+			if ( '' !== $card['title'] ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 6 );
+				$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $card['title'], 'h5', 'center',
+					$card_text, 16, '700' );
+			}
+			if ( '' !== $card['note'] ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $card['note'], 'center',
+					$card_text_muted, 14 );
+			}
+			$cols[] = PressGo_Element_Factory::col( $widgets, array_merge(
+				array( 'flex_align_items' => 'center' ),
+				PressGo_Style_Utils::card_style( $cfg, 28 )
+			) );
+		}
+
+		// One card ghost-centers; 2-4 share a row (stacking on mobile via the
+		// default row() behavior); 5+ wrap into ghost-padded rows of 3.
+		$n = count( $cols );
+		if ( 1 === $n ) {
+			$cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 44, 'sizes' => array() );
+			$grid = array( PressGo_Element_Factory::row( $cfg,
+				array( self::ghost_col(), $cols[0], self::ghost_col() ), 0 ) );
+		} else {
+			$grid = self::card_grid( $cfg, $cols, $n <= 4 ? $n : 3, 24 );
+		}
+
+		$children = array_merge( $header, $grid );
+
+		$sc_cta = self::resolve_cta( isset( $sc['cta'] ) ? $sc['cta'] : null );
+		if ( $sc_cta ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+			$children[] = PressGo_Widget_Helpers::btn_w( $cfg, $sc_cta['text'], $sc_cta['url'],
+				$c['primary'], $c['white'], null, $sc_cta['icon'], 'center' );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 5g. Schedule Tabs (multi-day agenda via native tabs widget)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Multi-day agenda: one tab per distinct items[].day (first-appearance
+	 * order, capped at 5) via the native Elementor tabs widget. Tab content is
+	 * kses-safe text rows — bold time · title, muted speaker/location line
+	 * (solid hex only inline). Elementor's own render emits a mobile tab title
+	 * before each content block, so phones get a stacked tap-to-open accordion
+	 * for free. Fewer than 2 distinct days → the default time-rail (never a
+	 * lone tab); day-less sessions fold into the first day's tab.
+	 */
+	public static function build_schedule_tabs( $cfg ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$sc    = $cfg['schedule'];
+
+		$items = self::sched_items( isset( $sc['items'] ) ? $sc['items'] : array() );
+		if ( empty( $items ) ) { return null; }
+
+		// Distinct day labels in first-appearance order.
+		$days     = array();
+		$dayless  = array();
+		$by_day   = array();
+		foreach ( $items as $it ) {
+			if ( '' === $it['day'] ) {
+				$dayless[] = $it;
+				continue;
+			}
+			if ( ! isset( $by_day[ $it['day'] ] ) ) {
+				$days[] = $it['day'];
+				$by_day[ $it['day'] ] = array();
+			}
+			$by_day[ $it['day'] ][] = $it;
+		}
+		if ( count( $days ) < 2 ) {
+			return self::build_schedule( $cfg );
+		}
+		$days = array_slice( $days, 0, 5 ); // cap at 5 tabs
+		// Sessions with no day fold into the first tab.
+		if ( ! empty( $dayless ) ) {
+			$by_day[ $days[0] ] = array_merge( $dayless, $by_day[ $days[0] ] );
+		}
+
+		// Inline span color must be a SOLID hex (kses strips rgba in style attrs).
+		$muted_hex = isset( $c['text_muted'] ) && is_string( $c['text_muted'] ) && '#' === substr( $c['text_muted'], 0, 1 )
+			? $c['text_muted'] : '#64748B';
+
+		$tabs = array();
+		foreach ( $days as $day ) {
+			$rows = '';
+			foreach ( $by_day[ $day ] as $it ) {
+				$line = '';
+				if ( '' !== $it['time'] ) {
+					$line .= '<strong>' . esc_html( $it['time'] ) . '</strong> · ';
+				}
+				$line .= esc_html( $it['title'] );
+				$meta_bits = array();
+				foreach ( array( 'speaker', 'location', 'tag' ) as $mk ) {
+					if ( '' !== $it[ $mk ] ) { $meta_bits[] = esc_html( $it[ $mk ] ); }
+				}
+				if ( '' !== $it['desc'] ) {
+					$meta_bits[] = esc_html( $it['desc'] );
+				}
+				if ( ! empty( $meta_bits ) ) {
+					$line .= '<br><span style="color:' . $muted_hex . ';">' . implode( ' · ', $meta_bits ) . '</span>';
+				}
+				$rows .= '<p>' . $line . '</p>';
+			}
+			$tabs[] = array( 'tab_title' => $day, 'tab_content' => $rows );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg,
+			isset( $sc['eyebrow'] ) ? $sc['eyebrow'] : '',
+			isset( $sc['headline'] ) ? $sc['headline'] : '',
+			isset( $sc['subheadline'] ) ? $sc['subheadline'] : null );
+
+		$tabs_w = PressGo_Element_Factory::widget( 'tabs', array(
+			'tabs'                                => $tabs,
+			'type'                                => 'horizontal',
+			'tabs_align_horizontal'               => 'stretch',
+			'border_color'                        => $c['border'],
+			'background_color'                    => $c['white'],
+			'tab_color'                           => PressGo_Style_Utils::card_text_muted(),
+			'tab_active_color'                    => $c['primary'],
+			'tab_typography_typography'           => 'custom',
+			'tab_typography_font_family'          => $fonts['heading'],
+			'tab_typography_font_weight'          => '700',
+			'tab_typography_font_size'            => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'tab_typography_font_size_mobile'     => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'content_typography_typography'       => 'custom',
+			'content_typography_font_family'      => $fonts['body'],
+			'content_typography_font_size'        => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'content_typography_line_height'      => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+		) );
+
+		$children = array_merge( $header, array( $tabs_w ) );
+
+		// CTA stays OUTSIDE the tabs (tab_content is text-level markup only).
+		$sc_cta = self::resolve_cta( isset( $sc['cta'] ) ? $sc['cta'] : null );
+		if ( $sc_cta ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 36 );
+			$children[] = PressGo_Widget_Helpers::btn_w( $cfg, $sc_cta['text'], $sc_cta['url'],
+				$c['primary'], $c['white'], null, $sc_cta['icon'], 'center' );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['white'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -3336,11 +3945,15 @@ class PressGo_Section_Builder {
 			);
 			$style['border_color'] = $c['primary'];
 
-			$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
+			// Bare-token photos ('sarah.jpg') render a broken avatar — gate with
+			// has_real_image; '' makes testimonial_w omit the image (guard.avatar-token-validation).
+			$image_url = ! empty( $item['photo'] ) && self::has_real_image( $item['photo'] ) ? $item['photo'] : '';
 
 			$testimonial_cols[] = PressGo_Element_Factory::col(
 				array(
-					PressGo_Widget_Helpers::star_rating_w( 5, 16, $c['gold'], 'left' ),
+					// Real rating when supplied; 5 only as the legacy default
+					// (guard.testimonial-honest-stars).
+					PressGo_Widget_Helpers::star_rating_w( null !== $item['rating'] ? $item['rating'] : 5, 16, $c['gold'], 'left' ),
 					PressGo_Widget_Helpers::spacer_w( 12 ),
 					PressGo_Widget_Helpers::testimonial_w( $cfg, $item['quote'],
 						$item['name'], $item['role'], $image_url, 'left' ),
@@ -3415,8 +4028,9 @@ class PressGo_Section_Builder {
 			'center', $c['text_dark'], 22, 18, 1.8 );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
 
-		// Stars.
-		$children[] = PressGo_Widget_Helpers::star_rating_w( 5, 20, $c['gold'], 'center' );
+		// Stars — the featured review's own rating when stated (guard.testimonial-honest-stars).
+		$children[] = PressGo_Widget_Helpers::star_rating_w(
+			null !== $featured['rating'] ? $featured['rating'] : 5, 20, $c['gold'], 'center' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 
 		// Author info.
@@ -3439,11 +4053,14 @@ class PressGo_Section_Builder {
 				// Word-boundary, mb-safe trim (byte substr split multibyte
 				// chars and printed � mid-word).
 				$truncated = self::trim_words( $item['quote'], 18 );
-				$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
+				// Bare-token photos ('sarah.jpg') render a broken avatar — gate with
+			// has_real_image; '' makes testimonial_w omit the image (guard.avatar-token-validation).
+			$image_url = ! empty( $item['photo'] ) && self::has_real_image( $item['photo'] ) ? $item['photo'] : '';
 
 				$mini_cols[] = PressGo_Element_Factory::col(
 					array(
-						PressGo_Widget_Helpers::star_rating_w( 5, 12, $c['gold'], 'left' ),
+						// Honest stars (guard.testimonial-honest-stars).
+						PressGo_Widget_Helpers::star_rating_w( null !== $item['rating'] ? $item['rating'] : 5, 12, $c['gold'], 'left' ),
 						PressGo_Widget_Helpers::spacer_w( 8 ),
 						PressGo_Widget_Helpers::testimonial_w( $cfg, $truncated,
 							$item['name'], $item['role'], $image_url, 'left' ),
@@ -3481,12 +4098,15 @@ class PressGo_Section_Builder {
 
 		$cols = array();
 		foreach ( $items as $item ) {
-			$image_url = ! empty( $item['photo'] ) ? $item['photo'] : '';
+			// Bare-token photos ('sarah.jpg') render a broken avatar — gate with
+			// has_real_image; '' makes testimonial_w omit the image (guard.avatar-token-validation).
+			$image_url = ! empty( $item['photo'] ) && self::has_real_image( $item['photo'] ) ? $item['photo'] : '';
 			$name = isset( $item['name'] ) ? $item['name'] : '';
 			$role = isset( $item['role'] ) ? $item['role'] : '';
 
 			$card_widgets = array(
-				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
+				// Honest stars (guard.testimonial-honest-stars).
+				PressGo_Widget_Helpers::star_rating_w( null !== $item['rating'] ? $item['rating'] : 5, 14, $c['gold'], 'left' ),
 				PressGo_Widget_Helpers::spacer_w( 12 ),
 				PressGo_Widget_Helpers::testimonial_w( $cfg, $item['quote'],
 					$name, $role, $image_url, 'left' ),
@@ -4188,9 +4808,11 @@ class PressGo_Section_Builder {
 
 			$widgets = array();
 
-			// "Most Popular" badge.
-			if ( ! empty( $plan['badge'] ) ) {
-				$widgets[] = self::pill_button( $cfg, strtoupper( $plan['badge'] ),
+			// "Most Popular" badge — plan_badge() guards object/array shapes
+			// (guard.pricing-badge-fatal).
+			$badge = self::plan_badge( $plan );
+			if ( '' !== $badge ) {
+				$widgets[] = self::pill_button( $cfg, strtoupper( $badge ),
 					PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.1 ),
 					$c['primary'], 'transparent' );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
@@ -4313,10 +4935,27 @@ class PressGo_Section_Builder {
 		if ( 1 === count( $plan_cols ) ) {
 			$plan_cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 50, 'sizes' => array() );
 			$plan_cols = array( self::ghost_col(), $plan_cols[0], self::ghost_col() );
+			$grid = array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24 ) );
+		} elseif ( count( $plan_cols ) >= 5 ) {
+			// 5-6 plans never fit one row — ghost-padded rows of 3
+			// (guard.pricing-tablet-wrap).
+			$grid = self::card_grid( $cfg, $plan_cols, 3, 24 );
+		} else {
+			// 4 cards clip price type/feature lists at ~720px — wrap 2x2 on
+			// tablet, the proven results_bars pattern (guard.pricing-tablet-wrap).
+			$row_extra = null;
+			if ( 4 === count( $plan_cols ) ) {
+				foreach ( $plan_cols as &$pcol ) {
+					$pcol['settings']['width_tablet'] = array( 'unit' => '%', 'size' => 48, 'sizes' => array() );
+				}
+				unset( $pcol );
+				$row_extra = array( 'flex_wrap_tablet' => 'wrap' );
+			}
+			$grid = array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24, $row_extra ) );
 		}
 
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24 ) ) ),
+			array_merge( $header, $grid ),
 			$c['light_bg'], null, 80, 80 );
 	}
 
@@ -4348,10 +4987,12 @@ class PressGo_Section_Builder {
 			$card_text       = PressGo_Style_Utils::card_text();
 			$card_text_muted = PressGo_Style_Utils::card_text_muted();
 
-			// Badge row.
-			if ( ! empty( $plan['badge'] ) ) {
+			// Badge row — plan_badge() guards object/array shapes
+			// (guard.pricing-badge-fatal).
+			$badge = self::plan_badge( $plan );
+			if ( '' !== $badge ) {
 				$badge_text = PressGo_Style_Utils::text_on_color( $c['primary'] );
-				$widgets[] = self::pill_button( $cfg, strtoupper( $plan['badge'] ),
+				$widgets[] = self::pill_button( $cfg, strtoupper( $badge ),
 					$c['primary'], $badge_text, $c['primary'] );
 				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 			}
@@ -4434,9 +5075,175 @@ class PressGo_Section_Builder {
 			$plan_cols[] = PressGo_Element_Factory::col( $widgets, $style );
 		}
 
+		// Count-adaptive (guard.pricing-tablet-wrap): 4 cards wrap 2x2 on tablet;
+		// 5+ flow into ghost-padded rows of 3.
+		if ( count( $plan_cols ) >= 5 ) {
+			$grid = self::card_grid( $cfg, $plan_cols, 3, 24 );
+		} else {
+			$row_extra = null;
+			if ( 4 === count( $plan_cols ) ) {
+				foreach ( $plan_cols as &$pcol ) {
+					$pcol['settings']['width_tablet'] = array( 'unit' => '%', 'size' => 48, 'sizes' => array() );
+				}
+				unset( $pcol );
+				$row_extra = array( 'flex_wrap_tablet' => 'wrap' );
+			}
+			$grid = array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24, $row_extra ) );
+		}
+
 		return PressGo_Element_Factory::outer( $cfg,
-			array_merge( $header, array( PressGo_Element_Factory::row( $cfg, $plan_cols, 24 ) ) ),
+			array_merge( $header, $grid ),
 			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 12d. Pricing Donation (giving tier cards — nonprofits, churches, fundraisers)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Donation tiers that don't read as SaaS pricing: amount-first display type
+	 * ('$50'), the impact line as the card body, optional badge + highlighted
+	 * accent border, and every card's button defaulting to the SAME section-level
+	 * give URL — one Stripe/PayPal/Tithe.ly link powers all tiers. Optional
+	 * trust_line under the grid renders ONLY what the config provides (never a
+	 * fabricated EIN). Tiers without an amount drop; none left → plan-card
+	 * default (which carries its own guards).
+	 */
+	public static function build_pricing_donation( $cfg ) {
+		$c = $cfg['colors'];
+		$p = $cfg['pricing'];
+
+		// pricing_plans normalizes strings/junk; a tier with no amount isn't a
+		// donation tier.
+		$plans = self::pricing_plans( isset( $p['plans'] ) ? $p['plans'] : array() );
+		$tiers = array();
+		foreach ( $plans as $plan ) {
+			if ( '' === $plan['price'] ) { continue; }
+			$tiers[] = $plan;
+		}
+		if ( empty( $tiers ) ) {
+			return self::build_pricing( $cfg );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg,
+			isset( $p['eyebrow'] ) ? $p['eyebrow'] : '',
+			isset( $p['headline'] ) ? $p['headline'] : '',
+			isset( $p['subheadline'] ) ? $p['subheadline'] : null );
+
+		// The shared give link: section cta is the default for every tier card.
+		$section_cta = self::resolve_cta( isset( $p['cta'] ) ? $p['cta'] : null );
+
+		$card_text       = PressGo_Style_Utils::card_text();
+		$card_text_muted = PressGo_Style_Utils::card_text_muted();
+
+		$cols = array();
+		foreach ( $tiers as $plan ) {
+			$highlighted = ! empty( $plan['highlighted'] );
+			$widgets = array();
+
+			// Badge ("MOST COMMON") — plan_badge() guards object shapes.
+			$badge = self::plan_badge( $plan );
+			if ( '' !== $badge ) {
+				$widgets[] = self::pill_button( $cfg, strtoupper( $badge ),
+					PressGo_Style_Utils::hex_to_rgba( $c['accent'], 0.12 ),
+					$c['accent'], 'transparent' );
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
+			} else {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 8 );
+			}
+
+			// Amount first, 40px display type. NO plan_period() here — it would
+			// append '/mo' to a bare '$50'. Recurring giving is expressed only by
+			// an EXPLICIT period the user supplied ('/month'), never defaulted.
+			list( $pr_size, $pr_mobile, $pr_tablet ) = self::price_size( $plan['price'] );
+			$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['price'], 'h2', 'center',
+				$card_text, min( 40, $pr_size ), '800', -1.5, 1.0,
+				null, min( 30, $pr_mobile ), min( 34, $pr_tablet ) );
+			$period = isset( $plan['period'] ) && is_scalar( $plan['period'] ) ? trim( (string) $plan['period'] ) : '';
+			if ( '' !== $period ) {
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $period, 'center',
+					$card_text_muted, 14 );
+			}
+
+			// Tier name ('Supporter') as a small uppercase label under the amount.
+			if ( '' !== $plan['name'] ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 6 );
+				$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $plan['name'], 'h5', 'center',
+					$card_text_muted, 13, '700', 1.5, null, 'uppercase' );
+			}
+
+			// Impact line as the card body.
+			if ( ! empty( $plan['description'] ) ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 10 );
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $plan['description'], 'center',
+					$card_text_muted, 15, null, 1.6 );
+			}
+
+			$widgets[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			// Buttons align across unequal impact-line lengths.
+			$widgets[] = self::grow_spacer();
+
+			// Card cta defaults to the section give link; with neither, the card
+			// renders without a button (still informative — never a '#' invention).
+			$tier_cta = self::resolve_cta( isset( $plan['cta'] ) ? $plan['cta'] : null );
+			if ( ! $tier_cta && $section_cta ) {
+				$tier_cta = $section_cta;
+			}
+			if ( $tier_cta ) {
+				if ( $highlighted ) {
+					$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $tier_cta['text'], $tier_cta['url'],
+						$c['accent'], $c['white'], null, $tier_cta['icon'], 'center' );
+				} else {
+					$widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $tier_cta['text'], $tier_cta['url'],
+						'transparent', $card_text, $card_text, $tier_cta['icon'], 'center' );
+				}
+			}
+
+			$style = PressGo_Style_Utils::card_style( $cfg, 30 );
+			if ( $highlighted ) {
+				// Accent border marks the suggested tier; survives the mobile stack.
+				$style['border_width'] = array(
+					'unit' => 'px', 'top' => '2', 'right' => '2',
+					'bottom' => '2', 'left' => '2', 'isLinked' => true,
+				);
+				$style['border_color'] = $c['accent'];
+			}
+			$cols[] = PressGo_Element_Factory::col( $widgets, $style );
+		}
+
+		// One tier ghost-centers; up to 4 share a row (2x2 tablet wrap, same as
+		// guard.pricing-tablet-wrap); 5+ flow into ghost-padded rows of 3.
+		$n = count( $cols );
+		if ( 1 === $n ) {
+			$cols[0]['settings']['width'] = array( 'unit' => '%', 'size' => 50, 'sizes' => array() );
+			$grid = array( PressGo_Element_Factory::row( $cfg,
+				array( self::ghost_col(), $cols[0], self::ghost_col() ), 0 ) );
+		} elseif ( $n >= 5 ) {
+			$grid = self::card_grid( $cfg, $cols, 3, 24 );
+		} else {
+			$row_extra = null;
+			if ( 4 === $n ) {
+				foreach ( $cols as &$dcol ) {
+					$dcol['settings']['width_tablet'] = array( 'unit' => '%', 'size' => 48, 'sizes' => array() );
+				}
+				unset( $dcol );
+				$row_extra = array( 'flex_wrap_tablet' => 'wrap' );
+			}
+			$grid = array( PressGo_Element_Factory::row( $cfg, $cols, 24, $row_extra ) );
+		}
+
+		$children = array_merge( $header, $grid );
+
+		// Trust line under the grid — REAL info only, rendered verbatim.
+		$trust = isset( $p['trust_line'] ) && is_scalar( $p['trust_line'] ) ? trim( (string) $p['trust_line'] ) : '';
+		if ( '' !== $trust ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, $trust, 'center',
+				$c['text_muted'], 13 );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -4724,7 +5531,9 @@ class PressGo_Section_Builder {
 
 			// Photo. If missing, render an initials-circle placeholder so the
 			// card doesn't have a gaping hole where the avatar should be.
-			if ( ! empty( $member['photo'] ) ) {
+			// has_real_image gates hallucinated bare tokens ('team1.jpg') into the
+			// initials branch too (guard.avatar-token-validation).
+			if ( ! empty( $member['photo'] ) && self::has_real_image( $member['photo'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
 					$member['name'], 150, 999, false, 'center' );
 			} else {
@@ -4802,7 +5611,9 @@ class PressGo_Section_Builder {
 		foreach ( $tm['members'] as $member ) {
 			$widgets = array();
 
-			if ( ! empty( $member['photo'] ) ) {
+			// Bare-token photo → initials branch, not a broken img
+			// (guard.avatar-token-validation).
+			if ( ! empty( $member['photo'] ) && self::has_real_image( $member['photo'] ) ) {
 				$widgets[] = PressGo_Widget_Helpers::image_w( $member['photo'],
 					$member['name'], 120, 999, false, 'center' );
 			} else {
@@ -4884,16 +5695,21 @@ class PressGo_Section_Builder {
 				$ft['social_icons'], 14, 'custom', 'rgba(255,255,255,0.4)', 'circle', 'left', 8
 			);
 		}
-		$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
-			'padding' => array(
-				'unit' => 'px', 'top' => '0', 'right' => '40',
-				'bottom' => '0', 'left' => '0', 'isLinked' => false,
-			),
-			'padding_mobile' => array(
-				'unit' => 'px', 'top' => '0', 'right' => '0',
-				'bottom' => '20', 'left' => '0', 'isLinked' => false,
-			),
-		) );
+		// Only render the brand column when it actually has content — an
+		// unconditional empty col was the root of the bare-slab footer
+		// (guard.footer-empty-slab).
+		if ( ! empty( $brand_widgets ) ) {
+			$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
+				'padding' => array(
+					'unit' => 'px', 'top' => '0', 'right' => '40',
+					'bottom' => '0', 'left' => '0', 'isLinked' => false,
+				),
+				'padding_mobile' => array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '20', 'left' => '0', 'isLinked' => false,
+				),
+			) );
+		}
 
 		// Link columns — one text_w per link for individual editability.
 		// Accept 'items' as alias for 'links' (the canonical key).
@@ -4978,6 +5794,16 @@ class PressGo_Section_Builder {
 			$cols[] = PressGo_Element_Factory::col( $contact_widgets );
 		}
 
+		// Nothing usable at all (footer:{} / columns:[]): render a copyright-only
+		// bar, or skip the section entirely (guard.footer-empty-slab).
+		if ( empty( $cols ) ) {
+			if ( empty( $ft['copyright'] ) || ! is_scalar( $ft['copyright'] ) ) { return null; }
+			return PressGo_Element_Factory::outer( $cfg,
+				array( PressGo_Widget_Helpers::text_w( $cfg, $ft['copyright'], 'center',
+					'rgba(255,255,255,0.4)', 13 ) ),
+				$c['dark_bg'], null, 28, 28 );
+		}
+
 		$children = array( PressGo_Element_Factory::row( $cfg, $cols, 24 ) );
 
 		// Copyright bar.
@@ -5021,16 +5847,21 @@ class PressGo_Section_Builder {
 				$ft['social_icons'], 14, 'custom', $c['text_muted'], 'circle', 'left', 8
 			);
 		}
-		$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
-			'padding' => array(
-				'unit' => 'px', 'top' => '0', 'right' => '40',
-				'bottom' => '0', 'left' => '0', 'isLinked' => false,
-			),
-			'padding_mobile' => array(
-				'unit' => 'px', 'top' => '0', 'right' => '0',
-				'bottom' => '20', 'left' => '0', 'isLinked' => false,
-			),
-		) );
+		// Only render the brand column when it actually has content — an
+		// unconditional empty col was the root of the bare-slab footer
+		// (guard.footer-empty-slab).
+		if ( ! empty( $brand_widgets ) ) {
+			$cols[] = PressGo_Element_Factory::col( $brand_widgets, array(
+				'padding' => array(
+					'unit' => 'px', 'top' => '0', 'right' => '40',
+					'bottom' => '0', 'left' => '0', 'isLinked' => false,
+				),
+				'padding_mobile' => array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '20', 'left' => '0', 'isLinked' => false,
+				),
+			) );
+		}
 
 		// Link columns — one text_w per link for individual editability.
 		$link_columns = isset( $ft['columns'] ) && is_array( $ft['columns'] ) ? $ft['columns'] : array();
@@ -5109,6 +5940,15 @@ class PressGo_Section_Builder {
 			}
 
 			$cols[] = PressGo_Element_Factory::col( $contact_widgets );
+		}
+
+		// Nothing usable at all: copyright-only bar or skip (guard.footer-empty-slab).
+		if ( empty( $cols ) ) {
+			if ( empty( $ft['copyright'] ) || ! is_scalar( $ft['copyright'] ) ) { return null; }
+			return PressGo_Element_Factory::outer( $cfg,
+				array( PressGo_Widget_Helpers::text_w( $cfg, $ft['copyright'], 'center',
+					$c['text_muted'], 13 ) ),
+				$c['light_bg'], null, 28, 28 );
 		}
 
 		$children = array( PressGo_Element_Factory::row( $cfg, $cols, 24 ) );
@@ -5619,10 +6459,19 @@ class PressGo_Section_Builder {
 				$desc_color, 15 );
 		}
 
+		// Canonical cta:{text,url} first, legacy cta_text/cta_url fallback — the
+		// schema-shaped object was silently ignored and the user's signup URL
+		// dropped (guard.newsletter-inline-height-and-cta). Same resolve block as
+		// build_newsletter.
+		$nl_cta = self::resolve_cta( isset( $nl['cta'] ) ? $nl['cta'] : null );
+		if ( ! $nl_cta ) {
+			$nl_cta = array(
+				'text' => isset( $nl['cta_text'] ) && is_scalar( $nl['cta_text'] ) ? (string) $nl['cta_text'] : 'Subscribe',
+				'url'  => isset( $nl['cta_url'] ) && is_scalar( $nl['cta_url'] ) ? (string) $nl['cta_url'] : '#',
+			);
+		}
 		$right = array(
-			PressGo_Widget_Helpers::btn_w( $cfg,
-				isset( $nl['cta_text'] ) ? $nl['cta_text'] : 'Subscribe',
-				isset( $nl['cta_url'] ) ? $nl['cta_url'] : '#',
+			PressGo_Widget_Helpers::btn_w( $cfg, $nl_cta['text'], $nl_cta['url'],
 				$btn_bg, $btn_label, null,
 				array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ), 'right' ),
 		);
@@ -5630,10 +6479,11 @@ class PressGo_Section_Builder {
 		$left_col = PressGo_Element_Factory::col( $left, array(
 			'vertical_align' => 'middle',
 		) );
+		// No min_height: the stray 300px/200px values (pasted from the split-hero
+		// image column) turned the compact bar into a mostly-empty slab
+		// (guard.newsletter-inline-height-and-cta).
 		$right_col = PressGo_Element_Factory::col( $right, array(
 			'vertical_align'    => 'middle',
-			'min_height'        => array( 'unit' => 'px', 'size' => 300, 'sizes' => array() ),
-			'min_height_mobile' => array( 'unit' => 'px', 'size' => 200, 'sizes' => array() ),
 		) );
 
 		$row = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 40 );
@@ -6046,7 +6896,10 @@ class PressGo_Section_Builder {
 			if ( is_string( $v ) ) { $v = array( 'url' => $v ); }
 			if ( ! is_array( $v ) ) { continue; }
 			$url = isset( $v['url'] ) && is_string( $v['url'] ) ? trim( $v['url'] ) : '';
-			if ( '' === $url || ! preg_match( '#(youtube\.com/(watch\?|shorts/|embed/)|youtu\.be/[\w-]{6,}|vimeo\.com/(?:[a-z][a-z/]*)?\d{6,11})#i', $url ) ) { continue; }
+			// Direct media-file URLs (.mp4/.webm) are also accepted now — video_w
+			// renders them via the widget's hosted mode (guard.hosted-video).
+			if ( '' === $url || ! ( preg_match( '#(youtube\.com/(watch\?|shorts/|embed/)|youtu\.be/[\w-]{6,}|vimeo\.com/(?:[a-z][a-z/]*)?\d{6,11})#i', $url )
+				|| preg_match( '#\.(mp4|webm|m4v|mov)(\?|$)#i', $url ) ) ) { continue; }
 			$v['url'] = $url;
 			$videos[] = $v;
 		}
