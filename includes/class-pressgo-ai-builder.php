@@ -46,6 +46,103 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_credits',      array( $this, 'ajax_credits' ) );
 		add_action( 'wp_ajax_pressgo_ai_thumb',        array( $this, 'ajax_thumb' ) );
 		add_action( 'wp_ajax_pressgo_ai_clear_chat',   array( $this, 'ajax_clear_chat' ) );
+		add_action( 'wp_ajax_pressgo_ai_versions',     array( $this, 'ajax_versions' ) );
+		add_action( 'wp_ajax_pressgo_ai_restore',      array( $this, 'ajax_restore' ) );
+	}
+
+	/**
+	 * Human label attached to the NEXT snapshot taken this request — set to the
+	 * user message that's about to overwrite the page, so the History panel can
+	 * show "Before: make the hero darker" instead of a bare timestamp.
+	 */
+	private $turn_label = '';
+
+	/**
+	 * List restorable design snapshots for a page (revisions that carry
+	 * _elementor_data). Newest first, capped at 20.
+	 */
+	public function ajax_versions() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
+		$post = get_post( $post_id );
+		if ( ! $post ) wp_send_json_error( 'page not found', 404 );
+
+		$out  = array();
+		$revs = wp_get_post_revisions( $post_id, array( 'posts_per_page' => 60 ) );
+		foreach ( $revs as $rev ) {
+			$data = get_metadata( 'post', $rev->ID, '_elementor_data', true );
+			if ( ! $data ) continue; // not a design snapshot (e.g. a plain content revision)
+			$label    = (string) get_metadata( 'post', $rev->ID, '_pressgo_ai_label', true );
+			$sections = 0;
+			$cfg_raw  = get_metadata( 'post', $rev->ID, self::META_AI_CONFIG, true );
+			if ( $cfg_raw ) {
+				$cfg = json_decode( wp_unslash( $cfg_raw ), true );
+				if ( is_array( $cfg ) && ! empty( $cfg['sections'] ) ) $sections = count( $cfg['sections'] );
+			}
+			if ( ! $sections ) {
+				$els = json_decode( $data, true );
+				if ( is_array( $els ) ) $sections = count( $els );
+			}
+			$ts = get_post_time( 'U', true, $rev );
+			$out[] = array(
+				'id'       => $rev->ID,
+				'ago'      => $ts ? human_time_diff( $ts, time() ) . ' ago' : '',
+				'date'     => $ts ? wp_date( 'M j, H:i', $ts ) : '',
+				'label'    => $label,
+				'sections' => $sections,
+			);
+			if ( count( $out ) >= 20 ) break;
+		}
+		wp_send_json_success( array(
+			'versions'          => $out,
+			'revisions_enabled' => wp_revisions_to_keep( $post ) !== 0,
+		) );
+	}
+
+	/**
+	 * Restore a design snapshot onto the page. The CURRENT state is snapshotted
+	 * first, so a restore is itself restorable — you can never lose a state by
+	 * clicking around in History.
+	 */
+	public function ajax_restore() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$rev_id  = absint( $_POST['revision_id'] ?? 0 );
+		if ( ! $post_id || ! $rev_id ) wp_send_json_error( 'missing ids', 400 );
+		$rev = wp_get_post_revision( $rev_id );
+		if ( ! $rev || (int) $rev->post_parent !== $post_id ) {
+			wp_send_json_error( 'revision does not belong to this page', 400 );
+		}
+		$data = get_metadata( 'post', $rev_id, '_elementor_data', true );
+		if ( ! $data ) wp_send_json_error( 'that snapshot has no design data', 400 );
+
+		// Snapshot what's live right now so the restore can be undone.
+		$ts = get_post_time( 'U', true, $rev );
+		$this->turn_label = 'Before restoring the ' . ( $ts ? wp_date( 'M j, H:i', $ts ) : '#' . $rev_id ) . ' version';
+		$this->snapshot_revision( $post_id );
+
+		update_post_meta( $post_id, '_elementor_data', wp_slash( $data ) );
+
+		$cfg = get_metadata( 'post', $rev_id, self::META_AI_CONFIG, true );
+		if ( $cfg ) {
+			update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( $cfg ) );
+		} else {
+			// No config travelled with this snapshot — drop the now-mismatched
+			// stored config so future AI edits read the page itself (summarize
+			// path) instead of editing a config that no longer matches reality.
+			delete_post_meta( $post_id, self::META_AI_CONFIG );
+		}
+		$settings = get_metadata( 'post', $rev_id, '_elementor_page_settings', true );
+		if ( $settings ) {
+			update_post_meta( $post_id, '_elementor_page_settings', $settings );
+		}
+
+		$this->purge_post_caches( $post_id );
+		wp_send_json_success( array(
+			'preview_bust'  => time(),
+			'restored_from' => $ts ? wp_date( 'M j, H:i', $ts ) : '',
+		) );
 	}
 
 	public function ajax_clear_chat() {
@@ -561,6 +658,7 @@ class PressGo_AI_Builder {
 				<a href="<?php echo esc_url( $list_url ); ?>" class="pg-builder-back" title="Back to list">&larr;</a>
 				<div class="pg-builder-title"><?php echo esc_html( $post->post_title ?: 'Untitled page' ); ?></div>
 				<div class="pg-builder-actions">
+					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
 					<span class="pg-credits-pill" id="pg-credits">— credits</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank">Edit in Elementor</a>
@@ -797,6 +895,10 @@ class PressGo_AI_Builder {
 			$stored_text = ( $user_msg ? $user_msg . "\n\n" : '' ) . '[' . $n . ' image' . ( $n > 1 ? 's' : '' ) . ' attached]';
 		}
 		$history[] = array( 'role' => 'user', 'content' => $stored_text );
+
+		// Any snapshot taken while handling THIS message gets labeled with it,
+		// so History reads "Before: <what you asked for>".
+		$this->turn_label = 'Before: ' . ( function_exists( 'mb_substr' ) ? mb_substr( $stored_text, 0, 80 ) : substr( $stored_text, 0, 80 ) );
 
 		// Build pageContext + sanitize messages for Anthropic. Prefer the stored
 		// CONFIG (clean, readable — business/sections/colors right there) so the
@@ -1111,6 +1213,16 @@ class PressGo_AI_Builder {
 				$cfg = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 				if ( $cfg ) {
 					update_metadata( 'post', (int) $revision_id, self::META_AI_CONFIG, wp_slash( $cfg ) );
+				}
+				// Page settings carry the generated custom CSS (hover colors etc.) —
+				// without them a restore would pair old sections with new styling.
+				$settings = get_post_meta( $post_id, '_elementor_page_settings', true );
+				if ( $settings ) {
+					update_metadata( 'post', (int) $revision_id, '_elementor_page_settings', $settings );
+				}
+				// Human label for the History panel ("Before: make the hero darker").
+				if ( $this->turn_label ) {
+					update_metadata( 'post', (int) $revision_id, '_pressgo_ai_label', wp_slash( $this->turn_label ) );
 				}
 			}
 		} catch ( \Throwable $e ) { /* best effort — never break the build */ }

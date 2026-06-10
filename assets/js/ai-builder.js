@@ -889,6 +889,110 @@
 		setTimeout(function () { confirmBtn.focus(); }, 10);
 	}
 
+	// ===== Version history (design snapshots) =====
+	// Every AI change snapshots the previous design as a WP revision (visible in
+	// Elementor's History too). This panel surfaces those snapshots right in the
+	// builder with one-click restore; a restore saves the current design first,
+	// so no state is ever lost by clicking around.
+	(function () {
+		var btn = document.getElementById('pg-history');
+		if (!btn) return;
+		var panel = null;
+
+		function close() {
+			if (panel) { panel.remove(); panel = null; document.removeEventListener('click', onDocClick, true); }
+		}
+		function onDocClick(e) {
+			if (panel && !panel.contains(e.target) && e.target !== btn) close();
+		}
+
+		function open() {
+			if (panel) { close(); return; }
+			panel = document.createElement('div');
+			panel.id = 'pg-history-panel';
+			panel.style.cssText = 'position:fixed;top:52px;right:16px;width:340px;max-height:70vh;overflow:auto;background:#fff;border:1px solid #e2e0f4;border-radius:10px;box-shadow:0 12px 32px rgba(20,16,60,0.18);z-index:99999;padding:10px 12px;font-size:13px;color:#1f2937;';
+			var head = document.createElement('div');
+			head.style.cssText = 'margin-bottom:8px;';
+			head.innerHTML = '<strong>Page history</strong><div style="color:#6b7280;font-size:12px;margin-top:2px;">A version is saved before every AI change. Restoring saves the current design too, so nothing is ever lost.</div>';
+			panel.appendChild(head);
+			var list = document.createElement('div');
+			list.style.cssText = 'color:#6b7280;';
+			list.textContent = 'Loading…';
+			panel.appendChild(list);
+			document.body.appendChild(panel);
+			setTimeout(function () { document.addEventListener('click', onDocClick, true); }, 0);
+
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_versions');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (!j || !j.success) throw new Error('bad payload');
+					var versions = j.data.versions || [];
+					if (!versions.length) {
+						list.textContent = j.data.revisions_enabled
+							? 'No saved versions yet. One is saved automatically before every AI change.'
+							: 'Revisions are disabled on this site (WP_POST_REVISIONS), so versions can\'t be saved.';
+						return;
+					}
+					list.innerHTML = '';
+					list.style.color = '';
+					versions.forEach(function (ver) {
+						var item = document.createElement('div');
+						item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid #f0effa;';
+						var info = document.createElement('div');
+						info.style.cssText = 'flex:1;min-width:0;';
+						var line1 = document.createElement('div');
+						line1.textContent = ver.date + ' · ' + ver.ago + (ver.sections ? ' · ' + ver.sections + ' sections' : '');
+						info.appendChild(line1);
+						if (ver.label) {
+							var line2 = document.createElement('div');
+							line2.style.cssText = 'color:#6b7280;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+							line2.textContent = ver.label;
+							info.appendChild(line2);
+						}
+						var rbtn = document.createElement('button');
+						rbtn.type = 'button';
+						rbtn.textContent = 'Restore';
+						rbtn.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;flex-shrink:0;';
+						rbtn.addEventListener('click', function () { restore(ver, rbtn); });
+						item.appendChild(info);
+						item.appendChild(rbtn);
+						list.appendChild(item);
+					});
+				})
+				.catch(function () { list.textContent = 'Could not load versions — try again.'; });
+		}
+
+		function restore(ver, rbtn) {
+			if (!window.confirm('Restore the version from ' + ver.date + '? Your current design is saved first, so you can switch back.')) return;
+			rbtn.disabled = true;
+			rbtn.textContent = 'Restoring…';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_restore');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fd.append('revision_id', ver.id);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (!j || !j.success) throw new Error('restore failed');
+					close();
+					reloadPreview(j.data.preview_bust || Date.now());
+					append(el('pg-msg-system', 'Restored the design from ' + (j.data.restored_from || ver.date) + '. The replaced design was saved to History too, so you can switch back any time.'));
+				})
+				.catch(function () {
+					rbtn.disabled = false;
+					rbtn.textContent = 'Restore';
+					append(el('pg-msg-error', 'Could not restore that version — try again.'));
+				});
+		}
+
+		btn.addEventListener('click', open);
+	})();
+
 	// Enter to send (Shift+Enter for newline)
 	input.addEventListener('keydown', function (e) {
 		if (e.key === 'Enter' && !e.shiftKey) {
