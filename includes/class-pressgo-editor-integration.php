@@ -26,8 +26,30 @@ class PressGo_Editor_Integration {
 		add_action( 'rest_api_init',                           array( $this, 'register_routes' ) );
 	}
 
+	/**
+	 * The live-sync pill only matters when an MCP client can actually write to
+	 * the site: MCP must be switched on AND at least one token/API key must
+	 * exist. For everyone else the "LIVE" pill in the editor corner is noise.
+	 * The token check is one indexed COUNT on editor load only.
+	 */
+	private function mcp_in_use() {
+		if ( ! get_option( 'pressgo_mcp_enabled', 1 ) ) {
+			return false;
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'pressgo_mcp_tokens';
+		// Table may not exist on installs that never initialized MCP storage.
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			return false;
+		}
+		return (bool) $wpdb->get_var( "SELECT 1 FROM {$table} LIMIT 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
 	public function enqueue_editor_scripts() {
 		if ( ! current_user_can( 'edit_posts' ) ) {
+			return;
+		}
+		if ( ! $this->mcp_in_use() ) {
 			return;
 		}
 
@@ -50,6 +72,9 @@ class PressGo_Editor_Integration {
 	}
 
 	public function enqueue_editor_styles() {
+		if ( ! $this->mcp_in_use() ) {
+			return;
+		}
 		wp_enqueue_style(
 			'pressgo-live-sync',
 			PRESSGO_PLUGIN_URL . 'admin/css/pressgo-live-sync.css',
