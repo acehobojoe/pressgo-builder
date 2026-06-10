@@ -920,6 +920,188 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 1b2. Hero Split Screen (full-bleed 50/50: flat color panel + edge-to-edge photo)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Full-bleed split-screen hero: copy vertically centered on a flat brand-
+	 * primary panel filling one half, the photo filling the other half edge to
+	 * edge (background_image on the COLUMN container — same proven pattern as
+	 * build_hero_image's panel col). True full width: content_width 'full' +
+	 * zeroed outer padding, so there is no boxed gap at the viewport edges.
+	 *
+	 * Config: reuses hero headline/subheadline/eyebrow/badge/cta_primary/
+	 * cta_secondary/trust_line/bullets/image. One new optional field:
+	 * image_side: 'right'|'left' (default 'right'). hero.parallax: true adds
+	 * background_attachment:'fixed' to the image column (knob.parallax).
+	 *
+	 * Mobile: the row stacks (row() default flex_direction_mobile column) and
+	 * the image column becomes a 320px photo band (min_height_mobile) — above
+	 * the copy when image_side is 'left', below it when 'right'. Copy aligns
+	 * center on mobile via align_mobile params.
+	 *
+	 * Note: when hero.topbar is configured, the generator prepends it directly
+	 * into this section's children — it lands above the row at full width
+	 * (matches the gradient-hero behavior; acceptable).
+	 */
+	public static function build_hero_split_screen( $cfg ) {
+		$c    = $cfg['colors'];
+		$h    = $cfg['hero'];
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
+		$img  = isset( $h['image'] ) ? $h['image'] : '';
+
+		// Half the viewport reserved for a photo is meaningless without a real
+		// image — fall back to the boxed split hero (which degrades further on
+		// its own when it too lacks an image).
+		if ( ! self::has_real_image( $img ) ) {
+			return self::build_hero_split( $cfg );
+		}
+
+		// Readable text on the brand-primary panel (WCAG luminance pick), with
+		// muted/rule variants derived from which side the pick landed on.
+		$on       = PressGo_Style_Utils::text_on_color( $c['primary'] );
+		$on_white = ( '#FFFFFF' === $on );
+		$muted    = $on_white ? 'rgba(255,255,255,0.78)' : 'rgba(15,23,42,0.75)';
+		$faint    = $on_white ? 'rgba(255,255,255,0.55)' : 'rgba(15,23,42,0.55)';
+		$rule     = $on_white ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.3)';
+
+		// ── Copy stack ──────────────────────────────────────────────
+		$copy = array();
+
+		if ( ! empty( $h['badge'] ) ) {
+			$copy[] = PressGo_Widget_Helpers::badge_w( $cfg, $h['badge'], $on_white ? 'dark' : 'light', 'left' );
+			$copy[] = PressGo_Widget_Helpers::spacer_w( 18 );
+		}
+
+		$copy[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'left',
+			$muted, 12, '600', 4, null, 'uppercase', null, null, 'center' );
+		$copy[] = PressGo_Widget_Helpers::spacer_w( 14 );
+		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 56, 30, 40 );
+		$copy[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'left',
+			$on, $hh_d, '800', -1.5, 1.1, null, $hh_m, $hh_t, 'center' );
+		$copy[] = PressGo_Widget_Helpers::spacer_w( 18 );
+		$copy[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $muted, 17, 15, 1.7, 'center' );
+
+		$bullets = self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() );
+		if ( ! empty( $bullets ) ) {
+			$bullet_items = array();
+			foreach ( array_slice( $bullets, 0, 5 ) as $b ) {
+				$bullet_items[] = array(
+					'text'          => $b,
+					'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+			$copy[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$copy[] = PressGo_Element_Factory::widget( 'icon-list', array(
+				'icon_list'                   => $bullet_items,
+				'icon_color'                  => $on_white ? $on : $c['accent'],
+				'text_color'                  => $on_white ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.85)',
+				'icon_size'                   => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+				'text_indent'                 => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+				'space_between'               => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+				'icon_typography_typography'  => 'custom',
+				'icon_typography_font_family' => $cfg['fonts']['body'],
+				'icon_typography_font_size'   => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+				'icon_typography_font_weight' => '600',
+			) );
+		}
+
+		$copy[] = PressGo_Widget_Helpers::spacer_w( 28 );
+
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['accent'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'left' ),
+		);
+		if ( $cta2 ) {
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'transparent', $on, $rule, null, 'left' );
+		}
+		$copy[] = self::btn_group( $btns, 'left', 12 );
+
+		if ( ! empty( $h['trust_line'] ) ) {
+			$copy[] = PressGo_Widget_Helpers::spacer_w( 22 );
+			$copy[] = self::btn_group( array_merge(
+				self::trust_line_has_rating( $h['trust_line'] ) ? array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
+				) : array(),
+				array(
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
+					$faint, 13, null, null, 'center' ),
+			) ), 'left', 10 );
+		}
+
+		// ── Columns ─────────────────────────────────────────────────
+		// Generous panel padding stands in for the missing boxed gutter.
+		$copy_col = PressGo_Element_Factory::col( $copy, array(
+			'vertical_align'        => 'middle',
+			'background_background' => 'classic',
+			'background_color'      => $c['primary'],
+			'padding'               => array(
+				'unit' => 'px', 'top' => '96', 'right' => '72',
+				'bottom' => '96', 'left' => '72', 'isLinked' => false,
+			),
+			'padding_tablet'        => array(
+				'unit' => 'px', 'top' => '64', 'right' => '40',
+				'bottom' => '64', 'left' => '40', 'isLinked' => false,
+			),
+			'padding_mobile'        => array(
+				'unit' => 'px', 'top' => '48', 'right' => '24',
+				'bottom' => '48', 'left' => '24', 'isLinked' => false,
+			),
+		) );
+
+		$norm_url  = PressGo_Widget_Helpers::normalize_image( $img )['url'];
+		$img_extra = array(
+			'background_background' => 'classic',
+			'background_image'      => array( 'url' => $norm_url, 'id' => '', 'size' => '' ),
+			'background_position'   => 'center center',
+			'background_size'       => 'cover',
+			// Edge-to-edge photo height; on mobile the column collapses to a
+			// 320px band (min_height is a verified responsive container control).
+			'min_height'            => array( 'unit' => 'px', 'size' => 620, 'sizes' => array() ),
+			'min_height_tablet'     => array( 'unit' => 'px', 'size' => 460, 'sizes' => array() ),
+			'min_height_mobile'     => array( 'unit' => 'px', 'size' => 320, 'sizes' => array() ),
+		);
+		if ( ! empty( $h['parallax'] ) ) {
+			// knob.parallax — background group control field 'attachment'
+			// (groups/background.php:427) → key 'background_attachment'.
+			// Elementor emits the rule under a (desktop+) selector only;
+			// .pg-parallax page CSS re-asserts scroll on <=1024px as a guard
+			// (iOS breaks fixed attachment with cover).
+			$img_extra['background_attachment'] = 'fixed';
+			$img_extra['css_classes']           = 'pg-parallax';
+		}
+		$img_col = PressGo_Element_Factory::col( array(), $img_extra );
+
+		// image_side: 'left' puts the photo first (and, stacked, ABOVE the
+		// copy on mobile); default 'right' renders copy-first / photo below.
+		$side = isset( $h['image_side'] ) && is_string( $h['image_side'] ) && 'left' === strtolower( $h['image_side'] )
+			? 'left' : 'right';
+		$cols = ( 'left' === $side ) ? array( $img_col, $copy_col ) : array( $copy_col, $img_col );
+
+		$row = PressGo_Element_Factory::row( $cfg, $cols, 0 );
+
+		// True full-bleed: full content width and zeroed outer padding at
+		// every breakpoint (outer() would otherwise re-add gutters).
+		$zero = array(
+			'unit' => 'px', 'top' => '0', 'right' => '0',
+			'bottom' => '0', 'left' => '0', 'isLinked' => true,
+		);
+		return PressGo_Element_Factory::outer( $cfg, array( $row ),
+			$c['primary'], null, 0, 0, array(
+				'content_width'  => 'full',
+				'padding'        => $zero,
+				'padding_tablet' => $zero,
+				'padding_mobile' => $zero,
+			) );
+	}
+
+	// ──────────────────────────────────────────────
 	// 1c. Hero Image (full-width background image with dark overlay)
 	// ──────────────────────────────────────────────
 
@@ -1060,6 +1242,14 @@ class PressGo_Section_Builder {
 				$extra['background_image']             = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
 				$extra['background_position']          = 'center center';
 				$extra['background_size']              = 'cover';
+				if ( ! empty( $h['parallax'] ) ) {
+					// knob.parallax — background group field 'attachment'
+					// (groups/background.php:427) → 'background_attachment'.
+					// Elementor scopes the rule (desktop+); .pg-parallax page
+					// CSS re-asserts scroll on <=1024px (iOS guard).
+					$extra['background_attachment'] = 'fixed';
+					$extra['css_classes']           = 'pg-parallax';
+				}
 				if ( $panel ) {
 					// The panel carries legibility — keep the photo visible
 					// with a light flat scrim.
@@ -1533,6 +1723,89 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::divider_w(),
 			),
 			$c['white'], null, 20, 20 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 2d. Stats Ticker (slim full-bleed brand band, inline stats + hairline dividers)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Slim full-width accent band: 3-5 inline value+label stats on the brand
+	 * primary, separated by hairline rules. Values render via the counter
+	 * widget through stat_value_widgets() (typography_number_* /
+	 * typography_title_* keys + thousand_separator_char '' all live in
+	 * counter_w); digit-free values fall back to static headings there.
+	 * Reads as the thin "proof strip" between hero and features on premium
+	 * SaaS/agency sites. All numbers are user-supplied — never fabricated.
+	 *
+	 * Fewer than 3 usable items can't read as a strip → fall back to
+	 * build_stats_inline (which itself returns null on zero items).
+	 *
+	 * Mobile: the row stacks; the left hairline rules are zeroed there
+	 * (border_width is responsive on containers) so no floating mid-air line.
+	 */
+	public static function build_stats_ticker( $cfg ) {
+		$c     = $cfg['colors'];
+		$raw   = $cfg['stats'];
+		$items = self::stat_items( isset( $raw['items'] ) ? $raw['items'] : $raw );
+
+		if ( count( $items ) < 3 ) {
+			return self::build_stats_inline( $cfg );
+		}
+		$items = array_slice( $items, 0, 5 );
+
+		// Solid brand band with WCAG-picked on-color (light primaries get
+		// dark text, not invisible white).
+		$band     = $c['primary'];
+		$on       = PressGo_Style_Utils::text_on_color( $band );
+		$on_white = ( '#FFFFFF' === $on );
+		$muted    = $on_white ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.7)';
+		$rule     = $on_white ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.2)';
+
+		$stat_cols = array();
+		foreach ( $items as $idx => $item ) {
+			$col_extra = array(
+				'flex_align_items' => 'center',
+				'padding'          => array(
+					'unit' => 'px', 'top' => '4', 'right' => '16',
+					'bottom' => '4', 'left' => '16', 'isLinked' => false,
+				),
+			);
+			if ( $idx > 0 ) {
+				// Hairline separator before every stat but the first.
+				$col_extra['border_border'] = 'solid';
+				$col_extra['border_width']  = array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '0', 'left' => '1', 'isLinked' => false,
+				);
+				// Stacked on mobile a left rule floats mid-air — remove it.
+				$col_extra['border_width_mobile'] = array(
+					'unit' => 'px', 'top' => '0', 'right' => '0',
+					'bottom' => '0', 'left' => '0', 'isLinked' => false,
+				);
+				$col_extra['border_color'] = $rule;
+			}
+			$stat_cols[] = PressGo_Element_Factory::col(
+				self::stat_value_widgets( $cfg, $item['value'], $item['label'],
+					$on, $muted, 32, 13 ),
+				$col_extra
+			);
+		}
+
+		// Slim band: override outer()'s auto tablet/mobile padding floors
+		// (they'd inflate a 36px band to 50/40).
+		return PressGo_Element_Factory::outer( $cfg,
+			array( PressGo_Element_Factory::row( $cfg, $stat_cols, 0 ) ),
+			$band, null, 36, 36, array(
+				'padding_tablet' => array(
+					'unit' => 'px', 'top' => '30', 'right' => '24',
+					'bottom' => '30', 'left' => '24', 'isLinked' => false,
+				),
+				'padding_mobile' => array(
+					'unit' => 'px', 'top' => '24', 'right' => '20',
+					'bottom' => '24', 'left' => '20', 'isLinked' => false,
+				),
+			) );
 	}
 
 	// ──────────────────────────────────────────────
@@ -2178,6 +2451,122 @@ class PressGo_Section_Builder {
 			$style['flex_justify_content'] = 'center';
 		}
 		return PressGo_Element_Factory::col( $widgets, $style );
+	}
+
+	// ──────────────────────────────────────────────
+	// 4f. Features Tabs (interactive switcher via the FREE legacy tabs widget)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Tabbed feature/service explorer — one tab per item, vertical side-tabs
+	 * on desktop (titles down the left, rich panel right). Built on the FREE
+	 * legacy `tabs` widget, whose repeater shape ({tab_title, tab_content})
+	 * is identical to the toggle widget build_faq ships today. All control
+	 * keys verified in /tmp/elementor-src/widgets/tabs.php: tabs repeater
+	 * (tab_title TEXT :124, tab_content WYSIWYG :138), type :181,
+	 * border_color :332, background_color :343, tab_color :364,
+	 * tab_active_color :378, tab_typography group :393, content_color :462,
+	 * content_typography group :476.
+	 *
+	 * Mobile: NATIVE accordion degrade — the widget renders a duplicate
+	 * .elementor-tab-mobile-title before each content pane (render(), :558)
+	 * and Elementor's own CSS/JS switch presentation under the mobile
+	 * breakpoint. Zero work from us; existing break-word rules already cover
+	 * .elementor-tab-title/.elementor-tab-content.
+	 *
+	 * Content: tab panels are WYSIWYG — text-level markup only. desc becomes
+	 * a kses-filtered <p>; optional items[].details (alias bullets) join as
+	 * one <p> of <br>-separated lines. No inline rgba(), no scripts.
+	 *
+	 * Items need BOTH a title (the tab label) and panel content; others are
+	 * dropped. Capped at 6 (tab strip overflow). Fewer than 2 surviving tabs
+	 * reads as a broken switcher → fall back to the default features grid.
+	 */
+	public static function build_features_tabs( $cfg ) {
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$f     = $cfg['features'];
+
+		$items = self::norm_items( isset( $f['items'] ) ? $f['items'] : array() );
+
+		// Text-level allowlist for panel HTML (WYSIWYG-filtered).
+		$allowed = array(
+			'p'      => array(),
+			'br'     => array(),
+			'strong' => array(),
+			'em'     => array(),
+			'span'   => array( 'style' => true ),
+		);
+
+		$tabs = array();
+		foreach ( $items as $item ) {
+			$title = isset( $item['title'] ) && is_scalar( $item['title'] ) ? trim( (string) $item['title'] ) : '';
+			if ( '' === $title ) { continue; } // a tab needs a label
+			$desc = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
+			$desc = is_scalar( $desc ) ? trim( (string) $desc ) : '';
+
+			// Optional supporting lines (details, alias bullets — the name
+			// already established on hero/cta_final).
+			$details = self::bullet_texts( isset( $item['details'] ) ? $item['details']
+				: ( isset( $item['bullets'] ) ? $item['bullets'] : array() ) );
+
+			$html = '';
+			if ( '' !== $desc ) {
+				$html .= '<p>' . $desc . '</p>';
+			}
+			if ( ! empty( $details ) ) {
+				$lines = array();
+				foreach ( array_slice( $details, 0, 6 ) as $d ) {
+					$lines[] = '<strong>·</strong>&nbsp; ' . $d;
+				}
+				$html .= '<p>' . implode( '<br>', $lines ) . '</p>';
+			}
+			if ( '' === $html ) { continue; } // title-only = empty pane, drop
+
+			$tabs[] = array(
+				'tab_title'   => sanitize_text_field( $title ),
+				'tab_content' => wp_kses( $html, $allowed ),
+				'_id'         => PressGo_Element_Factory::eid(),
+			);
+			if ( count( $tabs ) >= 6 ) { break; }
+		}
+
+		if ( count( $tabs ) < 2 ) {
+			return self::build_features( $cfg );
+		}
+
+		// Color logic: the section bg is light_bg (theme-remapped to dark on
+		// dark pages), but the active title + content wrapper carry a FIXED
+		// white surface via background_color — so panel text uses fixed dark
+		// literals while inactive titles (on the section bg) use the
+		// theme-aware card tokens.
+		$tabs_w = PressGo_Element_Factory::widget( 'tabs', array(
+			'tabs'                                => $tabs,
+			'type'                                => 'vertical',
+			'border_color'                        => $c['border'],
+			'background_color'                    => '#FFFFFF',
+			'tab_color'                           => PressGo_Style_Utils::card_text_muted(),
+			'tab_active_color'                    => $c['primary'],
+			'tab_typography_typography'           => 'custom',
+			'tab_typography_font_family'          => $fonts['heading'],
+			'tab_typography_font_weight'          => '700',
+			'tab_typography_font_size'            => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'tab_typography_font_size_mobile'     => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_color'                       => '#4B5563',
+			'content_typography_typography'       => 'custom',
+			'content_typography_font_family'      => $fonts['body'],
+			'content_typography_font_size'        => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'content_typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'content_typography_line_height'      => array( 'unit' => 'em', 'size' => 1.7, 'sizes' => array() ),
+		) );
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
+			isset( $f['subheadline'] ) ? $f['subheadline'] : null );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( $tabs_w ) ),
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -3762,6 +4151,14 @@ class PressGo_Section_Builder {
 				// letting the photo be visible.
 				$extra['background_overlay_background'] = 'classic';
 				$extra['background_overlay_color']     = 'rgba(0,0,0,0.5)';
+				if ( ! empty( $ct['parallax'] ) ) {
+					// knob.parallax — background group field 'attachment'
+					// (groups/background.php:427) → 'background_attachment'.
+					// Desktop-only by Elementor's own (desktop+) selector;
+					// .pg-parallax page CSS guards <=1024px (iOS).
+					$extra['background_attachment'] = 'fixed';
+					$extra['css_classes']           = 'pg-parallax';
+				}
 			}
 		}
 
@@ -5015,6 +5412,101 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::outer( $cfg,
 			array( PressGo_Element_Factory::row( $cfg, array( $pitch, $card ), 0 ) ),
 			isset( $c['dark_bg'] ) ? $c['dark_bg'] : '#0F172A', null, 90, 90 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 16c. Gallery Carousel (native image-carousel: swiper, autoplay, FREE)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Auto-playing image slider on Elementor's native image-carousel widget
+	 * (bundled swiper — we author zero JS). Control keys verified in
+	 * /tmp/elementor-src/widgets/image-carousel.php: carousel GALLERY :159,
+	 * thumbnail Group_Control_Image_Size → 'thumbnail_size' :172, responsive
+	 * slides_to_show :182, image_stretch :216, navigation :229, link_to :355,
+	 * caption_type :408, lazyload :431, autoplay :441, pause_on_hover :453,
+	 * pause_on_interaction :467, autoplay_speed :486, infinite :501.
+	 *
+	 * CRITICAL verified win: render() resolves each item by attachment ID but
+	 * falls back to the raw item URL when the ID resolves nothing (:943-945)
+	 * — so external Pexels/Unsplash URLs display CORRECTLY, unlike
+	 * image-gallery which mis-binds by ID (the trap build_gallery documents).
+	 *
+	 * Captions deliberately OFF (caption_type '') — the widget reads captions
+	 * from attachment post data, which external URLs don't have.
+	 *
+	 * Mobile: slides_to_show_mobile '1', native touch swipe, dots remain.
+	 * .pg-carousel page CSS normalizes slide heights (aspect-ratio 3/2 +
+	 * object-fit cover) so mixed portrait/landscape sets don't reflow per
+	 * slide — same lesson as the Creekwalk listing-gallery fix.
+	 *
+	 * Fewer than 3 real images reads broken as a carousel → fall back to
+	 * build_gallery_cards (which handles 1-2 images / returns null on zero).
+	 */
+	public static function build_gallery_carousel( $cfg ) {
+		$c  = $cfg['colors'];
+		$gl = $cfg['gallery'];
+
+		// No images → no section.
+		if ( empty( $gl['images'] ) || ! is_array( $gl['images'] ) ) { return null; }
+
+		// Only REAL image URLs become slides; resolve a library attachment ID
+		// when one exists (lets thumbnail_size 'large' kick in), else ship the
+		// raw URL the render() fallback displays verbatim.
+		$slides = array();
+		foreach ( $gl['images'] as $img ) {
+			$url = is_array( $img ) ? ( isset( $img['url'] ) ? $img['url'] : '' ) : $img;
+			if ( ! self::has_real_image( $url ) ) { continue; }
+			$attach_id = attachment_url_to_postid( $url );
+			$slides[]  = array(
+				'id'  => $attach_id ? (string) $attach_id : '',
+				'url' => $url,
+			);
+		}
+
+		if ( count( $slides ) < 3 ) {
+			return self::build_gallery_cards( $cfg );
+		}
+
+		$header = array();
+		if ( ! empty( $gl['eyebrow'] ) || ! empty( $gl['headline'] ) ) {
+			$header = PressGo_Style_Utils::section_header( $cfg,
+				isset( $gl['eyebrow'] ) ? $gl['eyebrow'] : '',
+				isset( $gl['headline'] ) ? $gl['headline'] : '',
+				isset( $gl['subheadline'] ) ? $gl['subheadline'] : null );
+		}
+
+		// gallery.columns → slides_to_show, clamped 2-4 and never the full
+		// slide count (an all-visible infinite loop reads static).
+		$columns = max( 2, min( 4, (int) ( isset( $gl['columns'] ) && is_scalar( $gl['columns'] ) ? $gl['columns'] : 3 ) ) );
+		$show    = max( 1, min( $columns, count( $slides ) - 1 ) );
+
+		$carousel = PressGo_Element_Factory::widget( 'image-carousel', array(
+			'carousel'              => $slides,
+			// Force a sensible size for library-resolved images — without
+			// this Elementor falls back to the 150px WP "thumbnail".
+			'thumbnail_size'        => 'large',
+			// Responsive select stores STRINGS ('1'-'10').
+			'slides_to_show'        => (string) $show,
+			'slides_to_show_tablet' => '2',
+			'slides_to_show_mobile' => '1',
+			'image_stretch'         => 'yes',
+			'navigation'            => 'dots',
+			'link_to'               => 'none',
+			'caption_type'          => '',
+			'lazyload'              => 'yes',
+			'autoplay'              => 'yes',
+			'pause_on_hover'        => 'yes',
+			'pause_on_interaction'  => 'yes',
+			'autoplay_speed'        => 4500,
+			'infinite'              => 'yes',
+			// Page CSS hook: caps slide image height + object-fit cover.
+			'_css_classes'          => 'pg-carousel',
+		) );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( $carousel ) ),
+			$c['white'], null, 60, 60 );
 	}
 
 	// ──────────────────────────────────────────────

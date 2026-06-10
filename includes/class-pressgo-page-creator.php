@@ -244,6 +244,27 @@ html {
     transition: transform 0.2s ease;
 }
 
+/* Gallery carousel (gallery.carousel) — normalize mixed portrait/landscape
+   sets so the strip holds one height instead of reflowing per slide. */
+.pg-carousel .swiper-slide-image {
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    width: 100%;
+    height: auto;
+    max-height: 420px;
+    border-radius: " . (int) $config['layout']['card_radius'] . "px;
+}
+
+/* Parallax knob — Elementor already scopes background-attachment:fixed to
+   (desktop+), but iOS ignores/breaks fixed attachment with cover, so
+   re-assert scroll below the desktop breakpoint as a hard guard. */
+@media (max-width: 1024px) {
+    .pg-parallax.e-con,
+    .pg-parallax {
+        background-attachment: scroll !important;
+    }
+}
+
 /* Pricing card highlight border */
 .e-child.e-con[style*='border-top: 3px'] {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -275,6 +296,11 @@ html {
         width: 140px !important;
         height: 140px !important;
         font-size: 40px !important;
+    }
+    /* Carousel slides on phones: shorter cap so one slide never fills the
+       whole viewport height. */
+    .pg-carousel .swiper-slide-image {
+        max-height: 260px;
     }
 }
 
