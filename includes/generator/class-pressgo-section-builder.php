@@ -96,9 +96,17 @@ class PressGo_Section_Builder {
 			return array( 'text' => trim( $node ), 'url' => '#', 'icon' => null );
 		}
 		if ( is_array( $node ) && ! empty( $node['text'] ) ) {
+			$url = isset( $node['url'] ) ? trim( (string) $node['url'] ) : '#';
+			// Models emit bare domains ("cornerstone.churchgiving.com/give") —
+			// without a scheme that renders as a RELATIVE link and 404s. Leave
+			// anchors, tel:, mailto:, and schemed URLs alone.
+			if ( '' !== $url && ! preg_match( '/^(https?:|tel:|mailto:|#|\/)/i', $url )
+				&& preg_match( '/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}([\/?#]|$)/i', $url ) ) {
+				$url = 'https://' . $url;
+			}
 			return array(
 				'text' => $node['text'],
-				'url'  => isset( $node['url'] ) ? $node['url'] : '#',
+				'url'  => '' !== $url ? $url : '#',
 				'icon' => isset( $node['icon'] ) ? $node['icon'] : null,
 			);
 		}
@@ -1852,7 +1860,10 @@ class PressGo_Section_Builder {
 
 		// Solid brand band with WCAG-picked on-color (light primaries get
 		// dark text, not invisible white).
-		$band     = $c['primary'];
+		// primary_dark, not primary: a split-screen/panel hero often uses the
+		// bare primary, and a same-color ticker directly below read as one tall
+		// blob (vision-judge finding). The darker band restores the seam.
+		$band     = isset( $c['primary_dark'] ) ? $c['primary_dark'] : $c['primary'];
 		$on       = PressGo_Style_Utils::text_on_color( $band );
 		$on_white = ( '#FFFFFF' === $on );
 		$muted    = $on_white ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.7)';
@@ -7235,6 +7246,20 @@ class PressGo_Section_Builder {
 				'transparent', $c['white'], 'rgba(255,255,255,0.35)',
 				isset( $cta2['icon'] ) ? $cta2['icon'] : null, 'justify' );
 		}
+
+		// Compact type + padding: "Call (843) 555-0162" is nowrap (mid-digit
+		// wraps are worse) and at default button sizing it OVERFLOWED its pill
+		// in a 50% column on a 390px phone (vision-judge finding). 14px text +
+		// tight padding fits the worst-case label-with-icon in half a phone.
+		foreach ( $btns as &$btn_w_ref ) {
+			$btn_w_ref['settings']['typography_typography'] = 'custom';
+			$btn_w_ref['settings']['typography_font_size']  = array( 'unit' => 'px', 'size' => 14, 'sizes' => array() );
+			$btn_w_ref['settings']['text_padding'] = array(
+				'unit' => 'px', 'top' => '12', 'right' => '10',
+				'bottom' => '12', 'left' => '10', 'isLinked' => false,
+			);
+		}
+		unset( $btn_w_ref );
 
 		// Each button in its own equal-width column so two CTAs split the bar
 		// 50/50 (explicit width_mobile keeps the split on phones — row() would

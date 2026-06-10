@@ -385,6 +385,10 @@ html {
     --overflow: hidden;
     overflow: hidden;
     max-width: 100%;
+    /* Edge fade: items hard-clipping at the viewport edge read as a bug;
+       a mask makes the infinite loop look intentional. */
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
 }
 .pg-marquee-track.e-con {
     --display: flex;

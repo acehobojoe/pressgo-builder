@@ -391,6 +391,16 @@ class PressGo_Generator {
 			if ( isset( $s['content_width'] ) && 'full' === $s['content_width'] ) {
 				return null;
 			}
+			// SLIM bands (stats ticker, sticky bar) have too little padding to
+			// absorb a divider — the wave crest rises into the content and sat
+			// over a stat label (vision-judge finding). Skip sections whose own
+			// padding is under ~40px.
+			if ( isset( $s['padding']['top'] ) && (int) $s['padding']['top'] < 40 ) {
+				return null;
+			}
+			if ( isset( $s['css_classes'] ) && false !== strpos( (string) $s['css_classes'], 'pg-sticky-bar' ) ) {
+				return null;
+			}
 			if ( empty( $s['background_color'] ) || ! is_string( $s['background_color'] ) ) {
 				return null;
 			}
