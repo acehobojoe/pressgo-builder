@@ -57,9 +57,16 @@ class PressGo_AI_Builder {
 	}
 
 	/**
-	 * Stream a cached PNG thumbnail of the given post. Hits
-	 * screenshot.pressgo.app once, caches the bytes for 24h in a transient
-	 * keyed by post-id + post-modified time. Subsequent renders are free.
+	 * Serve a cached thumbnail of the given post, generating it on first
+	 * request via screenshot.pressgo.app.
+	 *
+	 * Cache is FILE-BASED (uploads/pressgo-thumbs/{post}-{hash}.jpg) and served
+	 * by a redirect. The previous implementation stored the raw PNG bytes in a
+	 * transient — but binary isn't utf8mb4-safe, so MySQL silently truncated the
+	 * option value to '' on insert. Every SUCCESSFUL screenshot therefore cached
+	 * as an empty thumb with a 24h TTL, and the whole list rendered gray
+	 * placeholder boxes. Files sidestep encoding entirely, survive object-cache
+	 * configs, and the redirect frees the PHP worker instead of streaming ~1MB.
 	 */
 	public function ajax_thumb() {
 		if ( ! current_user_can( 'manage_options' ) ) wp_die( '', '', 403 );
@@ -68,45 +75,99 @@ class PressGo_AI_Builder {
 		$post = get_post( $post_id );
 		if ( ! $post ) wp_die( '', '', 404 );
 
-		$cache_key = 'pgthumb_' . $post_id . '_' . md5( $post->post_modified_gmt );
-		$png = get_transient( $cache_key );
-		if ( $png === false ) {
-			// A builder list with N pages fires N of these at once. Each does a
-			// synchronous screenshot (seconds), so without a cap they all block a
-			// PHP-FPM worker and saturate the pool — that's what hung the site.
-			// Generate at most THUMB_GEN_MAX at a time; over the cap, return the
-			// placeholder now and let the card fill in on a later load (by which
-			// point the first batch is cached). Also a per-post lock so the same
-			// thumb isn't generated twice concurrently.
-			$lock_key = 'pgthumb_lock_' . $post_id;
-			if ( get_transient( $lock_key ) || ! $this->thumb_acquire_slot() ) {
-				$this->thumb_placeholder(); // exits
-			}
-			set_transient( $lock_key, 1, 30 );
-			$preview = $this->signed_preview_url( $post_id );
-			$resp = wp_remote_get(
-				'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=desktop',
-				array( 'timeout' => 10, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
-			);
-			$this->thumb_release_slot();
-			delete_transient( $lock_key );
-			if ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 ) {
-				$png = '';
-			} else {
-				$png = wp_remote_retrieve_body( $resp );
-			}
-			// Cache even an empty result for 5 min so a 1× failure doesn't
-			// hammer the screenshot service on every page load.
-			set_transient( $cache_key, $png, $png ? DAY_IN_SECONDS : 5 * MINUTE_IN_SECONDS );
+		$dir = $this->thumb_dir();
+		if ( ! $dir ) {
+			$this->thumb_placeholder(); // exits
+		}
+		$name = $post_id . '-' . md5( $post->post_modified_gmt ) . '.jpg';
+		if ( file_exists( $dir['path'] . '/' . $name ) ) {
+			wp_redirect( $dir['url'] . '/' . $name, 302 );
+			exit;
 		}
 
-		if ( ! $png ) {
+		// A recent generation attempt failed — don't hammer the screenshot
+		// service on every list render; the card retries after the TTL.
+		if ( get_transient( 'pgthumb_fail_' . $post_id ) ) {
 			$this->thumb_placeholder(); // exits
+		}
+
+		// A builder list with N pages fires N of these at once. Each does a
+		// synchronous screenshot (seconds), so without a cap they all block a
+		// PHP-FPM worker and saturate the pool — that's what hung the site.
+		// Generate at most THUMB_GEN_MAX at a time; over the cap, return the
+		// placeholder now (the list JS reloads placeholder cards every few
+		// seconds, so the card fills in once a slot frees up). Also a per-post
+		// lock so the same thumb isn't generated twice concurrently.
+		$lock_key = 'pgthumb_lock_' . $post_id;
+		if ( get_transient( $lock_key ) || ! $this->thumb_acquire_slot() ) {
+			$this->thumb_placeholder(); // exits
+		}
+		set_transient( $lock_key, 1, 45 );
+		$preview = $this->signed_preview_url( $post_id );
+		$resp = wp_remote_get(
+			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=desktop',
+			array( 'timeout' => 20, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+		);
+		$this->thumb_release_slot();
+		delete_transient( $lock_key );
+		$png = ( is_wp_error( $resp ) || wp_remote_retrieve_response_code( $resp ) !== 200 )
+			? '' : wp_remote_retrieve_body( $resp );
+
+		if ( ! $png ) {
+			set_transient( 'pgthumb_fail_' . $post_id, 1, 5 * MINUTE_IN_SECONDS );
+			$this->thumb_placeholder(); // exits
+		}
+
+		// Stale thumbs for this post (older post_modified hashes) are dead
+		// weight — remove them before writing the fresh one.
+		foreach ( (array) glob( $dir['path'] . '/' . $post_id . '-*.jpg' ) as $old ) {
+			@unlink( $old ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+		// Downscale to card size: the raw shot is 1440px / ~1MB; the list cell
+		// is ~130px. A 640px JPEG is sharp on retina at a tenth of the bytes.
+		$tmp = $dir['path'] . '/' . $name . '.tmp.png';
+		file_put_contents( $tmp, $png );
+		$editor = wp_get_image_editor( $tmp );
+		$saved  = false;
+		if ( ! is_wp_error( $editor ) ) {
+			$editor->resize( 640, null );
+			$editor->set_quality( 82 );
+			$saved = ! is_wp_error( $editor->save( $dir['path'] . '/' . $name, 'image/jpeg' ) );
+		}
+		@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! $saved ) {
+			// Image editor unavailable (no GD/Imagick) — keep the raw PNG bytes
+			// as the cached file instead. Bigger, but the cache still works.
+			$saved = (bool) file_put_contents( $dir['path'] . '/' . $name, $png );
+		}
+
+		if ( $saved ) {
+			wp_redirect( $dir['url'] . '/' . $name, 302 );
+			exit;
 		}
 		header( 'Content-Type: image/png' );
 		header( 'Cache-Control: max-age=86400' );
 		echo $png; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — raw PNG bytes
 		exit;
+	}
+
+	/**
+	 * Thumbnail cache directory under uploads. Returns ['path','url'] or null
+	 * if it can't be created.
+	 */
+	private function thumb_dir() {
+		$upload = wp_upload_dir();
+		if ( ! empty( $upload['error'] ) ) {
+			return null;
+		}
+		$path = trailingslashit( $upload['basedir'] ) . 'pressgo-thumbs';
+		if ( ! is_dir( $path ) && ! wp_mkdir_p( $path ) ) {
+			return null;
+		}
+		return array(
+			'path' => $path,
+			'url'  => trailingslashit( $upload['baseurl'] ) . 'pressgo-thumbs',
+		);
 	}
 
 	/** Max thumbnails that may be generated (screenshotted) concurrently, so a
@@ -303,14 +364,24 @@ class PressGo_AI_Builder {
 			'order'          => 'DESC',
 		) );
 
+		// One-time cleanup: thumbnails used to be cached as raw PNG bytes in
+		// transients (binary-unsafe — see ajax_thumb). Drop the orphaned rows
+		// now that the cache is file-based.
+		if ( ! get_option( 'pressgo_thumb_cache_v2' ) ) {
+			global $wpdb;
+			$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_pgthumb\_%' OR option_name LIKE '\_transient\_timeout\_pgthumb\_%'" );
+			update_option( 'pressgo_thumb_cache_v2', 1, false );
+		}
+
 		$nonce = wp_create_nonce( 'pressgo_ai_admin' );
 		?>
 		<div class="wrap pressgo-ai-list">
 			<h1 class="wp-heading-inline">AI Builder</h1>
 			<button type="button" class="page-title-action" id="pressgo-ai-new-page">+ New page</button>
 			<p class="description" style="margin-top:8px;max-width:720px;">
-				Chat-driven Elementor page builder. Toggle <strong>AI</strong> on any page to enable
-				the in-builder chat for it. Open a page to chat with the AI and watch it build in real time.
+				Chat-driven Elementor page builder. Open any page to chat with the AI and
+				watch it build in real time. Existing pages keep their content — the AI
+				reads what's there and edits in place.
 			</p>
 
 			<table class="wp-list-table widefat striped pressgo-ai-table">
@@ -320,15 +391,13 @@ class PressGo_AI_Builder {
 						<th>Page</th>
 						<th>Status</th>
 						<th>Last edited</th>
-						<th style="text-align:center;width:80px">AI</th>
 						<th style="width:140px"></th>
 					</tr>
 				</thead>
 				<tbody>
 				<?php if ( empty( $pages ) ) : ?>
-					<tr><td colspan="6" style="text-align:center;color:#888;padding:24px;">No pages yet. Click "New page" to start.</td></tr>
+					<tr><td colspan="5" style="text-align:center;color:#888;padding:24px;">No pages yet. Click "New page" to start.</td></tr>
 				<?php else : foreach ( $pages as $p ) :
-					$ai_on    = (bool) get_post_meta( $p->ID, self::META_AI_ENABLED, true );
 					$is_elem  = (bool) get_post_meta( $p->ID, '_elementor_edit_mode', true );
 					$edit_url = admin_url( 'admin.php?page=' . self::MENU_SLUG . '&action=edit&post_id=' . $p->ID );
 					$view_url = get_permalink( $p->ID );
@@ -360,12 +429,6 @@ class PressGo_AI_Builder {
 						$rel = $ts && $ts > 100000 ? human_time_diff( $ts, time() ) . ' ago' : '—';
 						?>
 						<td><?php echo esc_html( $rel ); ?></td>
-						<td style="text-align:center">
-							<label class="pg-toggle">
-								<input type="checkbox" class="pressgo-ai-toggle" data-post-id="<?php echo esc_attr( $p->ID ); ?>" <?php checked( $ai_on ); ?>>
-								<span class="pg-toggle-slider"></span>
-							</label>
-						</td>
 						<td>
 							<a href="<?php echo esc_url( $edit_url ); ?>" class="button">Open builder</a>
 							<a href="<?php echo esc_url( $view_url ); ?>" target="_blank" class="button-link">View</a>
@@ -406,15 +469,23 @@ class PressGo_AI_Builder {
 			newPageBtn.addEventListener('click', createPage);
 			if (isFirstRun) createPage();
 
-			document.querySelectorAll('.pressgo-ai-toggle').forEach(function(cb){
-				cb.addEventListener('change', function(){
-					var fd = new FormData();
-					fd.append('action', 'pressgo_ai_toggle');
-					fd.append('nonce', nonce);
-					fd.append('post_id', cb.dataset.postId);
-					fd.append('enabled', cb.checked ? '1' : '0');
-					fetch(ajaxUrl, { method:'POST', credentials:'same-origin', body: fd });
-				});
+			// Thumbnail backfill: uncached thumbs return a 1x1 placeholder when the
+			// generator is at its concurrency cap. Reload those cards on a backoff
+			// schedule so the grid fills in without a manual refresh.
+			document.querySelectorAll('img.pg-thumb').forEach(function(img){
+				var tries = 0;
+				function check(){
+					if (img.naturalWidth > 1 || tries >= 6) return;
+					tries++;
+					setTimeout(function(){
+						var u = new URL(img.src, window.location.href);
+						u.searchParams.set('_r', String(tries));
+						img.src = u.toString();
+					}, 3500 * tries);
+				}
+				img.addEventListener('load', check);
+				img.addEventListener('error', check);
+				if (img.complete) check();
 			});
 		})();
 		</script>
@@ -857,9 +928,19 @@ class PressGo_AI_Builder {
 		if ( $tool_use && $is_patch && ! empty( $tool_use['changes'] ) ) {
 			$apply = $this->apply_patch_to_post( $post_id, $tool_use['changes'] );
 		} elseif ( $tool_use && ! empty( $tool_use['config'] ) ) {
-			// If progressive rendering already snapshotted the original page, don't
-			// snapshot again here (that would capture an intermediate frame).
-			$apply = $this->apply_config_to_post( $post_id, $tool_use['config'], $prog->snapshotted );
+			$cfg_in = is_array( $tool_use['config'] ) ? $tool_use['config'] : array();
+			if ( empty( $cfg_in['sections'] ) && $stored_config ) {
+				// The model sent a partial "full" config (e.g. colors only) for a
+				// page that has a stored design. Validating it as a full config
+				// dies with "must include at least one section" — merge it onto
+				// the stored config as a patch instead, which is what the model
+				// meant anyway.
+				$apply = $this->apply_patch_to_post( $post_id, $cfg_in );
+			} else {
+				// If progressive rendering already snapshotted the original page, don't
+				// snapshot again here (that would capture an intermediate frame).
+				$apply = $this->apply_config_to_post( $post_id, $cfg_in, $prog->snapshotted );
+			}
 		} else {
 			$apply = null;
 		}
@@ -1325,7 +1406,8 @@ class PressGo_AI_Builder {
 			. "7. Is there exactly one primary CTA above the fold (not zero, not several competing ones)?\n"
 			. "8. Any blank or missing icons?\n"
 			. "9. Any em dashes or en dashes, or AI-cliche copy (Elevate, Unlock, Seamless, Empower, Unleash, Supercharge, Revolutionize, Game-changing, Cutting-edge, or 'Transform' used as filler)?\n"
-			. ( $png_mobile ? "10. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
+			. "10. WRONG-BUSINESS CONTENT: does any section describe a different business or industry than the user's (e.g. roofing services on a pet-care page)? Automatic FAIL — rewrite that section for the actual business.\n"
+			. ( $png_mobile ? "11. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
 			. "\nIf any item FAILS, call set_page_config again with the FULL corrected config, fixing ONLY the real failures and leaving everything else exactly as it is. "
 			. "If every item PASSES, reply with one short sentence confirming it looks good and ask if they want any other changes — do NOT call the tool.";
 
@@ -1484,6 +1566,15 @@ class PressGo_AI_Builder {
 		$stored = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 		$base   = $stored ? json_decode( wp_unslash( $stored ), true ) : null;
 		if ( ! is_array( $base ) || empty( $base ) ) {
+			if ( empty( $changes['sections'] ) ) {
+				// No stored config AND the patch has no sections — there is
+				// nothing to merge onto and nothing to build. Fail with a
+				// message the user can act on instead of validator jargon.
+				return array(
+					'ok'    => false,
+					'error' => "This page doesn't have a stored AI design yet, so I can't apply a small tweak by itself. Ask me to rebuild the page with your change included (e.g. \"rebuild this page with a greener palette\") and I'll recreate it without losing the content.",
+				);
+			}
 			// No clean config to patch against — treat the changes as a full
 			// config so we still produce a page instead of erroring.
 			return $this->apply_config_to_post( $post_id, $changes );

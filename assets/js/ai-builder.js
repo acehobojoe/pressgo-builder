@@ -444,18 +444,37 @@
 			.catch(function () { /* leave default pill */ });
 	}
 
-	function loadHistory() {
+	function loadHistory(attempt) {
+		attempt = attempt || 0;
 		var fd = new FormData();
 		fd.append('action', 'pressgo_ai_get_chat');
 		fd.append('nonce', cfg.nonce);
 		fd.append('post_id', cfg.postId);
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
-			.then(function (r) { return r.json(); })
+			.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
 			.then(function (j) {
 				if (j && j.success) renderHistory(j.data.messages || []);
-				else renderHistory([]);
+				else throw new Error('bad payload');
 			})
-			.catch(function () { renderHistory([]); });
+			.catch(function () {
+				// A busy server (saturated PHP pool) used to land here and we
+				// rendered the EMPTY intro — which reads as "my conversation got
+				// deleted" even though the history is safe in the database.
+				// Retry with backoff; only after that, say so instead of lying.
+				if (attempt < 3) {
+					setTimeout(function () { loadHistory(attempt + 1); }, 1200 * (attempt + 1));
+					return;
+				}
+				renderHistory([]);
+				var err = el('pg-msg pg-msg-assistant');
+				err.textContent = "I couldn't load this page's chat history (the server is busy) — it isn't lost. ";
+				var retry = document.createElement('a');
+				retry.href = '#';
+				retry.textContent = 'Tap to retry';
+				retry.addEventListener('click', function (e) { e.preventDefault(); log.innerHTML = ''; loadHistory(0); });
+				err.appendChild(retry);
+				append(err);
+			});
 	}
 
 	function sendMessage(text) {
