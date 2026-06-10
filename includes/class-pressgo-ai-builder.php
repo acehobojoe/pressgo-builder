@@ -1773,7 +1773,8 @@ class PressGo_AI_Builder {
 	const SECTION_TYPES = array(
 		'hero', 'stats', 'social_proof', 'features', 'steps', 'results',
 		'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing', 'logo_bar',
-		'team', 'gallery', 'newsletter', 'cta_final', 'map', 'footer', 'disclaimer',
+		'team', 'gallery', 'newsletter', 'cta_final', 'map', 'sticky_bar',
+		'footer', 'disclaimer',
 	);
 
 	/**

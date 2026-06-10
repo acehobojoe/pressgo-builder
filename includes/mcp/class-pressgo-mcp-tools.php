@@ -20,7 +20,7 @@ class PressGo_MCP_Tools {
 		'hero', 'stats', 'social_proof', 'features', 'steps', 'results',
 		'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
 		'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final',
-		'footer', 'disclaimer',
+		'sticky_bar', 'footer', 'disclaimer',
 	);
 
 	/**

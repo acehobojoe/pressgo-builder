@@ -30,6 +30,10 @@ class PressGo_Generator {
 		'gallery'          => 'build_gallery',
 		'newsletter'       => 'build_newsletter',
 		'map'              => 'build_map',
+		// Sticky bar sits between content and trailing chrome in canonical
+		// order — reconcile_sections splices an unlisted instance right before
+		// the footer.
+		'sticky_bar'       => 'build_sticky_bar',
 		'footer'           => 'build_footer',
 		'disclaimer'       => 'build_disclaimer',
 	);
@@ -75,6 +79,10 @@ class PressGo_Generator {
 		'gallery.videos'                => 'build_gallery_videos',
 		'competitive_edge.comparison'   => 'build_competitive_edge_comparison',
 		'team.spotlight'                => 'build_team_spotlight',
+		'hero.mesh'                     => 'build_hero_mesh',
+		'logo_bar.marquee'              => 'build_logo_bar_marquee',
+		'testimonials.wall'             => 'build_testimonials_wall',
+		'steps.editorial'               => 'build_steps_editorial',
 	);
 
 	/**
