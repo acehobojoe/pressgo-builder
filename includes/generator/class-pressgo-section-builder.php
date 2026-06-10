@@ -5687,6 +5687,19 @@ class PressGo_Section_Builder {
 		$fonts = $cfg['fonts'];
 		$ft    = $cfg['footer'];
 
+		// Models often write brand as a flat string ("Acme Co") + tagline —
+		// normalize to the object shape so a string brand doesn't read as an
+		// EMPTY footer and get dropped by the empty-slab guard.
+		if ( isset( $ft['brand'] ) && is_scalar( $ft['brand'] ) && '' !== trim( (string) $ft['brand'] ) ) {
+			$ft['brand'] = array( 'name' => trim( (string) $ft['brand'] ) );
+		}
+		if ( ! empty( $ft['tagline'] ) && is_scalar( $ft['tagline'] ) && empty( $ft['brand']['description'] ) ) {
+			if ( ! isset( $ft['brand'] ) || ! is_array( $ft['brand'] ) ) {
+				$ft['brand'] = array();
+			}
+			$ft['brand']['description'] = trim( (string) $ft['tagline'] );
+		}
+
 		$cols = array();
 
 		// Brand column (wider).
@@ -5838,6 +5851,17 @@ class PressGo_Section_Builder {
 		$c     = $cfg['colors'];
 		$fonts = $cfg['fonts'];
 		$ft    = $cfg['footer'];
+
+		// Same flat-string brand/tagline normalization as build_footer.
+		if ( isset( $ft['brand'] ) && is_scalar( $ft['brand'] ) && '' !== trim( (string) $ft['brand'] ) ) {
+			$ft['brand'] = array( 'name' => trim( (string) $ft['brand'] ) );
+		}
+		if ( ! empty( $ft['tagline'] ) && is_scalar( $ft['tagline'] ) && empty( $ft['brand']['description'] ) ) {
+			if ( ! isset( $ft['brand'] ) || ! is_array( $ft['brand'] ) ) {
+				$ft['brand'] = array();
+			}
+			$ft['brand']['description'] = trim( (string) $ft['tagline'] );
+		}
 
 		$cols = array();
 
@@ -6227,11 +6251,22 @@ class PressGo_Section_Builder {
 		$form_settings = array(
 			'form_name'      => 'PressGo Lead Form',
 			'form_fields'    => $form_fields,
+			// Placeholder-only fields: label + identical placeholder reads
+			// redundant and template-y; modern lead forms let placeholders
+			// carry it (matches our production reference).
+			'show_labels'    => '',
 			'button_text'    => ! empty( $cta['cta']['text'] ) && is_scalar( $cta['cta']['text'] ) ? (string) $cta['cta']['text'] : 'Send My Request',
 			'button_size'    => 'md',
 			'button_background_color' => $c['accent'],
 			'button_color'   => $c['white'],
 			'button_border_radius' => array( 'unit' => 'px', 'size' => (int) $cfg['layout']['button_radius'], 'sizes' => array() ),
+			// Brand the fields: soft tinted fill, hairline border, card-family
+			// radius — instead of Elementor's bare default inputs.
+			'field_background_color' => '#F8FAFC',
+			'field_border_color'     => '#E2E8F0',
+			'field_border_width'     => array( 'unit' => 'px', 'top' => '1', 'right' => '1', 'bottom' => '1', 'left' => '1', 'isLinked' => true ),
+			'field_border_radius'    => array( 'unit' => 'px', 'size' => max( 6, min( 12, (int) $cfg['layout']['button_radius'] ) ), 'sizes' => array() ),
+			'field_text_color'       => $c['text_dark'],
 			'submit_actions' => array( 'email' ),
 			'email_to'       => $recipient,
 			'email_subject'  => 'New lead from ' . $biz . ': [field id="name"]',

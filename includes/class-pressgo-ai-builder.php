@@ -1179,6 +1179,10 @@ class PressGo_AI_Builder {
 	public function purge_post_caches( $post_id ) {
 		delete_post_meta( $post_id, '_elementor_css' );
 		delete_post_meta( $post_id, '_elementor_page_assets' );
+		// Elementor 3.x element cache holds RENDERED HTML — without this purge
+		// a fresh apply serves the old markup (we watched new form settings
+		// sit in _elementor_data while the page rendered the stale form).
+		delete_post_meta( $post_id, '_elementor_element_cache' );
 
 		$upload   = wp_upload_dir();
 		$css_file = trailingslashit( $upload['basedir'] ) . 'elementor/css/post-' . $post_id . '.css';
@@ -2077,6 +2081,7 @@ class PressGo_AI_Builder {
 		delete_post_meta( $post_id, '_elementor_inner_section_css' );
 		delete_post_meta( $post_id, '_elementor_page_assets' );
 		delete_post_meta( $post_id, '_elementor_controls_usage' );
+		delete_post_meta( $post_id, '_elementor_element_cache' ); // rendered-HTML cache — stale markup otherwise
 
 		// Nuke the on-disk per-post CSS file if it exists.
 		$upload = wp_upload_dir();
