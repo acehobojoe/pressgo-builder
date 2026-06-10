@@ -78,3 +78,18 @@ REMAINING JUDGE GAPS (next session):
 5. Testimonial placeholder avatars read broken (monogram fallback backlog).
 6. Footer duplicate Contact headings; orphan service card -> "Not sure?" CTA
    filler card; copy-lint for unverifiable quantity claims.
+
+## RELEASED 2.3.0 (2026-06-10, SVN r3566773) — LIVE-PROMPT HOLD RESOLVED
+Resolution = VERSION GATING, not the flip procedure above:
+- Plugin sends pluginVersion in chat body + ?v= on prompt.php fetches.
+- Prod backend (pressgo.app, deployed 812e98f): supportsNewVariants() serves
+  CONFIG_SCHEMA_TEXT_FULL (/opt/pressgo-ops/prompts/config-schema-full.json)
+  + NEW_VARIANT_ADDENDUM only to >=2.3.0; base prompt = 2.2.x-safe wording.
+- prompt.php v-gated the same way (system-prompt-full.txt / config-schema-full.json).
+- Old installs keep today's behavior verbatim; updaters get everything.
+KEEP /opt safe + full file PAIRS in sync going forward (full = repo copies).
+Pre-release sweep fixed: phone-btn nowrap, timeline mobile line, image-band
+calc width, placeholder-contact filter (NARROW), footer Contact dedupe,
+FA6 food icons, all-numbers fabrication rule. 7 suites green (~110 cases).
+Note: WP.org live version was actually 2.2.3 (2.2.4/2.2.5 were never
+published — tags drift), so 2.3.0 is a bigger jump for users than assumed.
