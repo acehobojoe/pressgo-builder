@@ -1777,6 +1777,62 @@ class PressGo_AI_Builder {
 	);
 
 	/**
+	 * Resolve an instance key to its base section type: "gallery#2" -> "gallery".
+	 * Bare names pass through. "#1" is not legal (first instance is bare).
+	 */
+	private function base_section_type( $key ) {
+		if ( is_string( $key ) && preg_match( '/^([a-z_]+)#[2-9][0-9]*$/', $key, $m ) ) {
+			return $m[1];
+		}
+		return $key;
+	}
+
+	/**
+	 * Turn a model-written sections array (strings and/or {type,...} objects,
+	 * possibly with bare repeats) into canonical instance keys, hoisting any
+	 * inline section data into flat keys on $config. The Nth bare occurrence of
+	 * base B becomes "B#N" (B for N=1) — the SAME numbering used when instances
+	 * were stored, so a patch written with bare repeats re-binds to existing
+	 * instance data instead of inventing new keys.
+	 *
+	 * @param array $sections The sections array from the model.
+	 * @param array $config   Config to hoist inline data onto (by reference).
+	 * @return array Canonical ordered instance keys.
+	 */
+	private function canonicalize_section_order( $sections, &$config ) {
+		$counts = array();
+		$order  = array();
+		foreach ( $sections as $section ) {
+			$data = null;
+			if ( is_string( $section ) && '' !== $section ) {
+				$entry_type = $section;
+			} elseif ( is_array( $section ) && ! empty( $section['type'] ) ) {
+				$entry_type = (string) $section['type'];
+				unset( $section['type'] );
+				$data = $section;
+			} else {
+				continue;
+			}
+			$base = $this->base_section_type( $entry_type );
+			$key  = $entry_type;
+			if ( $entry_type === $base ) { // bare name — auto-number repeats
+				$counts[ $base ] = isset( $counts[ $base ] ) ? $counts[ $base ] + 1 : 1;
+				$key = $counts[ $base ] > 1 ? $base . '#' . $counts[ $base ] : $base;
+			}
+			if ( in_array( $key, $order, true ) ) {
+				continue;
+			}
+			// Only carry inline DATA if the object actually has fields and the
+			// caller didn't already supply that instance via a flat key.
+			if ( null !== $data && ! empty( $data ) && ! isset( $config[ $key ] ) ) {
+				$config[ $key ] = $this->normalize_section_fields( $base, $data );
+			}
+			$order[] = $key;
+		}
+		return $order;
+	}
+
+	/**
 	 * Merge a patch onto a base config.
 	 *
 	 * The `sections` key (when present) is treated as AUTHORITATIVE membership +
@@ -1793,33 +1849,22 @@ class PressGo_AI_Builder {
 	private function merge_patch( $base, $changes ) {
 		$patch_sets_order = isset( $changes['sections'] ) && is_array( $changes['sections'] ) && ! empty( $changes['sections'] );
 		if ( $patch_sets_order ) {
-			$order = array();
-			foreach ( $changes['sections'] as $sec ) {
-				if ( is_string( $sec ) && '' !== $sec ) {
-					$order[] = $sec;
-					continue;
-				}
-				if ( is_array( $sec ) && ! empty( $sec['type'] ) ) {
-					$type = $sec['type'];
-					unset( $sec['type'] );
-					// Only carry inline DATA if the object actually has fields and
-					// the patch didn't already supply that section via a flat key.
-					if ( ! empty( $sec ) && ! isset( $changes[ $type ] ) ) {
-						$changes[ $type ] = $this->normalize_section_fields( $type, $sec );
-					}
-					$order[] = $type;
-				}
-			}
-			$changes['sections'] = array_values( array_unique( $order ) );
+			// Same canonicalization as full applies: bare repeats auto-number to
+			// the keys the stored config already uses, inline data hoists to
+			// flat (instance) keys on $changes.
+			$changes['sections'] = $this->canonicalize_section_order( $changes['sections'], $changes );
 		}
 
 		$merged = $this->deep_merge( $base, $changes );
 
 		if ( $patch_sets_order && isset( $merged['sections'] ) && is_array( $merged['sections'] ) ) {
 			$keep = $merged['sections'];
-			foreach ( self::SECTION_TYPES as $t ) {
-				if ( isset( $merged[ $t ] ) && ! in_array( $t, $keep, true ) ) {
-					unset( $merged[ $t ] ); // orphan: removed from order, drop its data
+			// Prune every section-instance data key (bare OR suffixed) that the
+			// new order no longer lists, so reconcile can't resurrect it.
+			foreach ( array_keys( $merged ) as $k ) {
+				if ( in_array( $this->base_section_type( $k ), self::SECTION_TYPES, true )
+					&& 'sections' !== $k && ! in_array( $k, $keep, true ) ) {
+					unset( $merged[ $k ] ); // orphan: removed from order, drop its data
 				}
 			}
 		}
@@ -1834,14 +1879,18 @@ class PressGo_AI_Builder {
 		if ( ! is_array( $config ) ) {
 			return $config;
 		}
-		$allowed = array_merge(
-			array( 'business_name', 'industry', 'colors', 'fonts', 'layout', 'sections' ),
-			self::SECTION_TYPES
-		);
+		$allowed = array( 'business_name', 'industry', 'colors', 'fonts', 'layout', 'sections' );
 		foreach ( array_keys( $config ) as $k ) {
-			if ( ! in_array( $k, $allowed, true ) ) {
-				unset( $config[ $k ] );
+			if ( in_array( $k, $allowed, true ) ) {
+				continue;
 			}
+			// Section data keys pass by BASE type, so suffixed instances
+			// ("gallery#2") survive while junk keys ("foo#2", "features#x",
+			// "features#1") are stripped.
+			if ( in_array( $this->base_section_type( $k ), self::SECTION_TYPES, true ) ) {
+				continue;
+			}
+			unset( $config[ $k ] );
 		}
 		return $config;
 	}
@@ -1946,37 +1995,26 @@ class PressGo_AI_Builder {
 			return array( 'ok' => false, 'error' => 'empty config' );
 		}
 
-		// The AI emits sections as a list of objects with `type` (and optional
-		// `variant`) inline. The Generator expects flat keys per section type
-		// plus a `sections` array of names. Normalize here.
+		// The AI emits sections either as type-name strings or as objects with
+		// `type` (and optional inline data). The Generator expects flat keys
+		// plus a `sections` array of instance keys. Normalize per entry (mixed
+		// arrays included), auto-numbering bare repeats so a model that writes
+		// ["steps","steps"] or two {type:"gallery"} objects gets two rendered
+		// instances instead of "last one wins".
 		if ( isset( $config['sections'] ) && is_array( $config['sections'] ) && ! empty( $config['sections'] ) ) {
-			$first = reset( $config['sections'] );
-			if ( is_array( $first ) && isset( $first['type'] ) ) {
-				$order = array();
-				foreach ( $config['sections'] as $section ) {
-					if ( ! is_array( $section ) || empty( $section['type'] ) ) continue;
-					$type = $section['type'];
-					unset( $section['type'] );
-					$section = $this->normalize_section_fields( $type, $section );
-					// If same type appears twice, only the last wins (Generator
-					// limitation). Acceptable for MVP.
-					$config[ $type ] = $section;
-					$order[] = $type;
-				}
-				$config['sections'] = $order;
-			}
+			$config['sections'] = $this->canonicalize_section_order( $config['sections'], $config );
 		}
 
 		// Field-name coercion for EVERY present section (cta_primary_text -> cta_primary{text},
-		// heading -> headline, etc.). The branch above only runs when sections arrive
-		// as objects; the progressive path sends them as flat type-string keys, which
-		// would otherwise skip this safety net (and a writer-omitted alias would render
-		// an empty CTA/headline). normalize_section_fields is idempotent, so running it
-		// again on already-normalized sections is harmless.
+		// heading -> headline, etc.). The progressive path sends sections as flat
+		// type-string keys, which would otherwise skip this safety net (and a
+		// writer-omitted alias would render an empty CTA/headline).
+		// normalize_section_fields is idempotent, so running it again on
+		// already-normalized sections is harmless.
 		if ( isset( $config['sections'] ) && is_array( $config['sections'] ) ) {
 			foreach ( $config['sections'] as $t ) {
 				if ( is_string( $t ) && isset( $config[ $t ] ) && is_array( $config[ $t ] ) ) {
-					$config[ $t ] = $this->normalize_section_fields( $t, $config[ $t ] );
+					$config[ $t ] = $this->normalize_section_fields( $this->base_section_type( $t ), $config[ $t ] );
 				}
 			}
 		}

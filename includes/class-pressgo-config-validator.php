@@ -133,30 +133,50 @@ class PressGo_Config_Validator {
 					$detected[] = $s;
 				}
 			}
+			// Suffixed instance data keys ("gallery#2") that exist without a
+			// sections list get appended in config-key order.
+			foreach ( array_keys( $config ) as $k ) {
+				if ( $k !== self::base_type( $k ) && in_array( self::base_type( $k ), $known_sections, true ) ) {
+					$detected[] = $k;
+				}
+			}
 			if ( empty( $detected ) ) {
 				return new WP_Error( 'no_sections', 'Config must include at least one section.' );
 			}
 			$config['sections'] = $detected;
 		}
 
-		// Validate hero section if present. Only `headline` is strictly
+		// Canonicalize repeated section types: bare repeats get auto-suffixed
+		// ("steps","steps" -> "steps","steps#2"), unknown types drop, instance
+		// counts are capped. Single funnel that makes model-emitted repetition
+		// safe no matter how it was written.
+		self::normalize_section_instances( $config );
+
+		// Validate hero section(s) if present. Only `headline` is strictly
 		// required — sub/CTAs/eyebrow are optional and just suppress their
 		// respective widgets when missing. Hero with just a headline is a
-		// legitimate one-pager pattern.
-		if ( isset( $config['hero'] ) ) {
-			if ( empty( $config['hero']['headline'] ) ) {
-				return new WP_Error( 'invalid_hero', 'Hero section requires `headline`.' );
+		// legitimate one-pager pattern. The BARE hero keeps its hard error
+		// (legacy contract); a suffixed hero instance missing a headline is
+		// dropped instead of failing the whole build.
+		foreach ( self::keys_of_type( $config, 'hero' ) as $hk ) {
+			if ( empty( $config[ $hk ]['headline'] ) ) {
+				if ( 'hero' === $hk ) {
+					return new WP_Error( 'invalid_hero', 'Hero section requires `headline`.' );
+				}
+				unset( $config[ $hk ] );
+				$config['sections'] = array_values( array_diff( $config['sections'], array( $hk ) ) );
+				continue;
 			}
 			foreach ( array( 'eyebrow', 'subheadline' ) as $optional ) {
-				if ( ! isset( $config['hero'][ $optional ] ) ) {
-					$config['hero'][ $optional ] = '';
+				if ( ! isset( $config[ $hk ][ $optional ] ) ) {
+					$config[ $hk ][ $optional ] = '';
 				}
 			}
 			// CTA is optional; if present it must have text. If text is
 			// missing, drop the CTA entirely (suppress button) rather than
 			// rejecting the whole section.
-			if ( isset( $config['hero']['cta_primary'] ) && empty( $config['hero']['cta_primary']['text'] ) ) {
-				unset( $config['hero']['cta_primary'] );
+			if ( isset( $config[ $hk ]['cta_primary'] ) && empty( $config[ $hk ]['cta_primary']['text'] ) ) {
+				unset( $config[ $hk ]['cta_primary'] );
 			}
 		}
 
@@ -167,8 +187,10 @@ class PressGo_Config_Validator {
 		foreach ( array( 'stats', 'social_proof', 'features', 'steps', 'results',
 			'competitive_edge', 'testimonials', 'faq', 'pricing', 'logo_bar',
 			'team', 'gallery', 'newsletter' ) as $sec ) {
-			if ( isset( $config[ $sec ] ) && is_array( $config[ $sec ] ) && ! isset( $config[ $sec ]['eyebrow'] ) ) {
-				$config[ $sec ]['eyebrow'] = '';
+			foreach ( self::keys_of_type( $config, $sec ) as $k ) {
+				if ( is_array( $config[ $k ] ) && ! isset( $config[ $k ]['eyebrow'] ) ) {
+					$config[ $k ]['eyebrow'] = '';
+				}
 			}
 		}
 
@@ -194,10 +216,13 @@ class PressGo_Config_Validator {
 		);
 
 		foreach ( $section_defaults as $section => $defaults ) {
-			if ( isset( $config[ $section ] ) && is_array( $config[ $section ] ) ) {
+			foreach ( self::keys_of_type( $config, $section ) as $k ) {
+				if ( ! is_array( $config[ $k ] ) ) {
+					continue;
+				}
 				foreach ( $defaults as $key => $default ) {
-					if ( ! isset( $config[ $section ][ $key ] ) ) {
-						$config[ $section ][ $key ] = $default;
+					if ( ! isset( $config[ $k ][ $key ] ) ) {
+						$config[ $k ][ $key ] = $default;
 					}
 				}
 			}
@@ -215,17 +240,21 @@ class PressGo_Config_Validator {
 			'gallery'      => 'images',
 		);
 		foreach ( $array_fields as $section => $field ) {
-			if ( isset( $config[ $section ][ $field ] ) && ! is_array( $config[ $section ][ $field ] ) ) {
-				$config[ $section ][ $field ] = array();
+			foreach ( self::keys_of_type( $config, $section ) as $k ) {
+				if ( isset( $config[ $k ][ $field ] ) && ! is_array( $config[ $k ][ $field ] ) ) {
+					$config[ $k ][ $field ] = array();
+				}
 			}
 		}
 
 		// Ensure CTA objects have required keys.
 		$cta_sections = array( 'hero' => 'cta_primary', 'cta_final' => 'cta' );
 		foreach ( $cta_sections as $section => $cta_key ) {
-			if ( isset( $config[ $section ][ $cta_key ] ) && is_array( $config[ $section ][ $cta_key ] ) ) {
-				if ( ! isset( $config[ $section ][ $cta_key ]['url'] ) ) {
-					$config[ $section ][ $cta_key ]['url'] = '#';
+			foreach ( self::keys_of_type( $config, $section ) as $k ) {
+				if ( isset( $config[ $k ][ $cta_key ] ) && is_array( $config[ $k ][ $cta_key ] ) ) {
+					if ( ! isset( $config[ $k ][ $cta_key ]['url'] ) ) {
+						$config[ $k ][ $cta_key ]['url'] = '#';
+					}
 				}
 			}
 		}
@@ -744,16 +773,21 @@ class PressGo_Config_Validator {
 	private static function cap_copy_lengths( &$config ) {
 		// Hero headline ceiling: 12 words (prompt target ~8). A 9-11 word
 		// benefit headline still wraps cleanly on mobile and now ships intact.
-		if ( ! empty( $config['hero']['headline'] ) && is_string( $config['hero']['headline'] ) ) {
-			$config['hero']['headline'] = self::trim_to_words( $config['hero']['headline'], 12 );
+		foreach ( self::keys_of_type( $config, 'hero' ) as $hk ) {
+			if ( ! empty( $config[ $hk ]['headline'] ) && is_string( $config[ $hk ]['headline'] ) ) {
+				$config[ $hk ]['headline'] = self::trim_to_words( $config[ $hk ]['headline'], 12 );
+			}
 		}
 
 		// Feature description ceiling: 32 words (prompt target ~20). A complete
 		// 22-28 word sentence survives instead of being chopped to a fragment.
-		if ( isset( $config['features']['items'] ) && is_array( $config['features']['items'] ) ) {
-			foreach ( $config['features']['items'] as $i => $item ) {
+		foreach ( self::keys_of_type( $config, 'features' ) as $fk ) {
+			if ( ! isset( $config[ $fk ]['items'] ) || ! is_array( $config[ $fk ]['items'] ) ) {
+				continue;
+			}
+			foreach ( $config[ $fk ]['items'] as $i => $item ) {
 				if ( is_array( $item ) && ! empty( $item['desc'] ) && is_string( $item['desc'] ) ) {
-					$config['features']['items'][ $i ]['desc'] = self::trim_to_words( $item['desc'], 32 );
+					$config[ $fk ]['items'][ $i ]['desc'] = self::trim_to_words( $item['desc'], 32 );
 				}
 			}
 		}
@@ -769,10 +803,11 @@ class PressGo_Config_Validator {
 			array( 'newsletter', 'cta' ),
 		);
 		foreach ( $button_paths as $path ) {
-			$section = $path[0];
 			$cta_key = $path[1];
-			if ( isset( $config[ $section ][ $cta_key ]['text'] ) && is_string( $config[ $section ][ $cta_key ]['text'] ) ) {
-				$config[ $section ][ $cta_key ]['text'] = self::trim_to_words( $config[ $section ][ $cta_key ]['text'], 6 );
+			foreach ( self::keys_of_type( $config, $path[0] ) as $k ) {
+				if ( isset( $config[ $k ][ $cta_key ]['text'] ) && is_string( $config[ $k ][ $cta_key ]['text'] ) ) {
+					$config[ $k ][ $cta_key ]['text'] = self::trim_to_words( $config[ $k ][ $cta_key ]['text'], 6 );
+				}
 			}
 		}
 
@@ -780,8 +815,11 @@ class PressGo_Config_Validator {
 		// verbatim and the builders add their own decorative marks — nested
 		// ""quotes"" read as a typo), then cap at 45 words so a rambling wall
 		// never lands in 22-30px spotlight type.
-		if ( isset( $config['testimonials']['items'] ) && is_array( $config['testimonials']['items'] ) ) {
-			foreach ( $config['testimonials']['items'] as $i => $item ) {
+		foreach ( self::keys_of_type( $config, 'testimonials' ) as $tk ) {
+			if ( ! isset( $config[ $tk ]['items'] ) || ! is_array( $config[ $tk ]['items'] ) ) {
+				continue;
+			}
+			foreach ( $config[ $tk ]['items'] as $i => $item ) {
 				if ( ! is_array( $item ) || empty( $item['quote'] ) || ! is_string( $item['quote'] ) ) {
 					continue;
 				}
@@ -798,8 +836,92 @@ class PressGo_Config_Validator {
 						$q = trim( substr( $q, 1, -1 ) );
 					}
 				}
-				$config['testimonials']['items'][ $i ]['quote'] = self::trim_to_words( $q, 45 );
+				$config[ $tk ]['items'][ $i ]['quote'] = self::trim_to_words( $q, 45 );
 			}
 		}
+	}
+
+	/**
+	 * Resolve an instance key to its base section type: "gallery#2" -> "gallery".
+	 * Bare names pass through. "#1" is not legal (first instance is bare).
+	 */
+	public static function base_type( $key ) {
+		if ( is_string( $key ) && preg_match( '/^([a-z_]+)#[2-9][0-9]*$/', $key, $m ) ) {
+			return $m[1];
+		}
+		return $key;
+	}
+
+	/**
+	 * Every config key (bare or suffixed) resolving to $type, bare key first.
+	 * Lets per-section validation rules run once per INSTANCE.
+	 */
+	private static function keys_of_type( $config, $type ) {
+		$keys = array();
+		if ( isset( $config[ $type ] ) ) {
+			$keys[] = $type;
+		}
+		foreach ( array_keys( $config ) as $k ) {
+			if ( $k !== $type && self::base_type( $k ) === $type ) {
+				$keys[] = $k;
+			}
+		}
+		return $keys;
+	}
+
+	/**
+	 * Canonicalize repeated section types in $config['sections']:
+	 *   - the Nth BARE repeat of a type is renamed to "type#N" (matching how the
+	 *     plugin numbers instances everywhere else), so a model emitting
+	 *     ["steps","steps","steps"] is safe;
+	 *   - entries whose base type is unknown are dropped;
+	 *   - a suffixed entry with no matching data key is dropped (can't invent
+	 *     content for it);
+	 *   - exact duplicates de-dupe; instances cap at 6 per type.
+	 */
+	private static function normalize_section_instances( &$config ) {
+		if ( ! isset( $config['sections'] ) || ! is_array( $config['sections'] ) ) {
+			return;
+		}
+		$known = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
+			'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
+			'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final', 'footer',
+			'disclaimer' );
+		$counts = array();
+		$order  = array();
+		foreach ( $config['sections'] as $entry ) {
+			if ( ! is_string( $entry ) || '' === $entry ) {
+				continue;
+			}
+			$base = self::base_type( $entry );
+			if ( ! in_array( $base, $known, true ) ) {
+				continue;
+			}
+			if ( $entry === $base ) {
+				$counts[ $base ] = isset( $counts[ $base ] ) ? $counts[ $base ] + 1 : 1;
+				$key = $counts[ $base ] > 1 ? $base . '#' . $counts[ $base ] : $base;
+			} else {
+				$key = $entry;
+				// Suffixed entry without its own data: nothing to render.
+				if ( ! isset( $config[ $key ] ) ) {
+					continue;
+				}
+			}
+			if ( in_array( $key, $order, true ) ) {
+				continue;
+			}
+			// Cap instances per type at 6 (count existing same-base keys in order).
+			$n = 0;
+			foreach ( $order as $o ) {
+				if ( self::base_type( $o ) === $base ) {
+					$n++;
+				}
+			}
+			if ( $n >= 6 ) {
+				continue;
+			}
+			$order[] = $key;
+		}
+		$config['sections'] = $order;
 	}
 }

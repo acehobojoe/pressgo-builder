@@ -276,6 +276,9 @@
 		cta_final: 'Call to action', map: 'Map', footer: 'Footer', disclaimer: 'Disclaimer'
 	};
 	function sectionLabel(name) {
+		// Repeated-section instance keys: "steps#2" -> "Steps 2".
+		var m = String(name || '').match(/^(.*)#([0-9]+)$/);
+		if (m) return sectionLabel(m[1]) + ' ' + m[2];
 		if (SECTION_LABELS[name]) return SECTION_LABELS[name];
 		return String(name || '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 	}

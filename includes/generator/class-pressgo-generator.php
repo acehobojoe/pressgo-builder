@@ -104,35 +104,44 @@ class PressGo_Generator {
 
 		$page = array();
 		foreach ( $section_names as $name ) {
-			if ( ! isset( self::$builders[ $name ] ) ) {
+			// Repetition: "gallery#2" resolves to the gallery builder but reads
+			// its OWN data key, so a page can repeat a section type. Bare names
+			// take byte-identical legacy paths ($base === $name).
+			$base = self::base_type( $name );
+			if ( ! isset( self::$builders[ $base ] ) ) {
 				continue;
 			}
 
 			// Check if the config has data for this section.
-			if ( ! isset( $cfg[ $name ] ) && ! in_array( $name, array( 'disclaimer' ), true ) ) {
+			if ( ! isset( $cfg[ $name ] ) && ! in_array( $base, array( 'disclaimer' ), true ) ) {
 				continue;
 			}
 
 			// Check for a layout variant override.
 			$variant_key = '';
 			if ( isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && isset( $cfg[ $name ]['variant'] ) ) {
-				$variant_key = $name . '.' . $cfg[ $name ]['variant'];
+				$variant_key = $base . '.' . $cfg[ $name ]['variant'];
 			}
 
 			$method = isset( self::$variants[ $variant_key ] )
 				? self::$variants[ $variant_key ]
-				: self::$builders[ $name ];
+				: self::$builders[ $base ];
+
+			// Builders read $cfg[<base type>] by literal key. For a suffixed
+			// instance, alias its data onto the base key for THIS call only —
+			// all 56 builders work unmodified.
+			$call_cfg = ( $name === $base ) ? $cfg : array_merge( $cfg, array( $base => $cfg[ $name ] ) );
 
 			// One malformed section must never kill the whole page build —
 			// treat a throwing builder exactly like one that returned null.
 			try {
-				$result = PressGo_Section_Builder::$method( $cfg );
+				$result = PressGo_Section_Builder::$method( $call_cfg );
 			} catch ( \Throwable $e ) {
 				error_log( sprintf( 'PressGo: section "%s" (%s) failed to build: %s', $name, $method, $e->getMessage() ) );
 				$result = null;
 			}
 
-			if ( null !== $result && 'hero' === $name && isset( $cfg['hero'] ) && is_array( $cfg['hero'] ) ) {
+			if ( null !== $result && 'hero' === $base && isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) ) {
 				// Optional slim topbar (brand / phone / CTA) prepended inside
 				// the hero — works for every hero variant uniformly.
 				$hero_bg = isset( $result['settings']['background_color'] ) ? $result['settings']['background_color'] : '';
@@ -140,7 +149,7 @@ class PressGo_Generator {
 				if ( $hero_bg && ! isset( $result['settings']['background_image'] ) ) {
 					$on_dark = ( '#FFFFFF' === PressGo_Style_Utils::text_on_color( $hero_bg ) );
 				}
-				$topbar = PressGo_Section_Builder::hero_topbar_row( $cfg, $cfg['hero'], $on_dark );
+				$topbar = PressGo_Section_Builder::hero_topbar_row( $cfg, $cfg[ $name ], $on_dark );
 				if ( $topbar && isset( $result['elements'] ) && is_array( $result['elements'] ) ) {
 					$spacer = array(
 						'id'         => PressGo_Element_Factory::eid(),
@@ -154,7 +163,7 @@ class PressGo_Generator {
 			}
 
 			if ( null !== $result && isset( $cfg[ $name ]['cta'] ) && is_array( $result['elements'] )
-				&& in_array( $name, array( 'features', 'steps', 'testimonials', 'gallery', 'stats', 'social_proof', 'logo_bar' ), true ) ) {
+				&& in_array( $base, array( 'features', 'steps', 'testimonials', 'gallery', 'stats', 'social_proof', 'logo_bar' ), true ) ) {
 				// Optional section-closing CTA ("CTA rhythm") for sections whose
 				// builders have no native cta handling — high-converting local
 				// landers repeat the same accent button after nearly every
@@ -174,8 +183,10 @@ class PressGo_Generator {
 			}
 
 			if ( null !== $result ) {
-				// Auto-inject section anchor ID for smooth scrolling.
-				$anchor = str_replace( '_', '-', $name );
+				// Auto-inject section anchor ID for smooth scrolling. '#' from
+				// instance suffixes becomes '-' so the id stays valid HTML
+				// ("gallery#2" -> "gallery-2").
+				$anchor = str_replace( array( '_', '#' ), '-', $name );
 				if ( isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && isset( $cfg[ $name ]['anchor'] ) ) {
 					$anchor = $cfg[ $name ]['anchor'];
 				}
@@ -455,10 +466,12 @@ class PressGo_Generator {
 		}
 
 		// (a) Keep only listed names a builder exists for AND that have data
-		// (disclaimer is allowed through without a data object).
+		// (disclaimer is allowed through without a data object). Suffixed
+		// instance names ("gallery#2") resolve to their base builder; exact-
+		// string de-dupe keeps distinct instances apart.
 		$kept = array();
 		foreach ( $section_names as $name ) {
-			if ( ! is_string( $name ) || ! isset( self::$builders[ $name ] ) ) {
+			if ( ! is_string( $name ) || ! isset( self::$builders[ self::base_type( $name ) ] ) ) {
 				continue;
 			}
 			if ( ! self::section_has_data( $name, $cfg ) ) {
@@ -470,15 +483,19 @@ class PressGo_Generator {
 			$kept[] = $name;
 		}
 
-		// (b) Find data-bearing sections that were never listed.
+		// (b) Find data-bearing sections that were never listed — scan the
+		// CONFIG keys (catches suffixed instances too), not the builder list.
 		$missing = array();
-		foreach ( array_keys( self::$builders ) as $name ) {
+		foreach ( array_keys( $cfg ) as $name ) {
+			if ( ! isset( self::$builders[ self::base_type( $name ) ] ) ) {
+				continue; // not a section data key (colors, fonts, layout...).
+			}
 			if ( in_array( $name, $kept, true ) ) {
 				continue;
 			}
 			// Only append sections the AI actually built data for — never
 			// fabricate a disclaimer the page never asked for.
-			if ( isset( $cfg[ $name ] ) && self::section_has_data( $name, $cfg ) ) {
+			if ( self::section_has_data( $name, $cfg ) ) {
 				$missing[] = $name;
 			}
 		}
@@ -508,10 +525,25 @@ class PressGo_Generator {
 	 * @return bool
 	 */
 	private static function section_has_data( $name, $cfg ) {
-		if ( 'disclaimer' === $name ) {
+		if ( 'disclaimer' === self::base_type( $name ) ) {
 			return true;
 		}
 		return isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && ! empty( $cfg[ $name ] );
+	}
+
+	/**
+	 * Resolve an instance key to its base section type: "gallery#2" -> "gallery".
+	 * Bare names pass through untouched. First instances never carry a suffix
+	 * and "#1" is not legal, so legacy configs hit only identity paths.
+	 *
+	 * @param string $key Section name or instance key.
+	 * @return string Base section type.
+	 */
+	private static function base_type( $key ) {
+		if ( is_string( $key ) && preg_match( '/^([a-z_]+)#[2-9][0-9]*$/', $key, $m ) ) {
+			return $m[1];
+		}
+		return $key;
 	}
 
 	/**
@@ -528,12 +560,12 @@ class PressGo_Generator {
 	 */
 	private static function insert_by_order( $list, $name, $order ) {
 		$tail = array( 'footer', 'disclaimer' );
-		if ( in_array( $name, $tail, true ) ) {
+		if ( in_array( self::base_type( $name ), $tail, true ) ) {
 			$list[] = $name; // trailing chrome — append.
 			return $list;
 		}
 
-		$rank = array_search( $name, $order, true );
+		$rank = array_search( self::base_type( $name ), $order, true );
 		if ( false === $rank ) {
 			$list[] = $name;
 			return $list;
@@ -543,10 +575,10 @@ class PressGo_Generator {
 		$inserted = false;
 		foreach ( $list as $existing ) {
 			if ( ! $inserted ) {
-				$existing_rank = array_search( $existing, $order, true );
+				$existing_rank = array_search( self::base_type( $existing ), $order, true );
 				// Insert before the first existing section that ranks later, and
 				// always before trailing chrome (footer/disclaimer).
-				if ( in_array( $existing, $tail, true )
+				if ( in_array( self::base_type( $existing ), $tail, true )
 					|| ( false !== $existing_rank && $existing_rank > $rank ) ) {
 					$out[]    = $name;
 					$inserted = true;
