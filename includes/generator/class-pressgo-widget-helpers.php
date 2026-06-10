@@ -574,12 +574,21 @@ class PressGo_Widget_Helpers {
 			}
 			$link_data = isset( $item['link'] ) ? $item['link'] : array();
 			$link_url  = is_array( $link_data ) && isset( $link_data['url'] ) ? $link_data['url'] : ( isset( $item['url'] ) ? $item['url'] : '#' );
+			// A social icon linking to '#' is worse than no icon — the model
+			// invents profiles the business never gave. Skip them.
+			if ( ! is_string( $link_url ) || '' === trim( $link_url ) || '#' === trim( $link_url ) ) {
+				continue;
+			}
 			$icon_list[] = array(
 				'social_icon'     => $icon_value,
 				'link'            => array( 'url' => $link_url, 'is_external' => true ),
 				'item_icon_color' => isset( $item['color'] ) ? $item['color'] : '',
 				'_id'             => PressGo_Element_Factory::eid(),
 			);
+		}
+
+		if ( empty( $icon_list ) ) {
+			return null;
 		}
 
 		$s = array(

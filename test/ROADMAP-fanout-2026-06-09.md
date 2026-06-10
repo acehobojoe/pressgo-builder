@@ -55,3 +55,26 @@ data fields — on plugin 2.2.5 those sections silently render EMPTY.
 RE-ENABLE AT PUBLISH (after 2.2.6 is live on WP.org):
 1. scp pressgo-builder repo includes/prompts/system-prompt.txt + config-schema.json → digitalocean:/opt/pressgo-ops/prompts/ ; bump prompt.php version; wp transient delete pressgo_system_prompt_v1
 2. cd pressgo.app && git checkout backend/src/routes/plugin-api.js (HEAD = full menu) → scp to /var/www/pressgo.app/backend/src/routes/ ; pm2 restart pressgo-api --update-env
+
+## PARITY NIGHT RESULTS (2026-06-09/10) — Bodystyle + Arbor rebuild loop
+Judge panel on the one-paragraph rebuilds (real pipeline, staging :3013):
+- Arbor 7/7/7/6/8, Bodystyle 7/7/8/7/6 — both "close-needs-edits", both
+  "owner would be thrilled". Heroes rated COMPETITIVE with hand-built.
+REBUILDS (for Joe to review): https://wp.pressgo.app/rebuild-arbor/ +
+  https://wp.pressgo.app/rebuild-bodystyle/ (briefs: /tmp/arbor-brief.txt,
+  /tmp/bodystyle-brief.txt on DO; configs /tmp/build-*.config.json)
+STAGING: /opt/pressgo-staging (port 3013, full prompts, copied DB, key in
+  /tmp/run-build.sh). Kill by cwd-check; harmless to prod. DELETE generations
+  rows to force first-build Sonnet.
+REMAINING JUDGE GAPS (next session):
+1. ARCHITECTURAL: sections are TYPE-KEYED — a page cannot repeat a type
+   (reference uses competitive_edge 3x: comparison/about/warning-signs).
+   Needs config sections as array-of-objects w/ per-instance data. BIG.
+2. Haiku plan calls can narrate without calling the tool ("I'm building...")
+   then stop — needs forced-tool retry. Affects all non-first builds!
+3. Team members don't get whitelist photos (guidance added; verify) +
+   story-rich bios from input facts.
+4. Service-area city pills recipe (added to plan guidance; verify next build).
+5. Testimonial placeholder avatars read broken (monogram fallback backlog).
+6. Footer duplicate Contact headings; orphan service card -> "Not sure?" CTA
+   filler card; copy-lint for unverifiable quantity claims.

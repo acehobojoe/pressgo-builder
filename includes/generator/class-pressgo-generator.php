@@ -213,6 +213,53 @@ class PressGo_Generator {
 			unset( $section );
 		}
 
+		// Drop null/false entries any helper returned (e.g. social_icons_w
+		// when every profile link was a '#' invention) before the passes below.
+		$strip_nulls = function ( $els ) use ( &$strip_nulls ) {
+			$out = array();
+			foreach ( $els as $el ) {
+				if ( ! is_array( $el ) ) { continue; }
+				if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+					$el['elements'] = $strip_nulls( $el['elements'] );
+				}
+				$out[] = $el;
+			}
+			return $out;
+		};
+		$page = $strip_nulls( $page );
+
+		// Dead-link lint: a button whose link is bare '#' converts nobody.
+		// Rewrite to the page's phone (tel:) when one exists anywhere in the
+		// config, else to the final-CTA anchor.
+		$fallback_url = '#cta-final';
+		$phone_scan = function ( $node ) use ( &$phone_scan ) {
+			if ( is_array( $node ) ) {
+				foreach ( $node as $k => $v ) {
+					if ( 'phone' === $k && is_scalar( $v ) && preg_match( '/\d{7,}/', preg_replace( '/[^0-9]/', '', (string) $v ) ) ) {
+						return 'tel:' . preg_replace( '/[^0-9+]/', '', (string) $v );
+					}
+					$r = $phone_scan( $v );
+					if ( $r ) { return $r; }
+				}
+			}
+			return null;
+		};
+		$tel = $phone_scan( $cfg );
+		if ( $tel ) { $fallback_url = $tel; }
+		$fix_links = function ( &$els ) use ( &$fix_links, $fallback_url ) {
+			foreach ( $els as &$el ) {
+				if ( ! is_array( $el ) ) { continue; }
+				if ( isset( $el['widgetType'] ) && 'button' === $el['widgetType']
+					&& isset( $el['settings']['link']['url'] ) && '#' === $el['settings']['link']['url'] ) {
+					$el['settings']['link']['url'] = $fallback_url;
+				}
+				if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+					$fix_links( $el['elements'] );
+				}
+			}
+		};
+		$fix_links( $page );
+
 		// Upgrade mapped FontAwesome icons to Phosphor in one pass over the
 		// finished tree (catches both AI-chosen and hardcoded-default icons).
 		$page = PressGo_Icons::convert_tree( $page );
