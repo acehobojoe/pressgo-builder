@@ -89,7 +89,7 @@ Uses Elementor's legacy **section/column** layout for maximum compatibility with
 | `includes/class-pressgo-page-creator.php` | Page creation + Elementor meta |
 | `includes/class-pressgo-config-validator.php` | Config validation + defaults |
 | `includes/generator/class-pressgo-generator.php` | Orchestrator with variant routing |
-| `includes/generator/class-pressgo-section-builder.php` | All 48 section builders |
+| `includes/generator/class-pressgo-section-builder.php` | All 56 section builders |
 | `includes/generator/class-pressgo-widget-helpers.php` | 17 widget builder helpers |
 | `includes/generator/class-pressgo-element-factory.php` | Core Elementor primitives |
 

@@ -614,6 +614,14 @@ class PressGo_Config_Validator {
 		// "New York, New York" or "so so".
 		$value = preg_replace( '/\b(to|the|a|an|of|your|and|for|with)\s+\1\b/i', '$1', $value );
 
+		// Star-glyph runs carry a real rating claim — convert to "N-star" text
+		// BEFORE the emoji strip deletes them, so "★★★★★ from 200+ clients"
+		// keeps its signal (and its star widget downstream).
+		$value = preg_replace_callback( '/[\x{2605}\x{2B50}\x{1F31F}]{1,10}/u', function ( $m ) {
+			$n = function_exists( 'mb_strlen' ) ? mb_strlen( $m[0] ) : 5;
+			return min( 5, max( 1, $n ) ) . '-star';
+		}, $value );
+
 		// Strip pictographic emoji — a system-font glyph inside display type is
 		// the clearest "not hand-designed" tell. (Keeps ASCII symbols intact.)
 		$value = preg_replace( '/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0E}\x{FE0F}\x{2B00}-\x{2BFF}]/u', '', $value );
@@ -625,19 +633,21 @@ class PressGo_Config_Validator {
 		// letters are entirely uppercase.
 		$letters = preg_replace( '/[^a-zA-Z]/', '', $value );
 		if ( strlen( $letters ) >= 8 && strtoupper( $letters ) === $letters && self::word_count( $value ) >= 4 ) {
-			$small = array( 'A', 'AN', 'AND', 'AS', 'AT', 'BUT', 'BY', 'FOR', 'IN', 'OF', 'ON', 'OR', 'THE', 'TO', 'VS', 'WITH' );
+			$small = array( 'A', 'AN', 'AND', 'AS', 'AT', 'BUT', 'BY', 'FOR', 'IN', 'OF', 'ON', 'OR', 'THE', 'TO', 'VS', 'WITH', 'YOUR', 'OUR', 'ANY' );
+			// Known acronyms keep caps; every OTHER word is title-cased — the
+			// old length heuristic left random 2-4-letter words uppercase
+			// ("CALL NOW for YOUR FREE Quote" ransom-note casing).
+			$acronyms = array( 'LLC', 'INC', 'CO', 'LTD', 'LLP', 'PC', 'PA', 'USA', 'US', 'UK', 'HVAC', 'AC', 'DC', 'TV', 'SEO', 'PPC', 'VIP', 'ASAP', 'DJ', 'ER', 'RV', 'ATV', 'CDL', 'EPA', 'OSHA', 'FDA', 'USDA', 'CPA', 'MD', 'DDS', 'DVM', 'RN', 'PT', 'IT', 'HR', 'CEO', 'CFO', 'BBB', 'API', 'GPS', 'LED', 'HD', '3D', 'AI', 'AM', 'PM', 'II', 'III', 'IV', 'EMT', 'CPR', 'ADA', 'DIY', 'GC' );
 			$words = preg_split( '/(\s+)/', $value, -1, PREG_SPLIT_DELIM_CAPTURE );
 			$out   = array();
 			$first = true;
 			foreach ( $words as $w ) {
 				if ( '' === trim( $w ) ) { $out[] = $w; continue; }
-				$bare = preg_replace( '/[^A-Z]/', '', $w );
-				if ( strlen( $bare ) >= 5 ) {
-					$out[] = ucfirst( strtolower( $w ) );
+				$bare = preg_replace( '/[^A-Z0-9]/', '', $w );
+				if ( in_array( $bare, $acronyms, true ) || preg_match( '/\d/', $bare ) ) {
+					$out[] = $w; // acronym or mixed alnum token (24/7) — keep.
 				} elseif ( ! $first && in_array( $bare, $small, true ) ) {
 					$out[] = strtolower( $w );
-				} elseif ( strlen( $bare ) >= 2 && strlen( $bare ) <= 4 ) {
-					$out[] = $w; // probable acronym — keep.
 				} else {
 					$out[] = ucfirst( strtolower( $w ) );
 				}
@@ -779,7 +789,12 @@ class PressGo_Config_Validator {
 				if ( strlen( $q ) > 1 ) {
 					$first = substr( $q, 0, 1 );
 					$last  = substr( $q, -1 );
-					if ( ( '"' === $first && '"' === $last ) || ( "'" === $first && "'" === $last ) ) {
+					// Only strip when the pair is the ONLY quotes — stripping
+					// the outer pair of '"Best," she said. "Amazing."' left an
+					// unbalanced interior quote.
+					if ( '"' === $first && '"' === $last && 2 === substr_count( $q, '"' ) ) {
+						$q = trim( substr( $q, 1, -1 ) );
+					} elseif ( "'" === $first && "'" === $last && 2 === substr_count( $q, "'" ) ) {
 						$q = trim( substr( $q, 1, -1 ) );
 					}
 				}

@@ -46,7 +46,7 @@ run('before_after pairs', 'gallery', array('variant'=>'before_after','headline'=
 )), array('Lost 32 lbs','Before','After','Marcus'), array('fakeToken'));
 run('before_after none -> cards fallback', 'gallery', array('variant'=>'before_after','headline'=>'Work','images'=>array(array('url'=>$IMG,'caption'=>'x'))), array('pexels-photo-265087'));
 // gallery.videos
-run('gallery.videos mixed', 'gallery', array('variant'=>'videos','headline'=>'Films','videos'=>array('https://www.youtube.com/watch?v=abc123', array('url'=>'https://vimeo.com/123','title'=>'Brand film','caption'=>'2026 reel'), 'https://not-a-video.com/x.mp4')), array('youtube.com','vimeo.com','Brand film'), array('not-a-video'));
+run('gallery.videos mixed', 'gallery', array('variant'=>'videos','headline'=>'Films','videos'=>array('https://www.youtube.com/watch?v=abc123', array('url'=>'https://vimeo.com/76979871','title'=>'Brand film','caption'=>'2026 reel'), 'https://not-a-video.com/x.mp4')), array('youtube.com','vimeo.com','Brand film'), array('not-a-video'));
 run('gallery.videos none -> null', 'gallery', array('variant'=>'videos','headline'=>'Films','videos'=>array('https://not-video.org')), array(), array('Films'));
 // competitive_edge.comparison
 run('ce.comparison full', 'competitive_edge', array('variant'=>'comparison','headline'=>'Why us','description'=>'d','us_label'=>'CleanPro','them_label'=>'Typical cleaners','benefits'=>array('Insured team','Flat pricing'),'them_points'=>array('Rotating strangers','Hidden fees'),'cta'=>'Get a quote'), array('CleanPro','Typical cleaners','Rotating strangers','ph-x','ph-check-circle','Get a quote'));

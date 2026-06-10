@@ -258,6 +258,14 @@ html {
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
+    /* Initials avatar circles are inline-styled (kses-safe solid hex), so
+       responsive controls can't shrink them — a 200px circle dominated a
+       390px viewport. !important beats the inline style. */
+    .pg-avatar-circle {
+        width: 140px !important;
+        height: 140px !important;
+        font-size: 40px !important;
+    }
 }
 
 @media (hover: none) {

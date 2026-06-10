@@ -215,7 +215,7 @@ class PressGo_Widget_Helpers {
 			// Darken border on hover too.
 			if ( '#' === substr( $border_color, 0, 1 ) ) {
 				$brgb = PressGo_Style_Utils::hex_to_rgb( $border_color );
-				$s['hover_border_color'] = sprintf( '#%02X%02X%02X',
+				$s['button_hover_border_color'] = sprintf( '#%02X%02X%02X',
 					max( 0, $brgb['r'] - 30 ), max( 0, $brgb['g'] - 30 ), max( 0, $brgb['b'] - 30 ) );
 			}
 		}
@@ -691,10 +691,18 @@ class PressGo_Widget_Helpers {
 	 */
 	public static function video_w( $url, $overlay_img = '', $border_radius = 12 ) {
 		$s = array(
-			'youtube_url'        => $url,
 			'show_image_overlay' => $overlay_img ? 'yes' : '',
 			'aspect_ratio'       => '169',
 		);
+		// The widget's video_type defaults to 'youtube' and its frontend
+		// handler bails when youtube_url has no YouTube ID — a Vimeo URL in
+		// youtube_url rendered an EMPTY player. Set the provider explicitly.
+		if ( preg_match( '#vimeo\.com#i', $url ) ) {
+			$s['video_type'] = 'vimeo';
+			$s['vimeo_url']  = $url;
+		} else {
+			$s['youtube_url'] = $url;
+		}
 
 		if ( $overlay_img ) {
 			$s['image_overlay'] = array( 'url' => $overlay_img, 'id' => '' );
@@ -775,8 +783,10 @@ class PressGo_Widget_Helpers {
 			// what every call site wants.
 			'number_color'    => $color ? $color : $c['text_dark'],
 			'title_color'     => $title_color ? $title_color : $c['text_muted'],
+			// Default '' renders a comma; ',' is not a valid option of the
+			// SELECT control (editor would show a blank dropdown).
 			'thousand_separator'      => 'yes',
-			'thousand_separator_char' => ',',
+			'thousand_separator_char' => '',
 			// NOTE: the counter widget's typography groups are named
 			// `typography_number` / `typography_title` (NOT the bare `typography`
 			// / `title_typography` most widgets use). The old keys were silently

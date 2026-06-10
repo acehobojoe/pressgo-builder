@@ -414,7 +414,7 @@ class PressGo_Section_Builder {
 	 * "500+ five-star reviews") — beside "Licensed & insured" or an event date
 	 * they read as a fabricated rating. */
 	private static function trust_line_has_rating( $text ) {
-		return (bool) preg_match( '/\b(rated?|ratings?|reviews?|stars?|google|yelp|trustpilot|facebook)\b|[0-5][.,]\d/i', (string) $text );
+		return (bool) preg_match( '/\b(rated?|ratings?|reviews?|stars?|google|yelp|trustpilot|facebook|tripadvisor|bbb|angi|houzz|zillow|g2|capterra|avvo)\b|[0-5][.,]\d|\d+(\.\d+)?\s*\/\s*(5|10)\b/i', (string) $text );
 	}
 
 	/**
@@ -476,7 +476,7 @@ class PressGo_Section_Builder {
 		return array(
 			self::btn_group( array(
 				PressGo_Widget_Helpers::star_rating_w( $rating, 18, $c['gold'], 'center' ),
-				PressGo_Widget_Helpers::heading_w( $cfg, implode( ' — ', $bits ), 'h6', 'center',
+				PressGo_Widget_Helpers::heading_w( $cfg, implode( ' · ', $bits ), 'h6', 'center',
 					$text_color, 15, '600' ),
 			), 'center', 10 ),
 			PressGo_Widget_Helpers::spacer_w( 28 ),
@@ -3818,11 +3818,15 @@ class PressGo_Section_Builder {
 				$initials = '';
 				$parts = preg_split( '/\s+/', trim( (string) $member['name'] ) );
 				foreach ( $parts as $p ) {
-					if ( $p !== '' ) { $initials .= strtoupper( substr( $p, 0, 1 ) ); }
-					if ( strlen( $initials ) >= 2 ) { break; }
+					if ( $p !== '' ) {
+						$initials .= function_exists( 'mb_strtoupper' )
+							? mb_strtoupper( mb_substr( $p, 0, 1 ) )
+							: strtoupper( substr( $p, 0, 1 ) );
+					}
+					if ( ( function_exists( 'mb_strlen' ) ? mb_strlen( $initials ) : strlen( $initials ) ) >= 2 ) { break; }
 				}
 				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					'<div style="width:120px;height:120px;border-radius:9999px;margin:0 auto;'
+					'<div class="pg-avatar-circle" style="width:120px;height:120px;border-radius:9999px;margin:0 auto;'
 					. 'display:flex;align-items:center;justify-content:center;'
 					. 'background:' . PressGo_Style_Utils::light_tint( $c['primary'] ) . ';'
 					. 'color:' . $c['primary'] . ';font-size:36px;font-weight:700;'
@@ -3894,11 +3898,15 @@ class PressGo_Section_Builder {
 				$initials = '';
 				$parts = preg_split( '/\s+/', trim( (string) $member['name'] ) );
 				foreach ( $parts as $p ) {
-					if ( $p !== '' ) { $initials .= strtoupper( substr( $p, 0, 1 ) ); }
-					if ( strlen( $initials ) >= 2 ) { break; }
+					if ( $p !== '' ) {
+						$initials .= function_exists( 'mb_strtoupper' )
+							? mb_strtoupper( mb_substr( $p, 0, 1 ) )
+							: strtoupper( substr( $p, 0, 1 ) );
+					}
+					if ( ( function_exists( 'mb_strlen' ) ? mb_strlen( $initials ) : strlen( $initials ) ) >= 2 ) { break; }
 				}
 				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
-					'<div style="width:100px;height:100px;border-radius:9999px;margin:0 auto;'
+					'<div class="pg-avatar-circle" style="width:100px;height:100px;border-radius:9999px;margin:0 auto;'
 					. 'display:flex;align-items:center;justify-content:center;'
 					. 'background:' . PressGo_Style_Utils::light_tint( $c['primary'] ) . ';'
 					. 'color:' . $c['primary'] . ';font-size:30px;font-weight:700;'
@@ -4248,7 +4256,7 @@ class PressGo_Section_Builder {
 				// Force a sensible image size — without this Elementor falls
 				// back to the WP "thumbnail" size (150x150) and the gallery
 				// renders as tiny fragmented squares regardless of source.
-				'gallery_image_size'   => 'large',
+				'thumbnail_size'       => 'large',
 			) ) );
 		} else {
 			// External URLs (Pexels/Unsplash) can't bind by attachment ID — the
@@ -4531,7 +4539,7 @@ class PressGo_Section_Builder {
 		}
 		$items = array_slice( $items, 0, 18 );
 
-		$header = PressGo_Style_Utils::section_header( $cfg, $p['eyebrow'], $p['headline'],
+		$header = PressGo_Style_Utils::section_header( $cfg, isset( $p['eyebrow'] ) ? $p['eyebrow'] : '', isset( $p['headline'] ) ? $p['headline'] : '',
 			isset( $p['subheadline'] ) ? $p['subheadline'] : null );
 
 		// Group by category, preserving first-appearance order.
@@ -4569,7 +4577,8 @@ class PressGo_Section_Builder {
 				$cols = array(
 					PressGo_Element_Factory::col( $left_widgets, array(
 						'width'        => array( 'unit' => '%', 'size' => 72, 'sizes' => array() ),
-						'width_mobile' => array( 'unit' => '%', 'size' => 68, 'sizes' => array() ),
+						'width_tablet' => array( 'unit' => '%', 'size' => 64, 'sizes' => array() ),
+						'width_mobile' => array( 'unit' => '%', 'size' => 62, 'sizes' => array() ),
 					) ),
 					PressGo_Element_Factory::col(
 						array(
@@ -4578,7 +4587,8 @@ class PressGo_Section_Builder {
 						),
 						array(
 							'width'          => array( 'unit' => '%', 'size' => 28, 'sizes' => array() ),
-							'width_mobile'   => array( 'unit' => '%', 'size' => 32, 'sizes' => array() ),
+							'width_tablet'   => array( 'unit' => '%', 'size' => 36, 'sizes' => array() ),
+							'width_mobile'   => array( 'unit' => '%', 'size' => 38, 'sizes' => array() ),
 							'vertical_align' => 'top',
 						)
 					),
@@ -4646,7 +4656,7 @@ class PressGo_Section_Builder {
 
 		$info = array(
 			PressGo_Widget_Helpers::heading_w( $cfg,
-				! empty( $map['headline'] ) ? $map['headline'] : 'Visit Us', 'h3', 'left',
+				! empty( $map['headline'] ) && is_scalar( $map['headline'] ) ? $map['headline'] : 'Visit Us', 'h3', 'left',
 				$card_text, 28, '800', -0.5, 1.2, null, 24 ),
 			PressGo_Widget_Helpers::spacer_w( 18 ),
 		);
@@ -4842,7 +4852,7 @@ class PressGo_Section_Builder {
 			if ( is_string( $v ) ) { $v = array( 'url' => $v ); }
 			if ( ! is_array( $v ) ) { continue; }
 			$url = isset( $v['url'] ) && is_string( $v['url'] ) ? trim( $v['url'] ) : '';
-			if ( '' === $url || ! preg_match( '#(youtube\.com|youtu\.be|vimeo\.com)#i', $url ) ) { continue; }
+			if ( '' === $url || ! preg_match( '#(youtube\.com/(watch\?|shorts/|embed/)|youtu\.be/[\w-]{6,}|vimeo\.com/(?:[a-z][a-z/]*)?\d{6,11})#i', $url ) ) { continue; }
 			$v['url'] = $url;
 			$videos[] = $v;
 		}
@@ -4909,7 +4919,7 @@ class PressGo_Section_Builder {
 		$them_label = isset( $ce['them_label'] ) && is_scalar( $ce['them_label'] ) && '' !== trim( (string) $ce['them_label'] )
 			? trim( (string) $ce['them_label'] ) : 'The Usual Way';
 
-		$header = PressGo_Style_Utils::section_header( $cfg, $ce['eyebrow'], $ce['headline'],
+		$header = PressGo_Style_Utils::section_header( $cfg, isset( $ce['eyebrow'] ) ? $ce['eyebrow'] : '', isset( $ce['headline'] ) ? $ce['headline'] : '',
 			isset( $ce['description'] ) ? $ce['description'] : null );
 
 		$mk_list = function ( $points, $icon, $icon_color, $text_color ) use ( $fonts ) {
@@ -5015,14 +5025,18 @@ class PressGo_Section_Builder {
 			$initials = '';
 			$parts = preg_split( '/\s+/', $m['name'] );
 			foreach ( $parts as $pp ) {
-				if ( '' !== $pp ) { $initials .= strtoupper( substr( $pp, 0, 1 ) ); }
-				if ( strlen( $initials ) >= 2 ) { break; }
+				if ( '' !== $pp ) {
+					$initials .= function_exists( 'mb_strtoupper' )
+						? mb_strtoupper( mb_substr( $pp, 0, 1 ) )
+						: strtoupper( substr( $pp, 0, 1 ) );
+				}
+				if ( ( function_exists( 'mb_strlen' ) ? mb_strlen( $initials ) : strlen( $initials ) ) >= 2 ) { break; }
 			}
 			$left_widgets = array( PressGo_Widget_Helpers::text_w( $cfg,
-				'<div style="width:220px;height:220px;border-radius:9999px;margin:0 auto;'
+				'<div class="pg-avatar-circle" style="width:200px;height:200px;border-radius:9999px;margin:0 auto;'
 				. 'display:flex;align-items:center;justify-content:center;'
 				. 'background:' . PressGo_Style_Utils::light_tint( $c['primary'] ) . ';'
-				. 'color:' . $c['primary'] . ';font-size:64px;font-weight:700;'
+				. 'color:' . $c['primary'] . ';font-size:56px;font-weight:700;'
 				. 'line-height:1;letter-spacing:-2px;">' . esc_html( $initials ) . '</div>',
 				'center', null, 14 ) );
 		}

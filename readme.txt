@@ -31,7 +31,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 * Live Elementor editor sync — chat edits appear without reloading
 * Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
 * "Watch URL" — share a live preview link with clients while you build
-* 19 section types with 48 layout variants
+* 19 section types with 56 layout variants
 * Every element is native Elementor — fully editable, no shortcodes
 * Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
 * Choose your Claude model: Sonnet 4.5 (default for paid), Opus 4.6, or Haiku 4.5 (free)
@@ -42,19 +42,19 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 * Hero (6 variants: default, split, image, video, gradient, minimal)
 * Stats (3 variants: default, dark, inline)
 * Social proof (2 variants: light, dark)
-* Features (4 variants: default, alternating, minimal, image cards, grid)
+* Features (6 variants: default, alternating, minimal, image cards, grid, bento)
 * How-it-works steps (3 variants: default, compact, timeline)
 * Results / metrics (2 variants: default, bars)
-* Competitive edge (3 variants: default, image, cards)
+* Competitive edge (4 variants: default, image, cards, us-vs-them comparison)
 * Testimonials (4 variants: default, featured, grid, minimal)
-* Pricing (2 variants: default, compact)
+* Pricing (3 variants: default, compact, service/menu price list)
 * FAQ accordion
-* Team profiles (2 variants: default, compact)
-* Gallery (2 variants: default, cards)
+* Team profiles (3 variants: default, compact, solo spotlight)
+* Gallery (4 variants: default, cards, before/after pairs, videos)
 * Newsletter (2 variants: default, inline)
 * Logo bar (2 variants: light, dark)
-* Google Maps embed
-* Final CTA (3 variants: default, card, image)
+* Google Maps embed (2 variants: default, contact card with hours)
+* Final CTA (4 variants: default, card, image, split with checklist)
 * Footer (2 variants: dark, light)
 * Blog posts grid (requires Elementor Pro)
 * Legal disclaimer
@@ -295,7 +295,7 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 = 1.1.0 =
 * Direct Anthropic API integration — uses your own Claude API key
 * Added 7 new section types: pricing, team, gallery, newsletter, logo bar, map, footer
-* 48 layout variants across 19 section types
+* 56 layout variants across 19 section types
 * Model selector: Sonnet 4.5, Opus 4.6, Haiku 4.5
 * Improved social proof with native editable button widgets
 * Auto-responsive mobile and tablet sizing
@@ -347,4 +347,4 @@ Layout and responsive polish — fixes container centering, adds mobile-responsi
 Adds automatic update notifications — you'll receive future updates directly on the WordPress Plugins page.
 
 = 1.1.0 =
-Major update: direct Claude API integration (bring your own key), 7 new section types, 48 layout variants, and model selection.
+Major update: direct Claude API integration (bring your own key), 7 new section types, 56 layout variants, and model selection.
