@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.1
+Stable tag: 2.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -161,6 +161,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.3.2 =
+* Fixed: images you attach as references (like a screenshot showing which photos to remove) are no longer placed on the page as if they were photos.
+* Fixed: asking for a Pexels or Unsplash image now fetches real stock photos, even if you don't use the word "stock".
+* Improved: the AI now says which of your library photos it used instead of guessing what they show, and chat screenshots stay out of other pages' photo pools.
+* Improved: the AI self-review now catches wrong-industry photos and webpage screenshots placed as images.
 
 = 2.3.1 =
 * New: History panel in the AI Builder. A version of your page is saved automatically before every AI change, and you can restore any earlier design with one click. Restoring saves the current design first, so nothing is ever lost.
