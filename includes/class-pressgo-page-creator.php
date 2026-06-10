@@ -290,7 +290,214 @@ html {
     }
 }";
 
+		// ── Recipe CSS — each block ships ONLY when this page's config
+		// actually uses the recipe, so plain pages carry zero extra bytes. ──
+
+		// Sticky mobile call bar. Hidden on desktop/tablet; a fixed bottom
+		// strip on phones. Gated on a USABLE cta via the builder's own guard
+		// (PressGo_Section_Builder::sticky_bar_cta) so the mobile body padding
+		// can never ship without the bar. Suffixed instances ("sticky_bar#2")
+		// are checked by aliasing onto the base key, mirroring the generator.
+		$has_sticky = false;
+		if ( class_exists( 'PressGo_Section_Builder' ) ) {
+			foreach ( $config as $k => $v ) {
+				if ( ! is_array( $v ) ) { continue; }
+				if ( 'sticky_bar' !== $k && ! preg_match( '/^sticky_bar#[2-9][0-9]*$/', (string) $k ) ) { continue; }
+				if ( PressGo_Section_Builder::sticky_bar_cta( array_merge( $config, array( 'sticky_bar' => $v ) ) ) ) {
+					$has_sticky = true;
+					break;
+				}
+			}
+		}
+		if ( $has_sticky ) {
+			$css .= "
+
+/* Sticky mobile call bar — in flow (hidden) on desktop, fixed bottom strip on
+   phones. Pure CSS, no JS. e-con display is var-driven, so both the custom
+   property and the real property are set. */
+.pg-sticky-bar.e-con {
+    --display: none;
+    display: none;
+}
+@media (max-width: 767px) {
+    .pg-sticky-bar.e-con {
+        --display: flex;
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 9990;
+        margin: 0;
+        box-shadow: 0 -6px 20px rgba(0,0,0,0.18);
+        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    }
+    .pg-sticky-bar .elementor-button {
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+    /* Reserve room above the bar so it never covers the footer's last line. */
+    body {
+        padding-bottom: 84px;
+    }
+}";
+		}
+
+		// Logo marquee — infinite horizontal crawl. The track holds the logo
+		// set twice, so translateX(-50%) loops seamlessly; uniform fixed item
+		// widths (set by the builder) keep the seam exact. Pauses on hover;
+		// prefers-reduced-motion restores a static centered wall and hides the
+		// duplicate set.
+		if ( $this->config_field_is( $config, 'logo_bar', 'variant', 'marquee' ) ) {
+			$css .= "
+
+/* Logo marquee */
+.pg-marquee.e-con {
+    --display: block;
+    display: block;
+    --overflow: hidden;
+    overflow: hidden;
+    max-width: 100%;
+}
+.pg-marquee-track.e-con {
+    --display: flex;
+    display: flex;
+    flex-wrap: nowrap !important;
+    width: max-content !important;
+    max-width: none !important;
+    animation: pg-marquee-scroll 30s linear infinite;
+}
+.pg-marquee:hover .pg-marquee-track.e-con {
+    animation-play-state: paused;
+}
+@keyframes pg-marquee-scroll {
+    to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pg-marquee-track.e-con {
+        animation: none;
+        width: auto !important;
+        flex-wrap: wrap !important;
+        justify-content: center;
+    }
+    .pg-marquee-dup.e-con {
+        --display: none;
+        display: none;
+    }
+}";
+		}
+
+		// Mesh hero — 4 layered radial gradients from the page's real palette
+		// over the container's solid dark_bg (which stays as the no-CSS
+		// fallback). rgba is legal here: page CSS, not an inline style attr.
+		if ( $this->config_field_is( $config, 'hero', 'variant', 'mesh' ) ) {
+			$mp = $rgb_primary;
+			$ma = $rgb_accent;
+			$css .= "
+
+/* Mesh hero */
+.pg-mesh.e-con {
+    background-image:
+        radial-gradient(at 12% 18%, rgba({$mp['r']},{$mp['g']},{$mp['b']},0.40) 0px, transparent 50%),
+        radial-gradient(at 88% 10%, rgba({$ma['r']},{$ma['g']},{$ma['b']},0.30) 0px, transparent 45%),
+        radial-gradient(at 78% 92%, rgba({$mp['r']},{$mp['g']},{$mp['b']},0.28) 0px, transparent 55%),
+        radial-gradient(at 18% 96%, rgba({$ma['r']},{$ma['g']},{$ma['b']},0.18) 0px, transparent 50%);
+}";
+		}
+
+		// Gradient-ink hero headline (hero.headline_style: 'gradient'). The
+		// widget's solid title_color stays set, so browsers without
+		// background-clip:text render the normal solid headline.
+		if ( $this->config_field_is( $config, 'hero', 'headline_style', 'gradient' ) ) {
+			$hsl_a        = PressGo_Style_Utils::hex_to_hsl( $accent );
+			$accent_light = PressGo_Style_Utils::hsl_to_hex( $hsl_a['h'], $hsl_a['s'], max( 0.72, $hsl_a['l'] ) );
+			$css .= "
+
+/* Gradient hero headline */
+@supports (-webkit-background-clip: text) {
+    .pg-gradient-text .elementor-heading-title {
+        background-image: linear-gradient(100deg, {$primary} 0%, {$accent} 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .pg-gradient-text-dark .elementor-heading-title {
+        background-image: linear-gradient(100deg, #FFFFFF 25%, {$accent_light} 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+}";
+		}
+
+		// Testimonials wall — masonry via CSS columns. The wrapper flips from
+		// flex to block+columns; cards become column items that never split.
+		if ( $this->config_field_is( $config, 'testimonials', 'variant', 'wall' ) ) {
+			$css .= "
+
+/* Testimonials masonry wall */
+.pg-masonry.e-con {
+    --display: block;
+    display: block;
+    columns: 3;
+    column-gap: 24px;
+}
+.pg-masonry.e-con > .e-con {
+    --display: flex;
+    display: flex;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin-bottom: 24px;
+    width: 100% !important;
+    max-width: 100%;
+}
+@media (max-width: 1024px) {
+    .pg-masonry.e-con { columns: 2; }
+}
+@media (max-width: 767px) {
+    .pg-masonry.e-con { columns: 1; }
+}";
+		}
+
+		// Editorial steps — ghost numeral polish (sizes/opacity live on the
+		// heading widget itself; this only stops wrapping and text selection).
+		if ( $this->config_field_is( $config, 'steps', 'variant', 'editorial' ) ) {
+			$css .= "
+
+/* Editorial ghost numerals */
+.pg-ghost-num .elementor-heading-title {
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+}";
+		}
+
 		return $css;
+	}
+
+	/**
+	 * Does any instance of section $base (bare key or a "#N"-suffixed repeat)
+	 * set $field to $value? Used to gate recipe CSS on actual usage so pages
+	 * that never invoke a recipe ship none of its CSS.
+	 *
+	 * @param array  $config Page config.
+	 * @param string $base   Base section type (e.g. 'hero').
+	 * @param string $field  Field name (e.g. 'variant').
+	 * @param string $value  Expected value (e.g. 'mesh').
+	 * @return bool
+	 */
+	private function config_field_is( $config, $base, $field, $value ) {
+		foreach ( $config as $k => $v ) {
+			if ( ! is_array( $v ) ) { continue; }
+			if ( $k !== $base && ! preg_match( '/^' . preg_quote( $base, '/' ) . '#[2-9][0-9]*$/', (string) $k ) ) {
+				continue;
+			}
+			if ( isset( $v[ $field ] ) && $value === $v[ $field ] ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

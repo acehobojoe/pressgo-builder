@@ -402,6 +402,22 @@ class PressGo_Section_Builder {
 		return array( $base - 20, max( 26, $mobile - 4 ), $tablet - 14 );
 	}
 
+	/**
+	 * The pg- class for the gradient-ink headline knob (hero.headline_style =
+	 * 'gradient'), or '' when the knob is absent/unknown. Two flavors: light
+	 * heroes clip the brand primary→accent through the h1; dark heroes get a
+	 * white→lightened-accent pair so the wash stays readable. The matching
+	 * background-clip rules are emitted into the page CSS by
+	 * generate_custom_css() (only when the knob is set), inside an @supports
+	 * guard — non-supporting browsers keep the solid inline title_color.
+	 */
+	private static function headline_gradient_class( $h, $on_dark ) {
+		if ( ! is_array( $h ) || ! isset( $h['headline_style'] ) || 'gradient' !== $h['headline_style'] ) {
+			return '';
+		}
+		return $on_dark ? 'pg-gradient-text-dark' : 'pg-gradient-text';
+	}
+
 	/** Normalize a bullets/benefits array: strings or {text} objects → trimmed
 	 * strings, junk and blanks dropped (an array item printed "Array"). */
 	private static function bullet_texts( $items ) {
@@ -735,8 +751,11 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.5)', 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 68, 32, 44 );
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
 			$c['white'], $hh_d, '800', -1.5, 1.12, null, $hh_m, $hh_t );
+		$grad_class = self::headline_gradient_class( $h, true );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$children[] = $h1;
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 ) );
 		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.85)' );
@@ -833,8 +852,11 @@ class PressGo_Section_Builder {
 			$c['primary'], 12, '600', 4, null, 'uppercase', null, null, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 12 );
 		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 64, 30, 40 );
-		$left[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'left',
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'left',
 			$c['text_dark'], $hh_d, '800', -1.5, 1.12, null, $hh_m, $hh_t, 'center' );
+		$grad_class = self::headline_gradient_class( $h, false );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$left[] = $h1;
 		$left[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$left[] = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'left', $c['text_muted'], 17, 15, 1.7, 'center' );
 		$left[] = PressGo_Widget_Helpers::spacer_w( 24 );
@@ -1093,8 +1115,11 @@ class PressGo_Section_Builder {
 			$c['primary'], 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 66, 32, 42 );
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
 			$c['text_dark'], $hh_d, '800', -1.5, 1.12, null, $hh_m, $hh_t );
+		$grad_class = self::headline_gradient_class( $h, false );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$children[] = $h1;
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			$c['text_muted'], 18, 15 ) );
@@ -1160,8 +1185,11 @@ class PressGo_Section_Builder {
 			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 70, 34, 46 );
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
 			$c['white'], $hh_d, '800', -2, 1.08, null, $hh_m, $hh_t );
+		$grad_class = self::headline_gradient_class( $h, true );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$children[] = $h1;
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			'rgba(255,255,255,0.8)', 19, 15 ) );
@@ -1243,8 +1271,11 @@ class PressGo_Section_Builder {
 			$c['primary'], 13, '600', 4, null, 'uppercase' );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 66, 32, 44 );
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
 			$c['text_dark'], $hh_d, '800', -1.5, 1.12, null, $hh_m, $hh_t );
+		$grad_class = self::headline_gradient_class( $h, false );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$children[] = $h1;
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			$c['text_muted'], 18, 15 ) );
@@ -1279,6 +1310,78 @@ class PressGo_Section_Builder {
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 140, 120 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 1g. Hero Mesh (layered radial mesh gradients, no image)
+	// ──────────────────────────────────────────────
+
+	public static function build_hero_mesh( $cfg ) {
+		$c    = $cfg['colors'];
+		$h    = $cfg['hero'];
+		$cta1 = self::resolve_cta( isset( $h['cta_primary'] ) ? $h['cta_primary'] : null, 'Get Started' );
+		$cta2 = self::resolve_cta( isset( $h['cta_secondary'] ) ? $h['cta_secondary'] : null );
+
+		$children = array();
+
+		if ( ! empty( $h['badge'] ) ) {
+			$children[] = PressGo_Widget_Helpers::badge_w( $cfg, $h['badge'], 'dark' );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
+		}
+
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'center',
+			'rgba(255,255,255,0.55)', 12, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
+		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 64, 32, 44 );
+		$h1 = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
+			$c['white'], $hh_d, '800', -1.5, 1.1, null, $hh_m, $hh_t );
+		$grad_class = self::headline_gradient_class( $h, true );
+		if ( $grad_class ) { $h1['settings']['_css_classes'] = $grad_class; }
+		$children[] = $h1;
+		$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
+			'rgba(255,255,255,0.78)', 19, 15 ) );
+		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.88)' );
+		if ( $hero_meta ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $hero_meta;
+		}
+		$children[] = PressGo_Widget_Helpers::spacer_w( 30 );
+
+		// CTA pair grouped + centered.
+		$btns = array(
+			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
+				isset( $cta1['url'] ) ? $cta1['url'] : '#',
+				$c['accent'], $c['white'], null,
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
+		);
+		if ( $cta2 ) {
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
+				isset( $cta2['url'] ) ? $cta2['url'] : '#',
+				'rgba(255,255,255,0.12)', $c['white'], 'rgba(255,255,255,0.28)', null, 'center' );
+		}
+		$children[] = self::btn_group( $btns, 'center', 14 );
+
+		if ( ! empty( $h['trust_line'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+			$children[] = self::btn_group( array_merge(
+				self::trust_line_has_rating( $h['trust_line'] ) ? array(
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				) : array(),
+				array(
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
+					'rgba(255,255,255,0.55)', 13 ),
+			) ), 'center', 10 );
+		}
+
+		// The mesh itself is painted by the pg-mesh rules in the page CSS —
+		// generate_custom_css() emits a 4-stop radial-gradient stack built from
+		// this page's real primary/accent hexes (rgba is legal in page CSS).
+		// The solid dark_bg set here is the no-CSS fallback, so the soft white
+		// text stays legible even if the custom CSS never loads.
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['dark_bg'], null, 150, 130,
+			array( 'css_classes' => 'pg-mesh' ) );
 	}
 
 	// ──────────────────────────────────────────────
@@ -2272,6 +2375,86 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
+	// 5d. Steps Editorial (oversized ghost numerals, alternating sides)
+	// ──────────────────────────────────────────────
+
+	public static function build_steps_editorial( $cfg ) {
+		$c  = $cfg['colors'];
+		$st = $cfg['steps'];
+
+		// norm_items: strings → title-only, junk dropped. The editorial rhythm
+		// needs at least two rows to alternate — fall back to default steps
+		// (which also handles the zero-item null).
+		$st_items = self::norm_items( isset( $st['items'] ) ? $st['items'] : array() );
+		if ( count( $st_items ) < 2 ) {
+			return self::build_steps( $cfg );
+		}
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $st['eyebrow'], $st['headline'],
+			isset( $st['subheadline'] ) ? $st['subheadline'] : null );
+
+		$rows = array();
+		foreach ( $st_items as $idx => $item ) {
+			$desc = isset( $item['desc'] ) ? $item['desc']
+				: ( isset( $item['description'] ) ? $item['description'] : '' );
+
+			// Zero-pad single-digit positions ("01") — editorial numerals read
+			// as design, not as a list index. Custom markers ("Day 2") pass
+			// through untouched.
+			$num = self::step_num( $item, $idx );
+			if ( ctype_digit( $num ) && 1 === strlen( $num ) ) {
+				$num = '0' . $num;
+			}
+
+			// Oversized ghost numeral: 120px display type at a 12%-alpha accent
+			// (widget setting, NOT an inline style attr — rgba is fine here).
+			// Static heading with no negative margins or absolute positioning —
+			// the most robust of the overlap techniques; pg-ghost-num only adds
+			// nowrap/user-select polish via page CSS. Mobile shrinks to 64px via
+			// the heading's own responsive size control, so nothing can overlap.
+			$ghost = PressGo_Widget_Helpers::heading_w( $cfg, $num, 'div', 'center',
+				PressGo_Style_Utils::hex_to_rgba( $c['accent'], 0.12 ), 120, '800', -3, 0.85,
+				null, 64, 96 );
+			$ghost['settings']['_css_classes'] = 'pg-ghost-num';
+
+			$num_col = PressGo_Element_Factory::col( array( $ghost ), array(
+				'vertical_align' => 'middle',
+				'_inline_size'   => 32,
+				'_column_size'   => 32,
+			) );
+
+			$text_col = PressGo_Element_Factory::col(
+				array(
+					PressGo_Widget_Helpers::heading_w( $cfg, isset( $item['title'] ) ? $item['title'] : '', 'h3', 'left',
+						$c['text_dark'], 26, '800', -0.5, 1.25, null, 21, 23, 'center' ),
+					PressGo_Widget_Helpers::spacer_w( 10 ),
+					PressGo_Widget_Helpers::text_w( $cfg, $desc, 'left', $c['text_muted'], 16, 15, 1.7, 'center' ),
+				),
+				array(
+					'vertical_align' => 'middle',
+					'_inline_size'   => 68,
+					'_column_size'   => 68,
+				)
+			);
+
+			if ( $idx > 0 ) {
+				$rows[] = PressGo_Widget_Helpers::spacer_w( 48 );
+			}
+			// Alternate the numeral's side with row-reverse instead of swapping
+			// DOM order — on mobile the row stacks (flex_direction_mobile:
+			// column from row()) and the numeral always lands ABOVE its title,
+			// both centered, with zero overlap.
+			$rows[] = PressGo_Element_Factory::row( $cfg, array( $num_col, $text_col ), 28, array(
+				'flex_direction' => ( 1 === $idx % 2 ) ? 'row-reverse' : 'row',
+			) );
+		}
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, $rows ),
+			$c['white'], null, 100, 80 );
+	}
+
+	// ──────────────────────────────────────────────
 	// 6. Results
 	// ──────────────────────────────────────────────
 
@@ -3009,6 +3192,77 @@ class PressGo_Section_Builder {
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 8e. Testimonials Wall (masonry quote wall via CSS columns)
+	// ──────────────────────────────────────────────
+
+	public static function build_testimonials_wall( $cfg ) {
+		$c = $cfg['colors'];
+		$t = $cfg['testimonials'];
+
+		// No testimonials → no section.
+		if ( empty( $t['items'] ) ) { return null; }
+		$items = self::quote_items( $t['items'] );
+		if ( empty( $items ) ) { return null; }
+
+		// Masonry needs density to read as a wall — fewer than 4 quotes routes
+		// to the 2-col grid (which handles its own count adaptation).
+		if ( count( $items ) < 4 ) {
+			return self::build_testimonials_grid( $cfg );
+		}
+		$items = array_slice( $items, 0, 12 );
+
+		$header = PressGo_Style_Utils::section_header( $cfg, $t['eyebrow'], $t['headline'],
+			isset( $t['subheadline'] ) ? $t['subheadline'] : null );
+		$header = array_merge( $header, self::aggregate_row( $cfg, $t, $c['text_muted'] ) );
+
+		// One card column per quote. Naturally-varying quote lengths are the
+		// point — CSS columns (pg-masonry) pack them with no equal-height
+		// padding waste; break-inside:avoid keeps each card whole.
+		$cards = array();
+		foreach ( $items as $item ) {
+			$widgets   = array();
+			$widgets[] = PressGo_Widget_Helpers::text_w( $cfg,
+				'&ldquo;' . $item['quote'] . '&rdquo;',
+				'left', PressGo_Style_Utils::card_text(), 15, 14, 1.7 );
+			if ( '' !== $item['name'] ) {
+				$widgets[] = PressGo_Widget_Helpers::spacer_w( 14 );
+				$widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $item['name'], 'h5', 'left',
+					PressGo_Style_Utils::card_text(), 15, '700' );
+			}
+			if ( '' !== $item['role'] ) {
+				$widgets[] = PressGo_Widget_Helpers::text_w( $cfg, $item['role'], 'left',
+					PressGo_Style_Utils::card_text_muted(), 13 );
+			}
+			$cards[] = PressGo_Element_Factory::col( $widgets,
+				PressGo_Style_Utils::card_style( $cfg, 24 ) );
+		}
+
+		// The wall wrapper is NOT a row() — the pg-masonry page CSS flips this
+		// container to display:block + CSS columns (3 desktop / 2 tablet / 1
+		// mobile) and the card cols become column items. Without that CSS it
+		// degrades to a single stacked column — readable, never broken.
+		$wall = array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'isInner'  => true,
+			'settings' => array(
+				'container_type' => 'flex',
+				'content_width'  => 'full',
+				'flex_direction' => 'column',
+				'flex_gap'       => array(
+					'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+				),
+				'css_classes'    => 'pg-masonry',
+			),
+			'elements' => $cards,
+		);
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array_merge( $header, array( $wall ) ),
+			$c['light_bg'], null, 80, 80 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -3912,6 +4166,126 @@ class PressGo_Section_Builder {
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
 			$c['dark_bg'], null, 40, 40 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 13c. Logo Bar Marquee (infinite horizontal CSS crawl)
+	// ──────────────────────────────────────────────
+
+	public static function build_logo_bar_marquee( $cfg ) {
+		$c  = $cfg['colors'];
+		$lb = $cfg['logo_bar'];
+
+		// Same comma-string / non-array coercion as the static variants.
+		if ( isset( $lb['logos'] ) && is_string( $lb['logos'] ) ) {
+			$lb['logos'] = array_values( array_filter( array_map( 'trim', explode( ',', $lb['logos'] ) ) ) );
+		}
+		if ( ! isset( $lb['logos'] ) || ! is_array( $lb['logos'] ) ) { $lb['logos'] = array(); }
+
+		// Drop unusable entries up front — the seamless-loop math below assumes
+		// every item actually renders.
+		$logos = array();
+		foreach ( $lb['logos'] as $logo ) {
+			if ( is_string( $logo ) ) {
+				if ( '' !== trim( $logo ) ) { $logos[] = $logo; }
+				continue;
+			}
+			if ( is_array( $logo ) && ( self::has_real_image( isset( $logo['url'] ) ? $logo['url'] : '' )
+				|| ! empty( $logo['name'] ) || ! empty( $logo['alt'] ) ) ) {
+				$logos[] = $logo;
+			}
+		}
+
+		// A 2-3 logo loop shows an obvious repeat gap — fall back to the
+		// static row (which also handles the zero-logo null).
+		if ( count( $logos ) < 4 ) {
+			return self::build_logo_bar( $cfg );
+		}
+
+		$children = array();
+		if ( ! empty( $lb['headline'] ) ) {
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $lb['headline'], 'h6', 'center',
+				$c['text_muted'], 13, '500' );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+		}
+
+		// The set renders TWICE so the translateX(-50%) keyframe loops with no
+		// seam (structural duplication of the user's real list — not fabricated
+		// content). Items are REBUILT each pass: copying the arrays would
+		// duplicate Elementor element IDs. Uniform fixed item widths (not
+		// flex_gap) keep the -50% loop point exact — a flex gap leaves no
+		// trailing slot after the last item, which shifts the seam.
+		$items = array();
+		for ( $pass = 0; $pass < 2; $pass++ ) {
+			foreach ( $logos as $logo ) {
+				$item = self::logo_item( $cfg, $logo, $c['text_muted'] );
+				if ( 1 === $pass && isset( $item['settings']['image']['alt'] ) ) {
+					// The duplicate set is decorative — blank its alt text.
+					$item['settings']['image']['alt'] = '';
+				}
+				$col_extra = array(
+					'vertical_align' => 'middle',
+					'width'          => array( 'unit' => 'px', 'size' => 200, 'sizes' => array() ),
+					'width_mobile'   => array( 'unit' => 'px', 'size' => 150, 'sizes' => array() ),
+					'padding'        => array(
+						'unit' => 'px', 'top' => '10', 'right' => '24',
+						'bottom' => '10', 'left' => '24', 'isLinked' => false,
+					),
+					'padding_mobile' => array(
+						'unit' => 'px', 'top' => '8', 'right' => '14',
+						'bottom' => '8', 'left' => '14', 'isLinked' => false,
+					),
+				);
+				if ( 1 === $pass ) {
+					// Tagged so prefers-reduced-motion can hide the duplicate
+					// set when the track degrades to a static wrapped wall.
+					$col_extra['css_classes'] = 'pg-marquee-dup';
+				}
+				$items[] = PressGo_Element_Factory::col( array( $item ), $col_extra );
+			}
+		}
+
+		// Track: one nowrap flex row holding both copies. Page CSS forces
+		// width:max-content and runs the pg-marquee-scroll keyframes; the
+		// pg-marquee wrapper clips the overflow (overflow control set too as
+		// belt-and-suspenders). No JS anywhere.
+		$track = array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'isInner'  => true,
+			'settings' => array(
+				'container_type'   => 'flex',
+				'content_width'    => 'full',
+				'flex_direction'   => 'row',
+				'flex_wrap'        => 'nowrap',
+				'flex_align_items' => 'center',
+				'flex_gap'         => array(
+					'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+				),
+				'css_classes'      => 'pg-marquee-track',
+			),
+			'elements' => $items,
+		);
+
+		$children[] = array(
+			'id'       => PressGo_Element_Factory::eid(),
+			'elType'   => 'container',
+			'isInner'  => true,
+			'settings' => array(
+				'container_type' => 'flex',
+				'content_width'  => 'full',
+				'flex_direction' => 'column',
+				'flex_gap'       => array(
+					'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true,
+				),
+				'overflow'       => 'hidden',
+				'css_classes'    => 'pg-marquee',
+			),
+			'elements' => array( $track ),
+		);
+
+		return PressGo_Element_Factory::outer( $cfg, $children,
+			$c['white'], null, 40, 40 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -5446,6 +5820,112 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Element_Factory::row( $cfg, array( $left_col, $right_col ), 48 );
 
 		return PressGo_Element_Factory::outer( $cfg, $children, $c['white'], null, 80, 80 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 20. Sticky Bar (mobile fixed bottom call bar)
+	// ──────────────────────────────────────────────
+
+	/**
+	 * Resolve the sticky bar's primary CTA: an explicit cta {text,url,icon}
+	 * wins; otherwise a real `phone` field synthesizes a "Call {phone}" tel:
+	 * button (derived from user-supplied data, never invented). Placeholder
+	 * contacts ((555) 123-4567 leaks) kill the bar entirely.
+	 *
+	 * Public because the page creator runs the SAME guard to decide whether to
+	 * emit the pg-sticky-bar CSS — that CSS carries a mobile body
+	 * padding-bottom which must never ship without the bar itself.
+	 *
+	 * @param array $cfg Full page config.
+	 * @return array|null Normalized {text, url, icon} or null.
+	 */
+	public static function sticky_bar_cta( $cfg ) {
+		$sb = isset( $cfg['sticky_bar'] ) && is_array( $cfg['sticky_bar'] ) ? $cfg['sticky_bar'] : null;
+		if ( ! $sb ) { return null; }
+
+		$cta = self::resolve_cta( isset( $sb['cta'] ) ? $sb['cta'] : null );
+
+		if ( ! $cta && isset( $sb['phone'] ) && is_scalar( $sb['phone'] )
+			&& ! self::is_placeholder_contact( $sb['phone'] ) ) {
+			$tel = preg_replace( '/[^0-9+]/', '', (string) $sb['phone'] );
+			if ( strlen( preg_replace( '/[^0-9]/', '', $tel ) ) >= 7 ) {
+				$cta = array(
+					'text' => 'Call ' . trim( (string) $sb['phone'] ),
+					'url'  => 'tel:' . $tel,
+					'icon' => 'fas fa-phone',
+				);
+			}
+		}
+
+		if ( ! $cta ) { return null; }
+		if ( self::is_placeholder_contact( $cta['text'] ) || self::is_placeholder_contact( $cta['url'] ) ) {
+			return null;
+		}
+		return $cta;
+	}
+
+	/**
+	 * Mobile sticky call bar — a slim full-width strip that renders in flow at
+	 * its config position but is hidden on desktop and pinned to the bottom of
+	 * the phone viewport by the pg-sticky-bar page CSS (position:fixed, pure
+	 * CSS, zero JS). 1-2 full-width buttons: the primary CTA (usually tel:)
+	 * plus an optional secondary. No usable CTA → null, never an empty strip.
+	 */
+	public static function build_sticky_bar( $cfg ) {
+		$c   = $cfg['colors'];
+		$cta = self::sticky_bar_cta( $cfg );
+		if ( ! $cta ) { return null; }
+		$sb  = $cfg['sticky_bar'];
+
+		// 'justify' stretches each button to its column, so the whole bar is
+		// tap target. btn_w auto-tags phone-bearing labels pg-btn-nowrap.
+		$btns   = array();
+		$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'], $cta['url'],
+			$c['accent'], $c['white'], null,
+			isset( $cta['icon'] ) ? $cta['icon'] : null, 'justify' );
+
+		$cta2 = self::resolve_cta( isset( $sb['cta_secondary'] ) ? $sb['cta_secondary'] : null );
+		if ( $cta2 && ! self::is_placeholder_contact( $cta2['text'] ) && ! self::is_placeholder_contact( $cta2['url'] ) ) {
+			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'], $cta2['url'],
+				'transparent', $c['white'], 'rgba(255,255,255,0.35)',
+				isset( $cta2['icon'] ) ? $cta2['icon'] : null, 'justify' );
+		}
+
+		// Each button in its own equal-width column so two CTAs split the bar
+		// 50/50 (explicit width_mobile keeps the split on phones — row() would
+		// otherwise default it to 100%).
+		$btn_cols = array();
+		$share    = count( $btns ) > 1 ? 50 : 100;
+		foreach ( $btns as $btn ) {
+			$btn_cols[] = PressGo_Element_Factory::col( array( $btn ), array(
+				'width'        => array( 'unit' => '%', 'size' => $share, 'sizes' => array() ),
+				'width_mobile' => array( 'unit' => '%', 'size' => $share, 'sizes' => array() ),
+			) );
+		}
+
+		// The bar must stay ONE slim row on every device (the fixed strip IS
+		// the mobile layout) — override row()'s default mobile stacking.
+		$row = PressGo_Element_Factory::row( $cfg, $btn_cols, 10, array(
+			'flex_direction_mobile' => 'row',
+			'flex_align_items'      => 'center',
+		) );
+
+		// Slim fixed paddings on all breakpoints — outer()'s auto tablet/mobile
+		// padding floors (50/40px) would turn a ~64px bar into a 150px slab.
+		$slim = array(
+			'unit' => 'px', 'top' => '10', 'right' => '14',
+			'bottom' => '10', 'left' => '14', 'isLinked' => false,
+		);
+
+		return PressGo_Element_Factory::outer( $cfg, array( $row ),
+			$c['dark_bg'], null, 10, 10,
+			array(
+				'css_classes'    => 'pg-sticky-bar',
+				'padding'        => $slim,
+				'padding_tablet' => $slim,
+				'padding_mobile' => $slim,
+			)
+		);
 	}
 
 	// ──────────────────────────────────────────────

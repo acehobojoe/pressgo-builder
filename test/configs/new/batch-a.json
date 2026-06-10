@@ -1,0 +1,83 @@
+{
+  "business_name": "Harbor & Pine Coffee Roasters",
+  "industry": "coffee roastery",
+  "colors": {
+    "primary": "#7C4A2D",
+    "dark_bg": "#1E150F",
+    "light_bg": "#F7F2EC",
+    "white": "#FFFFFF",
+    "text_dark": "#241A12",
+    "text_muted": "#6F6258",
+    "accent": "#C97B3D"
+  },
+  "fonts": {"heading": "Fraunces", "body": "Nunito Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 16, "button_radius": 10},
+  "sections": ["hero", "logo_bar", "steps", "testimonials", "cta_final", "sticky_bar", "footer"],
+  "hero": {
+    "variant": "mesh",
+    "headline_style": "gradient",
+    "eyebrow": "SMALL-BATCH ROASTERY, CHARLESTON SC",
+    "headline": "Coffee Roasted the Morning It Ships",
+    "subheadline": "We roast in 12-pound batches on the Charleston waterfront and get your bag in the mail within 48 hours. No warehouse, no months-old beans, just coffee at its peak.",
+    "cta_primary": {"text": "Shop Fresh Roasts", "url": "#cta-final", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "See How We Roast", "url": "#steps"},
+    "trust_line": "4.9 stars across 300+ Google reviews"
+  },
+  "logo_bar": {
+    "variant": "marquee",
+    "headline": "Proudly served by independents across the Lowcountry",
+    "logos": [
+      "Bluebird Bakery",
+      "Salt & Stone Bistro",
+      "The Corner Larder",
+      "Driftwood Hotel",
+      "Meridian Market",
+      "Copper Kettle Diner"
+    ]
+  },
+  "steps": {
+    "variant": "editorial",
+    "eyebrow": "OUR PROCESS",
+    "headline": "From Green Bean to Your Cup",
+    "subheadline": "Four steps, no shortcuts. This is why the roast date on our bags is measured in days, not months.",
+    "items": [
+      {"title": "Source", "desc": "We buy direct from family farms in Honduras, Ethiopia, and Sumatra, and we pay above fair trade rates for every lot we bring in."},
+      {"title": "Roast", "desc": "Beans hit the drum the same morning your order comes in. Small 12-pound batches, profiled by hand, logged roast by roast."},
+      {"title": "Rest", "desc": "Every roast rests a full day so the CO2 settles and the flavor opens up before it gets anywhere near a bag."},
+      {"title": "Ship", "desc": "Bagged with a one-way valve and in the mail within 48 hours of roasting. Most orders arrive within two days."}
+    ]
+  },
+  "testimonials": {
+    "variant": "wall",
+    "eyebrow": "REVIEWS",
+    "headline": "What Our Subscribers Say",
+    "subheadline": "Real notes from the people who drink it every morning.",
+    "aggregate": {"rating": 4.9, "count": 312, "source": "Google"},
+    "items": [
+      {"quote": "The Kiawah blend ruined hotel coffee for me forever. You can taste the difference a fresh roast date makes.", "name": "Marcie Tolan", "role": "Subscriber for two years"},
+      {"quote": "I switched our cafe to Harbor & Pine last spring and customers noticed within a week. Wholesale support has been outstanding too. They helped us dial in our espresso recipe and even trained two of our baristas on the new grinder.", "name": "Dre Wilkins", "role": "Owner, Bluebird Bakery"},
+      {"quote": "Best decaf I have ever had. Period.", "name": "Sam Okafor", "role": "Subscriber"},
+      {"quote": "Their single-origin Ethiopia tastes like blueberries. I did not believe the bag until I brewed it.", "name": "Priya Nair", "role": "Home brewer"},
+      {"quote": "We send Harbor & Pine gift boxes to clients every December and people start asking about them by October. The packaging is beautiful and the coffee backs it up.", "name": "Caroline Hsu", "role": "Office manager, Meridian Market"}
+    ]
+  },
+  "cta_final": {
+    "headline": "Your First Bag Ships Free",
+    "description": "Pick a roast, pick a schedule, cancel whenever you want. Freshness is the whole point.",
+    "cta": {"text": "Start a Subscription", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Free shipping on subscriptions. Skip or cancel anytime."
+  },
+  "sticky_bar": {
+    "cta": {"text": "Call (843) 555-0162", "url": "tel:+18435550162", "icon": "fas fa-phone"},
+    "cta_secondary": {"text": "Order Beans", "url": "#cta-final"}
+  },
+  "footer": {
+    "brand": {"name": "Harbor & Pine Coffee Roasters", "description": "Small-batch coffee roasted on the Charleston waterfront since 2019."},
+    "columns": [
+      {"title": "Shop", "links": [{"text": "Subscriptions"}, {"text": "Single Origins"}, {"text": "Blends"}, {"text": "Gift Boxes"}]},
+      {"title": "Visit", "links": [{"text": "The Roastery"}, {"text": "Wholesale"}, {"text": "Brew Guides"}]}
+    ],
+    "contact": {"email": "hello@harborandpine.coffee", "phone": "(843) 555-0162", "address": "12 Wharf Lane, Charleston, SC 29401"},
+    "copyright": "© 2026 Harbor & Pine Coffee Roasters. All rights reserved."
+  }
+}
