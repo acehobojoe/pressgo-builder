@@ -81,8 +81,7 @@ class PressGo_AI_Builder {
 		}
 		$name = $post_id . '-' . md5( $post->post_modified_gmt ) . '.jpg';
 		if ( file_exists( $dir['path'] . '/' . $name ) ) {
-			wp_redirect( $dir['url'] . '/' . $name, 302 );
-			exit;
+			$this->thumb_serve( $dir, $name ); // exits
 		}
 
 		// A recent generation attempt failed — don't hammer the screenshot
@@ -142,13 +141,48 @@ class PressGo_AI_Builder {
 		}
 
 		if ( $saved ) {
-			wp_redirect( $dir['url'] . '/' . $name, 302 );
-			exit;
+			$this->thumb_serve( $dir, $name ); // exits
 		}
 		header( 'Content-Type: image/png' );
 		header( 'Cache-Control: max-age=86400' );
 		echo $png; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — raw PNG bytes
 		exit;
+	}
+
+	/**
+	 * Serve a cached thumb file: redirect to its uploads URL when that URL
+	 * actually serves files we write to basedir, otherwise stream the bytes.
+	 * Hosts with a filtered/offloaded upload_dir (push-sync CDN setups,
+	 * upload_url_path pointing elsewhere) write locally fine but 404 on the
+	 * uploads URL — without this fallback every thumb there would 302 into a
+	 * 404 forever. Always exits.
+	 */
+	private function thumb_serve( $dir, $name ) {
+		if ( $this->thumb_url_servable( $dir, $name ) ) {
+			wp_redirect( $dir['url'] . '/' . $name, 302 );
+			exit;
+		}
+		header( 'Content-Type: image/jpeg' );
+		header( 'Cache-Control: max-age=86400' );
+		readfile( $dir['path'] . '/' . $name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+		exit;
+	}
+
+	/**
+	 * One-time-per-config probe: does the uploads URL actually serve a file we
+	 * just wrote to the uploads dir? Cached in an autoload-off option keyed by
+	 * the baseurl, so a CDN/offload config change re-probes.
+	 */
+	private function thumb_url_servable( $dir, $name ) {
+		$key    = 'pressgo_thumb_url_ok_' . md5( $dir['url'] );
+		$cached = get_option( $key, false );
+		if ( false !== $cached ) {
+			return '1' === $cached;
+		}
+		$resp = wp_remote_head( $dir['url'] . '/' . $name, array( 'timeout' => 4, 'sslverify' => false ) );
+		$ok   = ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200;
+		update_option( $key, $ok ? '1' : '0', false );
+		return $ok;
 	}
 
 	/**

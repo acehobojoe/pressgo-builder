@@ -309,12 +309,16 @@
 			chips.appendChild(b);
 		});
 		append(chips);
-		// Pre-fill the box with the first example, ready to edit + Send.
-		input.value = STARTERS[0].text;
+		// Pre-fill the box with the first example, ready to edit + Send — but
+		// never overwrite something the user already started typing (a late
+		// history retry can land here seconds after page load).
+		if (!input.value) input.value = STARTERS[0].text;
 		setTimeout(function () { input.focus(); }, 50);
 	}
 
 	function renderHistory(messages) {
+		// Never clobber a live conversation (belt to chatStarted's suspenders).
+		if (log.querySelector('.pg-msg-user')) return;
 		log.innerHTML = '';
 		if (!messages || !messages.length) {
 			if (cfg.firstRun) { renderFirstRun(); return; }
@@ -444,6 +448,12 @@
 			.catch(function () { /* leave default pill */ });
 	}
 
+	// Set the moment the user sends their first message this session. A pending
+	// loadHistory retry that resolves AFTER that must become a no-op — its
+	// renderHistory() would wipe the live optimistic bubble + streaming nodes
+	// and the build would stream into detached DOM.
+	var chatStarted = false;
+
 	function loadHistory(attempt) {
 		attempt = attempt || 0;
 		var fd = new FormData();
@@ -453,10 +463,12 @@
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 			.then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
 			.then(function (j) {
+				if (chatStarted) return; // user already talking — don't clobber the live log
 				if (j && j.success) renderHistory(j.data.messages || []);
 				else throw new Error('bad payload');
 			})
 			.catch(function () {
+				if (chatStarted) return;
 				// A busy server (saturated PHP pool) used to land here and we
 				// rendered the EMPTY intro — which reads as "my conversation got
 				// deleted" even though the history is safe in the database.
@@ -471,13 +483,19 @@
 				var retry = document.createElement('a');
 				retry.href = '#';
 				retry.textContent = 'Tap to retry';
-				retry.addEventListener('click', function (e) { e.preventDefault(); log.innerHTML = ''; loadHistory(0); });
+				retry.addEventListener('click', function (e) {
+					e.preventDefault();
+					if (chatStarted) { err.remove(); return; } // mid-conversation: just dismiss
+					log.innerHTML = '';
+					loadHistory(0);
+				});
 				err.appendChild(retry);
 				append(err);
 			});
 	}
 
 	function sendMessage(text) {
+		chatStarted = true; // any still-pending history retries become no-ops
 		// Optimistic user bubble — shows any attached images inline.
 		var userBubble = el('pg-msg pg-msg-user');
 		if (pendingImages.length) {
