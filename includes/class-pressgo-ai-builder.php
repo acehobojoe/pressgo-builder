@@ -928,9 +928,16 @@ class PressGo_AI_Builder {
 		// Import every attached image into the WP media library (parented to this
 		// page) so the AI can place them AND the user keeps reusable copies.
 		// Build vision blocks too (capped) so the model can actually see them.
+		// Keep the URL of each import: mapping "attachment N = URL" lets the
+		// model connect what it SEES (vision) to a placeable URL — and lets it
+		// recognize a reference screenshot it must NOT place.
 		$vision_blocks = array();
+		$imported      = array();
 		foreach ( $images as $im ) {
-			$this->import_image_to_media( $im['base64'], $im['mime'], $post_id );
+			$res = $this->import_image_to_media( $im['base64'], $im['mime'], $post_id );
+			if ( $res ) {
+				$imported[] = $res;
+			}
 			if ( count( $vision_blocks ) < 6 ) {
 				$vision_blocks[] = array(
 					'type'   => 'image',
@@ -956,6 +963,20 @@ class PressGo_AI_Builder {
 			if ( count( $avail ) > 1 ) {
 				$image_note .= "When several fit, spread them across the page (a gallery is great for multiple photos; use the strongest for the hero).\n";
 			}
+			$image_note .= "HONESTY: you cannot see what an unlabeled URL contains — never claim an unlabeled image shows something specific (dogs, food, your team). If you place unlabeled library images, say you used their library photos and that they can ask to swap any that look wrong.\n";
+		}
+
+		// Map THIS turn's attachments to their imported URLs. Without this the
+		// model sees the pixels (vision) and a bare URL list separately, can't
+		// connect them, and has placed users' "remove these" REFERENCE
+		// SCREENSHOTS as hero backgrounds.
+		$attach_note = '';
+		if ( ! empty( $imported ) ) {
+			$attach_note = "\n\nThe image(s) attached to THIS message were imported to the media library (in attachment order):\n";
+			foreach ( $imported as $idx => $im ) {
+				$attach_note .= ( $idx + 1 ) . '. ' . $im['url'] . "\n";
+			}
+			$attach_note .= "Decide from the user's message whether these attachments are PHOTOS TO PLACE or REFERENCE IMAGES (a screenshot of the current page, a design to copy, or pictures of things to remove). NEVER place a reference image on the page as if it were a photo — not as a hero, not in a gallery. If they show images to remove and you cannot tell which existing URLs match, remove every image you cannot confirm fits this business and state exactly what you removed.";
 		}
 
 		// Attach the image blocks (vision) + the available-images note to the
@@ -967,7 +988,7 @@ class PressGo_AI_Builder {
 				$blocks   = $vision_blocks;
 				$blocks[] = array(
 					'type' => 'text',
-					'text' => ( $user_msg !== '' ? $user_msg : 'See the attached image(s) — use them as a visual reference and place them on the page.' ) . $image_note,
+					'text' => ( $user_msg !== '' ? $user_msg : 'See the attached image(s).' ) . $image_note . $attach_note,
 				);
 				$wire_messages[ $last_key ]['content'] = $blocks;
 			}
@@ -1277,6 +1298,11 @@ class PressGo_AI_Builder {
 		$meta = wp_generate_attachment_metadata( $attach_id, $upload['file'] );
 		wp_update_attachment_metadata( $attach_id, $meta );
 
+		// Mark chat imports: they're often reference screenshots ("remove
+		// these", a design to copy), so they must never flow into OTHER pages'
+		// available-image pools, and this page lists them with a warning label.
+		update_post_meta( $attach_id, '_pressgo_chat_import', 1 );
+
 		return array( 'id' => $attach_id, 'url' => wp_get_attachment_url( $attach_id ) );
 	}
 
@@ -1299,6 +1325,9 @@ class PressGo_AI_Builder {
 				}
 				$seen[ $a->ID ] = true;
 				$alt = get_post_meta( $a->ID, '_wp_attachment_image_alt', true );
+				if ( ! $alt && get_post_meta( $a->ID, '_pressgo_chat_import', true ) ) {
+					$alt = 'imported from chat — may be a reference screenshot rather than a photo; check the conversation before placing';
+				}
 				if ( ! $alt ) {
 					$alt = $a->post_title;
 				}
@@ -1324,7 +1353,9 @@ class PressGo_AI_Builder {
 		}
 		// 2) Fill with the user's RECENT media-library images so the AI can also
 		//    use photos they uploaded elsewhere (wp-admin, other pages), not just
-		//    ones attached to this page.
+		//    ones attached to this page. Chat imports are excluded here: another
+		//    page's "remove these" reference screenshot must never be offered as
+		//    a placeable photo on THIS page.
 		if ( count( $out ) < $limit ) {
 			$collect( get_posts( array(
 				'post_type'      => 'attachment',
@@ -1333,6 +1364,12 @@ class PressGo_AI_Builder {
 				'posts_per_page' => $limit,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'     => '_pressgo_chat_import',
+						'compare' => 'NOT EXISTS',
+					),
+				),
 			) ) );
 		}
 		return $out;
@@ -1552,8 +1589,9 @@ class PressGo_AI_Builder {
 			. "7. Is there exactly one primary CTA above the fold (not zero, not several competing ones)?\n"
 			. "8. Any blank or missing icons?\n"
 			. "9. Any em dashes or en dashes, or AI-cliche copy (Elevate, Unlock, Seamless, Empower, Unleash, Supercharge, Revolutionize, Game-changing, Cutting-edge, or 'Transform' used as filler)?\n"
-			. "10. WRONG-BUSINESS CONTENT: does any section describe a different business or industry than the user's (e.g. roofing services on a pet-care page)? Automatic FAIL — rewrite that section for the actual business.\n"
-			. ( $png_mobile ? "11. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
+			. "10. WRONG-BUSINESS CONTENT: does any section's copy OR PHOTOS describe or show a different business or industry than the user's (e.g. roofing copy or excavator photos on a pet-care page)? Automatic FAIL — rewrite or remove it for the actual business.\n"
+			. "11. SCREENSHOT-AS-PHOTO: is any placed image actually a screenshot of a webpage or app (UI cards, buttons, browser chrome visible inside the image)? Automatic FAIL — remove it.\n"
+			. ( $png_mobile ? "12. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
 			. "\nIf any item FAILS, call set_page_config again with the FULL corrected config, fixing ONLY the real failures and leaving everything else exactly as it is. "
 			. "If every item PASSES, reply with one short sentence confirming it looks good and ask if they want any other changes — do NOT call the tool.";
 
