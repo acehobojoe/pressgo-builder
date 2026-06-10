@@ -84,6 +84,13 @@ class PressGo_Generator {
 	 * @return array Elementor elements array (ready for json_encode).
 	 */
 	public function generate( $cfg ) {
+		// Full-dark page theme: colors.theme = 'dark' flips card surfaces to
+		// frosted dark (Style_Utils flag) and remaps hardcoded-white section
+		// backgrounds to a dark alt tint (post-pass below). The premium
+		// all-dark look (Bodystyle-class) needs every strip dark.
+		$dark_theme = isset( $cfg['colors']['theme'] ) && 'dark' === $cfg['colors']['theme'];
+		PressGo_Style_Utils::$dark_theme = $dark_theme;
+
 		$section_names = isset( $cfg['sections'] )
 			? $cfg['sections']
 			: array_keys( self::$builders );
@@ -125,6 +132,47 @@ class PressGo_Generator {
 				$result = null;
 			}
 
+			if ( null !== $result && 'hero' === $name && isset( $cfg['hero'] ) && is_array( $cfg['hero'] ) ) {
+				// Optional slim topbar (brand / phone / CTA) prepended inside
+				// the hero — works for every hero variant uniformly.
+				$hero_bg = isset( $result['settings']['background_color'] ) ? $result['settings']['background_color'] : '';
+				$on_dark = true; // heroes default dark (gradient/image/photo)
+				if ( $hero_bg && ! isset( $result['settings']['background_image'] ) ) {
+					$on_dark = ( '#FFFFFF' === PressGo_Style_Utils::text_on_color( $hero_bg ) );
+				}
+				$topbar = PressGo_Section_Builder::hero_topbar_row( $cfg, $cfg['hero'], $on_dark );
+				if ( $topbar && isset( $result['elements'] ) && is_array( $result['elements'] ) ) {
+					$spacer = array(
+						'id'         => PressGo_Element_Factory::eid(),
+						'elType'     => 'widget',
+						'widgetType' => 'spacer',
+						'settings'   => array( 'space' => array( 'unit' => 'px', 'size' => 36, 'sizes' => array() ) ),
+						'elements'   => array(),
+					);
+					array_unshift( $result['elements'], $topbar, $spacer );
+				}
+			}
+
+			if ( null !== $result && isset( $cfg[ $name ]['cta'] ) && is_array( $result['elements'] )
+				&& in_array( $name, array( 'features', 'steps', 'testimonials', 'gallery', 'stats', 'social_proof', 'logo_bar' ), true ) ) {
+				// Optional section-closing CTA ("CTA rhythm") for sections whose
+				// builders have no native cta handling — high-converting local
+				// landers repeat the same accent button after nearly every
+				// section. Builders WITH native cta fields are excluded above.
+				$rhythm_cta = PressGo_Section_Builder::public_resolve_cta( $cfg[ $name ]['cta'] );
+				if ( $rhythm_cta ) {
+					$result['elements'][] = array(
+						'id'         => PressGo_Element_Factory::eid(),
+						'elType'     => 'widget',
+						'widgetType' => 'spacer',
+						'settings'   => array( 'space' => array( 'unit' => 'px', 'size' => 36, 'sizes' => array() ) ),
+						'elements'   => array(),
+					);
+					$result['elements'][] = PressGo_Widget_Helpers::btn_w( $cfg, $rhythm_cta['text'], $rhythm_cta['url'],
+						$cfg['colors']['accent'], $cfg['colors']['white'], null, $rhythm_cta['icon'], 'center' );
+				}
+			}
+
 			if ( null !== $result ) {
 				// Auto-inject section anchor ID for smooth scrolling.
 				$anchor = str_replace( '_', '-', $name );
@@ -136,6 +184,33 @@ class PressGo_Generator {
 				}
 				$page[] = $result;
 			}
+		}
+
+		if ( $dark_theme ) {
+			// Remap hardcoded light section backgrounds to dark surfaces so no
+			// builder can break the all-dark rhythm: white -> dark alt tint,
+			// light_bg-literal -> dark base. Alternation is preserved (two
+			// dark tones), photo/gradient sections untouched.
+			$c        = $cfg['colors'];
+			$dark_bg  = isset( $c['dark_bg'] ) ? $c['dark_bg'] : '#0F172A';
+			$hsl      = PressGo_Style_Utils::hex_to_hsl( $dark_bg );
+			$dark_alt = PressGo_Style_Utils::hsl_to_hex( $hsl['h'], $hsl['s'], min( 0.96, $hsl['l'] + 0.05 ) );
+			$white    = isset( $c['white'] ) ? strtoupper( $c['white'] ) : '#FFFFFF';
+			$light    = isset( $c['light_bg'] ) ? strtoupper( $c['light_bg'] ) : '#F8FAFC';
+			foreach ( $page as &$section ) {
+				if ( ! isset( $section['settings']['background_color'] ) ) { continue; }
+				$bg = strtoupper( (string) $section['settings']['background_color'] );
+				// Only remap LIGHT backgrounds (a dark light_bg token means the
+				// user already themed it — leave it).
+				if ( ( $bg === $white || $bg === '#FFFFFF' ) ) {
+					$section['settings']['background_color'] = $dark_alt;
+				} elseif ( $bg === $light && '#FFFFFF' === PressGo_Style_Utils::text_on_color( $light ) ) {
+					// light_bg token is already dark — keep.
+				} elseif ( $bg === $light ) {
+					$section['settings']['background_color'] = $dark_bg;
+				}
+			}
+			unset( $section );
 		}
 
 		// Upgrade mapped FontAwesome icons to Phosphor in one pass over the

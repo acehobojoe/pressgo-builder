@@ -86,6 +86,11 @@ class PressGo_Section_Builder {
 	 * fatal on `$cta['text']` (the #1 crash class: the validator strips an
 	 * empty-text CTA, leaving the key undefined).
 	 */
+	/** Public wrapper so the generator's CTA-rhythm hook can normalize a cta. */
+	public static function public_resolve_cta( $node ) {
+		return self::resolve_cta( $node );
+	}
+
 	private static function resolve_cta( $node, $fallback_text = '' ) {
 		if ( is_string( $node ) && '' !== trim( $node ) ) {
 			return array( 'text' => trim( $node ), 'url' => '#', 'icon' => null );
@@ -483,6 +488,63 @@ class PressGo_Section_Builder {
 		);
 	}
 
+	/**
+	 * Slim header strip prepended INSIDE the hero: brand wordmark left,
+	 * phone (tel:) + small CTA right — the topbar both reference landers
+	 * (Arbor Nation, Bodystyle) lead with. Driven by hero.topbar
+	 * {brand?, phone?, cta?{text,url}}; returns null when nothing usable.
+	 * Called by the generator AFTER the hero builds so every variant gets it.
+	 */
+	public static function hero_topbar_row( $cfg, $h, $on_dark ) {
+		$tb = isset( $h['topbar'] ) && is_array( $h['topbar'] ) ? $h['topbar'] : null;
+		if ( ! $tb ) { return null; }
+		$c     = $cfg['colors'];
+		$brand = isset( $tb['brand'] ) && is_scalar( $tb['brand'] ) ? trim( (string) $tb['brand'] ) : '';
+		$phone = isset( $tb['phone'] ) && is_scalar( $tb['phone'] ) ? trim( (string) $tb['phone'] ) : '';
+		$cta   = self::resolve_cta( isset( $tb['cta'] ) ? $tb['cta'] : null );
+		if ( '' === $brand && '' === $phone && ! $cta ) { return null; }
+
+		$text_color  = $on_dark ? $c['white'] : $c['text_dark'];
+		$muted_color = $on_dark ? 'rgba(255,255,255,0.75)' : $c['text_muted'];
+
+		$left_widgets = array();
+		if ( '' !== $brand ) {
+			$left_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg, $brand, 'h5', 'left',
+				$text_color, 18, '800', 0.5, 1.2, 'uppercase' );
+		}
+		$right_widgets = array();
+		if ( '' !== $phone ) {
+			// Text-style tel: link via a transparent button.
+			$right_widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $phone,
+				'tel:' . preg_replace( '/[^0-9+]/', '', $phone ),
+				'transparent', $muted_color, null,
+				array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ), 'right' );
+		}
+		if ( $cta ) {
+			$right_widgets[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta['text'], $cta['url'],
+				$c['accent'], $c['white'], null, null, 'right' );
+		}
+
+		$left_col = PressGo_Element_Factory::col( $left_widgets, array(
+			'vertical_align' => 'middle',
+			'width'          => array( 'unit' => '%', 'size' => 40, 'sizes' => array() ),
+		) );
+		$right_col = PressGo_Element_Factory::col(
+			array( self::btn_group( $right_widgets, 'right', 8 ) ),
+			array(
+				'vertical_align' => 'middle',
+				'width'          => array( 'unit' => '%', 'size' => 60, 'sizes' => array() ),
+			)
+		);
+		$cols = $left_widgets ? array( $left_col, $right_col ) : array( $right_col );
+
+		// Stay a row on mobile (phone stays reachable); brand never wraps badly
+		// because it is the only left item.
+		return PressGo_Element_Factory::row( $cfg, $cols, 10, array(
+			'flex_direction_mobile' => 'row',
+		) );
+	}
+
 	/** A step's display number — accepts `num`, falls back to `number`, then the
 	 * 1-based position, so a numbered-steps section never renders blank badges. */
 	private static function step_num( $item, $i ) {
@@ -841,53 +903,116 @@ class PressGo_Section_Builder {
 			return self::build_hero_gradient( $cfg );
 		}
 
+		// Layout knobs: `panel: 'left'` anchors the whole stack inside a
+		// left-aligned dark content panel over a lightly-scrimmed photo (the
+		// reference-lander look); `bullets` adds a checkmark list under the
+		// subheadline (trust bullets — ISA certified, 24/7 response...).
+		$panel   = isset( $h['panel'] ) && is_string( $h['panel'] ) && 'left' === strtolower( $h['panel'] );
+		$bullets = self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() );
+		$align   = $panel ? 'left' : 'center';
+		$align_m = $panel ? 'center' : null;
+
 		$children = array();
 
 		if ( ! empty( $h['badge'] ) ) {
-			$children[] = PressGo_Widget_Helpers::badge_w( $cfg, $h['badge'], 'dark' );
+			$children[] = PressGo_Widget_Helpers::badge_w( $cfg, $h['badge'], 'dark', $align );
 			$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 		}
 
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', 'center',
-			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase' );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['eyebrow'], 'h6', $align,
+			'rgba(255,255,255,0.6)', 12, '600', 4, null, 'uppercase', null, null, $align_m );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
-		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], 70, 34, 46 );
-		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', 'center',
-			$c['white'], $hh_d, '800', -1.5, 1.08, null, $hh_m, $hh_t );
+		list( $hh_d, $hh_m, $hh_t ) = self::hero_h1_sizes( $h['headline'], $panel ? 52 : 70, $panel ? 30 : 34, $panel ? 40 : 46 );
+		$children[] = PressGo_Widget_Helpers::heading_w( $cfg, $h['headline'], 'h1', $align,
+			$c['white'], $hh_d, '800', -1.5, 1.08, null, $hh_m, $hh_t, $align_m );
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
-		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
-			'rgba(255,255,255,0.8)', 19, 15 ) );
+		$sub_w = PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], $align,
+			'rgba(255,255,255,0.8)', $panel ? 17 : 19, 15, 1.6, $align_m );
+		$children[] = $panel ? $sub_w : self::measure( $sub_w );
+
+		if ( ! empty( $bullets ) ) {
+			$bullet_items = array();
+			foreach ( array_slice( $bullets, 0, 5 ) as $b ) {
+				$bullet_items[] = array(
+					'text'          => $b,
+					'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+					'link'          => array( 'url' => '' ),
+				);
+			}
+			$blist = PressGo_Element_Factory::widget( 'icon-list', array(
+				'icon_list'                   => $bullet_items,
+				'icon_color'                  => $c['accent'],
+				'text_color'                  => 'rgba(255,255,255,0.92)',
+				'icon_size'                   => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+				'text_indent'                 => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+				'space_between'               => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+				'icon_typography_typography'  => 'custom',
+				'icon_typography_font_family' => $cfg['fonts']['body'],
+				'icon_typography_font_size'   => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+				'icon_typography_font_weight' => '600',
+			) );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $panel ? $blist : self::measure( $blist, 560 );
+		}
+
 		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.9)' );
 		if ( $hero_meta ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
 			$children[] = $hero_meta;
 		}
-		$children[] = PressGo_Widget_Helpers::spacer_w( 32 );
+		$children[] = PressGo_Widget_Helpers::spacer_w( $panel ? 26 : 32 );
 
-		// CTA buttons grouped + centered.
+		// CTA buttons grouped.
 		$btns = array(
 			PressGo_Widget_Helpers::btn_w( $cfg, $cta1['text'],
 				isset( $cta1['url'] ) ? $cta1['url'] : '#',
 				$c['accent'], $c['white'], null,
-				isset( $cta1['icon'] ) ? $cta1['icon'] : null, 'center' ),
+				isset( $cta1['icon'] ) ? $cta1['icon'] : null, $align ),
 		);
 		if ( $cta2 ) {
 			$btns[] = PressGo_Widget_Helpers::btn_w( $cfg, $cta2['text'],
 				isset( $cta2['url'] ) ? $cta2['url'] : '#',
-				'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, 'center' );
+				'rgba(255,255,255,0.15)', $c['white'], 'rgba(255,255,255,0.3)', null, $align );
 		}
-		$children[] = self::btn_group( $btns, 'center', 14 );
+		$children[] = self::btn_group( $btns, $align, 14 );
 
 		if ( ! empty( $h['trust_line'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
 			$children[] = self::btn_group( array_merge(
 				self::trust_line_has_rating( $h['trust_line'] ) ? array(
-				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
+				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], $align ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					'rgba(255,255,255,0.6)', 13 ),
-			) ), 'center', 10 );
+				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], $align,
+					'rgba(255,255,255,0.6)', 13, null, null, $align_m ),
+			) ), $align, 10 );
+		}
+
+		if ( $panel ) {
+			// Wrap the stack in a 52% left panel (subtle dark surface so copy
+			// reads over the photo without a heavy full-bleed scrim).
+			$panel_hsl = PressGo_Style_Utils::hex_to_hsl( $c['dark_bg'] );
+			$panel_bg  = PressGo_Style_Utils::hsl_to_hex( $panel_hsl['h'], $panel_hsl['s'], max( 0.04, $panel_hsl['l'] - 0.02 ) );
+			$panel_col = PressGo_Element_Factory::col( $children, array(
+				'width'                 => array( 'unit' => '%', 'size' => 52, 'sizes' => array() ),
+				'background_background' => 'classic',
+				'background_color'      => PressGo_Style_Utils::hex_to_rgba( $panel_bg, 0.82 ),
+				'border_radius'         => array(
+					'unit' => 'px', 'top' => '16', 'right' => '16',
+					'bottom' => '16', 'left' => '16', 'isLinked' => true,
+				),
+				'padding'               => array(
+					'unit' => 'px', 'top' => '36', 'right' => '36',
+					'bottom' => '36', 'left' => '36', 'isLinked' => true,
+				),
+				'padding_mobile'        => array(
+					'unit' => 'px', 'top' => '24', 'right' => '20',
+					'bottom' => '24', 'left' => '20', 'isLinked' => false,
+				),
+			) );
+			$children = array(
+				PressGo_Element_Factory::row( $cfg, array( $panel_col, self::ghost_col() ), 0 ),
+			);
 		}
 
 		// Build section with background image + dark overlay. Shape divider
@@ -901,18 +1026,25 @@ class PressGo_Section_Builder {
 				$extra['background_image']             = array( 'url' => $norm_url, 'id' => '', 'size' => '' );
 				$extra['background_position']          = 'center center';
 				$extra['background_size']              = 'cover';
-				// Vertical gradient scrim, darker through the middle/bottom
-				// where the headline + CTAs sit. Heavier than the old flat
-				// 0.78 slab (top 0.72 → center 0.86) so text stays legible
-				// over busy or bright photos while the image still reads at
-				// the top edge.
-				$extra['background_overlay_background']    = 'gradient';
-				$extra['background_overlay_color']         = 'rgba(0,0,0,0.72)';
-				$extra['background_overlay_color_stop']    = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
-				$extra['background_overlay_color_b']       = 'rgba(0,0,0,0.86)';
-				$extra['background_overlay_color_b_stop']  = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
-				$extra['background_overlay_gradient_type'] = 'linear';
-				$extra['background_overlay_gradient_angle'] = array( 'unit' => 'deg', 'size' => 180, 'sizes' => array() );
+				if ( $panel ) {
+					// The panel carries legibility — keep the photo visible
+					// with a light flat scrim.
+					$extra['background_overlay_background'] = 'classic';
+					$extra['background_overlay_color']      = 'rgba(0,0,0,0.35)';
+				} else {
+					// Vertical gradient scrim, darker through the middle/bottom
+					// where the headline + CTAs sit. Heavier than the old flat
+					// 0.78 slab (top 0.72 → center 0.86) so text stays legible
+					// over busy or bright photos while the image still reads at
+					// the top edge.
+					$extra['background_overlay_background']    = 'gradient';
+					$extra['background_overlay_color']         = 'rgba(0,0,0,0.72)';
+					$extra['background_overlay_color_stop']    = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
+					$extra['background_overlay_color_b']       = 'rgba(0,0,0,0.86)';
+					$extra['background_overlay_color_b_stop']  = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+					$extra['background_overlay_gradient_type'] = 'linear';
+					$extra['background_overlay_gradient_angle'] = array( 'unit' => 'deg', 'size' => 180, 'sizes' => array() );
+				}
 			}
 		} else {
 			// Fallback to gradient if no image.
@@ -925,7 +1057,7 @@ class PressGo_Section_Builder {
 		}
 
 		return PressGo_Element_Factory::outer( $cfg, $children,
-			$c['dark_bg'], null, 180, 160, $extra );
+			$c['dark_bg'], null, $panel ? 90 : 180, $panel ? 90 : 160, $extra );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1716,27 +1848,19 @@ class PressGo_Section_Builder {
 					'transparent', PressGo_Style_Utils::card_text(), PressGo_Style_Utils::card_text(), $item_cta['icon'] );
 			}
 
-			$feature_cols[] = PressGo_Element_Factory::col( $widgets, array(
-				'background_background' => 'classic',
-				'background_color'      => $c['white'],
-				'border_radius'         => array(
-					'unit' => 'px', 'top' => $r, 'right' => $r,
-					'bottom' => $r, 'left' => $r, 'isLinked' => true,
-				),
-				'border_border'         => 'solid',
-				'border_width'          => array(
-					'unit' => 'px', 'top' => '1', 'right' => '1',
-					'bottom' => '1', 'left' => '1', 'isLinked' => true,
-				),
-				'border_color'          => $c['border'],
-				'_box_shadow_box_shadow_type' => 'yes',
-				'_box_shadow_box_shadow'      => $cfg['layout']['card_shadow'],
-				'padding'               => array(
-					'unit' => 'px', 'top' => '0', 'right' => '24',
-					'bottom' => '28', 'left' => '24', 'isLinked' => false,
-				),
-				'overflow'              => 'hidden',
-			) );
+			// card_style() is theme-aware (frosted on dark pages); override the
+			// padding so the image band can bleed to the card edges.
+			$ic_style = PressGo_Style_Utils::card_style( $cfg );
+			$ic_style['padding'] = array(
+				'unit' => 'px', 'top' => '0', 'right' => '24',
+				'bottom' => '28', 'left' => '24', 'isLinked' => false,
+			);
+			$ic_style['padding_mobile'] = array(
+				'unit' => 'px', 'top' => '0', 'right' => '20',
+				'bottom' => '24', 'left' => '20', 'isLinked' => false,
+			);
+			$ic_style['overflow'] = 'hidden';
+			$feature_cols[] = PressGo_Element_Factory::col( $widgets, $ic_style );
 		}
 
 		$header = PressGo_Style_Utils::section_header( $cfg, $f['eyebrow'], $f['headline'],
@@ -3293,7 +3417,7 @@ class PressGo_Section_Builder {
 
 		$card_col = PressGo_Element_Factory::col( $card_children, array(
 			'background_background'  => 'classic',
-			'background_color'       => $c['white'],
+			'background_color'       => PressGo_Style_Utils::$dark_theme ? 'rgba(255,255,255,0.06)' : $c['white'],
 			'border_radius'          => array(
 				'unit' => 'px', 'top' => $r, 'right' => $r,
 				'bottom' => $r, 'left' => $r, 'isLinked' => true,
@@ -4378,7 +4502,7 @@ class PressGo_Section_Builder {
 		// Centered card.
 		$card_col = PressGo_Element_Factory::col( $children, array(
 			'background_background' => 'classic',
-			'background_color'      => $c['white'],
+			'background_color'      => PressGo_Style_Utils::$dark_theme ? 'rgba(255,255,255,0.06)' : $c['white'],
 			'border_radius'         => array(
 				'unit' => 'px', 'top' => $r, 'right' => $r,
 				'bottom' => $r, 'left' => $r, 'isLinked' => true,

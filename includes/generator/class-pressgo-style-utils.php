@@ -178,15 +178,22 @@ class PressGo_Style_Utils {
 	 * the user may set to a light value for dark-themed pages; using it on a
 	 * white card then makes the content disappear.
 	 */
+	/**
+	 * Full-dark page theme flag — set by the generator from colors.theme so
+	 * card surfaces flip to frosted dark without changing any call signature.
+	 */
+	public static $dark_theme = false;
+
 	public static function card_text() {
-		return '#0F172A';
+		return self::$dark_theme ? '#FFFFFF' : '#0F172A';
 	}
 
 	/**
-	 * Muted near-black for secondary content inside cards.
+	 * Muted near-black for secondary content inside cards (light muted on a
+	 * dark-theme frosted card).
 	 */
 	public static function card_text_muted() {
-		return '#4B5563';
+		return self::$dark_theme ? 'rgba(255,255,255,0.65)' : '#4B5563';
 	}
 
 	/**
@@ -197,6 +204,33 @@ class PressGo_Style_Utils {
 		$layout = $cfg['layout'];
 		$r      = (string) $layout['card_radius'];
 		$mob    = (string) max( 16, $pad - 8 );
+
+		if ( self::$dark_theme ) {
+			// Frosted card on a dark page: translucent white surface + hairline
+			// border, no drop shadow (shadows read as dirt on dark).
+			return array(
+				'background_background' => 'classic',
+				'background_color'      => 'rgba(255,255,255,0.05)',
+				'border_border'         => 'solid',
+				'border_width'          => array(
+					'unit' => 'px', 'top' => '1', 'right' => '1',
+					'bottom' => '1', 'left' => '1', 'isLinked' => true,
+				),
+				'border_color'          => 'rgba(255,255,255,0.10)',
+				'border_radius'         => array(
+					'unit' => 'px', 'top' => $r, 'right' => $r,
+					'bottom' => $r, 'left' => $r, 'isLinked' => true,
+				),
+				'padding'               => array(
+					'unit' => 'px', 'top' => (string) $pad, 'right' => (string) $pad,
+					'bottom' => (string) $pad, 'left' => (string) $pad, 'isLinked' => true,
+				),
+				'padding_mobile'        => array(
+					'unit' => 'px', 'top' => $mob, 'right' => $mob,
+					'bottom' => $mob, 'left' => $mob, 'isLinked' => true,
+				),
+			);
+		}
 
 		return array(
 			'background_background'          => 'classic',
