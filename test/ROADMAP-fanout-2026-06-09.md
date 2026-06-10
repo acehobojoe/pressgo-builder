@@ -44,3 +44,14 @@ Constraints (Joe): no slowdown, no added weight — native Elementor Free widget
 
 ## WIRING CHECKLIST (per variant — from June 9 session)
 generator $variants map; config-schema.json root + /opt/pressgo-ops/prompts/config-schema.json + includes/prompts mirror; brain.json (section_variants + guidance + dark-safe); plugin-api.js menu ~L661 + judgment ~L1020; includes/prompts/system-prompt.txt (+ scp to /opt + bump prompt.php version + clear transient); CLAUDE.md table; recipe-gallery + sparse/garbage harnesses.
+
+## LIVE-PROMPT HOLD (2026-06-09, per Joe: "don't push live")
+The fan-out variants are SANDBOX-ONLY until plugin 2.2.6 ships to WP.org.
+Live prompt surfaces were rolled back to the bento/split state (graceful on 2.2.5):
+- /opt/pressgo-ops/prompts/{system-prompt.txt,config-schema.json} ← safe copies (prompt.php v1.5.1)
+- /var/www/pressgo.app/backend/src/routes/plugin-api.js ← pressgo.app git 6dd15f8
+Reason: pricing.list (items), gallery.before_after (pairs), gallery.videos use NEW
+data fields — on plugin 2.2.5 those sections silently render EMPTY.
+RE-ENABLE AT PUBLISH (after 2.2.6 is live on WP.org):
+1. scp pressgo-builder repo includes/prompts/system-prompt.txt + config-schema.json → digitalocean:/opt/pressgo-ops/prompts/ ; bump prompt.php version; wp transient delete pressgo_system_prompt_v1
+2. cd pressgo.app && git checkout backend/src/routes/plugin-api.js (HEAD = full menu) → scp to /var/www/pressgo.app/backend/src/routes/ ; pm2 restart pressgo-api --update-env
