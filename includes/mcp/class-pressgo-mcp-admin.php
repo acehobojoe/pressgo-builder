@@ -30,7 +30,6 @@ class PressGo_MCP_Admin {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 
 		// "Try Bring Your Own Model" announcement notice for existing users.
-		add_action( 'admin_notices', array( $this, 'render_byom_notice' ) );
 	}
 
 	public function handle_dismiss_byom() {
@@ -43,54 +42,6 @@ class PressGo_MCP_Admin {
 		exit;
 	}
 
-	public function render_byom_notice() {
-		if ( ! current_user_can( 'edit_pages' ) ) { return; }
-		// Don't show on the MCP page itself.
-		$screen = isset( $_GET['page'] ) ? $_GET['page'] : '';
-		if ( 'pressgo-mcp' === $screen ) { return; }
-		// Don't show inside Elementor's editor.
-		if ( isset( $_GET['action'] ) && 'elementor' === $_GET['action'] ) { return; }
-		// Once-dismissed never re-appears for that user.
-		if ( get_user_meta( get_current_user_id(), 'pressgo_byom_notice_dismissed', true ) ) { return; }
-
-		$mcp_url   = self::mcp_url();
-		$setup_url = admin_url( 'admin.php?page=pressgo-mcp' );
-		?>
-		<div class="notice pressgo-byom-notice" style="
-			border-left-color: transparent;
-			border-radius: 8px;
-			padding: 16px 20px;
-			background: linear-gradient(135deg, #6c5ce7 0%, #4364e8 100%);
-			color: #fff;
-			margin: 16px 0;
-			box-shadow: 0 4px 14px rgba(67, 100, 232, 0.25);
-			display: flex; align-items: center; gap: 18px;
-		">
-			<div style="flex:1;">
-				<p style="margin:0 0 4px;font-size:15px;font-weight:600;">
-					✨ New: bring your own AI to PressGo
-				</p>
-				<p style="margin:0;color:rgba(255,255,255,0.92);font-size:13px;line-height:1.55;">
-					Connect Claude Pro/Max, Claude Desktop, Cursor, or any MCP-capable AI to this site
-					and have it build <em>and live-edit</em> pages using <em>your</em> subscription —
-					talk to your AI, watch it build, ask for changes, see them in seconds. No PressGo credits used.
-				</p>
-			</div>
-			<div style="flex:0 0 auto;display:flex;gap:8px;">
-				<a href="<?php echo esc_url( $setup_url ); ?>" class="button button-hero" style="background:#fff !important;color:#4364e8 !important;border-color:#fff !important;font-weight:600;">
-					Set it up →
-				</a>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;">
-					<?php wp_nonce_field( self::NONCE_ACTION ); ?>
-					<input type="hidden" name="action" value="pressgo_mcp_dismiss_byom">
-					<button type="submit" class="button button-hero" style="background:transparent !important;color:#fff !important;border-color:rgba(255,255,255,0.45) !important;">
-						Dismiss
-					</button>
-				</form>
-			</div>
-		</div>
-		<?php
-	}
 
 	public function register_menu() {
 		add_submenu_page(

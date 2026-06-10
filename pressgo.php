@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       PressGo AI — Landing Page & Website Builder for Elementor
  * Plugin URI:        https://pressgo.app
- * Description:       Connect Claude / Cursor / any MCP-capable AI to your WordPress site and build Elementor pages by chat with live preview. Or use the built-in generator with a text prompt.
+ * Description:       AI page builder for Elementor. Describe your page in chat and watch it build live — every element a native Elementor widget. Advanced: connect Claude, Cursor, or any MCP client.
  * Version:           2.3.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
