@@ -1056,6 +1056,11 @@ class PressGo_AI_Builder {
 			// The backend gates new-variant prompt menus on this so older
 			// plugins are never steered toward layouts they can't render.
 			'pluginVersion'             => PRESSGO_VERSION,
+			// Site capabilities: the backend only teaches Pro-widget recipes
+			// (native lead forms etc.) when the site can actually render them.
+			'siteCapabilities'          => array(
+				'elementorPro' => PressGo::is_elementor_pro_active(),
+			),
 		), $emit, $progressive ? $progress_cb : null );
 
 		if ( ! empty( $result['error'] ) ) {

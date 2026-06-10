@@ -37,8 +37,20 @@ class PressGo_Generator {
 	/**
 	 * Layout variant overrides. Key: "section.variant" → builder method.
 	 */
+	/**
+	 * Variants that require Elementor PRO widgets. On sites without Pro the
+	 * generator silently falls back to the base (free) builder for the type —
+	 * a config can never produce a widget the install can't render. The
+	 * backend only TEACHES these variants to Pro sites (siteCapabilities),
+	 * so this map is the local safety net, not the primary gate.
+	 */
+	private static $pro_variants = array(
+		'cta_final.form' => true,
+	);
+
 	private static $variants = array(
 		'hero.split'                    => 'build_hero_split',
+		'cta_final.form'                => 'build_cta_final_form',
 		'hero.image'                    => 'build_hero_image',
 		'hero.video'                    => 'build_hero_video',
 		'hero.gradient'                 => 'build_hero_gradient',
@@ -121,6 +133,15 @@ class PressGo_Generator {
 			$variant_key = '';
 			if ( isset( $cfg[ $name ] ) && is_array( $cfg[ $name ] ) && isset( $cfg[ $name ]['variant'] ) ) {
 				$variant_key = $base . '.' . $cfg[ $name ]['variant'];
+			}
+
+			// Pro-widget variants degrade gracefully: a config written on a
+			// site WITH Elementor Pro (or imported from one) must never break a
+			// free site — the variant falls back to its free sibling instead of
+			// emitting a widget the free plugin can't render.
+			if ( $variant_key && isset( self::$pro_variants[ $variant_key ] )
+				&& ! ( class_exists( 'PressGo' ) && PressGo::is_elementor_pro_active() ) ) {
+				$variant_key = '';
 			}
 
 			$method = isset( self::$variants[ $variant_key ] )
