@@ -41,9 +41,7 @@ phpcs.xml
 mcp-server
 includes/class-pressgo-updater.php
 wordpress-org-assets
-brain.json
 brain-widget-schemas.json
-config-schema.json
 README.md
 EOF
 

@@ -33,8 +33,10 @@ class PressGo_Prompt_Builder {
 			return $cached;
 		}
 
-		// Fetch from prompt server.
-		$response = wp_remote_get( self::$prompt_url, array(
+		// Fetch from prompt server. The version param lets the server send the
+		// prompt matching THIS plugin's capabilities (new layout variants are
+		// only advertised to versions whose generator renders them).
+		$response = wp_remote_get( add_query_arg( 'v', PRESSGO_VERSION, self::$prompt_url ), array(
 			'timeout' => 15,
 			'headers' => array(
 				'Authorization' => 'Bearer ' . self::$prompt_token,

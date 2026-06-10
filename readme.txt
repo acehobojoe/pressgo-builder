@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.2.5
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -161,6 +161,16 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.3.0 =
+* Your photos now appear on the FIRST build — drop image URLs or media-library photos into chat and they land in the hero, service cards, and galleries automatically.
+* 8 new layouts (56 total): service/menu price lists (restaurants, salons, trades), a "Visit Us" contact + hours + map section, before/after photo pairs, video galleries, us-vs-them comparison cards, solo-professional team spotlight, asymmetric bento feature grids, and a split final CTA with a trust checklist.
+* Full dark theme: ask for a dark premium look and every section renders dark with frosted cards — no more white strips breaking the design.
+* New hero options: slim header bar (brand + tap-to-call + button), left content panel over your photo, and trust bullet checklists.
+* Honest pages by default: the AI no longer invents testimonials, review counts, ratings, or statistics — placeholder content is clearly labeled for you to replace.
+* Conversion polish: repeatable section CTA buttons, dead links auto-route to your phone number, phone-number buttons never wrap mid-digit.
+* Dozens of layout/robustness fixes: counters and checklists now use your brand fonts, balanced card grids on every screen size, mobile spacing fixes, smarter icon handling, and graceful handling of any data the AI produces.
+
 
 = 2.2.5 =
 * **Much better pages out of the box.** A large quality upgrade to the AI builder. Your first build now uses a stronger model, and the AI gets a real design brief — an opinionated page recipe, when to use each section layout, what makes a strong hero, and light/dark visual rhythm — instead of improvising. New pages come out richer and more intentional.

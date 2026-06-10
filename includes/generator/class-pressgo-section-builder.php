@@ -500,7 +500,7 @@ class PressGo_Section_Builder {
 		if ( ! $tb ) { return null; }
 		$c     = $cfg['colors'];
 		$brand = isset( $tb['brand'] ) && is_scalar( $tb['brand'] ) ? trim( (string) $tb['brand'] ) : '';
-		$phone = isset( $tb['phone'] ) && is_scalar( $tb['phone'] ) ? trim( (string) $tb['phone'] ) : '';
+		$phone = isset( $tb['phone'] ) && is_scalar( $tb['phone'] ) && ! self::is_placeholder_contact( $tb['phone'] ) ? trim( (string) $tb['phone'] ) : '';
 		$cta   = self::resolve_cta( isset( $tb['cta'] ) ? $tb['cta'] : null );
 		if ( '' === $brand && '' === $phone && ! $cta ) { return null; }
 
@@ -543,6 +543,18 @@ class PressGo_Section_Builder {
 		return PressGo_Element_Factory::row( $cfg, $cols, 10, array(
 			'flex_direction_mobile' => 'row',
 		) );
+	}
+
+	/**
+	 * Is a contact value a template placeholder the model leaked? "(555)
+	 * 123-4567", "Your Address Here", example.com emails. Shipping these in a
+	 * real footer is worse than omitting the line. Deliberately NARROW — a
+	 * user-supplied 555-01xx test number or a real "123 Main St" must pass.
+	 */
+	private static function is_placeholder_contact( $v ) {
+		if ( ! is_scalar( $v ) ) { return true; }
+		$v = (string) $v;
+		return (bool) preg_match( '/\(555\)\s?123|555-123-?4567|your\s+(address|phone|email|city)|example\.(com|org)|email@example|address here/i', $v );
 	}
 
 	/** A step's display number — accepts `num`, falls back to `number`, then the
@@ -1451,7 +1463,7 @@ class PressGo_Section_Builder {
 		}
 		$children[] = self::pill_cloud( $pills );
 
-		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 0, 24 );
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['light_bg'], null, 32, 28 );
 	}
 
 	/**
@@ -1531,7 +1543,7 @@ class PressGo_Section_Builder {
 		}
 		$children[] = self::pill_cloud( $pills );
 
-		return PressGo_Element_Factory::outer( $cfg, $children, $c['dark_bg'], null, 0, 24 );
+		return PressGo_Element_Factory::outer( $cfg, $children, $c['dark_bg'], null, 32, 28 );
 	}
 
 	// ──────────────────────────────────────────────
@@ -1812,6 +1824,10 @@ class PressGo_Section_Builder {
 							'unit' => 'px', 'top' => $r, 'right' => $r,
 							'bottom' => '0', 'left' => '0', 'isLinked' => false,
 						),
+						// width:100% resolves BEFORE the negative margins, so
+						// -24px left alone shifted the band and left a bare
+						// strip on the right edge. Stretch by the full 48px.
+						'width'                 => array( 'unit' => 'custom', 'size' => 'calc(100% + 48px)', 'sizes' => array() ),
 						'margin'                => array(
 							'unit' => 'px', 'top' => '0', 'right' => '-24',
 							'bottom' => '0', 'left' => '-24', 'isLinked' => false,
@@ -2219,9 +2235,11 @@ class PressGo_Section_Builder {
 				. 'box-shadow:0 4px 12px ' . PressGo_Style_Utils::hex_to_rgba( $c['primary'], 0.3 ) . ';">'
 				. esc_html( $num ) . '</span></div>';
 
-			// Connecting line (except after last item).
+			// Connecting line (except after last item). Desktop-only: when the
+			// columns stack on mobile the line floats uselessly between the
+			// circle and its own text.
 			if ( $idx < count( $st['items'] ) - 1 ) {
-				$num_html .= '<div style="width:2px; height:40px; background:' . $c['border'] . '; margin:8px auto;"></div>';
+				$num_html .= '<div class="pg-timeline-line" style="width:2px; height:40px; background:' . $c['border'] . '; margin:8px auto;"></div>';
 			}
 
 			$num_col = PressGo_Element_Factory::col(
@@ -4109,8 +4127,13 @@ class PressGo_Section_Builder {
 		// Link columns — one text_w per link for individual editability.
 		// Accept 'items' as alias for 'links' (the canonical key).
 		$link_columns = isset( $ft['columns'] ) && is_array( $ft['columns'] ) ? $ft['columns'] : array();
+		$has_contact_card = ! empty( $ft['contact'] );
 		foreach ( $link_columns as $lc ) {
 			if ( ! is_array( $lc ) ) { continue; }
+			// A nav column also titled "Contact" beside the real contact column
+			// renders duplicate adjacent headings — skip it.
+			if ( $has_contact_card && isset( $lc['title'] ) && is_string( $lc['title'] )
+				&& 'contact' === strtolower( trim( $lc['title'] ) ) ) { continue; }
 			$col_widgets = array();
 			$col_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg,
 				isset( $lc['title'] ) ? $lc['title'] : '', 'h6', 'left',
@@ -4142,21 +4165,21 @@ class PressGo_Section_Builder {
 			$contact_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
 			$contact_items = array();
-			if ( ! empty( $ft['contact']['email'] ) ) {
+			if ( ! empty( $ft['contact']['email'] ) && ! self::is_placeholder_contact( $ft['contact']['email'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['email'],
 					'selected_icon' => array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ),
 					'link'          => array( 'url' => 'mailto:' . $ft['contact']['email'] ),
 				);
 			}
-			if ( ! empty( $ft['contact']['phone'] ) ) {
+			if ( ! empty( $ft['contact']['phone'] ) && ! self::is_placeholder_contact( $ft['contact']['phone'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['phone'],
 					'selected_icon' => array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ),
 					'link'          => array( 'url' => '' ),
 				);
 			}
-			if ( ! empty( $ft['contact']['address'] ) ) {
+			if ( ! empty( $ft['contact']['address'] ) && ! self::is_placeholder_contact( $ft['contact']['address'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['address'],
 					'selected_icon' => array( 'value' => 'fas fa-map-marker-alt', 'library' => 'fa-solid' ),
@@ -4240,8 +4263,13 @@ class PressGo_Section_Builder {
 
 		// Link columns — one text_w per link for individual editability.
 		$link_columns = isset( $ft['columns'] ) && is_array( $ft['columns'] ) ? $ft['columns'] : array();
+		$has_contact_card = ! empty( $ft['contact'] );
 		foreach ( $link_columns as $lc ) {
 			if ( ! is_array( $lc ) ) { continue; }
+			// A nav column also titled "Contact" beside the real contact column
+			// renders duplicate adjacent headings — skip it.
+			if ( $has_contact_card && isset( $lc['title'] ) && is_string( $lc['title'] )
+				&& 'contact' === strtolower( trim( $lc['title'] ) ) ) { continue; }
 			$col_widgets = array();
 			$col_widgets[] = PressGo_Widget_Helpers::heading_w( $cfg,
 				isset( $lc['title'] ) ? $lc['title'] : '', 'h6', 'left',
@@ -4271,21 +4299,21 @@ class PressGo_Section_Builder {
 			$contact_widgets[] = PressGo_Widget_Helpers::spacer_w( 12 );
 
 			$contact_items = array();
-			if ( ! empty( $ft['contact']['email'] ) ) {
+			if ( ! empty( $ft['contact']['email'] ) && ! self::is_placeholder_contact( $ft['contact']['email'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['email'],
 					'selected_icon' => array( 'value' => 'fas fa-envelope', 'library' => 'fa-solid' ),
 					'link'          => array( 'url' => 'mailto:' . $ft['contact']['email'] ),
 				);
 			}
-			if ( ! empty( $ft['contact']['phone'] ) ) {
+			if ( ! empty( $ft['contact']['phone'] ) && ! self::is_placeholder_contact( $ft['contact']['phone'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['phone'],
 					'selected_icon' => array( 'value' => 'fas fa-phone', 'library' => 'fa-solid' ),
 					'link'          => array( 'url' => '' ),
 				);
 			}
-			if ( ! empty( $ft['contact']['address'] ) ) {
+			if ( ! empty( $ft['contact']['address'] ) && ! self::is_placeholder_contact( $ft['contact']['address'] ) ) {
 				$contact_items[] = array(
 					'text'          => $ft['contact']['address'],
 					'selected_icon' => array( 'value' => 'fas fa-map-marker-alt', 'library' => 'fa-solid' ),
@@ -4764,8 +4792,8 @@ class PressGo_Section_Builder {
 		$map = $cfg['map'];
 
 		$address = self::flatten_address( isset( $map['address'] ) ? $map['address'] : '' );
-		$phone   = isset( $map['phone'] ) && is_scalar( $map['phone'] ) ? trim( (string) $map['phone'] ) : '';
-		$email   = isset( $map['email'] ) && is_scalar( $map['email'] ) ? trim( (string) $map['email'] ) : '';
+		$phone   = isset( $map['phone'] ) && is_scalar( $map['phone'] ) && ! self::is_placeholder_contact( $map['phone'] ) ? trim( (string) $map['phone'] ) : '';
+		$email   = isset( $map['email'] ) && is_scalar( $map['email'] ) && ! self::is_placeholder_contact( $map['email'] ) ? trim( (string) $map['email'] ) : '';
 		$hours   = self::bullet_texts( isset( $map['hours'] ) ? $map['hours'] : array() );
 		$note    = isset( $map['note'] ) && is_scalar( $map['note'] ) ? trim( (string) $map['note'] ) : '';
 

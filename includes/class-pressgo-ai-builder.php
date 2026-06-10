@@ -825,6 +825,9 @@ class PressGo_AI_Builder {
 			'pageContext'               => $page_context,
 			'mode'                      => $mode,
 			'clientSupportsProgressive' => $progressive,
+			// The backend gates new-variant prompt menus on this so older
+			// plugins are never steered toward layouts they can't render.
+			'pluginVersion'             => PRESSGO_VERSION,
 		), $emit, $progressive ? $progress_cb : null );
 
 		if ( ! empty( $result['error'] ) ) {

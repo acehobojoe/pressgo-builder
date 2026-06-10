@@ -154,6 +154,9 @@ class PressGo_Widget_Helpers {
 		$radius = (string) $layout['button_radius'];
 		$text   = sanitize_text_field( (string) $text );
 		$url    = self::sanitize_url( $url );
+		// A label carrying a phone number must never wrap mid-digit
+		// ("Call (864) 691-" / "6001"). Tag it for the nowrap CSS rule.
+		$has_phone = (bool) preg_match( '/\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/', $text );
 		$s      = array(
 			'text'                     => $text,
 			'link'                     => array( 'url' => $url, 'is_external' => false, 'nofollow' => false ),
@@ -176,6 +179,9 @@ class PressGo_Widget_Helpers {
 			),
 			'typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 		);
+		if ( $has_phone ) {
+			$s['_css_classes'] = 'pg-btn-nowrap';
+		}
 
 		if ( $bg ) {
 			$s['background_color'] = $bg;

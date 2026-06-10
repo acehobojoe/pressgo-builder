@@ -120,6 +120,11 @@ class PressGo_Page_Creator {
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
 }
 
+/* Phone-labeled buttons never wrap mid-digit */
+.pg-btn-nowrap .elementor-button-text {
+    white-space: nowrap;
+}
+
 /* Card container hover — smooth shadow transition */
 .e-child.e-con {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -257,6 +262,11 @@ html {
     .elementor-testimonial-content {
         word-wrap: break-word;
         overflow-wrap: break-word;
+    }
+    /* Timeline connecting line is a desktop affordance — stacked on mobile
+       it floats between a circle and its own text as dead space. */
+    .pg-timeline-line {
+        display: none;
     }
     /* Initials avatar circles are inline-styled (kses-safe solid hex), so
        responsive controls can't shrink them — a 200px circle dominated a
