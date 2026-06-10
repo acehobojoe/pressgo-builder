@@ -1,0 +1,129 @@
+{
+  "colors": {
+    "primary": "#5C3A21",
+    "dark_bg": "#1F140B",
+    "light_bg": "#F7F1E8",
+    "white": "#FFFFFF",
+    "text_dark": "#231509",
+    "text_muted": "#6F5E4E",
+    "accent": "#C9772E"
+  },
+  "fonts": {"heading": "Fraunces", "body": "Work Sans"},
+  "layout": {"boxed_width": 1200, "card_radius": 14, "button_radius": 10, "section_divider": "waves"},
+  "sections": ["hero", "stats", "features", "gallery", "cta_final", "footer"],
+  "hero": {
+    "variant": "split_screen",
+    "parallax": true,
+    "image_side": "right",
+    "eyebrow": "SMALL-BATCH ROASTERY · ASHEVILLE NC",
+    "headline": "Coffee Roasted the Slow Way",
+    "subheadline": "Twenty-pound batches, nine farm partners we know by name, and a roast date printed on every bag. This is coffee with a paper trail.",
+    "image": "https://images.pexels.com/photos/894695/pexels-photo-894695.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "cta_primary": {"text": "Shop Fresh Roasts", "url": "#gallery", "icon": "fas fa-arrow-right"},
+    "cta_secondary": {"text": "Visit a Cafe", "url": "#footer"},
+    "bullets": [
+      "Roasted to order, shipped within 48 hours",
+      "Direct relationships with nine farms",
+      "Free pickup at all three cafes"
+    ],
+    "trust_line": "Roasting in Asheville since 2014"
+  },
+  "stats": {
+    "variant": "ticker",
+    "items": [
+      {"value": "12", "label": "Years Roasting"},
+      {"value": "3", "label": "Cafe Locations"},
+      {"value": "40", "label": "Roasts in Rotation"}
+    ]
+  },
+  "features": {
+    "variant": "tabs",
+    "eyebrow": "WHAT WE MAKE",
+    "headline": "From Green Bean to Brew Bar",
+    "subheadline": "Four programs, one obsession: coffee that tastes like where it grew.",
+    "items": [
+      {
+        "title": "Single Origins",
+        "desc": "Rotating lots from farms we visit and buy from year after year. Each bag lists the producer, the elevation, and the week it was roasted.",
+        "details": [
+          "Ethiopia, Colombia, Guatemala, and Sumatra on the current menu",
+          "Whole bean or ground for your brewer",
+          "Roasted Mondays and Thursdays"
+        ]
+      },
+      {
+        "title": "Signature Blends",
+        "desc": "Three house blends built for everyday brewing: Ember for dark, Oak for medium, and Morning Porch for breakfast. Consistent profiles, batch after batch.",
+        "details": [
+          "Espresso-friendly and drip-friendly options",
+          "Available in 12 oz and 5 lb bags"
+        ]
+      },
+      {
+        "title": "Cold Brew & Cans",
+        "desc": "Slow-steeped for 18 hours in small tanks, then kegged or canned right at the roastery. Stocked in our cafes and a handful of local grocers."
+      },
+      {
+        "title": "Wholesale & Training",
+        "desc": "We supply cafes and restaurants within a day's drive, and we train every account's bar staff ourselves, dialing in grinders, water, and milk.",
+        "details": [
+          "Tiered pricing on 5 lb bags",
+          "On-site barista training included",
+          "Loaner equipment while yours is serviced"
+        ]
+      }
+    ]
+  },
+  "gallery": {
+    "variant": "carousel",
+    "columns": 3,
+    "eyebrow": "INSIDE THE ROASTERY",
+    "headline": "Where the Work Happens",
+    "subheadline": "The roaster floor, the cupping table, and the bars we pour at every day.",
+    "images": [
+      {"url": "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Fresh cup of coffee on the cupping table"},
+      {"url": "https://images.pexels.com/photos/312418/pexels-photo-312418.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Latte on the cafe bar"},
+      {"url": "https://images.pexels.com/photos/685527/pexels-photo-685527.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Roasted beans cooling in the drum"},
+      {"url": "https://images.pexels.com/photos/1307698/pexels-photo-1307698.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Coffee beans ready for bagging"},
+      {"url": "https://images.pexels.com/photos/2299028/pexels-photo-2299028.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Espresso bar during morning service"},
+      {"url": "https://images.pexels.com/photos/1855214/pexels-photo-1855214.jpeg?auto=compress&cs=tinysrgb&w=800", "alt": "Pour over brewing at the bar"}
+    ]
+  },
+  "cta_final": {
+    "variant": "card",
+    "headline": "Taste It Fresh This Week",
+    "description": "Order online and we roast your bag in the next batch, or stop by any of our three cafes and we will pour you a cup first.",
+    "cta": {"text": "Shop Fresh Roasts", "url": "#", "icon": "fas fa-arrow-right"},
+    "trust_line": "Roasted to order · Free local pickup"
+  },
+  "footer": {
+    "brand": {
+      "name": "Ember & Oak Coffee Roasters",
+      "description": "Small-batch coffee roasted in Asheville, North Carolina since 2014."
+    },
+    "columns": [
+      {
+        "title": "Visit",
+        "links": [
+          {"text": "West Asheville Cafe"},
+          {"text": "Downtown Cafe"},
+          {"text": "River Arts Roastery Bar"}
+        ]
+      },
+      {
+        "title": "Coffee",
+        "links": [
+          {"text": "Single Origins"},
+          {"text": "Signature Blends"},
+          {"text": "Cold Brew"},
+          {"text": "Wholesale"}
+        ]
+      }
+    ],
+    "contact": {
+      "email": "hello@emberandoak.coffee",
+      "phone": "(828) 555-0114"
+    },
+    "copyright": "© 2026 Ember & Oak Coffee Roasters. All rights reserved."
+  }
+}

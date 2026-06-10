@@ -75,6 +75,10 @@ class PressGo_Generator {
 		'gallery.videos'                => 'build_gallery_videos',
 		'competitive_edge.comparison'   => 'build_competitive_edge_comparison',
 		'team.spotlight'                => 'build_team_spotlight',
+		'gallery.carousel'              => 'build_gallery_carousel',
+		'features.tabs'                 => 'build_features_tabs',
+		'hero.split_screen'             => 'build_hero_split_screen',
+		'stats.ticker'                  => 'build_stats_ticker',
 	);
 
 	/**
@@ -224,6 +228,14 @@ class PressGo_Generator {
 			unset( $section );
 		}
 
+		// layout.section_divider knob: stitch native Elementor shape dividers
+		// onto the bottom edge of flat-color sections so consecutive bands
+		// interlock instead of butting. Runs AFTER the dark-theme remap so the
+		// divider fill matches each section's FINAL background color.
+		if ( isset( $cfg['layout']['section_divider'] ) ) {
+			$page = self::apply_section_dividers( $page, $cfg['layout']['section_divider'] );
+		}
+
 		// Drop null/false entries any helper returned (e.g. social_icons_w
 		// when every profile link was a '#' invention) before the passes below.
 		$strip_nulls = function ( $els ) use ( &$strip_nulls ) {
@@ -286,6 +298,106 @@ class PressGo_Generator {
 		// trip WP's fatal-protection and deactivate Elementor). One pass fixes it
 		// regardless of which builder produced it.
 		$page = self::stringify_urls( $page );
+
+		return $page;
+	}
+
+	/**
+	 * layout.section_divider knob — apply Elementor's NATIVE container shape
+	 * divider (free feature; the exact controls build_hero_gradient already
+	 * uses) to the bottom edge of every top-level section whose NEXT sibling
+	 * has a different solid background. The divider SVG is filled with the
+	 * next section's background hex so the two bands interlock seamlessly.
+	 *
+	 * Control names verified in /tmp/elementor-src/elements/container.php
+	 * (register_shape_dividers_controls, :1173-1345): shape_divider_bottom,
+	 * shape_divider_bottom_color, shape_divider_bottom_height (responsive),
+	 * shape_divider_bottom_flip. Shape slugs limited to the four long-stable
+	 * core shapes whitelisted below ('waves' is production-proven in
+	 * build_hero_gradient, which also proves the conditional 'e-shapes'
+	 * style asset enqueues from saved settings).
+	 *
+	 * Conservative skip rules — a wrong-colored wave is worse than none:
+	 * - either side is a gradient or photo section (no single hex to match);
+	 * - both sides share the same background (seam already invisible);
+	 * - section already carries its own bottom divider (hero.gradient);
+	 * - next section overlaps upward via negative top margin (default stats
+	 *   cards) — the divider would hide behind the overlap.
+	 *
+	 * @param array  $page  Built top-level sections.
+	 * @param string $style 'waves'|'tilt'|'curve'|'triangle'.
+	 * @return array
+	 */
+	private static function apply_section_dividers( $page, $style ) {
+		$allowed = array( 'waves', 'tilt', 'curve', 'triangle' );
+		// Shapes supporting the flip switcher (per core Shapes registry);
+		// setting flip on the others is dead data, so don't.
+		$flippable = array( 'waves', 'tilt' );
+		if ( ! is_string( $style ) || ! in_array( $style, $allowed, true ) || ! is_array( $page ) ) {
+			return $page;
+		}
+
+		// A section's matchable solid background, or null when it can't take /
+		// inform a divider (gradient, photo, missing).
+		$solid_bg = function ( $section ) {
+			if ( ! isset( $section['settings'] ) || ! is_array( $section['settings'] ) ) {
+				return null;
+			}
+			$s = $section['settings'];
+			if ( isset( $s['background_image'] ) ) {
+				return null; // photo band
+			}
+			if ( isset( $s['background_background'] ) && 'classic' !== $s['background_background'] ) {
+				return null; // gradient
+			}
+			// Full-bleed sections (hero.split_screen) have edge-to-edge child
+			// content that paints OVER a bottom divider, and their flat color
+			// is only half the visual truth (one half is a photo column) —
+			// exclude them from both sides of a seam.
+			if ( isset( $s['content_width'] ) && 'full' === $s['content_width'] ) {
+				return null;
+			}
+			if ( empty( $s['background_color'] ) || ! is_string( $s['background_color'] ) ) {
+				return null;
+			}
+			return $s['background_color'];
+		};
+
+		$seam = 0;
+		$last = count( $page ) - 1;
+		for ( $i = 0; $i < $last; $i++ ) {
+			$bg_here = $solid_bg( $page[ $i ] );
+			$bg_next = $solid_bg( $page[ $i + 1 ] );
+			if ( null === $bg_here || null === $bg_next ) {
+				continue;
+			}
+			if ( strtoupper( $bg_here ) === strtoupper( $bg_next ) ) {
+				continue; // same color — divider would be invisible
+			}
+			if ( isset( $page[ $i ]['settings']['shape_divider_bottom'] ) ) {
+				continue; // builder shipped its own (hero.gradient waves)
+			}
+			// Next section pulls itself upward (stats overlap cards) — the
+			// divider would render underneath it.
+			if ( isset( $page[ $i + 1 ]['settings']['margin']['top'] )
+				&& (int) $page[ $i + 1 ]['settings']['margin']['top'] < 0 ) {
+				continue;
+			}
+
+			$page[ $i ]['settings']['shape_divider_bottom']        = $style;
+			$page[ $i ]['settings']['shape_divider_bottom_color']  = $bg_next;
+			$page[ $i ]['settings']['shape_divider_bottom_height'] = array(
+				'unit' => 'px', 'size' => 70, 'sizes' => array(),
+			);
+			// Subtle accent on phones instead of eating the viewport.
+			$page[ $i ]['settings']['shape_divider_bottom_height_mobile'] = array(
+				'unit' => 'px', 'size' => 28, 'sizes' => array(),
+			);
+			if ( ( $seam % 2 ) === 1 && in_array( $style, $flippable, true ) ) {
+				$page[ $i ]['settings']['shape_divider_bottom_flip'] = 'yes';
+			}
+			$seam++;
+		}
 
 		return $page;
 	}
