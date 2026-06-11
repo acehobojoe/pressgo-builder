@@ -466,6 +466,10 @@
 	// the user was looking at when they asked for an edit. Without this,
 	// every build snaps them back to the hero and they lose context.
 	var savedScrollY = 0;
+
+	// Visual editor selection (set by the Select-mode module below). When a
+	// section is selected, chat requests carry it so the AI scopes its patch.
+	var selectedSectionKey = '';
 	function reloadPreview(bust) {
 		try {
 			// Capture current scroll position before tearing down the doc.
@@ -614,6 +618,9 @@
 		fd.append('nonce', cfg.nonce);
 		fd.append('post_id', cfg.postId);
 		fd.append('message', text);
+		// Visual editor scoping: with a section selected, the server narrows
+		// the AI's patch to that key.
+		if (selectedSectionKey) fd.append('selected_section', selectedSectionKey);
 		if (visionInput && visionInput.checked) fd.append('vision', '1');
 		if (pendingImages.length) {
 			fd.append('images', JSON.stringify(pendingImages.map(function (im) {
@@ -1477,6 +1484,935 @@
 			form.dispatchEvent(new Event('submit', { cancelable: true }));
 		}
 	});
+
+	// ════════════════════════════════════════════════════════════════════
+	// Visual editor — Select mode + schema-driven property panel.
+	//
+	// Every section root in the preview carries `pg-sec pg-key--{key}`
+	// classes (the key encodes "#" as "--": gallery#2 → gallery--2). The
+	// iframe is same-origin, so this module reaches straight into
+	// contentDocument: hover outlines, click-to-select, a floating label
+	// chip — then renders a right-side property panel from
+	// cfg.editorFields[baseType] prefilled from cfg.pageConfig[key].
+	// Apply posts a COMPLETE section object through the zero-token
+	// pressgo_ai_apply_patch pipeline (validate → snapshot → render →
+	// purge), so panel edits share one undo history with the AI.
+	// ════════════════════════════════════════════════════════════════════
+	(function () {
+		var edFields = cfg.editorFields || {};
+		var toolbar  = document.querySelector('.pg-preview-toolbar');
+		if (!frame || !toolbar || !Object.keys(edFields).length) return;
+
+		// ── State ─────────────────────────────────────────────────────
+		var selectMode = false;
+		var working    = null;   // working copy: section object, or {dottedPath:value} in page mode
+		var pageMode   = false;
+		var dirtyKeys  = {};     // touched field paths
+		var controls   = [];     // text-like control registry (click-into-field + live preview)
+		var panelEl    = null;
+		var chatChip   = null;
+		var noSecToastShown = false;
+
+		function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+		function baseType(key) { return String(key).replace(/#\d+$/, ''); }
+		function encodeKey(key) { return String(key).replace('#', '--'); }
+		// 'pg-key--features--2' → 'features#2' (base types use underscores,
+		// never dashes, so the trailing '--{digits}' is unambiguous).
+		function decodeKeyClass(cls) {
+			var rest = String(cls).slice('pg-key--'.length);
+			var m = rest.match(/^(.*)--([0-9]+)$/);
+			return m ? m[1] + '#' + m[2] : rest;
+		}
+		function keyOfSection(secEl) {
+			var classes = (secEl.className || '').split(/\s+/);
+			for (var i = 0; i < classes.length; i++) {
+				if (classes[i].indexOf('pg-key--') === 0) return decodeKeyClass(classes[i]);
+			}
+			return '';
+		}
+		function normText(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
+		function getPath(obj, path) {
+			return String(path).split('.').reduce(function (o, k) {
+				return (o && typeof o === 'object') ? o[k] : undefined;
+			}, obj);
+		}
+		function setPath(obj, path, value) {
+			var keys = String(path).split('.');
+			var o = obj;
+			for (var i = 0; i < keys.length - 1; i++) {
+				if (!o[keys[i]] || typeof o[keys[i]] !== 'object') o[keys[i]] = {};
+				o = o[keys[i]];
+			}
+			o[keys[keys.length - 1]] = value;
+		}
+		function titleize(s) {
+			return String(s).replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+		}
+		function toHex6(v) {
+			v = String(v || '');
+			if (/^#[0-9a-fA-F]{3}$/.test(v)) return '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
+			if (/^#[0-9a-fA-F]{6}/.test(v)) return v.slice(0, 7);
+			return '';
+		}
+
+		// ── Toast ─────────────────────────────────────────────────────
+		function showToast(msg, isError) {
+			var t = document.createElement('div');
+			t.className = 'pg-toast' + (isError ? ' is-error' : '');
+			t.textContent = msg;
+			document.body.appendChild(t);
+			setTimeout(function () { t.classList.add('is-out'); }, 2800);
+			setTimeout(function () { t.remove(); }, 3300);
+		}
+
+		// ── Select-mode toggle button (injected next to the viewport switcher) ──
+		var selBtn = document.createElement('button');
+		selBtn.type = 'button';
+		selBtn.id = 'pg-select-toggle';
+		selBtn.className = 'pg-select-toggle';
+		selBtn.title = 'Select mode: click any section in the preview to edit it directly (no AI credits)';
+		selBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Select</span>';
+		toolbar.appendChild(selBtn);
+
+		selBtn.addEventListener('click', function () {
+			if (!selectMode && !cfg.pageConfig) {
+				showToast('Build the page first — visual editing needs a built page.', true);
+				return;
+			}
+			setSelectMode(!selectMode);
+		});
+
+		function setSelectMode(on) {
+			selectMode = on;
+			selBtn.classList.toggle('is-active', on);
+			if (on) {
+				armDoc();
+				clearSelection(true); // opens the panel on the Page tab
+			} else {
+				disarmDoc();
+				selectedSectionKey = '';
+				renderChatChip();
+				closePanel();
+			}
+		}
+
+		// ── Iframe chrome: hover outline + label chip + click-select ──
+		// Handlers live in the parent and are re-attached on every iframe
+		// load (the doc is brand new each reload).
+		var docState = null; // { doc, style, chip, onOver, onClick }
+
+		function armDoc() {
+			var doc;
+			try { doc = frame.contentDocument; } catch (e) { return; }
+			if (!doc || !doc.body) return;
+			if (docState && docState.doc === doc) { markSelected(); return; }
+			disarmDoc();
+
+			var style = doc.createElement('style');
+			style.id = 'pg-select-style';
+			style.textContent = [
+				'.pg-sec { cursor: pointer !important; }',
+				'.pg-sec.pg-ed-hover { outline: 2px dashed rgba(91,79,255,0.65) !important; outline-offset: -2px; }',
+				'.pg-sec.pg-ed-selected { outline: 3px solid #5b4fff !important; outline-offset: -3px; }',
+				'#pg-select-chip { position: fixed; z-index: 2147483646; background: #5b4fff; color: #fff;' +
+					'font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
+					'padding: 3px 9px; border-radius: 0 0 6px 0; pointer-events: none; display: none;' +
+					'box-shadow: 0 2px 8px rgba(91,79,255,0.35); letter-spacing: 0.02em; }'
+			].join('\n');
+			(doc.head || doc.body).appendChild(style);
+
+			var chip = doc.createElement('div');
+			chip.id = 'pg-select-chip';
+			doc.body.appendChild(chip);
+
+			var hovered = null;
+			function onOver(e) {
+				if (!selectMode) return;
+				var sec = e.target && e.target.closest ? e.target.closest('.pg-sec') : null;
+				if (sec === hovered) return;
+				if (hovered) hovered.classList.remove('pg-ed-hover');
+				hovered = sec;
+				if (sec) {
+					sec.classList.add('pg-ed-hover');
+					var r = sec.getBoundingClientRect();
+					chip.textContent = sectionLabel(keyOfSection(sec));
+					chip.style.left = Math.max(0, r.left) + 'px';
+					chip.style.top = Math.max(0, r.top) + 'px';
+					chip.style.display = 'block';
+				} else {
+					chip.style.display = 'none';
+				}
+			}
+			function onClick(e) {
+				if (!selectMode) return;
+				// Select mode owns clicks: never follow links / fire toggles.
+				e.preventDefault();
+				e.stopPropagation();
+				var sec = e.target && e.target.closest ? e.target.closest('.pg-sec') : null;
+				if (!sec) { clearSelection(); return; }
+				var key = keyOfSection(sec);
+				if (!key) { clearSelection(); return; }
+				if (key === selectedSectionKey) {
+					focusFieldForElement(e.target);
+					return;
+				}
+				selectSection(key);
+			}
+			doc.addEventListener('mouseover', onOver, true);
+			doc.addEventListener('click', onClick, true);
+			docState = { doc: doc, style: style, chip: chip, onOver: onOver, onClick: onClick };
+			markSelected();
+
+			if (!doc.querySelector('.pg-sec') && !noSecToastShown) {
+				noSecToastShown = true;
+				showToast('No selectable sections found — ask the AI for any small change to refresh the page markers.', true);
+			}
+		}
+
+		function disarmDoc() {
+			if (!docState) return;
+			try {
+				docState.doc.removeEventListener('mouseover', docState.onOver, true);
+				docState.doc.removeEventListener('click', docState.onClick, true);
+				if (docState.style) docState.style.remove();
+				if (docState.chip) docState.chip.remove();
+				var marked = docState.doc.querySelectorAll('.pg-ed-hover, .pg-ed-selected');
+				for (var i = 0; i < marked.length; i++) {
+					marked[i].classList.remove('pg-ed-hover');
+					marked[i].classList.remove('pg-ed-selected');
+				}
+			} catch (e) { /* doc already torn down */ }
+			docState = null;
+		}
+
+		function markSelected() {
+			if (!docState) return;
+			try {
+				var doc = docState.doc;
+				var old = doc.querySelectorAll('.pg-ed-selected');
+				for (var i = 0; i < old.length; i++) old[i].classList.remove('pg-ed-selected');
+				if (selectedSectionKey) {
+					var sec = doc.querySelector('.pg-key--' + encodeKey(selectedSectionKey));
+					if (sec) sec.classList.add('pg-ed-selected');
+				}
+			} catch (e) {}
+		}
+
+		function findSelectedRoot() {
+			if (!selectedSectionKey) return null;
+			try {
+				var doc = frame.contentDocument;
+				return doc ? doc.querySelector('.pg-key--' + encodeKey(selectedSectionKey)) : null;
+			} catch (e) { return null; }
+		}
+
+		// Re-arm on every preview reload (new contentDocument).
+		frame.addEventListener('load', function () {
+			docState = null; // old doc is gone
+			if (selectMode) armDoc();
+		});
+
+		// ── Selection ─────────────────────────────────────────────────
+		function isDirty() { return Object.keys(dirtyKeys).length > 0; }
+		function confirmDiscard() {
+			return !isDirty() || window.confirm('You have unapplied edits in the panel — discard them?');
+		}
+
+		function selectSection(key) {
+			if (!confirmDiscard()) return;
+			selectedSectionKey = key;
+			markSelected();
+			renderChatChip();
+			openPanel();
+			renderPanel(false);
+		}
+
+		function clearSelection(keepQuiet) {
+			if (!keepQuiet && !confirmDiscard()) return;
+			selectedSectionKey = '';
+			markSelected();
+			renderChatChip();
+			if (selectMode) {
+				openPanel();
+				renderPanel(false); // Page tab
+			}
+		}
+
+		// ── Chat scoping chip ("Editing: Gallery 2 ✕") ────────────────
+		function renderChatChip() {
+			if (chatChip) { chatChip.remove(); chatChip = null; }
+			if (!selectedSectionKey) return;
+			chatChip = document.createElement('div');
+			chatChip.className = 'pg-edit-chip';
+			var lbl = document.createElement('span');
+			lbl.textContent = 'Editing: ' + sectionLabel(selectedSectionKey);
+			chatChip.appendChild(lbl);
+			var x = document.createElement('button');
+			x.type = 'button';
+			x.className = 'pg-edit-chip-x';
+			x.setAttribute('aria-label', 'Stop editing this section');
+			x.innerHTML = '&times;';
+			x.addEventListener('click', function () { clearSelection(); });
+			chatChip.appendChild(x);
+			chatPanel.insertBefore(chatChip, attachStrip);
+		}
+
+		// ── Property panel shell ──────────────────────────────────────
+		function ensurePanel() {
+			if (panelEl) return panelEl;
+			panelEl = document.createElement('aside');
+			panelEl.className = 'pg-editor-panel';
+			panelEl.innerHTML =
+				'<div class="pg-ed-head">' +
+					'<div class="pg-ed-head-text">' +
+						'<strong class="pg-ed-title"></strong>' +
+						'<span class="pg-ed-key"></span>' +
+					'</div>' +
+					'<button type="button" class="pg-ed-close" aria-label="Close panel">&times;</button>' +
+				'</div>' +
+				'<div class="pg-ed-body"></div>' +
+				'<div class="pg-ed-foot">' +
+					'<div class="pg-ed-error" hidden></div>' +
+					'<div class="pg-ed-ask">' +
+						'<input type="text" class="pg-ed-ask-input" placeholder="Ask AI about this section…">' +
+					'</div>' +
+					'<div class="pg-ed-actions">' +
+						'<button type="button" class="pg-ed-discard" hidden>Discard</button>' +
+						'<button type="button" class="pg-ed-apply" disabled>Apply</button>' +
+					'</div>' +
+				'</div>';
+			previewWrap.appendChild(panelEl);
+			panelEl.querySelector('.pg-ed-close').addEventListener('click', function () {
+				if (!confirmDiscard()) return;
+				if (selectedSectionKey) { selectedSectionKey = ''; markSelected(); renderChatChip(); }
+				closePanel();
+			});
+			panelEl.querySelector('.pg-ed-apply').addEventListener('click', applyPending);
+			panelEl.querySelector('.pg-ed-discard').addEventListener('click', function () { renderPanel(false); });
+			var ask = panelEl.querySelector('.pg-ed-ask-input');
+			function sendAsk() {
+				var t = (ask.value || '').trim();
+				if (!t) return;
+				input.value = t;       // prefill the main chat input —
+				input.focus();         // scoping rides the selection chip
+				ask.value = '';
+			}
+			ask.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter') { e.preventDefault(); sendAsk(); }
+			});
+			return panelEl;
+		}
+		function openPanel() {
+			ensurePanel().classList.add('is-open');
+			previewWrap.classList.add('pg-ed-open');
+		}
+		function closePanel() {
+			if (panelEl) panelEl.classList.remove('is-open');
+			previewWrap.classList.remove('pg-ed-open');
+		}
+
+		function setError(msg) {
+			if (!panelEl) return;
+			var e = panelEl.querySelector('.pg-ed-error');
+			if (msg) { e.textContent = msg; e.hidden = false; }
+			else { e.hidden = true; }
+		}
+
+		function markDirty(path) {
+			dirtyKeys[path] = 1;
+			paintApply();
+		}
+		function paintApply() {
+			if (!panelEl) return;
+			var n = Object.keys(dirtyKeys).length;
+			var btn = panelEl.querySelector('.pg-ed-apply');
+			btn.disabled = !n;
+			btn.innerHTML = n ? 'Apply <span class="pg-ed-badge">' + n + '</span>' : 'Apply';
+			panelEl.querySelector('.pg-ed-discard').hidden = !n;
+		}
+
+		// ── Panel rendering (schema-driven) ───────────────────────────
+		// preserve=true keeps the current working copy + dirty state
+		// (used by repeater add/remove/reorder which re-render the body).
+		function renderPanel(preserve) {
+			ensurePanel();
+			setError('');
+			pageMode = !selectedSectionKey;
+			var spec = pageMode ? edFields._page : edFields[baseType(selectedSectionKey)];
+
+			if (!preserve) {
+				dirtyKeys = {};
+				if (pageMode) {
+					working = {};
+					if (spec) {
+						Object.keys(spec.fields || {}).forEach(function (p) {
+							var v = getPath(cfg.pageConfig || {}, p);
+							if (v !== undefined) working[p] = (v && typeof v === 'object') ? deepClone(v) : v;
+						});
+					}
+				} else {
+					var cur = (cfg.pageConfig || {})[selectedSectionKey];
+					working = (cur && typeof cur === 'object') ? deepClone(cur) : {};
+				}
+			}
+			controls = [];
+
+			panelEl.querySelector('.pg-ed-title').textContent =
+				pageMode ? 'Page settings' : sectionLabel(selectedSectionKey);
+			panelEl.querySelector('.pg-ed-key').textContent =
+				pageMode ? 'colors · fonts · layout' : selectedSectionKey;
+			panelEl.querySelector('.pg-ed-ask').style.display = pageMode ? 'none' : '';
+
+			var body = panelEl.querySelector('.pg-ed-body');
+			body.innerHTML = '';
+
+			if (!spec || !Object.keys(spec.fields || {}).length) {
+				var empty = document.createElement('div');
+				empty.className = 'pg-ed-empty';
+				empty.textContent = pageMode
+					? 'No page-level settings available.'
+					: 'No quick-edit fields for this section type yet — describe the change in chat and the AI will handle it.';
+				body.appendChild(empty);
+				paintApply();
+				return;
+			}
+
+			// Layout (variant) select first — the section's biggest lever.
+			if (!pageMode && spec.variants && spec.variants.length > 1) {
+				body.appendChild(buildVariantField(spec.variants));
+			}
+
+			Object.keys(spec.fields).forEach(function (fkey) {
+				var f = spec.fields[fkey];
+				var row = buildField(fkey, f);
+				if (row) body.appendChild(row);
+			});
+			paintApply();
+		}
+
+		function buildVariantField(variants) {
+			var sel = document.createElement('select');
+			var current = String(working.variant || 'default');
+			var opts = variants.slice();
+			if (opts.indexOf(current) === -1) opts.unshift(current);
+			opts.forEach(function (v) {
+				var o = document.createElement('option');
+				o.value = v;
+				o.textContent = titleize(v);
+				if (v === current) o.selected = true;
+				sel.appendChild(o);
+			});
+			sel.addEventListener('change', function () {
+				working.variant = sel.value;
+				markDirty('variant');
+			});
+			return fieldRow('Layout', sel, 'How this section is arranged. Applies on the next Apply.');
+		}
+
+		function fieldRow(label, controlEl, hint) {
+			var row = document.createElement('div');
+			row.className = 'pg-ed-field';
+			var l = document.createElement('label');
+			l.className = 'pg-ed-label';
+			l.textContent = label;
+			row.appendChild(l);
+			row.appendChild(controlEl);
+			if (hint) {
+				var h = document.createElement('div');
+				h.className = 'pg-ed-hint';
+				h.textContent = hint;
+				row.appendChild(h);
+			}
+			return row;
+		}
+
+		// Registry entry for text-like controls so click-into-field and the
+		// optimistic live preview can find them. orig = the value as rendered
+		// in the CURRENT preview (frozen at panel render).
+		function registerText(path, inputEl, getVal) {
+			var ctl = { path: path, el: inputEl, get: getVal, orig: normText(getVal()), node: null };
+			controls.push(ctl);
+			inputEl.addEventListener('input', function () { liveUpdateText(ctl); });
+			return ctl;
+		}
+
+		// Build one control row for a field spec. Value lives in `working`.
+		function buildField(fkey, f) {
+			var kind = f.kind;
+			var value = pageMode ? working[fkey] : working[fkey];
+
+			// `list` whose current value holds objects renders as a repeater
+			// inferred from the data (the PHP map can't always tell).
+			if (kind === 'list' && Array.isArray(value) && value.some(function (it) { return it && typeof it === 'object'; })) {
+				kind = 'repeater';
+				f = { kind: 'repeater', label: f.label, hint: f.hint, fields: inferSubfields(value) };
+				normalizeRepeaterItems(fkey, f.fields);
+			}
+			if (kind === 'repeater' && Array.isArray(value) && (!f.fields || !Object.keys(f.fields).length)) {
+				f = { kind: 'repeater', label: f.label, hint: f.hint, fields: inferSubfields(value) };
+			}
+
+			switch (kind) {
+				case 'text':
+				case 'textarea': {
+					var t = kind === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+					if (kind === 'textarea') t.rows = 3; else t.type = 'text';
+					t.value = value == null ? '' : String(value);
+					t.addEventListener('input', function () {
+						working[fkey] = t.value;
+						markDirty(fkey);
+					});
+					registerText(fkey, t, function () { return t.value; });
+					return fieldRow(f.label, t, f.hint);
+				}
+				case 'url': {
+					var u = document.createElement('input');
+					u.type = 'url';
+					u.placeholder = 'https://…  ·  #anchor  ·  tel:…';
+					u.value = value == null ? '' : String(value);
+					u.addEventListener('input', function () { working[fkey] = u.value; markDirty(fkey); });
+					return fieldRow(f.label, u, f.hint);
+				}
+				case 'image': {
+					var wrap = document.createElement('div');
+					wrap.className = 'pg-ed-image';
+					var thumb = document.createElement('img');
+					thumb.className = 'pg-ed-image-thumb';
+					thumb.alt = '';
+					var ii = document.createElement('input');
+					ii.type = 'url';
+					ii.placeholder = 'Image URL';
+					ii.value = value == null ? '' : String(value);
+					function paintThumb() {
+						var v = (ii.value || '').trim();
+						if (/^https?:\/\//.test(v)) { thumb.src = v; thumb.style.display = ''; }
+						else { thumb.removeAttribute('src'); thumb.style.display = 'none'; }
+					}
+					thumb.addEventListener('error', function () { thumb.style.display = 'none'; });
+					paintThumb();
+					ii.addEventListener('input', function () { working[fkey] = ii.value; markDirty(fkey); paintThumb(); });
+					wrap.appendChild(thumb);
+					wrap.appendChild(ii);
+					return fieldRow(f.label, wrap, f.hint);
+				}
+				case 'color': {
+					var hex = toHex6(value);
+					var c = document.createElement('input');
+					c.type = 'color';
+					c.value = hex || '#cccccc';
+					c.addEventListener('input', function () {
+						working[fkey] = c.value;
+						markDirty(fkey);
+					});
+					var cw = document.createElement('div');
+					cw.className = 'pg-ed-color';
+					cw.appendChild(c);
+					var cv = document.createElement('span');
+					cv.className = 'pg-ed-color-val';
+					cv.textContent = hex || (value ? String(value) : '—');
+					c.addEventListener('input', function () { cv.textContent = c.value; });
+					cw.appendChild(cv);
+					return fieldRow(f.label, cw, f.hint);
+				}
+				case 'select': {
+					var s = document.createElement('select');
+					var curv = value == null ? '' : String(value);
+					var sopts = (f.options || []).slice();
+					if (sopts.indexOf(curv) === -1) sopts.unshift(curv);
+					sopts.forEach(function (ov) {
+						var o = document.createElement('option');
+						o.value = ov;
+						o.textContent = ov === '' ? '(none)' : titleize(ov);
+						if (ov === curv) o.selected = true;
+						s.appendChild(o);
+					});
+					s.addEventListener('change', function () { working[fkey] = s.value; markDirty(fkey); });
+					return fieldRow(f.label, s, f.hint);
+				}
+				case 'number': {
+					var n = document.createElement('input');
+					n.type = 'number';
+					if (f.min != null) n.min = f.min;
+					if (f.max != null) n.max = f.max;
+					if (f.step != null) n.step = f.step;
+					n.value = value == null ? '' : String(value);
+					n.addEventListener('input', function () {
+						var num = parseFloat(n.value);
+						if (isNaN(num)) { delete working[fkey]; }
+						else { working[fkey] = num; }
+						markDirty(fkey);
+					});
+					return fieldRow(f.label, n, f.hint);
+				}
+				case 'checkbox': {
+					var cb = document.createElement('input');
+					cb.type = 'checkbox';
+					cb.checked = !!value;
+					cb.addEventListener('change', function () { working[fkey] = cb.checked; markDirty(fkey); });
+					var cbw = document.createElement('div');
+					cbw.className = 'pg-ed-checkbox';
+					cbw.appendChild(cb);
+					return fieldRow(f.label, cbw, f.hint);
+				}
+				case 'list': {
+					var lt = document.createElement('textarea');
+					lt.rows = 4;
+					lt.placeholder = 'One item per line';
+					lt.value = Array.isArray(value)
+						? value.map(function (it) { return typeof it === 'string' ? it : JSON.stringify(it); }).join('\n')
+						: '';
+					lt.addEventListener('input', function () {
+						working[fkey] = lt.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+						markDirty(fkey);
+					});
+					return fieldRow(f.label, lt, (f.hint ? f.hint + ' · ' : '') + 'One item per line.');
+				}
+				case 'cta': {
+					var cur = (value && typeof value === 'object') ? value : (value ? { text: String(value) } : {});
+					if (!working[fkey] || typeof working[fkey] !== 'object') working[fkey] = cur;
+					var box = document.createElement('div');
+					box.className = 'pg-ed-cta';
+					var ct = document.createElement('input');
+					ct.type = 'text';
+					ct.placeholder = 'Button text';
+					ct.value = cur.text == null ? '' : String(cur.text);
+					var cu = document.createElement('input');
+					cu.type = 'url';
+					cu.placeholder = 'Link (https://… · #anchor · tel:…)';
+					cu.value = cur.url == null ? '' : String(cur.url);
+					ct.addEventListener('input', function () { working[fkey].text = ct.value; markDirty(fkey + '.text'); });
+					cu.addEventListener('input', function () { working[fkey].url = cu.value; markDirty(fkey + '.url'); });
+					registerText(fkey + '.text', ct, function () { return ct.value; });
+					box.appendChild(ct);
+					box.appendChild(cu);
+					return fieldRow(f.label, box, f.hint);
+				}
+				case 'repeater':
+					return buildRepeater(fkey, f);
+			}
+			return null;
+		}
+
+		// Infer repeater sub-fields from the shape of existing items (string
+		// and number values become editable; nested objects stay chat-only).
+		function inferSubfields(items) {
+			var sub = {};
+			(items || []).forEach(function (it) {
+				if (!it || typeof it !== 'object' || Array.isArray(it)) return;
+				Object.keys(it).forEach(function (k) {
+					if (sub[k]) return;
+					var v = it[k];
+					if (typeof v === 'number') sub[k] = { kind: 'number', label: titleize(k) };
+					else if (typeof v === 'string') sub[k] = { kind: guessKind(k), label: titleize(k) };
+				});
+			});
+			return sub;
+		}
+		function guessKind(k) {
+			if (/image|logo|avatar|photo|img/.test(k)) return 'image';
+			if (/url|link|href|video|embed/.test(k)) return 'url';
+			if (/color/.test(k)) return 'color';
+			if (/^(desc|description|text|quote|answer|a|bio|body|note|subheadline)$/.test(k)) return 'textarea';
+			return 'text';
+		}
+		// Items can be plain strings (gallery images); when rendered as a
+		// repeater, promote them to objects so sub-fields have a home.
+		// Arrays replace wholesale on merge, so this is safe.
+		function normalizeRepeaterItems(fkey, subfields) {
+			var arr = working[fkey];
+			if (!Array.isArray(arr)) return;
+			var first = Object.keys(subfields)[0] || 'url';
+			var wrapKey = subfields.url ? 'url' : first;
+			for (var i = 0; i < arr.length; i++) {
+				if (typeof arr[i] === 'string') {
+					var o = {};
+					o[wrapKey] = arr[i];
+					arr[i] = o;
+				}
+			}
+		}
+
+		function buildRepeater(fkey, f) {
+			if (!Array.isArray(working[fkey])) working[fkey] = [];
+			var sub = f.fields || {};
+			var row = document.createElement('div');
+			row.className = 'pg-ed-field pg-ed-repeater';
+			var l = document.createElement('label');
+			l.className = 'pg-ed-label';
+			l.textContent = f.label;
+			row.appendChild(l);
+
+			var listEl = document.createElement('div');
+			listEl.className = 'pg-ed-rep-list';
+			row.appendChild(listEl);
+
+			function itemTitle(it, i) {
+				// Prefer human-name keys (title/name/question…) over whatever
+				// happens to come first in the spec (often the icon class).
+				var preferred = ['title', 'name', 'question', 'q', 'label', 'headline', 'author', 'text', 'caption', 'alt'];
+				for (var p = 0; p < preferred.length; p++) {
+					var pk = preferred[p];
+					if (typeof it[pk] === 'string' && it[pk].trim()) {
+						return it[pk].length > 34 ? it[pk].slice(0, 33) + '…' : it[pk];
+					}
+				}
+				for (var k in sub) {
+					if (typeof it[k] === 'string' && it[k].trim() && sub[k].kind !== 'image' && sub[k].kind !== 'url') {
+						return it[k].length > 34 ? it[k].slice(0, 33) + '…' : it[k];
+					}
+				}
+				for (var k2 in it) {
+					if (typeof it[k2] === 'string' && it[k2].trim()) {
+						return it[k2].length > 34 ? it[k2].slice(0, 33) + '…' : it[k2];
+					}
+				}
+				return 'Item ' + (i + 1);
+			}
+
+			function rerender() {
+				listEl.innerHTML = '';
+				// Drop stale registry entries for this repeater's sub-fields.
+				controls = controls.filter(function (c) { return c.path.indexOf(fkey + '.') !== 0; });
+				working[fkey].forEach(function (it, i) { listEl.appendChild(buildRepRow(it, i)); });
+			}
+
+			function buildRepRow(it, i) {
+				var arr = working[fkey];
+				var rowEl = document.createElement('div');
+				rowEl.className = 'pg-ed-rep-row';
+				var head = document.createElement('div');
+				head.className = 'pg-ed-rep-head';
+				var caret = document.createElement('span');
+				caret.className = 'pg-ed-rep-caret';
+				caret.textContent = '▸';
+				head.appendChild(caret);
+				var title = document.createElement('span');
+				title.className = 'pg-ed-rep-title';
+				title.textContent = itemTitle(it, i);
+				head.appendChild(title);
+				var tools = document.createElement('span');
+				tools.className = 'pg-ed-rep-tools';
+				function toolBtn(txt, label, fn, disabled) {
+					var b = document.createElement('button');
+					b.type = 'button';
+					b.innerHTML = txt;
+					b.title = label;
+					b.disabled = !!disabled;
+					b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+					tools.appendChild(b);
+				}
+				toolBtn('&uarr;', 'Move up', function () {
+					arr.splice(i - 1, 0, arr.splice(i, 1)[0]);
+					markDirty(fkey); rerender();
+				}, i === 0);
+				toolBtn('&darr;', 'Move down', function () {
+					arr.splice(i + 1, 0, arr.splice(i, 1)[0]);
+					markDirty(fkey); rerender();
+				}, i === arr.length - 1);
+				toolBtn('&times;', 'Remove item', function () {
+					arr.splice(i, 1);
+					markDirty(fkey); rerender();
+				});
+				head.appendChild(tools);
+				rowEl.appendChild(head);
+
+				var bodyEl = document.createElement('div');
+				bodyEl.className = 'pg-ed-rep-body';
+				bodyEl.hidden = true;
+				Object.keys(sub).forEach(function (sk) {
+					var sf = sub[sk];
+					var sv = it[sk];
+					var inp;
+					if (sf.kind === 'textarea') { inp = document.createElement('textarea'); inp.rows = 2; }
+					else {
+						inp = document.createElement('input');
+						inp.type = sf.kind === 'number' ? 'number' : (sf.kind === 'url' || sf.kind === 'image' ? 'url' : 'text');
+					}
+					inp.value = sv == null ? '' : String(sv);
+					inp.placeholder = sf.label;
+					inp.addEventListener('input', function () {
+						it[sk] = sf.kind === 'number' ? (parseFloat(inp.value) || 0) : inp.value;
+						markDirty(fkey);
+						if (sf.kind === 'text' || sf.kind === 'textarea') title.textContent = itemTitle(it, i);
+					});
+					if (sf.kind === 'text' || sf.kind === 'textarea') {
+						registerText(fkey + '.' + i + '.' + sk, inp, function () { return inp.value; });
+					}
+					var sw = document.createElement('div');
+					sw.className = 'pg-ed-rep-field';
+					var sl = document.createElement('span');
+					sl.textContent = sf.label;
+					sw.appendChild(sl);
+					sw.appendChild(inp);
+					bodyEl.appendChild(sw);
+				});
+				rowEl.appendChild(bodyEl);
+				head.addEventListener('click', function () {
+					bodyEl.hidden = !bodyEl.hidden;
+					caret.textContent = bodyEl.hidden ? '▸' : '▾';
+				});
+				return rowEl;
+			}
+
+			var add = document.createElement('button');
+			add.type = 'button';
+			add.className = 'pg-ed-rep-add';
+			add.textContent = '+ Add item';
+			add.addEventListener('click', function () {
+				var blank = {};
+				Object.keys(sub).forEach(function (sk) { blank[sk] = sub[sk].kind === 'number' ? 0 : ''; });
+				working[fkey].push(blank);
+				markDirty(fkey);
+				rerender();
+				var rows = listEl.querySelectorAll('.pg-ed-rep-row');
+				var last = rows[rows.length - 1];
+				if (last) last.querySelector('.pg-ed-rep-head').click();
+			});
+			row.appendChild(add);
+			if (f.hint) {
+				var h = document.createElement('div');
+				h.className = 'pg-ed-hint';
+				h.textContent = f.hint;
+				row.appendChild(h);
+			}
+			rerender();
+			return row;
+		}
+
+		// ── Click-into-field heuristic ────────────────────────────────
+		// Clicking a text element inside the selected section focuses the
+		// panel field whose current value best matches the clicked text.
+		function focusFieldForElement(el) {
+			var t = normText(el && el.textContent);
+			if (!t || t.length > 400) return;
+			var best = null, bestScore = 0;
+			controls.forEach(function (ctl) {
+				var v = normText(ctl.get());
+				if (!v) return;
+				var score = 0;
+				if (v === t) score = 3;
+				else if (v.length > 3 && t.indexOf(v) !== -1) score = 2;
+				else if (t.length > 3 && v.indexOf(t) !== -1) score = 2;
+				if (score > bestScore) { bestScore = score; best = ctl; }
+			});
+			if (best) {
+				// Expand the repeater row that holds it, if collapsed.
+				var repBody = best.el.closest ? best.el.closest('.pg-ed-rep-body') : null;
+				if (repBody && repBody.hidden) {
+					var headEl = repBody.parentNode.querySelector('.pg-ed-rep-head');
+					if (headEl) headEl.click();
+				}
+				best.el.focus();
+				try { best.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { best.el.scrollIntoView(); }
+				var fieldEl = best.el.closest ? best.el.closest('.pg-ed-field, .pg-ed-rep-field') : null;
+				if (fieldEl) {
+					fieldEl.classList.remove('pg-ed-flash');
+					void fieldEl.offsetWidth;
+					fieldEl.classList.add('pg-ed-flash');
+				}
+			}
+		}
+
+		// ── Optimistic text preview ───────────────────────────────────
+		// While typing, live-swap the matching text node inside the selected
+		// section so the edit feels instant. Authoritative render = Apply.
+		function liveUpdateText(ctl) {
+			if (pageMode || !selectedSectionKey || !ctl.orig) return;
+			var node = ctl.node;
+			if (!node || !node.isConnected) {
+				node = findTextNode(ctl.orig);
+				if (!node) return;
+				ctl.node = node;
+			}
+			node.nodeValue = ctl.get();
+		}
+		function findTextNode(normOrig) {
+			var root = findSelectedRoot();
+			if (!root) return null;
+			try {
+				var walker = (frame.contentDocument).createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+				var n;
+				while ((n = walker.nextNode())) {
+					if (normText(n.nodeValue) === normOrig) return n;
+				}
+			} catch (e) {}
+			return null;
+		}
+
+		// ── Apply loop ────────────────────────────────────────────────
+		function applyPending() {
+			if (!isDirty() || !panelEl) return;
+			var patch = {};
+			var label;
+			if (pageMode) {
+				// Dotted paths group by first segment; each touched group is
+				// sent COMPLETE, merged over the page's current group object.
+				var groups = {};
+				Object.keys(dirtyKeys).forEach(function (p) { groups[p.split('.')[0]] = 1; });
+				Object.keys(groups).forEach(function (g) {
+					var merged = deepClone((cfg.pageConfig && cfg.pageConfig[g] && typeof cfg.pageConfig[g] === 'object') ? cfg.pageConfig[g] : {});
+					Object.keys(working).forEach(function (p) {
+						if (p.split('.')[0] !== g) return;
+						if (working[p] === undefined) return;
+						setPath(merged, p.split('.').slice(1).join('.'), working[p]);
+					});
+					patch[g] = merged;
+				});
+				label = 'edit page settings via panel';
+			} else {
+				// COMPLETE section object — repeaters replace wholesale.
+				patch[selectedSectionKey] = working;
+				label = 'edit ' + selectedSectionKey + ' via panel';
+			}
+
+			var btn = panelEl.querySelector('.pg-ed-apply');
+			btn.disabled = true;
+			btn.textContent = 'Applying…';
+			setError('');
+
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_apply_patch');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fd.append('changes', JSON.stringify(patch));
+			fd.append('label', label);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (j && j.success) {
+						// Sync the local config so the next panel open shows
+						// what the server now has.
+						if (!cfg.pageConfig) cfg.pageConfig = {};
+						Object.keys(patch).forEach(function (k) { cfg.pageConfig[k] = deepClone(patch[k]); });
+						dirtyKeys = {};
+						renderPanel(false);
+						reloadPreview((j.data && j.data.preview_bust) || Date.now());
+						showToast('Saved — undo in History');
+					} else {
+						var msg = (j && (typeof j.data === 'string' ? j.data : (j.data && j.data.message))) || 'Could not apply that change.';
+						setError(msg);
+						btn.disabled = false;
+						paintApply();
+					}
+				})
+				.catch(function () {
+					setError('Network error — your edits are still here, try Apply again.');
+					btn.disabled = false;
+					paintApply();
+				});
+		}
+
+		// Test hook (also handy from the console).
+		window.__pgEditor = {
+			enable: function (on) { setSelectMode(on !== false); },
+			select: selectSection,
+			deselect: function () { clearSelection(true); },
+			apply: applyPending,
+			state: function () {
+				return { selectMode: selectMode, selected: selectedSectionKey, pageMode: pageMode, dirty: Object.keys(dirtyKeys), working: working };
+			}
+		};
+	})();
 
 	loadHistory();
 	refreshCredits();
