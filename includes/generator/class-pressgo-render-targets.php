@@ -69,10 +69,12 @@ class PressGo_Render_Targets {
 			return array( 'ok' => false, 'error' => "renderer '{$target}' returned empty content" );
 		}
 
-		wp_update_post( array(
+		// wp_update_post expects SLASHED data (it unslashes internally) — raw
+		// content would lose literal backslashes (JSON-escaped block attrs).
+		wp_update_post( wp_slash( array(
 			'ID'           => $post_id,
 			'post_content' => $out['post_content'],
-		) );
+		) ) );
 
 		// A page that previously rendered through Elementor must stop doing so,
 		// or Elementor's the_content filter keeps serving the old build.
