@@ -142,16 +142,28 @@ class PressGo_Renderer_Bricks {
 			if ( ! is_string( $type ) ) {
 				continue;
 			}
-			$method = 'build_' . $type;
+			// Instance keys ("gallery#2") resolve to the base builder but read
+			// their own data key — without this, repeated sections were skipped.
+			$base   = preg_replace( '/#\d+$/', '', $type );
+			$method = 'build_' . $base;
 			if ( ! method_exists( $this, $method ) ) {
 				continue;
 			}
 			$data = isset( $config[ $type ] ) ? $config[ $type ] : array();
 			// disclaimer is a plain string in the config.
-			if ( ! is_array( $data ) && 'disclaimer' !== $type ) {
+			if ( ! is_array( $data ) && 'disclaimer' !== $base ) {
 				$data = array();
 			}
+			$before_keys = array_keys( $this->els );
 			$this->$method( $data );
+			// Visual-editor marker on the section root(s) this builder added.
+			$marker = 'pg-sec pg-sec--' . sanitize_html_class( $base ) . ' pg-key--' . sanitize_html_class( str_replace( '#', '--', $type ) );
+			foreach ( array_diff( array_keys( $this->els ), $before_keys ) as $k ) {
+				if ( isset( $this->els[ $k ]['parent'] ) && 0 === $this->els[ $k ]['parent'] ) {
+					$cur = isset( $this->els[ $k ]['settings']['_cssClasses'] ) ? $this->els[ $k ]['settings']['_cssClasses'] . ' ' : '';
+					$this->els[ $k ]['settings']['_cssClasses'] = $cur . $marker;
+				}
+			}
 		}
 
 		return array(

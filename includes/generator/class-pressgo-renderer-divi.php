@@ -68,6 +68,19 @@ class PressGo_Renderer_Divi {
 			}
 			$sc = $this->$method( $data );
 			if ( is_string( $sc ) && '' !== $sc ) {
+				// Visual-editor marker on the section root: click in the
+				// preview resolves to this config key ("gallery#2"->"gallery--2").
+				$marker = 'pg-sec pg-sec--' . sanitize_html_class( $type ) . ' pg-key--' . sanitize_html_class( str_replace( '#', '--', $name ) );
+				if ( preg_match( '/\[et_pb_section([^\]]*)\]/', $sc, $m, PREG_OFFSET_CAPTURE ) ) {
+					$tag = $m[0][0];
+					$off = $m[0][1];
+					if ( false !== strpos( $tag, 'module_class="' ) ) {
+						$new_tag = preg_replace( '/module_class="([^"]*)"/', 'module_class="$1 ' . $marker . '"', $tag, 1 );
+					} else {
+						$new_tag = '[et_pb_section module_class="' . $marker . '"' . $m[1][0] . ']';
+					}
+					$sc = substr_replace( $sc, $new_tag, $off, strlen( $tag ) );
+				}
 				$out .= $sc . "\n";
 			}
 		}

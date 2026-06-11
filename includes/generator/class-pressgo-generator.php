@@ -233,6 +233,14 @@ class PressGo_Generator {
 				if ( ! isset( $result['settings']['_element_id'] ) ) {
 					$result['settings']['_element_id'] = $anchor;
 				}
+				// Section markers for the visual editor: pg-key--{key} maps a
+				// click in the preview straight to this section's config key
+				// ('#' is invalid in a class, so "gallery#2" -> "gallery--2").
+				// One stamp here covers all 56 Elementor builders.
+				$marker = 'pg-sec pg-sec--' . sanitize_html_class( $base ) . ' pg-key--' . sanitize_html_class( str_replace( '#', '--', $name ) );
+				$result['settings']['css_classes'] = isset( $result['settings']['css_classes'] ) && '' !== $result['settings']['css_classes']
+					? $result['settings']['css_classes'] . ' ' . $marker
+					: $marker;
 				$page[] = $result;
 			}
 		}

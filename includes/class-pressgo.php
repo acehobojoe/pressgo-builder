@@ -52,6 +52,7 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-ai-client.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-scraper-client.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-config-validator.php';
+		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-editor-fields.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-page-creator.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-editor-integration.php';
 

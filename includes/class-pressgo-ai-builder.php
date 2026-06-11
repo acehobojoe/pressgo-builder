@@ -87,6 +87,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_duplicate',    array( $this, 'ajax_duplicate' ) );
 		add_action( 'wp_ajax_pressgo_ai_review_seen',  array( $this, 'ajax_review_seen' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_optout', array( $this, 'ajax_brand_optout' ) );
+		add_action( 'wp_ajax_pressgo_ai_apply_patch',  array( $this, 'ajax_apply_patch' ) );
 	}
 
 	/**
@@ -271,6 +272,27 @@ class PressGo_AI_Builder {
 		$this->check_auth();
 		update_option( 'pressgo_review_ask_shown', (int) get_option( 'pressgo_review_ask_shown', 0 ) + 1, false );
 		wp_send_json_success();
+	}
+
+	/**
+	 * Visual editor: apply a hand-built config patch (zero AI tokens). Same
+	 * pipeline as AI patches — merge, validate, snapshot, dispatch, purge —
+	 * so the panel and the chat share one undo history.
+	 */
+	public function ajax_apply_patch() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$changes = json_decode( wp_unslash( (string) ( $_POST['changes'] ?? '' ) ), true );
+		if ( ! $post_id || ! is_array( $changes ) || empty( $changes ) ) {
+			wp_send_json_error( 'missing post_id or changes', 400 );
+		}
+		$label = sanitize_text_field( wp_unslash( $_POST['label'] ?? '' ) );
+		$this->turn_label = $label ? ( 'Before: ' . $label ) : 'Before: panel edit';
+		$res = $this->apply_patch_to_post( $post_id, $changes );
+		if ( empty( $res['ok'] ) ) {
+			wp_send_json_error( isset( $res['error'] ) ? $res['error'] : 'patch failed', 422 );
+		}
+		wp_send_json_success( array( 'preview_bust' => time() ) );
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
@@ -1092,6 +1114,13 @@ class PressGo_AI_Builder {
 					// pings ajax_review_seen), not on page load — loading the
 					// builder 3 times without a build used to exhaust the ask.
 				?>,
+				editorFields: <?php echo wp_json_encode( class_exists( 'PressGo_Editor_Fields' ) ? PressGo_Editor_Fields::map() : array() ); ?>,
+				pageConfig: <?php
+					// Current stored config so the panel can show live values
+					// without an extra fetch. null when the page has no build yet.
+					$boot_cfg = self::decode_meta_json( (string) get_post_meta( $post_id, self::META_AI_CONFIG, true ) );
+					echo wp_json_encode( is_array( $boot_cfg ) ? $boot_cfg : null );
+				?>,
 				page: <?php echo wp_json_encode( array(
 					'status' => get_post_status( $post_id ),
 					'url'    => get_permalink( $post_id ),
@@ -1199,6 +1228,12 @@ class PressGo_AI_Builder {
 
 		$post_id  = absint( $_POST['post_id'] ?? 0 );
 		$user_msg = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
+		// Visual editor: when a section is selected in the preview, scope the
+		// AI's edit to it — fewer wrong-section patches, smaller prompts.
+		$selected = isset( $_POST['selected_section'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_section'] ) ) : '';
+		if ( '' !== $selected && preg_match( '/^[a-z_]+(#[0-9]+)?$/', $selected ) && '' !== $user_msg ) {
+			$user_msg .= "\n\n[The user has the '" . $selected . "' section selected in the preview. Scope this request to that section — patch only that key — unless the message clearly refers to the whole page or another section.]";
+		}
 		$vision   = ! empty( $_POST['vision'] );
 
 		// Optional inline images (drag/drop, paste, or file picker). Supports a

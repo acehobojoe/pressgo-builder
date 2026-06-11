@@ -726,7 +726,8 @@ class PressGo_Renderer_Gutenberg {
 		$dark   = $this->tone_is_dark( $tone );
 		$tinted = in_array( $tone, array( 'primary', 'primary_grad' ), true );
 		$cls    = 'pg-gb-sec pg-gb-' . str_replace( '_', '-', $base ) . ' pg-gb-s' . $i
-			. ( $dark ? ' pg-gb-dark' : '' ) . ( $tinted ? ' pg-gb-tinted' : '' ) . ( $extra ? ' ' . $extra : '' );
+			. ( $dark ? ' pg-gb-dark' : '' ) . ( $tinted ? ' pg-gb-tinted' : '' ) . ( $extra ? ' ' . $extra : '' )
+			. ' ' . $this->sec_marker( $name );
 		$bg = $this->tone_bg( $tone );
 		if ( '' !== $bg ) {
 			$this->rules[] = '.pg-gb-s' . $i . '{background:' . $bg . '}';
@@ -736,6 +737,15 @@ class PressGo_Renderer_Gutenberg {
 		}
 		$anchor = str_replace( array( '_', '#' ), '-', $name );
 		return $this->group( array( $this->group( $kids, 'pg-gb-wrap' ) ), $cls, array( 'anchor' => $anchor ) );
+	}
+
+	/**
+	 * Visual-editor marker classes: pg-key--{key} lets a click in the preview
+	 * resolve to this section's config key ("gallery#2" -> "gallery--2").
+	 */
+	private function sec_marker( $name ) {
+		$base = self::base_type( $name );
+		return 'pg-sec pg-sec--' . sanitize_html_class( $base ) . ' pg-key--' . sanitize_html_class( str_replace( '#', '--', (string) $name ) );
 	}
 
 	private function tone_bg( $tone ) {
@@ -939,7 +949,7 @@ class PressGo_Renderer_Gutenberg {
 			} else {
 				$kids = array_merge( $kids, $stack );
 			}
-			return $this->photo_band( $img, $kids, 620, 'pg-gb-hero', 'hero' );
+			return $this->photo_band( $img, $kids, 620, 'pg-gb-hero ' . $this->sec_marker( 'hero' ), 'hero' );
 		}
 
 		$kids = array();
@@ -2050,7 +2060,7 @@ class PressGo_Renderer_Gutenberg {
 		) ) );
 
 		if ( 'image' === $variant ) {
-			return $this->photo_band( $img, $center, 420, 'pg-gb-cta-final', 'cta-final' );
+			return $this->photo_band( $img, $center, 420, 'pg-gb-cta-final ' . $this->sec_marker( 'cta_final' ), 'cta-final' );
 		}
 		if ( 'card' === $variant ) {
 			return $this->sec( $name, array( $this->group( $center, 'pg-gb-card pg-gb-cta-card-inner pg-gb-narrow' ) ), 'light' );
