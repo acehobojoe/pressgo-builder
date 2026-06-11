@@ -33,7 +33,8 @@ class PressGo_MCP_Tools {
 			array(
 				'name'        => 'create_page',
 				'description' =>
-					"Create a new draft Elementor page. If `config` is provided, the full page is built " .
+					"Create a new draft page, rendered through the site's configured page builder " .
+					"(Elementor, Gutenberg, Divi, or Bricks). If `config` is provided, the full page is built " .
 					"in one shot. If omitted, an empty draft is created so you can incrementally add " .
 					"sections with add_section/set_globals. Read the pressgo://schema resource first " .
 					"to see the full config shape.",
@@ -559,6 +560,23 @@ class PressGo_MCP_Tools {
 			return $cap_check;
 		}
 
+		// What will this site render new pages through? Only seed Elementor
+		// claim-metas when the page will actually be an Elementor page —
+		// otherwise stamp the resolved target so every later tool call (and
+		// the renderer's neutralize step) treats it as a config-driven page.
+		$default_target = class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( 0 ) : 'elementor';
+		$seed_meta = ( 'elementor' === $default_target )
+			? array(
+				'_elementor_edit_mode'      => 'builder',
+				'_elementor_template_type'  => 'wp-page',
+				'_wp_page_template'         => 'elementor_canvas',
+				'_elementor_data'           => '[]',
+				'_elementor_page_settings'  => array( 'hide_title' => 'yes' ),
+			)
+			: array(
+				'_pressgo_target_builder'   => $default_target,
+			);
+
 		// If config provided, build incrementally (one bad section shouldn't
 		// nuke the whole call). Otherwise create an empty draft.
 		if ( $config ) {
@@ -573,13 +591,7 @@ class PressGo_MCP_Tools {
 				'post_status' => 'draft',
 				'post_type'   => 'page',
 				'post_author' => (int) $user->ID,
-				'meta_input'  => array(
-					'_elementor_edit_mode'      => 'builder',
-					'_elementor_template_type'  => 'wp-page',
-					'_wp_page_template'         => 'elementor_canvas',
-					'_elementor_data'           => '[]',
-					'_elementor_page_settings'  => array( 'hide_title' => 'yes' ),
-				),
+				'meta_input'  => $seed_meta,
 			), true );
 			if ( is_wp_error( $post_id ) ) {
 				return $post_id;
@@ -591,6 +603,24 @@ class PressGo_MCP_Tools {
 				'layout' => $validated['layout'],
 			) );
 			self::maybe_inject_globals( $post_id );
+
+			// Non-Elementor target: the config IS the page — apply it in one
+			// shot through the full pipeline (stores _pressgo_ai_config,
+			// renders post_content, purges caches).
+			if ( 'elementor' !== $default_target ) {
+				$apply = self::apply_config( $post_id, $config );
+				if ( is_wp_error( $apply ) ) {
+					return $apply;
+				}
+				self::increment_free_create_counter();
+				self::send_heartbeat();
+				$count     = isset( $apply['sections'] ) ? (int) $apply['sections'] : 0;
+				$watch_url = class_exists( 'PressGo_MCP_Admin' ) ? PressGo_MCP_Admin::watch_url( $post_id ) : '';
+				return self::page_summary( $post_id,
+					"Page {$post_id} built with {$count} section(s) from your config via the {$default_target} renderer.\n\n" .
+					"⚠️ Tell the user this URL to see it: {$watch_url}"
+				);
+			}
 
 			// Convert config -> sections array and dispatch through add_sections logic.
 			$order = isset( $validated['sections'] ) && is_array( $validated['sections'] )
@@ -624,19 +654,20 @@ class PressGo_MCP_Tools {
 				'post_status' => 'draft',
 				'post_type'   => 'page',
 				'post_author' => (int) $user->ID,
-				'meta_input'  => array(
-					'_elementor_edit_mode'      => 'builder',
-					'_elementor_template_type'  => 'wp-page',
-					'_wp_page_template'         => 'elementor_canvas',
-					'_elementor_data'           => '[]',
-					'_elementor_page_settings'  => array( 'hide_title' => 'yes' ),
-				),
+				'meta_input'  => $seed_meta,
 			), true );
 			if ( is_wp_error( $post_id ) ) {
 				return $post_id;
 			}
 			self::stamp_pressgo_meta( $post_id, array() );
 			self::maybe_inject_globals( $post_id );
+			// Non-Elementor: seed an empty AI config so incremental add_section
+			// calls have a config to append to (the config is the source of
+			// truth on these targets).
+			if ( 'elementor' !== $default_target ) {
+				$empty = array_merge( self::default_globals(), array( 'sections' => array() ) );
+				update_post_meta( $post_id, '_pressgo_ai_config', wp_slash( wp_json_encode( $empty ) ) );
+			}
 		}
 
 		// Increment the daily free counter only on successful create.
@@ -768,6 +799,15 @@ class PressGo_MCP_Tools {
 			return new WP_Error( 'mcp_bad_args', 'Missing or invalid `data` payload.' );
 		}
 
+		// Non-Elementor targets: the stored AI config is the source of truth —
+		// append the section there and re-apply through the full pipeline.
+		$target = self::page_target( $post_id );
+		if ( 'elementor' !== $target ) {
+			return self::config_add_sections( $post_id, array(
+				array( 'type' => $type, 'variant' => $variant, 'data' => $data ),
+			), $target );
+		}
+
 		// Build a single-section partial config using the page's existing globals.
 		$section_data = $data;
 		if ( $variant ) {
@@ -811,6 +851,13 @@ class PressGo_MCP_Tools {
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! isset( $args['sections'] ) || ! is_array( $args['sections'] ) || ! $args['sections'] ) {
 			return new WP_Error( 'mcp_bad_args', '`sections` must be a non-empty array.' );
+		}
+
+		// Non-Elementor targets: append the whole batch to the stored AI config
+		// and re-apply once through the full pipeline.
+		$target = self::page_target( $post_id );
+		if ( 'elementor' !== $target ) {
+			return self::config_add_sections( $post_id, $args['sections'], $target );
 		}
 
 		$globals  = self::get_page_globals( $post_id );
@@ -906,6 +953,13 @@ class PressGo_MCP_Tools {
 			return new WP_Error( 'mcp_bad_args', 'Missing or invalid `data` payload.' );
 		}
 
+		// Non-Elementor targets: section_index maps to the stored config's
+		// sections[] order; merge into that entry and re-apply.
+		$target = self::page_target( $post_id );
+		if ( 'elementor' !== $target ) {
+			return self::config_update_section( $post_id, $index, $type, $variant_arg, $variant_passed, $data, $target );
+		}
+
 		$existing = self::read_elementor_data( $post_id );
 		if ( $index < 0 || $index >= count( $existing ) ) {
 			return new WP_Error( 'mcp_bad_args', "section_index {$index} is out of range (page has " . count( $existing ) . " sections)." );
@@ -990,6 +1044,18 @@ class PressGo_MCP_Tools {
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		$lock = self::check_globals_lock( $args );
 		if ( is_wp_error( $lock ) ) { return $lock; }
+
+		// set_globals re-renders through the Elementor section records — on a
+		// page that renders through another builder it would report success
+		// while the live page never changes. Refuse honestly.
+		$target = self::page_target( $post_id );
+		if ( 'elementor' !== $target ) {
+			return new WP_Error( 'mcp_wrong_target',
+				"Page {$post_id} renders through {$target}, not Elementor. set_globals is Elementor-only — " .
+				"on this page colors/fonts/layout live in its AI config: change them via the AI Builder chat, " .
+				"or use update_section to edit individual sections."
+			);
+		}
 
 		// Snapshot prior state so undo can roll back palette/typography changes.
 		self::push_undo( $post_id, 'set_globals' );
@@ -1227,7 +1293,7 @@ class PressGo_MCP_Tools {
 		return array(
 			'content' => array( array(
 				'type' => 'text',
-				'text' => "Header updated and applied to {$count} PressGo page(s).",
+				'text' => "Header updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)",
 			) ),
 			'structuredContent' => array( 'header' => $tpl, 'pages_updated' => $count ),
 		);
@@ -1247,7 +1313,7 @@ class PressGo_MCP_Tools {
 		return array(
 			'content' => array( array(
 				'type' => 'text',
-				'text' => "Footer updated and applied to {$count} PressGo page(s).",
+				'text' => "Footer updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)",
 			) ),
 			'structuredContent' => array( 'footer' => $tpl, 'pages_updated' => $count ),
 		);
@@ -1302,6 +1368,12 @@ class PressGo_MCP_Tools {
 	 * @return bool True if the page was modified.
 	 */
 	private static function apply_global_section( $post_id, $kind, $tpl ) {
+		// Header/footer injection writes _elementor_data — Elementor-only.
+		// Pages rendering through gutenberg/divi/bricks are skipped (their
+		// chrome belongs to the theme / their own builder).
+		if ( 'elementor' !== self::page_target( $post_id ) ) {
+			return false;
+		}
 		$elements = self::read_elementor_data( $post_id );
 		$globals  = self::get_page_globals( $post_id );
 
@@ -1455,25 +1527,34 @@ class PressGo_MCP_Tools {
 			? sanitize_text_field( $args['new_title'] )
 			: ( $src->post_title . ' (copy)' );
 
-		$new_id = wp_insert_post( array(
+		$new_id = wp_insert_post( wp_slash( array(
 			'post_title'  => $new_title,
 			'post_status' => 'draft',
 			'post_type'   => $src->post_type,
 			'post_author' => (int) $user->ID,
 			'post_excerpt'=> $src->post_excerpt,
-		), true );
+			// Non-Elementor targets render from post_content — without this a
+			// gutenberg/divi/bricks clone is a blank page.
+			'post_content'=> $src->post_content,
+		) ), true );
 		if ( is_wp_error( $new_id ) ) { return $new_id; }
 
-		// Copy the meta keys that matter for an Elementor + PressGo page.
+		// Copy the meta keys that matter for a PressGo page on ANY render
+		// target (Elementor claim-metas, the AI config, the target stamp).
 		$meta_keys = array(
 			'_elementor_data', '_elementor_edit_mode', '_elementor_template_type',
 			'_elementor_version', '_elementor_page_settings', '_wp_page_template',
 			'_pressgo_built', '_pressgo_globals', '_pressgo_sections',
+			'_pressgo_ai_config', '_pressgo_target_builder',
+			'_et_pb_use_builder', '_et_pb_page_layout', '_et_pb_post_hide_nav', '_et_pb_built_for_post_type',
+			'_bricks_editor_mode', '_bricks_page_content_2',
 		);
 		foreach ( $meta_keys as $key ) {
 			$val = get_post_meta( $post_id, $key, true );
 			if ( '' === $val || null === $val ) { continue; }
-			update_post_meta( $new_id, $key, $val );
+			// get_post_meta returns unslashed; update_post_meta unslashes again —
+			// wp_slash keeps JSON escapes (\/ , \uXXXX) byte-identical.
+			update_post_meta( $new_id, $key, ( is_string( $val ) || is_array( $val ) ) ? wp_slash( $val ) : $val );
 		}
 		// Stamp pressgo built so list_pages picks it up.
 		update_post_meta( $new_id, '_pressgo_built', '1' );
@@ -1986,6 +2067,13 @@ class PressGo_MCP_Tools {
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
 
+		// Non-Elementor targets keep their design in the AI config, not
+		// _elementor_data (empty there) — summarize the config instead.
+		$target = self::page_target( $post_id );
+		if ( 'elementor' !== $target ) {
+			return self::inspect_config_page( $post_id, $target );
+		}
+
 		$elements = self::read_elementor_data( $post_id );
 		$records  = get_post_meta( $post_id, '_pressgo_sections', true );
 		$globals  = self::get_page_globals( $post_id );
@@ -2033,6 +2121,62 @@ class PressGo_MCP_Tools {
 			'section_count' => count( $sections ),
 			'sections'      => $sections,
 		);
+		return array(
+			'content' => array( array(
+				'type' => 'text',
+				'text' => wp_json_encode( $snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			) ),
+			'structuredContent' => $snapshot,
+		);
+	}
+
+	/**
+	 * inspect_page for config-driven (non-Elementor) targets: summarize the
+	 * stored AI config — section order with types/variants + labels, brand
+	 * basics, and the render target. Same output shape as the Elementor path.
+	 */
+	private static function inspect_config_page( $post_id, $target ) {
+		$config = self::read_ai_config( $post_id );
+		$order  = ( is_array( $config ) && isset( $config['sections'] ) && is_array( $config['sections'] ) )
+			? array_values( $config['sections'] )
+			: array();
+
+		$sections = array();
+		foreach ( $order as $i => $key ) {
+			$entry = ( is_array( $config ) && isset( $config[ $key ] ) && is_array( $config[ $key ] ) ) ? $config[ $key ] : array();
+			$label = null;
+			foreach ( array( 'headline', 'title', 'heading' ) as $lk ) {
+				if ( ! empty( $entry[ $lk ] ) && is_string( $entry[ $lk ] ) ) {
+					$label = $entry[ $lk ];
+					break;
+				}
+			}
+			$sections[] = array(
+				'index'   => $i,
+				'type'    => self::base_section_type( $key ),
+				'variant' => isset( $entry['variant'] ) ? $entry['variant'] : null,
+				'label'   => $label,
+			);
+		}
+
+		$snapshot = array(
+			'post_id'       => $post_id,
+			'title'         => get_the_title( $post_id ),
+			'status'        => get_post_status( $post_id ),
+			'target'        => $target,
+			'edit_url'      => admin_url( "post.php?post={$post_id}&action=edit" ),
+			'watch_url'     => class_exists( 'PressGo_MCP_Admin' ) ? PressGo_MCP_Admin::watch_url( $post_id ) : '',
+			'business_name' => is_array( $config ) && isset( $config['business_name'] ) ? $config['business_name'] : null,
+			'colors'        => is_array( $config ) && isset( $config['colors'] ) ? $config['colors'] : null,
+			'fonts'         => is_array( $config ) && isset( $config['fonts'] ) ? $config['fonts'] : null,
+			'globals'       => self::get_page_globals( $post_id ),
+			'section_count' => count( $sections ),
+			'sections'      => $sections,
+		);
+		if ( null === $config ) {
+			$snapshot['note'] = "This page renders through {$target} but has no stored AI config yet — " .
+				'build it via the AI Builder chat before editing sections.';
+		}
 		return array(
 			'content' => array( array(
 				'type' => 'text',
@@ -2128,15 +2272,216 @@ class PressGo_MCP_Tools {
 		if ( ! user_can( $user, 'edit_post', $post_id ) ) {
 			return new WP_Error( 'mcp_forbidden', "You don't have permission to edit post {$post_id}." );
 		}
-		// MCP section tools read/write _elementor_data only. On a page that
-		// renders through another builder (multi-builder targets), they would
-		// report success while the live page never changes — refuse honestly
-		// instead of lying.
-		$target = (string) get_post_meta( $post_id, '_pressgo_target_builder', true );
-		if ( '' !== $target && 'elementor' !== $target ) {
-			return new WP_Error( 'mcp_wrong_target', "Page {$post_id} renders through {$target}, not Elementor. MCP section tools currently support Elementor pages only — use the AI Builder chat for this page, or switch its render target back to Elementor first." );
-		}
 		return true;
+	}
+
+	/**
+	 * The builder a page renders through. Per-post meta `_pressgo_target_builder`
+	 * is stamped on every apply; empty (legacy pages) means Elementor.
+	 *
+	 * Section tools branch on this: 'elementor' pages keep the original
+	 * _elementor_data read/write path, every other target mutates the stored
+	 * AI config and re-applies through PressGo_AI_Builder::apply_config_to_post.
+	 */
+	public static function page_target( $post_id ) {
+		$target = (string) get_post_meta( $post_id, '_pressgo_target_builder', true );
+		if ( '' === $target || 'elementor' === $target ) {
+			return 'elementor';
+		}
+		return $target;
+	}
+
+	/**
+	 * Decode the page's stored AI config (`_pressgo_ai_config`). Same decode
+	 * contract as PressGo_AI_Builder::decode_meta_json: get_post_meta returns
+	 * UNSLASHED data, so decode raw first; fall back to an unslashed parse only
+	 * for legacy double-slashed rows. Returns array or null.
+	 */
+	public static function read_ai_config( $post_id ) {
+		$raw = get_post_meta( $post_id, '_pressgo_ai_config', true );
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return null;
+		}
+		$decoded = json_decode( $raw, true );
+		if ( null === $decoded ) {
+			$decoded = json_decode( wp_unslash( $raw ), true );
+		}
+		return is_array( $decoded ) ? $decoded : null;
+	}
+
+	/** Helpful error when a config-path tool finds no stored config to edit. */
+	private static function no_config_error( $post_id, $target ) {
+		return new WP_Error( 'mcp_no_config',
+			"Page {$post_id} renders through {$target} and section tools edit its stored AI config — " .
+			"but this page has no AI config; build it via the AI Builder chat first (PressGo > AI pages), " .
+			"then these tools can edit it."
+		);
+	}
+
+	/** "gallery#2" -> "gallery". Mirrors PressGo_AI_Builder::base_section_type. */
+	private static function base_section_type( $key ) {
+		if ( is_string( $key ) && preg_match( '/^([a-z_]+)#[2-9][0-9]*$/', $key, $m ) ) {
+			return $m[1];
+		}
+		return $key;
+	}
+
+	/**
+	 * Next free instance key for $type in a config: bare name if unused,
+	 * otherwise "type#2", "type#3"… — the same numbering scheme
+	 * canonicalize_section_order uses, so suffixed keys round-trip cleanly.
+	 */
+	private static function config_instance_key( $config, $type ) {
+		$order = ( isset( $config['sections'] ) && is_array( $config['sections'] ) ) ? $config['sections'] : array();
+		if ( ! in_array( $type, $order, true ) && ! isset( $config[ $type ] ) ) {
+			return $type;
+		}
+		$n = 2;
+		while ( in_array( $type . '#' . $n, $order, true ) || isset( $config[ $type . '#' . $n ] ) ) {
+			$n++;
+		}
+		return $type . '#' . $n;
+	}
+
+	/**
+	 * Apply a mutated config through the FULL pipeline (normalize > validate >
+	 * snapshot > render dispatch > cache purge). Returns the apply result array
+	 * on success, WP_Error on failure.
+	 */
+	private static function apply_config( $post_id, $config ) {
+		if ( ! class_exists( 'PressGo_AI_Builder' ) ) {
+			return new WP_Error( 'mcp_apply_failed', 'AI Builder is not loaded on this install.' );
+		}
+		$res = ( new PressGo_AI_Builder() )->apply_config_to_post( $post_id, $config );
+		if ( empty( $res['ok'] ) ) {
+			$why = isset( $res['error'] ) ? $res['error'] : 'unknown error';
+			return new WP_Error( 'mcp_apply_failed', "Config apply failed: {$why}" );
+		}
+		return $res;
+	}
+
+	/**
+	 * Non-Elementor add_section / add_sections: append section entries to the
+	 * stored config and re-apply through the full pipeline. $sections is a list
+	 * of already-sanitized { type, variant, data } triples.
+	 *
+	 * Returns array( summary, failed[] ) shaped like the Elementor batch path,
+	 * or WP_Error when nothing could be added / the apply failed.
+	 */
+	private static function config_add_sections( $post_id, $sections, $target ) {
+		$config = self::read_ai_config( $post_id );
+		if ( null === $config ) {
+			return self::no_config_error( $post_id, $target );
+		}
+		if ( ! isset( $config['sections'] ) || ! is_array( $config['sections'] ) ) {
+			$config['sections'] = array();
+		}
+
+		$built  = array();
+		$failed = array();
+		foreach ( $sections as $i => $sec ) {
+			$type    = isset( $sec['type'] ) ? sanitize_key( $sec['type'] ) : '';
+			$variant = isset( $sec['variant'] ) ? sanitize_key( $sec['variant'] ) : '';
+			$data    = ( isset( $sec['data'] ) && is_array( $sec['data'] ) ) ? $sec['data'] : null;
+			if ( ! in_array( $type, self::VALID_SECTION_TYPES, true ) ) {
+				$failed[] = array( 'index' => $i, 'reason' => "Unknown section type: {$type}" );
+				continue;
+			}
+			if ( ! $data ) {
+				$failed[] = array( 'index' => $i, 'reason' => 'Missing or invalid data' );
+				continue;
+			}
+			$entry = $data;
+			if ( $variant ) {
+				$entry['variant'] = $variant;
+			}
+			// Repeat types get suffixed instance keys ("gallery#2") — the same
+			// numbering canonicalize_section_order produces, so the suffixed key
+			// goes straight into sections[] and binds to its data key.
+			$key                  = self::config_instance_key( $config, $type );
+			$config[ $key ]       = $entry;
+			$config['sections'][] = $key;
+			$built[]              = $key . ( $variant ? "/{$variant}" : '' );
+		}
+
+		if ( ! $built ) {
+			$reasons = implode( '; ', array_map( function ( $f ) { return "[{$f['index']}] {$f['reason']}"; }, $failed ) );
+			return new WP_Error( 'mcp_bad_args', 'No valid sections to add. ' . $reasons );
+		}
+
+		// Snapshot prior state, then run the full apply pipeline. If the apply
+		// fails the page was not modified — discard the snapshot we just pushed.
+		self::push_undo( $post_id, 'add_sections (' . count( $built ) . ') [' . $target . ']' );
+		$apply = self::apply_config( $post_id, $config );
+		if ( is_wp_error( $apply ) ) {
+			self::discard_last_undo( $post_id );
+			return $apply;
+		}
+
+		$note = 'Built ' . count( $built ) . ' section(s) via the ' . $target . ' renderer: ' . implode( ', ', $built );
+		if ( $failed ) {
+			$note .= ' — ' . count( $failed ) . ' failed: ' . implode( '; ', array_map(
+				function ( $f ) { return "[{$f['index']}] {$f['reason']}"; }, $failed
+			) );
+		}
+		$summary = self::page_summary( $post_id, $note );
+		if ( $failed ) {
+			$summary['structuredContent']['failed'] = $failed;
+		}
+		return $summary;
+	}
+
+	/**
+	 * Non-Elementor update_section: section_index maps to the config's
+	 * sections[] order. Provided data keys merge over the existing entry
+	 * (keep the rest); a passed variant replaces the stored one; a different
+	 * type replaces the instance wholesale. Re-applies the full pipeline.
+	 */
+	private static function config_update_section( $post_id, $index, $type, $variant_arg, $variant_passed, $data, $target ) {
+		$config = self::read_ai_config( $post_id );
+		if ( null === $config ) {
+			return self::no_config_error( $post_id, $target );
+		}
+		$order = ( isset( $config['sections'] ) && is_array( $config['sections'] ) ) ? array_values( $config['sections'] ) : array();
+		if ( $index < 0 || $index >= count( $order ) ) {
+			return new WP_Error( 'mcp_bad_args', "section_index {$index} is out of range (page has " . count( $order ) . ' sections).' );
+		}
+
+		$key      = $order[ $index ];
+		$cur_base = self::base_section_type( $key );
+		$entry    = ( isset( $config[ $key ] ) && is_array( $config[ $key ] ) ) ? $config[ $key ] : array();
+
+		if ( $type === $cur_base ) {
+			// Same type: merge provided keys over the stored entry.
+			$entry = array_merge( $entry, $data );
+		} else {
+			// Type change: replace the instance at this position wholesale.
+			unset( $config[ $key ] );
+			$new_key = self::config_instance_key( $config, $type );
+			$order[ $index ] = $new_key;
+			$key   = $new_key;
+			$entry = $data;
+		}
+		if ( $variant_passed && $variant_arg ) {
+			$entry['variant'] = $variant_arg;
+		}
+		$config[ $key ]     = $entry;
+		$config['sections'] = $order;
+
+		self::push_undo( $post_id, "update_section {$index} → {$type}" . ( $variant_passed && $variant_arg ? "/{$variant_arg}" : '' ) . " [{$target}]" );
+		$apply = self::apply_config( $post_id, $config );
+		if ( is_wp_error( $apply ) ) {
+			self::discard_last_undo( $post_id );
+			return $apply;
+		}
+
+		$vlabel = '';
+		if ( $variant_passed && $variant_arg ) {
+			$vlabel = "/{$variant_arg}";
+		} elseif ( ! empty( $entry['variant'] ) ) {
+			$vlabel = '/' . $entry['variant'];
+		}
+		return self::page_summary( $post_id, "Updated section {$index} ({$key}{$vlabel}) via the {$target} renderer." );
 	}
 
 	/**
@@ -2199,10 +2544,42 @@ class PressGo_MCP_Tools {
 	const UNDO_STACK_MAX = 20;
 
 	/**
+	 * Every builder-claim meta a render-target apply may touch. The first
+	 * three groups mirror the claims arrays in
+	 * PressGo_Render_Targets::neutralize_other_targets (which deletes the
+	 * OTHER builders' metas on every apply); the last two are the dispatch
+	 * stamps the apply rewrites. Undo snapshots capture the ones that exist
+	 * and restore exactly that set — deleting any that didn't exist.
+	 */
+	private static function undo_target_meta_keys() {
+		return array(
+			// elementor claims
+			'_elementor_edit_mode', '_elementor_data', '_elementor_element_cache', '_elementor_template_type',
+			// divi claims
+			'_et_pb_use_builder', '_et_pb_page_layout', '_et_pb_post_hide_nav', '_et_pb_built_for_post_type',
+			// bricks claims
+			'_bricks_editor_mode', '_bricks_page_content_2',
+			// dispatch stamps
+			'_pressgo_target_builder', '_wp_page_template',
+		);
+	}
+
+	/**
 	 * Snapshot the page's current state into an undo stack entry. Called by
 	 * every mutating tool BEFORE it writes. Cap'd at 20 entries.
+	 *
+	 * Captures per-target state: the raw AI config + post_content (source of
+	 * truth on non-Elementor targets) and every builder claim-meta that
+	 * exists, alongside the legacy elementor_data/sections/globals fields.
 	 */
 	public static function push_undo( $post_id, $reason ) {
+		$post         = get_post( $post_id );
+		$target_metas = array();
+		foreach ( self::undo_target_meta_keys() as $mk ) {
+			if ( metadata_exists( 'post', $post_id, $mk ) ) {
+				$target_metas[ $mk ] = get_post_meta( $post_id, $mk, true );
+			}
+		}
 		$snapshot = array(
 			'ts'             => time(),
 			'reason'         => substr( (string) $reason, 0, 200 ),
@@ -2210,6 +2587,9 @@ class PressGo_MCP_Tools {
 			'sections'       => get_post_meta( $post_id, '_pressgo_sections', true ),
 			'globals'        => get_post_meta( $post_id, '_pressgo_globals', true ),
 			'page_settings'  => get_post_meta( $post_id, '_elementor_page_settings', true ),
+			'config'         => get_post_meta( $post_id, '_pressgo_ai_config', true ),
+			'post_content'   => $post ? (string) $post->post_content : '',
+			'target_metas'   => $target_metas,
 		);
 		$stack = get_post_meta( $post_id, self::UNDO_STACK_KEY, true );
 		if ( ! is_array( $stack ) ) { $stack = array(); }
@@ -2217,7 +2597,22 @@ class PressGo_MCP_Tools {
 		if ( count( $stack ) > self::UNDO_STACK_MAX ) {
 			$stack = array_slice( $stack, -self::UNDO_STACK_MAX );
 		}
-		update_post_meta( $post_id, self::UNDO_STACK_KEY, $stack );
+		// wp_slash: update_post_meta unslashes its value, which would eat the
+		// backslashes inside captured JSON strings (\/ and \uXXXX escapes in
+		// _elementor_data / _pressgo_ai_config) and make restores non-identical.
+		update_post_meta( $post_id, self::UNDO_STACK_KEY, wp_slash( $stack ) );
+	}
+
+	/**
+	 * Drop the most recent undo entry. Used when a tool pushed a snapshot but
+	 * its apply then failed without modifying the page — keeping the entry
+	 * would make the next undo a silent no-op that burns a level.
+	 */
+	private static function discard_last_undo( $post_id ) {
+		$stack = get_post_meta( $post_id, self::UNDO_STACK_KEY, true );
+		if ( ! is_array( $stack ) || empty( $stack ) ) { return; }
+		array_pop( $stack );
+		update_post_meta( $post_id, self::UNDO_STACK_KEY, wp_slash( $stack ) );
 	}
 
 	private static function undo_last_change( $args, $user ) {
@@ -2232,23 +2627,55 @@ class PressGo_MCP_Tools {
 			return new WP_Error( 'mcp_no_undo', 'Nothing to undo on this page yet.' );
 		}
 		$snap = array_pop( $stack );
-		update_post_meta( $post_id, self::UNDO_STACK_KEY, $stack );
+		update_post_meta( $post_id, self::UNDO_STACK_KEY, wp_slash( $stack ) );
 
-		// Restore each meta key from the snapshot.
-		if ( isset( $snap['elementor_data'] ) ) {
-			update_post_meta( $post_id, '_elementor_data', $snap['elementor_data'] );
+		// Restore each meta key from the snapshot. Values were captured
+		// unslashed (get_post_meta), so writes must wp_slash — update_post_meta
+		// unslashes internally and would otherwise corrupt JSON escapes.
+		if ( isset( $snap['target_metas'] ) && is_array( $snap['target_metas'] ) ) {
+			// Per-target snapshot (multi-builder): restore every builder
+			// claim-meta exactly — write what existed, delete what didn't.
+			// This includes _elementor_data, so the legacy field below is
+			// skipped to avoid resurrecting an empty '' meta on non-Elementor
+			// pages.
+			foreach ( self::undo_target_meta_keys() as $mk ) {
+				if ( array_key_exists( $mk, $snap['target_metas'] ) ) {
+					$v = $snap['target_metas'][ $mk ];
+					update_post_meta( $post_id, $mk, ( is_string( $v ) || is_array( $v ) ) ? wp_slash( $v ) : $v );
+				} else {
+					delete_post_meta( $post_id, $mk );
+				}
+			}
+		} elseif ( isset( $snap['elementor_data'] ) ) {
+			update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
+		}
+		if ( array_key_exists( 'config', $snap ) ) {
+			if ( '' === $snap['config'] || null === $snap['config'] ) {
+				delete_post_meta( $post_id, '_pressgo_ai_config' );
+			} else {
+				update_post_meta( $post_id, '_pressgo_ai_config', wp_slash( $snap['config'] ) );
+			}
+		}
+		if ( array_key_exists( 'post_content', $snap ) ) {
+			wp_update_post( wp_slash( array(
+				'ID'           => $post_id,
+				'post_content' => (string) $snap['post_content'],
+			) ) );
 		}
 		if ( isset( $snap['sections'] ) ) {
-			update_post_meta( $post_id, '_pressgo_sections', $snap['sections'] ?: array() );
+			update_post_meta( $post_id, '_pressgo_sections', wp_slash( $snap['sections'] ?: array() ) );
 		}
 		if ( isset( $snap['globals'] ) ) {
-			update_post_meta( $post_id, '_pressgo_globals', $snap['globals'] ?: array() );
+			update_post_meta( $post_id, '_pressgo_globals', wp_slash( $snap['globals'] ?: array() ) );
 		}
 		if ( isset( $snap['page_settings'] ) ) {
-			update_post_meta( $post_id, '_elementor_page_settings', $snap['page_settings'] ?: array() );
+			update_post_meta( $post_id, '_elementor_page_settings', wp_slash( $snap['page_settings'] ?: array() ) );
 		}
 		// Bust caches so the next read/render is fresh.
 		clean_post_cache( $post_id );
+		if ( function_exists( 'rocket_clean_post' ) ) {
+			rocket_clean_post( $post_id );
+		}
 		if ( class_exists( '\Elementor\Plugin' ) ) {
 			try { $css = \Elementor\Core\Files\CSS\Post::create( $post_id ); if ( $css ) { $css->delete(); } } catch ( \Throwable $e ) {}
 		}
@@ -2496,14 +2923,26 @@ class PressGo_MCP_Tools {
 	}
 
 	private static function page_summary( $post_id, $note = '' ) {
+		$target = self::page_target( $post_id );
+		if ( 'elementor' === $target ) {
+			$edit_url      = admin_url( "post.php?post={$post_id}&action=elementor" );
+			$section_count = count( self::read_elementor_data( $post_id ) );
+		} else {
+			$edit_url = admin_url( "post.php?post={$post_id}&action=edit" );
+			$cfg      = self::read_ai_config( $post_id );
+			$section_count = ( is_array( $cfg ) && isset( $cfg['sections'] ) && is_array( $cfg['sections'] ) )
+				? count( $cfg['sections'] )
+				: 0;
+		}
 		$summary = array(
 			'post_id'         => (int) $post_id,
 			'title'           => get_the_title( $post_id ),
 			'status'          => get_post_status( $post_id ),
-			'edit_url'        => admin_url( "post.php?post={$post_id}&action=elementor" ),
+			'target'          => $target,
+			'edit_url'        => $edit_url,
 			'preview_url'     => add_query_arg( 'preview', 'true', get_permalink( $post_id ) ),
 			'watch_url'       => class_exists( 'PressGo_MCP_Admin' ) ? PressGo_MCP_Admin::watch_url( $post_id ) : '',
-			'section_count'   => count( self::read_elementor_data( $post_id ) ),
+			'section_count'   => $section_count,
 		);
 		$text = ( $note ? $note . "\n\n" : '' ) . wp_json_encode( $summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 		return array(
