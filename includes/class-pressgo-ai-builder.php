@@ -49,6 +49,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_versions',     array( $this, 'ajax_versions' ) );
 		add_action( 'wp_ajax_pressgo_ai_restore',      array( $this, 'ajax_restore' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_toggle', array( $this, 'ajax_brand_toggle' ) );
+		add_action( 'wp_ajax_pressgo_ai_review_done',  array( $this, 'ajax_review_done' ) );
 	}
 
 	/**
@@ -62,6 +63,16 @@ class PressGo_AI_Builder {
 			'brand'   => ! empty( $brand ) ? $brand : null,
 			'enabled' => '1' === get_option( 'pressgo_use_site_brand', '1' ),
 		);
+	}
+
+	/**
+	 * Review ask resolution: 'reviewed' or 'dismissed' both stop the ask
+	 * forever. We only ever ask happy users (5+ successful builds).
+	 */
+	public function ajax_review_done() {
+		$this->check_auth();
+		update_option( 'pressgo_review_ask_done', sanitize_key( $_POST['choice'] ?? 'dismissed' ), false );
+		wp_send_json_success();
 	}
 
 	/** Persist the Site Brand toggle (site-wide, not per page). */
@@ -764,7 +775,24 @@ class PressGo_AI_Builder {
 				nonce:   <?php echo wp_json_encode( $nonce ); ?>,
 				ajaxUrl: <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
 				previewBase: <?php echo wp_json_encode( $preview_url ); ?>,
-				firstRun: <?php echo ! empty( $_GET['firstrun'] ) ? 'true' : 'false'; ?>,
+				firstRun: <?php
+					// Starter prompts for the post-key-save flow AND any site
+					// that has never completed a build — the blank-prompt stall
+					// is the single biggest funnel leak.
+					echo ( ! empty( $_GET['firstrun'] ) || 0 === (int) get_option( 'pressgo_build_count', 0 ) ) ? 'true' : 'false';
+				?>,
+				review: <?php
+					$builds = (int) get_option( 'pressgo_build_count', 0 );
+					$shown  = (int) get_option( 'pressgo_review_ask_shown', 0 );
+					echo wp_json_encode( array(
+						'ask' => ( $builds >= 5 && ! get_option( 'pressgo_review_ask_done' ) && $shown < 3 ),
+						'url' => 'https://wordpress.org/support/plugin/pressgo-builder/reviews/#new-post',
+						'builds' => $builds,
+					) );
+					if ( $builds >= 5 && ! get_option( 'pressgo_review_ask_done' ) && $shown < 3 ) {
+						update_option( 'pressgo_review_ask_shown', $shown + 1, false );
+					}
+				?>,
 				brand: <?php echo wp_json_encode( array(
 					'exists'  => (bool) $brand_state['brand'],
 					'enabled' => $brand_state['enabled'],
@@ -1171,6 +1199,12 @@ class PressGo_AI_Builder {
 					$this->request_refund( $api_key, $tool_use['generationId'] );
 				}
 			}
+		}
+
+		if ( $applied ) {
+			// Site-wide successful-build counter: drives the first-run starter
+			// prompts (0 builds yet) and the 5-build review ask.
+			update_option( 'pressgo_build_count', (int) get_option( 'pressgo_build_count', 0 ) + 1, false );
 		}
 
 		// Continuous branding bookkeeping after a successful apply:

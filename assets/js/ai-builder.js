@@ -657,6 +657,7 @@
 					append(built);
 					reloadPreview(evt.preview_bust);
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
+					maybeAskReview();
 					break;
 				case 'apply_error':
 					dismissTypingOnce();
@@ -890,6 +891,47 @@
 		}
 		confirmBtn.addEventListener('click', doClear);
 		setTimeout(function () { confirmBtn.focus(); }, 10);
+	}
+
+	// ===== Review ask (after 5 successful builds, once, dismissible) =====
+	// Only happy users ever see this: 5+ builds, shown right after a SUCCESSFUL
+	// build (peak satisfaction), max 3 appearances ever, any click ends it.
+	var reviewAskRendered = false;
+	function maybeAskReview() {
+		var r = cfg.review;
+		if (!r || !r.ask || reviewAskRendered) return;
+		reviewAskRendered = true;
+		var card = el('pg-msg pg-msg-built');
+		card.style.borderColor = '#F59E0B';
+		var txt = document.createElement('div');
+		txt.innerHTML = '<strong>That’s ' + (r.builds || 5) + ' pages built with PressGo.</strong> If it’s been useful, a quick review genuinely keeps this thing going.';
+		card.appendChild(txt);
+		var rowEl = document.createElement('div');
+		rowEl.style.cssText = 'margin-top:10px;display:flex;gap:8px;';
+		function done(choice) {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_review_done');
+			fd.append('nonce', cfg.nonce);
+			fd.append('choice', choice);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+			card.remove();
+		}
+		var yes = document.createElement('a');
+		yes.href = r.url;
+		yes.target = '_blank';
+		yes.rel = 'noopener';
+		yes.textContent = '⭐ Leave a review';
+		yes.style.cssText = 'background:#F59E0B;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none;';
+		yes.addEventListener('click', function () { done('reviewed'); });
+		var no = document.createElement('button');
+		no.type = 'button';
+		no.textContent = 'No thanks';
+		no.style.cssText = 'background:transparent;border:1px solid #e2e0f4;color:#6b7280;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;';
+		no.addEventListener('click', function () { done('dismissed'); });
+		rowEl.appendChild(yes);
+		rowEl.appendChild(no);
+		card.appendChild(rowEl);
+		append(card);
 	}
 
 	// ===== Continuous branding toggle =====
