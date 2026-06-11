@@ -2484,7 +2484,13 @@ class PressGo_AI_Builder {
 		return true;
 	}
 
-	private function apply_config_to_post( $post_id, $config, $skip_snapshot = false ) {
+	/**
+	 * PUBLIC since multi-builder MCP: the full apply pipeline (normalize >
+	 * validate > snapshot > store config > dispatch to the page's render
+	 * target > purge). MCP's config-path tools reuse it so every surface
+	 * applies a config identically.
+	 */
+	public function apply_config_to_post( $post_id, $config, $skip_snapshot = false ) {
 		if ( empty( $config ) || ! is_array( $config ) ) {
 			return array( 'ok' => false, 'error' => 'empty config' );
 		}
