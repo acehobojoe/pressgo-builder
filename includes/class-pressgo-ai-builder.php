@@ -1022,11 +1022,16 @@ class PressGo_AI_Builder {
 		$image_note = '';
 		$avail = $this->page_image_urls( $post_id );
 		if ( ! empty( $avail ) ) {
-			$image_note .= "\n\nImages available in the user's WordPress media library — use these EXACT URLs for image fields (hero.image, feature item images, gallery images). Do NOT invent image URLs. Use ONLY the ones that clearly fit this page; ignore any that look unrelated:\n";
+			// EDIT turns get an "available, don't reshuffle" framing — the old
+			// "place them prominently" pressure made bare continuations swap a
+			// page's stock photos for unrelated library images.
+			$image_note .= ( 'edit' === $mode )
+				? "\n\nImages available in the user's WordPress media library (EXACT URLs, never invent others). Only place or swap images when the user's CURRENT request is about images — otherwise leave the page's existing images exactly as they are:\n"
+				: "\n\nImages available in the user's WordPress media library — use these EXACT URLs for image fields (hero.image, feature item images, gallery images). Do NOT invent image URLs. Use ONLY the ones that clearly fit this page; ignore any that look unrelated:\n";
 			foreach ( $avail as $a ) {
 				$image_note .= '- ' . $a['url'] . ( $a['alt'] ? ' (' . $a['alt'] . ')' : '' ) . "\n";
 			}
-			if ( count( $avail ) > 1 ) {
+			if ( count( $avail ) > 1 && 'edit' !== $mode ) {
 				$image_note .= "When several fit, spread them across the page (a gallery is great for multiple photos; use the strongest for the hero).\n";
 			}
 			$image_note .= "HONESTY: you cannot see what an unlabeled URL contains — never claim an unlabeled image shows something specific (dogs, food, your team). If you place unlabeled library images, say you used their library photos and that they can ask to swap any that look wrong.\n";

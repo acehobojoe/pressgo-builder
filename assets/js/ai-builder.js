@@ -941,31 +941,28 @@
 	(function () {
 		var b = cfg.brand;
 		if (!b || !b.exists) return;
-		var footer = document.querySelector('.pg-chat-footer');
-		if (!footer) return;
-		var label = document.createElement('label');
-		label.className = 'pg-vision-toggle';
-		label.setAttribute('data-tooltip', 'Site brand: new pages reuse this site\'s saved colors, fonts, and business identity' + (b.name ? ' (' + b.name + ')' : '') + '. Turn off to give a page its own fresh look.');
-		label.style.marginTop = '6px';
-		var input = document.createElement('input');
-		input.type = 'checkbox';
-		input.className = 'pg-vision-input';
-		input.checked = !!b.enabled;
-		var track = document.createElement('span');
-		track.className = 'pg-vision-track';
-		track.innerHTML = '<span class="pg-vision-thumb"></span>';
-		var name = document.createElement('span');
-		name.className = 'pg-vision-label';
-		name.innerHTML = '<span class="pg-vision-name">Site brand</span><span class="pg-vision-hint">' + (b.name ? escapeHtml(b.name) : 'consistent pages') + '</span>';
-		label.appendChild(input);
-		label.appendChild(track);
-		label.appendChild(name);
-		footer.appendChild(label);
-		input.addEventListener('change', function () {
+		// Compact topbar chip (next to History/Clear chat) instead of a second
+		// footer toggle — the footer stays A(eyes)-only and uncluttered.
+		var actions = document.querySelector('.pg-builder-actions');
+		if (!actions) return;
+		var chip = document.createElement('button');
+		chip.type = 'button';
+		chip.className = 'pg-builder-ghost';
+		chip.title = 'Site brand: new pages reuse this site\'s saved colors, fonts, and identity' + (b.name ? ' (' + b.name + ')' : '') + '. Click to toggle; off gives a page its own fresh look.';
+		var on = !!b.enabled;
+		function paint() {
+			chip.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:' + (on ? '#22C55E' : '#9CA3AF') + ';"></span>Brand';
+			chip.style.opacity = on ? '1' : '0.65';
+		}
+		paint();
+		actions.insertBefore(chip, actions.firstChild);
+		chip.addEventListener('click', function () {
+			on = !on;
+			paint();
 			var fd = new FormData();
 			fd.append('action', 'pressgo_ai_brand_toggle');
 			fd.append('nonce', cfg.nonce);
-			fd.append('enabled', input.checked ? '1' : '');
+			fd.append('enabled', on ? '1' : '');
 			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
 		});
 	})();
