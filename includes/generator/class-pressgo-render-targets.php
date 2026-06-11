@@ -82,7 +82,11 @@ class PressGo_Render_Targets {
 
 		if ( ! empty( $out['meta'] ) && is_array( $out['meta'] ) ) {
 			foreach ( $out['meta'] as $k => $v ) {
-				update_post_meta( $post_id, $k, is_string( $v ) ? wp_slash( $v ) : $v );
+				// update_post_meta expects SLASHED data for strings AND arrays
+				// (wp_slash recurses, slashing only the strings inside). Passing
+				// raw would strip literal backslashes — same bug class as the
+				// · corruption fixed in 2.3.4.
+				update_post_meta( $post_id, $k, ( is_string( $v ) || is_array( $v ) ) ? wp_slash( $v ) : $v );
 			}
 		}
 		if ( ! empty( $out['page_template'] ) ) {
