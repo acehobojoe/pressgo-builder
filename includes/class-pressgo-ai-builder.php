@@ -800,6 +800,11 @@ class PressGo_AI_Builder {
 					// is the single biggest funnel leak.
 					echo ( ! empty( $_GET['firstrun'] ) || 0 === (int) get_option( 'pressgo_build_count', 0 ) ) ? 'true' : 'false';
 				?>,
+				prefill: <?php
+					// Next-page chips land here with a ready prompt for the new
+					// page ("An About page for the same business…").
+					echo wp_json_encode( isset( $_GET['prefill'] ) ? mb_substr( sanitize_textarea_field( wp_unslash( $_GET['prefill'] ) ), 0, 500 ) : '' );
+				?>,
 				review: <?php
 					$builds = (int) get_option( 'pressgo_build_count', 0 );
 					$shown  = (int) get_option( 'pressgo_review_ask_shown', 0 );
@@ -851,10 +856,13 @@ class PressGo_AI_Builder {
 
 	public function ajax_create_page() {
 		$this->check_auth();
+		// Optional title — the next-page chips ("About", "Contact") name the
+		// page they're about to build instead of the timestamp default.
+		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
 		$post_id = wp_insert_post( array(
 			'post_type'    => 'page',
 			'post_status'  => 'draft',
-			'post_title'   => 'AI page — ' . gmdate( 'M j H:i' ),
+			'post_title'   => '' !== $title ? $title : 'AI page — ' . gmdate( 'M j H:i' ),
 			'post_content' => '',
 		) );
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
@@ -941,6 +949,11 @@ class PressGo_AI_Builder {
 
 		$api_key = PressGo_Admin::has_api_configured() ? get_option( 'pressgo_account_key', '' ) : '';
 		if ( ! $api_key || strpos( $api_key, 'pg_' ) !== 0 ) {
+			// Direct-mode users hit this with a "configured" plugin — name the
+			// actual situation and the way out instead of a generic dead end.
+			if ( 'direct' === PressGo_Admin::get_api_mode() ) {
+				wp_send_json_error( 'The AI Builder chat runs on a PressGo account key. Your site is in "Own API Key" mode, which the chat doesn\'t use. Create a free account at pressgo.app (10 free credits/month), then paste your pg_ key under PressGo → Settings.', 400 );
+			}
 			wp_send_json_error( 'Plugin is not connected to a PressGo account. Add a pg_ key under PressGo → Settings.', 400 );
 		}
 

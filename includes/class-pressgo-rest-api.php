@@ -168,7 +168,19 @@ class PressGo_Rest_API {
 
 			$data    = json_decode( wp_remote_retrieve_body( $response ), true );
 			$credits = isset( $data['total'] ) ? $data['total'] : 0;
-			wp_send_json_success( array( 'message' => "PressGo API connected! {$credits} credits available." ) );
+			// A key that just validated must be PERSISTED, not discarded — users
+			// click Test, see green, and walk straight into the builder without
+			// ever clicking Save, then the builder 400s on the old/empty key.
+			$saved_now = false;
+			if ( $override !== '' && $override !== PressGo_Admin::get_account_key() ) {
+				update_option( 'pressgo_account_key', $override );
+				$saved_now = true;
+			}
+			wp_send_json_success( array(
+				'message' => "PressGo API connected! {$credits} credits available." . ( $saved_now ? ' Key saved ✓' : '' ),
+				'credits' => $credits,
+				'saved'   => $saved_now,
+			) );
 		}
 
 		// Direct mode — test prompt server + Claude API.

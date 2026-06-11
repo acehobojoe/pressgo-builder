@@ -136,7 +136,7 @@ class PressGo_Admin {
 	public function render_api_mode_field() {
 		$value = get_option( 'pressgo_api_mode', 'pressgo' );
 		echo '<fieldset>';
-		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 3 free credits/month, buy more as needed</label><br/>';
+		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 10 free credits/month (a page costs 1&ndash;2), buy more as needed</label><br/>';
 		echo '<label><input type="radio" name="pressgo_api_mode" value="direct"' . checked( $value, 'direct', false ) . ' /> <strong>Own API Key</strong> &mdash; use your Anthropic key directly</label>';
 		echo '</fieldset>';
 	}

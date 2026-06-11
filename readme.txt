@@ -133,6 +133,10 @@ Start free — no credit card. Create a free PressGo account at [pressgo.app/reg
 
 With a **PressGo API key**: 10 free credits/month included. Beyond that, $15 one-time pack = 75 credits, or PressGo Plus = $12/mo for 100 credits + MCP unlimited + Pro features. Each build (or significant chat-driven edit) costs 1 credit; just chatting with the AI is free until it actually changes the page. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
 
+= Does the AI Builder chat work with my own Anthropic key? =
+
+The chat-driven AI Builder runs on a PressGo account key (`pg_...`) — it's how pages stream, get reviewed, and stay in sync. "Own API Key" mode powers the legacy one-shot generator only. A free PressGo account (10 credits/month, no card) unlocks the full chat builder.
+
 = What data is sent to external servers? =
 
 When you click Generate, your text prompt and optional image are sent to Anthropic's API (`api.anthropic.com`) over HTTPS using your API key. The response is a JSON configuration that the plugin converts to Elementor elements locally. No data is collected by PressGo.

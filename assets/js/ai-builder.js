@@ -242,6 +242,7 @@
 		return d;
 	}
 
+	var lowCreditNudged = false;
 	function flashCredits(newTotal) {
 		if (typeof newTotal !== 'number') return;
 		credPill.textContent = newTotal + ' credits';
@@ -253,6 +254,35 @@
 			setTimeout(function () { credPill.classList.remove('is-flash'); }, 700);
 		}
 		lastCreditValue = newTotal;
+		// Credit pressure: at <=3 the pill goes amber and clickable, and the
+		// chat gets ONE quiet nudge per session. Every purchase ever made
+		// happened around credit pressure — this recreates that moment before
+		// the hard zero instead of after it.
+		if (newTotal <= 3) {
+			credPill.classList.add('is-low');
+			credPill.title = 'Running low — click to top up';
+			credPill.style.cursor = 'pointer';
+			credPill.onclick = function () {
+				window.open('https://pressgo.app/dashboard?buy=credits', '_blank');
+			};
+			if (!lowCreditNudged && newTotal > 0) {
+				lowCreditNudged = true;
+				var nudge = el('pg-msg pg-msg-note');
+				nudge.appendChild(document.createTextNode(
+					newTotal + (newTotal === 1 ? ' credit' : ' credits') + ' left this month. A $15 pack adds 75 so you can keep building — '));
+				var a = document.createElement('a');
+				a.href = 'https://pressgo.app/dashboard?buy=credits';
+				a.target = '_blank';
+				a.textContent = 'top up here';
+				nudge.appendChild(a);
+				nudge.appendChild(document.createTextNode('.'));
+				append(nudge);
+			}
+		} else {
+			credPill.classList.remove('is-low');
+			credPill.onclick = null;
+			credPill.style.cursor = '';
+		}
 	}
 
 	function el(cls, text) {
@@ -319,12 +349,69 @@
 		setTimeout(function () { input.focus(); }, 50);
 	}
 
+	// The next-page loop: retained users all follow the same arc unprompted —
+	// homepage, then About/Services/Contact/404. After the first successful
+	// build of the session, offer that arc as one-click chips. Each chip
+	// creates a NEW draft page (building in this chat would overwrite the page
+	// just built) and lands in its builder with the prompt pre-filled.
+	var NEXT_PAGES = [
+		{ chip: 'About',    title: 'About',    text: 'An About page for the same business as my other pages. Our story, what makes us different, and a friendly call to action. Match the site brand.' },
+		{ chip: 'Services', title: 'Services', text: 'A Services page for the same business, one section per main service with short benefit-led descriptions, and a strong call to action. Match the site brand.' },
+		{ chip: 'Contact',  title: 'Contact',  text: 'A Contact page for the same business with a contact form and our real contact details (ask me for anything you don\'t have). Match the site brand.' },
+		{ chip: '404 page', title: '404',      text: 'A friendly 404 page matching the site brand: short apology, one button back to the homepage.' },
+	];
+	var nextPagesOffered = false;
+	function maybeOfferNextPages() {
+		if (nextPagesOffered) return;
+		nextPagesOffered = true;
+		var card = el('pg-msg pg-next-pages');
+		card.appendChild(el('pg-next-pages-head', 'Most sites also need a few more pages. One tap starts the next one (same brand, new page):'));
+		var row = document.createElement('div');
+		row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;';
+		NEXT_PAGES.forEach(function (p) {
+			var b = document.createElement('button');
+			b.type = 'button';
+			b.textContent = p.chip;
+			b.className = 'pg-starter-chip';
+			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
+			b.addEventListener('click', function () {
+				b.disabled = true;
+				b.textContent = 'Creating…';
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_create_page');
+				fd.append('nonce', cfg.nonce);
+				fd.append('title', p.title);
+				fetch(cfg.ajaxUrl, { method: 'POST', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (j && j.success && j.data && j.data.post_id) {
+							window.location = 'admin.php?page=pressgo-ai-builder&action=edit&post_id=' +
+								j.data.post_id + '&prefill=' + encodeURIComponent(p.text);
+						} else {
+							b.disabled = false; b.textContent = p.chip;
+						}
+					})
+					.catch(function () { b.disabled = false; b.textContent = p.chip; });
+			});
+			row.appendChild(b);
+		});
+		card.appendChild(row);
+		append(card);
+	}
+
 	function renderHistory(messages) {
 		// Never clobber a live conversation (belt to chatStarted's suspenders).
 		if (log.querySelector('.pg-msg-user')) return;
 		log.innerHTML = '';
 		if (!messages || !messages.length) {
 			if (cfg.firstRun) { renderFirstRun(); return; }
+			// A next-page chip landed us here with a ready prompt.
+			if (cfg.prefill && !input.value) {
+				append(el('pg-msg-system', 'New page, same brand. Tweak the prompt below if you like, then hit Send.'));
+				input.value = cfg.prefill;
+				setTimeout(function () { input.focus(); }, 50);
+				return;
+			}
 			append(el('pg-msg-system', 'Tell me what kind of page you want — business, vibe, the goal. I\'ll ask 1-2 follow-ups then build a first draft.'));
 			return;
 		}
@@ -659,6 +746,7 @@
 					reloadPreview(evt.preview_bust);
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
 					maybeAskReview();
+					maybeOfferNextPages();
 					break;
 				case 'apply_error':
 					dismissTypingOnce();
@@ -700,6 +788,12 @@
 					streamFailed = true;
 					var errBubble = el('pg-msg-error');
 					var msgText = evt.message || evt.error || 'Chat error';
+					// Project-aware credit wall: "out of credits" lands harder when
+					// it names the work in progress instead of reading like a meter.
+					if (evt.code === 'INSUFFICIENT_CREDITS' && cfg.review && cfg.review.builds > 0) {
+						msgText = 'You’re ' + cfg.review.builds + ' page' + (cfg.review.builds === 1 ? '' : 's') +
+							' into this site and out of credits. A $15 pack (75 credits) finishes it.';
+					}
 					var msgDiv = document.createElement('div');
 					msgDiv.textContent = msgText;
 					errBubble.appendChild(msgDiv);

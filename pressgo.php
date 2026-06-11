@@ -6,6 +6,7 @@
  * Version:           2.3.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
+ * Requires Plugins:  elementor
  * Author:            PressGo
  * Author URI:        https://pressgodigital.com
  * License:           GPL v2 or later

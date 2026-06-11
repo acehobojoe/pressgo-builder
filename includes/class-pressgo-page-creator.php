@@ -86,9 +86,13 @@ class PressGo_Page_Creator {
 				'X-Pressgo-Tier' => $tier,
 			),
 			'body'     => wp_json_encode( array(
-				'creates_today'  => $count,
-				'plugin_version' => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
-				'wp_version'     => isset( $wp_version ) ? $wp_version : '',
+				'creates_today'    => $count,
+				'plugin_version'   => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
+				'wp_version'       => isset( $wp_version ) ? $wp_version : '',
+				// Sizes two previously-speculative segments: own-API-key users
+				// and installs without Elementor (a total dead end when it hits).
+				'api_mode'         => get_option( 'pressgo_api_mode', 'pressgo' ),
+				'elementor_active' => defined( 'ELEMENTOR_VERSION' ),
 			) ),
 		) );
 	}

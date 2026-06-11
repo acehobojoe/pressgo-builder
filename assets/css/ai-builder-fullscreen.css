@@ -52,6 +52,25 @@ html, body {
 	border: 1px solid #dcdcde;
 	transition: background 0.4s ease, color 0.4s ease, transform 0.25s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
+.pg-credits-pill.is-low {
+	background: #fcf3e6; color: #996800;
+	border-color: #f0c33c;
+}
+.pg-credits-pill.is-low:hover { background: #f7e8c9; }
+.pg-msg-note {
+	align-self: center;
+	font-size: 13px; color: #786300;
+	background: #fcf9e8; border: 1px solid #f0e6aa;
+	border-radius: 10px; padding: 8px 14px;
+	max-width: 85%;
+}
+.pg-msg-note a { color: #5b4fff; font-weight: 600; }
+.pg-next-pages {
+	align-self: stretch;
+	background: #fafaff; border: 1px solid #e4e1ff;
+	border-radius: 12px; padding: 12px 16px;
+}
+.pg-next-pages-head { font-size: 13px; color: #50575e; }
 .pg-credits-pill.is-flash {
 	background: linear-gradient(90deg, #5b4fff, #b893ff);
 	color: #fff;
