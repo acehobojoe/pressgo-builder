@@ -95,8 +95,9 @@ class PressGo_Editor_Fields {
 
 		if ( false !== strpos( $type, 'array' ) ) {
 			// Array of objects -> repeater with string sub-fields; array of
-			// strings -> simple list.
-			$items = isset( $fdef['items'] ) && is_array( $fdef['items'] ) ? $fdef['items'] : array();
+			// strings -> simple list. The schema nests sub-field specs under
+			// 'item_schema' (NOT 'items' — that's the field's own name).
+			$items = isset( $fdef['item_schema'] ) && is_array( $fdef['item_schema'] ) ? $fdef['item_schema'] : array();
 			$sub   = array();
 			foreach ( $items as $ik => $idef ) {
 				if ( ! is_array( $idef ) || '_' === $ik[0] ) {
