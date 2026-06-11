@@ -127,6 +127,32 @@ class PressGo_Admin {
 			'pressgo_api_section',
 			array( 'class' => 'pressgo-field-direct' )
 		);
+
+		register_setting( 'pressgo_settings', 'pressgo_target_builder', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_key',
+			'default'           => 'auto',
+		) );
+		add_settings_field(
+			'pressgo_target_builder',
+			'Default Page Builder',
+			array( $this, 'render_target_builder_field' ),
+			'pressgo-settings',
+			'pressgo_api_section'
+		);
+	}
+
+	/** Site-wide default render target; each page can override in the builder. */
+	public function render_target_builder_field() {
+		$value   = get_option( 'pressgo_target_builder', 'auto' );
+		$targets = class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::available() : array( 'elementor' );
+		echo '<select name="pressgo_target_builder">';
+		printf( '<option value="auto"%s>Auto (Elementor if active, else Gutenberg)</option>', selected( $value, 'auto', false ) );
+		foreach ( $targets as $t ) {
+			printf( '<option value="%s"%s>%s</option>', esc_attr( $t ), selected( $value, $t, false ), esc_html( ucfirst( $t ) ) );
+		}
+		echo '</select>';
+		echo '<p class="description">Which page builder new AI pages render into. Each page can override this from the builder topbar.</p>';
 	}
 
 	public function render_api_mode_section() {
@@ -138,6 +164,7 @@ class PressGo_Admin {
 		echo '<fieldset>';
 		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 10 free credits/month (a page costs 1&ndash;2), buy more as needed</label><br/>';
 		echo '<label><input type="radio" name="pressgo_api_mode" value="direct"' . checked( $value, 'direct', false ) . ' /> <strong>Own API Key</strong> &mdash; use your Anthropic key directly</label>';
+		echo '<p class="description" style="margin-top:6px;">Heads up: the chat-based <strong>AI Builder</strong> runs on a PressGo key in either mode. "Own API Key" powers the legacy one-shot generator only.</p>';
 		echo '</fieldset>';
 	}
 

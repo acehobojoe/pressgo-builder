@@ -52,6 +52,13 @@ html, body {
 	border: 1px solid #dcdcde;
 	transition: background 0.4s ease, color 0.4s ease, transform 0.25s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
+.pg-status-pill {
+	font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+	padding: 3px 10px; border-radius: 999px; cursor: pointer; user-select: none;
+	background: #f0f0f1; color: #6b7280; border: 1px solid #dcdcde;
+}
+.pg-status-pill.is-live { background: #e7f7ee; color: #157347; border-color: #abe3c3; }
+#pg-page-title[contenteditable="true"] { outline: 2px solid #5b4fff; border-radius: 4px; padding: 0 6px; }
 .pg-brand-panel {
 	position: absolute; top: 48px; right: 12px; z-index: 60;
 	width: 320px; background: #fff; border: 1px solid #dcdcde;

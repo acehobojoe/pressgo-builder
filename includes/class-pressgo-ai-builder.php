@@ -81,6 +81,12 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_brand_get',    array( $this, 'ajax_brand_get' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_save',   array( $this, 'ajax_brand_save' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_clear',  array( $this, 'ajax_brand_clear' ) );
+		add_action( 'wp_ajax_pressgo_ai_publish',      array( $this, 'ajax_publish' ) );
+		add_action( 'wp_ajax_pressgo_ai_rename',       array( $this, 'ajax_rename' ) );
+		add_action( 'wp_ajax_pressgo_ai_delete_page',  array( $this, 'ajax_delete_page' ) );
+		add_action( 'wp_ajax_pressgo_ai_duplicate',    array( $this, 'ajax_duplicate' ) );
+		add_action( 'wp_ajax_pressgo_ai_review_seen',  array( $this, 'ajax_review_seen' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_optout', array( $this, 'ajax_brand_optout' ) );
 	}
 
 	/**
@@ -140,7 +146,10 @@ class PressGo_AI_Builder {
 	/** Brand panel: read the full foundation for the control menu. */
 	public function ajax_brand_get() {
 		$this->check_auth();
-		wp_send_json_success( $this->site_brand_state() );
+		$state = $this->site_brand_state();
+		$pid   = absint( $_POST['post_id'] ?? 0 );
+		$state['page_optout'] = $pid ? (bool) get_post_meta( $pid, '_pressgo_brand_optout', true ) : false;
+		wp_send_json_success( $state );
 	}
 
 	/**
@@ -168,6 +177,99 @@ class PressGo_AI_Builder {
 		if ( class_exists( 'PressGo_MCP_Tools' ) ) {
 			delete_option( PressGo_MCP_Tools::BRAND_FOUNDATION_OPTION );
 		}
+		wp_send_json_success();
+	}
+
+	/** Publish/unpublish a page from the builder — everything is born a draft. */
+	public function ajax_publish() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$publish = ! empty( $_POST['publish'] );
+		if ( ! $post_id || ! current_user_can( 'publish_pages' ) ) {
+			wp_send_json_error( 'not allowed', 403 );
+		}
+		$res = wp_update_post( array( 'ID' => $post_id, 'post_status' => $publish ? 'publish' : 'draft' ), true );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( $res->get_error_message(), 500 );
+		}
+		$this->purge_post_caches( $post_id );
+		wp_send_json_success( array(
+			'status' => get_post_status( $post_id ),
+			'url'    => get_permalink( $post_id ),
+		) );
+	}
+
+	/** Rename a page from the builder topbar. */
+	public function ajax_rename() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$title   = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
+		if ( ! $post_id || '' === $title ) {
+			wp_send_json_error( 'missing title', 400 );
+		}
+		wp_update_post( array( 'ID' => $post_id, 'post_title' => $title ) );
+		wp_send_json_success( array( 'title' => get_the_title( $post_id ) ) );
+	}
+
+	/** Trash a page from the list. Trash, not delete — recoverable. */
+	public function ajax_delete_page() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id || ! current_user_can( 'delete_post', $post_id ) ) {
+			wp_send_json_error( 'not allowed', 403 );
+		}
+		wp_trash_post( $post_id );
+		wp_send_json_success();
+	}
+
+	/** Duplicate a page: post row + ALL design metas, new draft. */
+	public function ajax_duplicate() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$src     = get_post( $post_id );
+		if ( ! $src ) {
+			wp_send_json_error( 'page not found', 404 );
+		}
+		$new_id = wp_insert_post( array(
+			'post_type'    => $src->post_type,
+			'post_status'  => 'draft',
+			'post_title'   => $src->post_title . ' (copy)',
+			'post_content' => $src->post_content,
+		) );
+		if ( is_wp_error( $new_id ) || ! $new_id ) {
+			wp_send_json_error( 'duplicate failed', 500 );
+		}
+		// Copy every meta except per-post housekeeping. get_post_meta returns
+		// UNSLASHED values; update_post_meta expects slashed — wp_slash both
+		// strings and arrays (same rule as the render dispatcher).
+		$skip = array( '_edit_lock', '_edit_last', '_wp_old_slug' );
+		foreach ( get_post_meta( $post_id ) as $mk => $vals ) {
+			if ( in_array( $mk, $skip, true ) ) { continue; }
+			foreach ( $vals as $raw ) {
+				$val = maybe_unserialize( $raw );
+				update_post_meta( $new_id, $mk, ( is_string( $val ) || is_array( $val ) ) ? wp_slash( $val ) : $val );
+			}
+		}
+		wp_send_json_success( array( 'post_id' => $new_id ) );
+	}
+
+	/** Per-PAGE brand opt-out: one off-brand page without killing site-wide branding. */
+	public function ajax_brand_optout() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
+		if ( ! empty( $_POST['optout'] ) ) {
+			update_post_meta( $post_id, '_pressgo_brand_optout', '1' );
+		} else {
+			delete_post_meta( $post_id, '_pressgo_brand_optout' );
+		}
+		wp_send_json_success();
+	}
+
+	/** Review ask was actually DISPLAYED — only then burn a shown-credit. */
+	public function ajax_review_seen() {
+		$this->check_auth();
+		update_option( 'pressgo_review_ask_shown', (int) get_option( 'pressgo_review_ask_shown', 0 ) + 1, false );
 		wp_send_json_success();
 	}
 
@@ -712,7 +814,11 @@ class PressGo_AI_Builder {
 						</td>
 						<td>
 							<strong><a href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( $p->post_title ?: '(no title)' ); ?></a></strong>
-							<?php if ( $is_elem ) : ?><br><span style="color:#5b4fff;font-size:11px;font-weight:500;">Elementor</span><?php endif; ?>
+							<?php
+							// Badge the page with its ACTUAL builder, not a blanket "Elementor".
+							$row_target = (string) get_post_meta( $p->ID, '_pressgo_target_builder', true );
+							if ( '' === $row_target && $is_elem ) { $row_target = 'elementor'; }
+							if ( $row_target ) : ?><br><span style="color:#5b4fff;font-size:11px;font-weight:500;"><?php echo esc_html( ucfirst( $row_target ) ); ?></span><?php endif; ?>
 						</td>
 						<td><?php echo esc_html( ucfirst( $p->post_status ) ); ?></td>
 						<?php
@@ -729,6 +835,8 @@ class PressGo_AI_Builder {
 						<td>
 							<a href="<?php echo esc_url( $edit_url ); ?>" class="button">Open builder</a>
 							<a href="<?php echo esc_url( $view_url ); ?>" target="_blank" class="button-link">View</a>
+							<button type="button" class="button-link pg-row-duplicate" data-id="<?php echo (int) $p->ID; ?>">Duplicate</button>
+							<button type="button" class="button-link pg-row-trash" data-id="<?php echo (int) $p->ID; ?>" style="color:#b32d2e;">Trash</button>
 						</td>
 					</tr>
 				<?php endforeach; endif; ?>
@@ -745,6 +853,36 @@ class PressGo_AI_Builder {
 			// settings page — auto-create a page and carry the flag through so
 			// the builder opens with a starter prompt + chips.
 			var isFirstRun = /[?&]firstrun=1\b/.test(window.location.search);
+
+			// Row actions: duplicate (full page + design metas) and trash
+			// (recoverable from wp-admin's regular Trash).
+			document.querySelectorAll('.pg-row-duplicate').forEach(function (b) {
+				b.addEventListener('click', function () {
+					b.disabled = true; b.textContent = 'Duplicating…';
+					var fd = new FormData();
+					fd.append('action', 'pressgo_ai_duplicate');
+					fd.append('nonce', nonce);
+					fd.append('post_id', b.getAttribute('data-id'));
+					fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+						.then(function (r) { return r.json(); })
+						.then(function (j) {
+							if (j && j.success) { location.reload(); }
+							else { b.disabled = false; b.textContent = 'Duplicate'; }
+						});
+				});
+			});
+			document.querySelectorAll('.pg-row-trash').forEach(function (b) {
+				b.addEventListener('click', function () {
+					if (!window.confirm('Move this page to the Trash? You can restore it from Pages > Trash.')) return;
+					var fd = new FormData();
+					fd.append('action', 'pressgo_ai_delete_page');
+					fd.append('nonce', nonce);
+					fd.append('post_id', b.getAttribute('data-id'));
+					fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+						.then(function (r) { return r.json(); })
+						.then(function (j) { if (j && j.success) { b.closest('tr').remove(); } });
+				});
+			});
 
 			var newPageBtn = document.getElementById('pressgo-ai-new-page');
 			function createPage(){
@@ -839,7 +977,8 @@ class PressGo_AI_Builder {
 		<body class="pg-builder-body">
 			<header class="pg-builder-topbar">
 				<a href="<?php echo esc_url( $list_url ); ?>" class="pg-builder-back" title="Back to list">&larr;</a>
-				<div class="pg-builder-title"><?php echo esc_html( $post->post_title ?: 'Untitled page' ); ?></div>
+				<div class="pg-builder-title" id="pg-page-title" title="Click to rename" tabindex="0"><?php echo esc_html( $post->post_title ?: 'Untitled page' ); ?></div>
+				<span class="pg-status-pill" id="pg-status-pill"></span>
 				<div class="pg-builder-actions">
 					<?php
 					// Target-builder picker — only when the site can render more
@@ -949,10 +1088,15 @@ class PressGo_AI_Builder {
 						'url' => 'https://wordpress.org/support/plugin/pressgo-builder/reviews/#new-post',
 						'builds' => $builds,
 					) );
-					if ( $builds >= 5 && ! get_option( 'pressgo_review_ask_done' ) && $shown < 3 ) {
-						update_option( 'pressgo_review_ask_shown', $shown + 1, false );
-					}
+					// shown-counter burns when the card actually RENDERS (the JS
+					// pings ajax_review_seen), not on page load — loading the
+					// builder 3 times without a build used to exhaust the ask.
 				?>,
+				page: <?php echo wp_json_encode( array(
+					'status' => get_post_status( $post_id ),
+					'url'    => get_permalink( $post_id ),
+					'title'  => get_the_title( $post_id ),
+				) ); ?>,
 				brand: <?php echo wp_json_encode( array(
 					'exists'  => (bool) $brand_state['brand'],
 					'enabled' => $brand_state['enabled'],
@@ -1319,7 +1463,7 @@ class PressGo_AI_Builder {
 			// Continuous branding: when the Site Brand toggle is on and a
 			// foundation exists, the AI reuses the established palette/fonts/
 			// identity for new pages instead of inventing fresh ones.
-			'siteBrand'                 => ( $brand_state['enabled'] && $brand_state['brand'] ) ? $brand_state['brand'] : null,
+			'siteBrand'                 => ( $brand_state['enabled'] && $brand_state['brand'] && ! get_post_meta( $post_id, '_pressgo_brand_optout', true ) ) ? $brand_state['brand'] : null,
 			// Which builder this page renders into. The backend swaps in a
 			// per-target reality addendum (what degrades, what Pro markers
 			// don't apply) and records it in telemetry.
@@ -1410,15 +1554,20 @@ class PressGo_AI_Builder {
 						PressGo_MCP_Tools::merge_brand_foundation( array(
 							'brand_name' => isset( $stored_now['business_name'] ) && is_scalar( $stored_now['business_name'] ) ? (string) $stored_now['business_name'] : '',
 							'industry'   => isset( $stored_now['industry'] ) && is_scalar( $stored_now['industry'] ) ? (string) $stored_now['industry'] : '',
-							'colors'     => isset( $stored_now['colors'] ) && is_array( $stored_now['colors'] ) ? $stored_now['colors'] : array(),
+							'colors'     => isset( $stored_now['colors'] ) && is_array( $stored_now['colors'] ) ? self::base_brand_colors( $stored_now['colors'] ) : array(),
 							'fonts'      => isset( $stored_now['fonts'] ) && is_array( $stored_now['fonts'] ) ? $stored_now['fonts'] : array(),
 							'layout'     => isset( $stored_now['layout'] ) && is_array( $stored_now['layout'] ) ? $stored_now['layout'] : array(),
 						) );
-					} elseif ( $is_patch && is_array( $tool_use['changes'] ?? null ) ) {
+					} elseif ( is_array( $tool_use['changes'] ?? null ) || ( ! $is_patch && isset( $tool_use['config'] ) ) ) {
+						// Sync color/font changes back to the foundation from BOTH
+						// edit shapes — patches AND full rewrites (a full-config
+						// color change previously never synced, leaving the brand
+						// stale while the page moved on).
+						$src_cfg = $is_patch ? ( $tool_use['changes'] ?? array() ) : ( $tool_use['config'] ?? array() );
 						$sync = array();
 						foreach ( array( 'colors', 'fonts' ) as $bk ) {
-							if ( isset( $tool_use['changes'][ $bk ] ) && is_array( $tool_use['changes'][ $bk ] ) ) {
-								$sync[ $bk ] = $tool_use['changes'][ $bk ];
+							if ( isset( $src_cfg[ $bk ] ) && is_array( $src_cfg[ $bk ] ) ) {
+								$sync[ $bk ] = 'colors' === $bk ? self::base_brand_colors( $src_cfg[ $bk ] ) : $src_cfg[ $bk ];
 							}
 						}
 						if ( ! empty( $sync ) ) {
@@ -1520,6 +1669,17 @@ class PressGo_AI_Builder {
 	 * overwrites it, so the change is reversible from Elementor's History panel.
 	 * Best-effort: never blocks the build.
 	 */
+	/**
+	 * Brand foundation stores only BASE color tokens. Derived shades
+	 * (primary_dark, accent_hover, surface tints…) are recomputed by the
+	 * validator per build — persisting them once meant a later primary change
+	 * shipped with stale mismatched derivatives on every future page.
+	 */
+	private static function base_brand_colors( $colors ) {
+		$base = array( 'primary', 'accent', 'background', 'surface', 'text', 'muted', 'heading' );
+		return array_intersect_key( (array) $colors, array_flip( $base ) );
+	}
+
 	/** Per-target snapshot metas: which postmeta constitutes "the design". */
 	private static function target_state_metas() {
 		return array(

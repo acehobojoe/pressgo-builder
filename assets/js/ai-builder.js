@@ -243,6 +243,7 @@
 	}
 
 	var lowCreditNudged = false;
+	var brandHintShown = false;
 	function flashCredits(newTotal) {
 		if (typeof newTotal !== 'number') return;
 		credPill.textContent = newTotal + ' credits';
@@ -745,8 +746,16 @@
 					append(built);
 					reloadPreview(evt.preview_bust);
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
-					maybeAskReview();
-					maybeOfferNextPages();
+					// Stagger: when the review ask renders this turn, hold the
+					// next-page chips for the following build — two cards
+					// stacking after one event buries both.
+					if (!maybeAskReview()) { maybeOfferNextPages(); }
+					// First build on a brand-less site just LEARNED the brand —
+					// surface it without requiring a reload.
+					if (cfg.brand && !cfg.brand.exists && !brandHintShown) {
+						brandHintShown = true;
+						append(el('pg-msg-system', 'Site brand learned from this build — new pages will match it. Reload the builder to see the Brand control.'));
+					}
 					break;
 				case 'apply_error':
 					dismissTypingOnce();
@@ -933,6 +942,79 @@
 		clearBtn.addEventListener('click', function () { openClearConfirm(); });
 	}
 
+	// ===== Page status pill + publish + rename =====
+	(function () {
+		var pill = document.getElementById('pg-status-pill');
+		var titleEl = document.getElementById('pg-page-title');
+		var page = cfg.page || {};
+		function paintPill() {
+			if (!pill) return;
+			var live = page.status === 'publish';
+			pill.textContent = live ? 'Live' : 'Draft';
+			pill.className = 'pg-status-pill' + (live ? ' is-live' : '');
+			pill.title = live
+				? 'This page is live. Click to view it; shift-click to unpublish.'
+				: 'This page is a draft only you can see. Click to publish it.';
+		}
+		function setStatus(publish) {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_publish');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fd.append('publish', publish ? '1' : '');
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (j && j.success) {
+						page.status = j.data.status;
+						page.url = j.data.url;
+						paintPill();
+						append(el('pg-msg-system', page.status === 'publish'
+							? 'Page is live: ' + page.url
+							: 'Page unpublished — back to draft.'));
+					}
+				});
+		}
+		if (pill) {
+			paintPill();
+			pill.addEventListener('click', function (e) {
+				if (page.status === 'publish') {
+					if (e.shiftKey) { setStatus(false); }
+					else if (page.url) { window.open(page.url, '_blank'); }
+				} else {
+					setStatus(true);
+				}
+			});
+		}
+		if (titleEl) {
+			titleEl.addEventListener('click', function () {
+				if (titleEl.isContentEditable) return;
+				titleEl.contentEditable = 'true';
+				titleEl.focus();
+				document.execCommand && document.execCommand('selectAll', false, null);
+			});
+			function commit() {
+				if (!titleEl.isContentEditable) return;
+				titleEl.contentEditable = 'false';
+				var t = (titleEl.textContent || '').trim();
+				if (!t || t === page.title) { titleEl.textContent = page.title || t; return; }
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_rename');
+				fd.append('nonce', cfg.nonce);
+				fd.append('post_id', cfg.postId);
+				fd.append('title', t);
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (j) { if (j && j.success) { page.title = j.data.title; titleEl.textContent = j.data.title; } });
+			}
+			titleEl.addEventListener('blur', commit);
+			titleEl.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+				if (e.key === 'Escape') { titleEl.textContent = page.title || ''; titleEl.contentEditable = 'false'; }
+			});
+		}
+	})();
+
 	// Target-builder picker: persists per page, applies on the NEXT build.
 	var targetSel = document.getElementById('pg-target-builder');
 	if (targetSel) {
@@ -1016,8 +1098,13 @@
 	var reviewAskRendered = false;
 	function maybeAskReview() {
 		var r = cfg.review;
-		if (!r || !r.ask || reviewAskRendered) return;
+		if (!r || !r.ask || reviewAskRendered) return false;
 		reviewAskRendered = true;
+		// Burn a shown-credit only now that the card actually renders.
+		var seenFd = new FormData();
+		seenFd.append('action', 'pressgo_ai_review_seen');
+		seenFd.append('nonce', cfg.nonce);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: seenFd });
 		var card = el('pg-msg pg-msg-built');
 		card.style.borderColor = '#F59E0B';
 		var txt = document.createElement('div');
@@ -1049,6 +1136,7 @@
 		rowEl.appendChild(no);
 		card.appendChild(rowEl);
 		append(card);
+		return true;
 	}
 
 	// ===== Continuous branding toggle =====
@@ -1171,6 +1259,26 @@
 			brandPanel.appendChild(fieldRow('Headings', headF));
 			brandPanel.appendChild(fieldRow('Body', bodyF));
 
+			// Per-PAGE opt-out: one off-brand page without flipping the
+			// site-wide toggle (and forgetting to flip it back).
+			var optWrap = document.createElement('label');
+			optWrap.className = 'pg-brand-toggle';
+			optWrap.style.marginTop = '2px';
+			var optCb = document.createElement('input');
+			optCb.type = 'checkbox';
+			optCb.checked = !!state.page_optout;
+			optWrap.appendChild(optCb);
+			optWrap.appendChild(document.createTextNode(' skip the brand on THIS page only'));
+			brandPanel.appendChild(optWrap);
+			optCb.addEventListener('change', function () {
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_brand_optout');
+				fd.append('nonce', cfg.nonce);
+				fd.append('post_id', cfg.postId);
+				fd.append('optout', optCb.checked ? '1' : '');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+			});
+
 			var foot = document.createElement('div');
 			foot.className = 'pg-brand-foot';
 			var saveBtn = document.createElement('button');
@@ -1250,6 +1358,7 @@
 			var fd = new FormData();
 			fd.append('action', 'pressgo_ai_brand_get');
 			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
 			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 				.then(function (r) { return r.json(); })
 				.then(function (j) { if (j && j.success) openBrandPanel(j.data); })
