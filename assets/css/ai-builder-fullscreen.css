@@ -281,6 +281,15 @@ html, body {
 	display: flex; gap: 8px;
 	align-items: flex-end;
 }
+/* The send/status button must never eat the textarea's width. */
+.pg-chat-input #pg-chat-send {
+	flex-shrink: 0;
+	min-width: 72px;
+	max-width: 110px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 /* Attach button — paperclip icon by default; morphs into the thumbnail
    when an image is staged. Specificity bump (.pg-chat-input .pg-attach-btn)
    so we beat the .pg-chat-input button rule that styles Send purple. */

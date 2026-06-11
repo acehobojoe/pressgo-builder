@@ -362,8 +362,9 @@
 		var t0 = Date.now();
 		function tick() {
 			var s = Math.round((Date.now() - t0) / 1000);
-			sendBtn.textContent = s < 1 ? 'Thinking…'
-				: 'Thinking… ' + s + 's' + (s < 30 ? '' : ' · almost there');
+			// Compact: the long "Thinking… 37s · almost there" label squeezed
+			// the textarea into a sliver. Status swaps text, never grows.
+			sendBtn.textContent = s < 1 ? 'Thinking…' : ( s < 30 ? s + 's…' : 'Almost…' );
 		}
 		tick();
 		elapsedTimer = setInterval(tick, 1000);
