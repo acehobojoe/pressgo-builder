@@ -69,6 +69,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_restore',      array( $this, 'ajax_restore' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_toggle', array( $this, 'ajax_brand_toggle' ) );
 		add_action( 'wp_ajax_pressgo_ai_review_done',  array( $this, 'ajax_review_done' ) );
+		add_action( 'wp_ajax_pressgo_ai_set_target',   array( $this, 'ajax_set_target' ) );
 	}
 
 	/**
@@ -99,6 +100,21 @@ class PressGo_AI_Builder {
 		$this->check_auth();
 		update_option( 'pressgo_use_site_brand', ! empty( $_POST['enabled'] ) ? '1' : '0', false );
 		wp_send_json_success();
+	}
+
+	/** Per-page render target (multi-builder). Applies on the NEXT build. */
+	public function ajax_set_target() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$target  = sanitize_key( $_POST['target'] ?? '' );
+		if ( ! $post_id || ! class_exists( 'PressGo_Render_Targets' ) ) {
+			wp_send_json_error( 'bad request', 400 );
+		}
+		if ( ! in_array( $target, PressGo_Render_Targets::available(), true ) ) {
+			wp_send_json_error( 'target not available on this site', 400 );
+		}
+		update_post_meta( $post_id, '_pressgo_target_builder', $target );
+		wp_send_json_success( array( 'target' => $target ) );
 	}
 
 	/**
@@ -720,6 +736,21 @@ class PressGo_AI_Builder {
 				<a href="<?php echo esc_url( $list_url ); ?>" class="pg-builder-back" title="Back to list">&larr;</a>
 				<div class="pg-builder-title"><?php echo esc_html( $post->post_title ?: 'Untitled page' ); ?></div>
 				<div class="pg-builder-actions">
+					<?php
+					// Target-builder picker — only when the site can render more
+					// than one target. Changing it re-routes the NEXT build/edit.
+					if ( class_exists( 'PressGo_Render_Targets' ) ) {
+						$pg_targets = PressGo_Render_Targets::available();
+						if ( count( $pg_targets ) > 1 ) {
+							$pg_current = PressGo_Render_Targets::resolve( $post_id );
+							echo '<select id="pg-target-builder" class="pg-builder-ghost" title="Which page builder the AI renders into. Changes apply on the next build.">';
+							foreach ( $pg_targets as $pg_t ) {
+								printf( '<option value="%s"%s>%s</option>', esc_attr( $pg_t ), selected( $pg_current, $pg_t, false ), esc_html( ucfirst( $pg_t ) ) );
+							}
+							echo '</select>';
+						}
+					}
+					?>
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
 					<span class="pg-credits-pill" id="pg-credits">— credits</span>

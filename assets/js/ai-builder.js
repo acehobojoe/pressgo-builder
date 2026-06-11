@@ -933,6 +933,28 @@
 		clearBtn.addEventListener('click', function () { openClearConfirm(); });
 	}
 
+	// Target-builder picker: persists per page, applies on the NEXT build.
+	var targetSel = document.getElementById('pg-target-builder');
+	if (targetSel) {
+		targetSel.addEventListener('change', function () {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_set_target');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fd.append('target', targetSel.value);
+			fetch(cfg.ajaxUrl, { method: 'POST', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (j && j.success) {
+						append(el('pg-msg-system', 'Render target set to ' + targetSel.value + '. Your next build or edit renders into it.'));
+					} else {
+						append(el('pg-msg-error', (j && j.data) || 'Could not set render target.'));
+					}
+				})
+				.catch(function () { append(el('pg-msg-error', 'Could not set render target.')); });
+		});
+	}
+
 	function openClearConfirm() {
 		// Don't double-open.
 		if (document.getElementById('pg-clear-modal')) return;

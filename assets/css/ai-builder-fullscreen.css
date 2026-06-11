@@ -52,6 +52,11 @@ html, body {
 	border: 1px solid #dcdcde;
 	transition: background 0.4s ease, color 0.4s ease, transform 0.25s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
+select#pg-target-builder {
+	font-size: 12px; padding: 4px 8px;
+	border: 1px solid #dcdcde; border-radius: 6px;
+	background: #fff; color: #50575e; cursor: pointer;
+}
 .pg-credits-pill.is-low {
 	background: #fcf3e6; color: #996800;
 	border-color: #f0c33c;
