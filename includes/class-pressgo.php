@@ -37,6 +37,16 @@ class PressGo {
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-section-builder.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-generator.php';
 
+		// Multi-builder render targets. The dispatcher always loads; renderer
+		// files load when present so targets can ship independently.
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-render-targets.php';
+		foreach ( array( 'gutenberg', 'divi', 'bricks' ) as $pressgo_rt ) {
+			$pressgo_rt_file = PRESSGO_PLUGIN_DIR . "includes/generator/class-pressgo-renderer-{$pressgo_rt}.php";
+			if ( file_exists( $pressgo_rt_file ) ) {
+				require_once $pressgo_rt_file;
+			}
+		}
+
 		// AI + page creation.
 		require_once PRESSGO_PLUGIN_DIR . 'includes/prompts/class-pressgo-prompt-builder.php';
 		require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-ai-client.php';

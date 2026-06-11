@@ -2183,6 +2183,22 @@ class PressGo_AI_Builder {
 			}
 			$config = $validated;
 		}
+		// Multi-builder dispatch: validated config is builder-agnostic. The
+		// Elementor path continues below unchanged; other targets render via
+		// PressGo_Render_Targets (same snapshot + stored-config semantics).
+		$render_target = class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post_id ) : 'elementor';
+		if ( 'elementor' !== $render_target ) {
+			if ( ! $skip_snapshot ) {
+				$this->snapshot_revision( $post_id );
+			}
+			update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
+			$applied = PressGo_Render_Targets::apply( $render_target, $config, $post_id );
+			if ( empty( $applied['ok'] ) ) {
+				return $applied;
+			}
+			return array( 'ok' => true, 'sections' => count( $config['sections'] ?? array() ), 'target' => $render_target );
+		}
+
 		// Generate Elementor elements.
 		if ( ! class_exists( 'PressGo_Generator' ) ) {
 			return array( 'ok' => false, 'error' => 'generator not loaded' );
