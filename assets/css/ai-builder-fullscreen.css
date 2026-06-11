@@ -52,6 +52,25 @@ html, body {
 	border: 1px solid #dcdcde;
 	transition: background 0.4s ease, color 0.4s ease, transform 0.25s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
+.pg-brand-panel {
+	position: absolute; top: 48px; right: 12px; z-index: 60;
+	width: 320px; background: #fff; border: 1px solid #dcdcde;
+	border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.14);
+	padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+	font-size: 13px; text-align: left;
+}
+.pg-brand-head { display: flex; justify-content: space-between; align-items: center; }
+.pg-brand-toggle { font-size: 12px; color: #50575e; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.pg-brand-row { display: flex; align-items: center; gap: 8px; }
+.pg-brand-row > span { width: 64px; color: #6b7280; font-size: 12px; flex-shrink: 0; }
+.pg-brand-row input[type="text"], .pg-brand-row textarea {
+	flex: 1; border: 1px solid #dcdcde; border-radius: 6px; padding: 5px 8px; font-size: 13px;
+}
+.pg-brand-colors { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 2px 0; }
+.pg-brand-swatch { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #50575e; cursor: pointer; }
+.pg-brand-swatch input[type="color"] { width: 26px; height: 26px; border: 1px solid #dcdcde; border-radius: 6px; padding: 1px; background: #fff; cursor: pointer; }
+.pg-brand-foot { display: flex; justify-content: space-between; margin-top: 4px; }
+.pg-builder-topbar { position: relative; }
 select#pg-target-builder {
 	font-size: 12px; padding: 4px 8px;
 	border: 1px solid #dcdcde; border-radius: 6px;

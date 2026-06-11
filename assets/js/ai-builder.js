@@ -1077,14 +1077,183 @@
 		}
 		paint();
 		actions.insertBefore(chip, actions.firstChild);
+
+		// ===== Brand control panel =====
+		// The chip opens a real control menu: view/edit the stored foundation
+		// (name, industry, voice, colors, fonts), toggle continuous branding,
+		// or clear it so the next first build relearns from scratch.
+		var brandPanel = null;
+		function closeBrandPanel() {
+			if (brandPanel) { brandPanel.remove(); brandPanel = null; document.removeEventListener('click', onBrandDocClick, true); }
+		}
+		function onBrandDocClick(e) {
+			if (brandPanel && !brandPanel.contains(e.target) && e.target !== chip && !chip.contains(e.target)) closeBrandPanel();
+		}
+		function fieldRow(label, input) {
+			var row = document.createElement('label');
+			row.className = 'pg-brand-row';
+			var span = document.createElement('span');
+			span.textContent = label;
+			row.appendChild(span);
+			row.appendChild(input);
+			return row;
+		}
+		function textInput(value, placeholder) {
+			var i = document.createElement('input');
+			i.type = 'text';
+			i.value = value || '';
+			if (placeholder) i.placeholder = placeholder;
+			return i;
+		}
+		function isHex(v) { return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')); }
+
+		function openBrandPanel(state) {
+			closeBrandPanel();
+			var b = state.brand || {};
+			brandPanel = document.createElement('div');
+			brandPanel.className = 'pg-brand-panel';
+
+			var head = document.createElement('div');
+			head.className = 'pg-brand-head';
+			var title = document.createElement('strong');
+			title.textContent = 'Site brand';
+			head.appendChild(title);
+			var toggleWrap = document.createElement('label');
+			toggleWrap.className = 'pg-brand-toggle';
+			var toggle = document.createElement('input');
+			toggle.type = 'checkbox';
+			toggle.checked = on;
+			toggleWrap.appendChild(toggle);
+			toggleWrap.appendChild(document.createTextNode(' apply to new pages'));
+			head.appendChild(toggleWrap);
+			brandPanel.appendChild(head);
+
+			var nameI = textInput(b.brand_name, 'Business name');
+			var indI  = textInput(b.industry, 'Industry');
+			brandPanel.appendChild(fieldRow('Name', nameI));
+			brandPanel.appendChild(fieldRow('Industry', indI));
+
+			var voiceI = document.createElement('textarea');
+			voiceI.rows = 2;
+			voiceI.placeholder = 'Voice (e.g. warm and plainspoken)';
+			voiceI.value = b.voice || '';
+			brandPanel.appendChild(fieldRow('Voice', voiceI));
+
+			// Colors: every stored hex key gets a native color input.
+			var colorInputs = {};
+			var colors = b.colors || {};
+			var colorKeys = Object.keys(colors).filter(function (k) { return isHex(colors[k]); });
+			['primary', 'accent', 'background', 'text'].forEach(function (k) {
+				if (colorKeys.indexOf(k) === -1 && isHex(colors[k])) colorKeys.push(k);
+			});
+			if (colorKeys.length) {
+				var sw = document.createElement('div');
+				sw.className = 'pg-brand-colors';
+				colorKeys.forEach(function (k) {
+					var wrap = document.createElement('label');
+					wrap.className = 'pg-brand-swatch';
+					var ci = document.createElement('input');
+					ci.type = 'color';
+					ci.value = colors[k].length === 4
+						? '#' + colors[k][1] + colors[k][1] + colors[k][2] + colors[k][2] + colors[k][3] + colors[k][3]
+						: colors[k].slice(0, 7);
+					colorInputs[k] = ci;
+					wrap.appendChild(ci);
+					wrap.appendChild(document.createTextNode(k.replace(/_/g, ' ')));
+					sw.appendChild(wrap);
+				});
+				brandPanel.appendChild(sw);
+			}
+
+			var fonts = b.fonts || {};
+			var headF = textInput(fonts.heading, 'Heading font (Google Fonts name)');
+			var bodyF = textInput(fonts.body, 'Body font');
+			brandPanel.appendChild(fieldRow('Headings', headF));
+			brandPanel.appendChild(fieldRow('Body', bodyF));
+
+			var foot = document.createElement('div');
+			foot.className = 'pg-brand-foot';
+			var saveBtn = document.createElement('button');
+			saveBtn.type = 'button';
+			saveBtn.className = 'pg-modal-btn is-primary';
+			saveBtn.textContent = 'Save';
+			var clearBtn2 = document.createElement('button');
+			clearBtn2.type = 'button';
+			clearBtn2.className = 'pg-modal-btn is-danger';
+			clearBtn2.textContent = 'Clear & relearn';
+			clearBtn2.title = 'Forget this brand. The next first build on a fresh page learns a new one.';
+			foot.appendChild(clearBtn2);
+			foot.appendChild(saveBtn);
+			brandPanel.appendChild(foot);
+
+			toggle.addEventListener('change', function () {
+				on = toggle.checked;
+				paint();
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_brand_toggle');
+				fd.append('nonce', cfg.nonce);
+				fd.append('enabled', on ? '1' : '');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+			});
+
+			saveBtn.addEventListener('click', function () {
+				saveBtn.disabled = true;
+				saveBtn.textContent = 'Saving…';
+				var payload = {
+					brand_name: nameI.value.trim(),
+					industry: indI.value.trim(),
+					voice: voiceI.value.trim(),
+					fonts: { heading: headF.value.trim(), body: bodyF.value.trim() },
+					colors: {},
+				};
+				Object.keys(colorInputs).forEach(function (k) { payload.colors[k] = colorInputs[k].value; });
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_brand_save');
+				fd.append('nonce', cfg.nonce);
+				fd.append('brand', JSON.stringify(payload));
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (j && j.success) {
+							var nm = (j.data.brand && j.data.brand.brand_name) || '';
+							shortName = nm.length > 16 ? nm.slice(0, 15) + '…' : nm;
+							paint();
+							closeBrandPanel();
+							append(el('pg-msg-system', 'Brand saved. New pages will follow it.'));
+						} else {
+							saveBtn.disabled = false;
+							saveBtn.textContent = 'Save';
+						}
+					})
+					.catch(function () { saveBtn.disabled = false; saveBtn.textContent = 'Save'; });
+			});
+
+			clearBtn2.addEventListener('click', function () {
+				if (!window.confirm('Forget this brand? Existing pages keep their look; the next first build learns a fresh brand.')) return;
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_brand_clear');
+				fd.append('nonce', cfg.nonce);
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function () {
+						closeBrandPanel();
+						chip.remove();
+						append(el('pg-msg-system', 'Brand cleared. The next first build will learn a new one.'));
+					});
+			});
+
+			actions.appendChild(brandPanel);
+			setTimeout(function () { document.addEventListener('click', onBrandDocClick, true); }, 0);
+		}
+
 		chip.addEventListener('click', function () {
-			on = !on;
-			paint();
+			if (brandPanel) { closeBrandPanel(); return; }
 			var fd = new FormData();
-			fd.append('action', 'pressgo_ai_brand_toggle');
+			fd.append('action', 'pressgo_ai_brand_get');
 			fd.append('nonce', cfg.nonce);
-			fd.append('enabled', on ? '1' : '');
-			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) { if (j && j.success) openBrandPanel(j.data); })
+				.catch(function () {});
 		});
 	})();
 

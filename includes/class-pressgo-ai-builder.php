@@ -70,6 +70,9 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_brand_toggle', array( $this, 'ajax_brand_toggle' ) );
 		add_action( 'wp_ajax_pressgo_ai_review_done',  array( $this, 'ajax_review_done' ) );
 		add_action( 'wp_ajax_pressgo_ai_set_target',   array( $this, 'ajax_set_target' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_get',    array( $this, 'ajax_brand_get' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_save',   array( $this, 'ajax_brand_save' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_clear',  array( $this, 'ajax_brand_clear' ) );
 	}
 
 	/**
@@ -99,6 +102,40 @@ class PressGo_AI_Builder {
 	public function ajax_brand_toggle() {
 		$this->check_auth();
 		update_option( 'pressgo_use_site_brand', ! empty( $_POST['enabled'] ) ? '1' : '0', false );
+		wp_send_json_success();
+	}
+
+	/** Brand panel: read the full foundation for the control menu. */
+	public function ajax_brand_get() {
+		$this->check_auth();
+		wp_send_json_success( $this->site_brand_state() );
+	}
+
+	/**
+	 * Brand panel: save manual edits. Accepts brand_name, industry, voice,
+	 * colors{}, fonts{} — merged through the same sanitizing path MCP uses.
+	 */
+	public function ajax_brand_save() {
+		$this->check_auth();
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) {
+			wp_send_json_error( 'brand store unavailable', 500 );
+		}
+		$raw  = isset( $_POST['brand'] ) ? json_decode( wp_unslash( (string) $_POST['brand'] ), true ) : null;
+		if ( ! is_array( $raw ) ) {
+			wp_send_json_error( 'bad brand payload', 400 );
+		}
+		$args = array_intersect_key( $raw, array_flip( array( 'brand_name', 'industry', 'logo_url', 'voice', 'colors', 'fonts' ) ) );
+		$f    = PressGo_MCP_Tools::merge_brand_foundation( $args );
+		unset( $f['updated'] );
+		wp_send_json_success( array( 'brand' => $f ) );
+	}
+
+	/** Brand panel: clear the foundation — next first build relearns it. */
+	public function ajax_brand_clear() {
+		$this->check_auth();
+		if ( class_exists( 'PressGo_MCP_Tools' ) ) {
+			delete_option( PressGo_MCP_Tools::BRAND_FOUNDATION_OPTION );
+		}
 		wp_send_json_success();
 	}
 
