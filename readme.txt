@@ -162,6 +162,9 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.3.3 =
+* MCP: OAuth endpoint responses now include an X-PressGo-OAuth header, so connector errors (like a security plugin or WAF intercepting registration with a 403) are instantly distinguishable from plugin responses. If your AI client fails to connect with a 403, check whether the response has this header: no header means something in front of WordPress blocked the request, and allowlisting /wp-json/pressgo/v1/oauth/ in your security plugin fixes it.
+
 = 2.3.2 =
 * Fixed: images you attach as references (like a screenshot showing which photos to remove) are no longer placed on the page as if they were photos.
 * Fixed: asking for a Pexels or Unsplash image now fetches real stock photos, even if you don't use the word "stock".
