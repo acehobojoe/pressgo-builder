@@ -52,6 +52,14 @@ class PressGo_AI_Builder {
 		// bar and theme chrome so the preview reads like a real visitor view.
 		add_action( 'init', array( $this, 'maybe_clean_preview' ) );
 
+		// Non-Elementor AI pages render through the plugin's minimal canvas
+		// template — Gutenberg/Bricks targets otherwise land in the theme's
+		// default page template, wrapping the AI landing page in theme header/
+		// nav/title/footer (and the same chrome pollutes previews, thumbnails,
+		// and A(eyes) screenshots). Elementor keeps elementor_canvas; Divi
+		// keeps its own blank template when present.
+		add_filter( 'template_include', array( $this, 'maybe_canvas_template' ), 99 );
+
 		// Purge caches after ANY Elementor save (not just AI-builder applies),
 		// so a designer who edits in the native Elementor editor and clicks
 		// Update/Publish sees their changes immediately instead of a stale page.
@@ -96,6 +104,30 @@ class PressGo_AI_Builder {
 		$this->check_auth();
 		update_option( 'pressgo_review_ask_done', sanitize_key( $_POST['choice'] ?? 'dismissed' ), false );
 		wp_send_json_success();
+	}
+
+	/**
+	 * Serve the plugin's minimal canvas for AI pages on targets that need it.
+	 * Gutenberg/Bricks always (their renderers return no template); Divi only
+	 * when its blank template isn't available (theme not active).
+	 */
+	public function maybe_canvas_template( $template ) {
+		if ( ! is_singular() ) {
+			return $template;
+		}
+		$post_id = get_queried_object_id();
+		if ( ! $post_id || ! get_post_meta( $post_id, self::META_AI_ENABLED, true ) ) {
+			return $template;
+		}
+		$target = (string) get_post_meta( $post_id, '_pressgo_target_builder', true );
+		if ( '' === $target || 'elementor' === $target ) {
+			return $template;
+		}
+		if ( 'divi' === $target && false !== strpos( (string) $template, 'page-template-blank' ) ) {
+			return $template; // Divi's own blank template is doing the job.
+		}
+		$canvas = PRESSGO_PLUGIN_DIR . 'templates/pressgo-canvas.php';
+		return file_exists( $canvas ) ? $canvas : $template;
 	}
 
 	/** Persist the Site Brand toggle (site-wide, not per page). */
@@ -175,8 +207,11 @@ class PressGo_AI_Builder {
 		$out  = array();
 		$revs = wp_get_post_revisions( $post_id, array( 'posts_per_page' => 60 ) );
 		foreach ( $revs as $rev ) {
-			$data = get_metadata( 'post', $rev->ID, '_elementor_data', true );
-			if ( ! $data ) continue; // not a design snapshot (e.g. a plain content revision)
+			// A design snapshot carries the marker (new) or _elementor_data
+			// (pre-multi-builder snapshots) — plain content revisions have neither.
+			$data      = get_metadata( 'post', $rev->ID, '_elementor_data', true );
+			$is_snap   = '1' === (string) get_metadata( 'post', $rev->ID, '_pressgo_snapshot', true );
+			if ( ! $data && ! $is_snap ) continue; // not a design snapshot
 			$label    = (string) get_metadata( 'post', $rev->ID, '_pressgo_ai_label', true );
 			$sections = 0;
 			$cfg_raw  = get_metadata( 'post', $rev->ID, self::META_AI_CONFIG, true );
@@ -184,7 +219,7 @@ class PressGo_AI_Builder {
 				$cfg = self::decode_meta_json( $cfg_raw );
 				if ( is_array( $cfg ) && ! empty( $cfg['sections'] ) ) $sections = count( $cfg['sections'] );
 			}
-			if ( ! $sections ) {
+			if ( ! $sections && $data ) {
 				$els = json_decode( $data, true );
 				if ( is_array( $els ) ) $sections = count( $els );
 			}
@@ -218,15 +253,35 @@ class PressGo_AI_Builder {
 		if ( ! $rev || (int) $rev->post_parent !== $post_id ) {
 			wp_send_json_error( 'revision does not belong to this page', 400 );
 		}
-		$data = get_metadata( 'post', $rev_id, '_elementor_data', true );
-		if ( ! $data ) wp_send_json_error( 'that snapshot has no design data', 400 );
+		$data    = get_metadata( 'post', $rev_id, '_elementor_data', true );
+		$is_snap = '1' === (string) get_metadata( 'post', $rev_id, '_pressgo_snapshot', true );
+		if ( ! $data && ! $is_snap ) wp_send_json_error( 'that snapshot has no design data', 400 );
 
 		// Snapshot what's live right now so the restore can be undone.
 		$ts = get_post_time( 'U', true, $rev );
 		$this->turn_label = 'Before restoring the ' . ( $ts ? wp_date( 'M j, H:i', $ts ) : '#' . $rev_id ) . ' version';
 		$this->snapshot_revision( $post_id );
 
-		update_post_meta( $post_id, '_elementor_data', wp_slash( $data ) );
+		// Restore the FULL per-target state: post_content (Gutenberg/Divi
+		// designs live there) + every design meta the snapshot carried, and
+		// remove the design metas it did NOT carry so the page can't end up
+		// claimed by two builders at once.
+		wp_update_post( wp_slash( array(
+			'ID'           => $post_id,
+			'post_content' => (string) $rev->post_content,
+		) ) );
+		foreach ( self::target_state_metas() as $mk ) {
+			$mv = get_metadata( 'post', $rev_id, $mk, true );
+			if ( '' !== $mv && null !== $mv && false !== $mv ) {
+				update_post_meta( $post_id, $mk, is_string( $mv ) ? wp_slash( $mv ) : $mv );
+			} elseif ( $is_snap ) {
+				// Only marker-era snapshots carry COMPLETE state — for those,
+				// a missing meta means "the page didn't have it", so remove it.
+				// Legacy (pre-multi-builder) snapshots only stored Elementor
+				// keys; deleting the rest would strip e.g. the canvas template.
+				delete_post_meta( $post_id, $mk );
+			}
+		}
 
 		$cfg = get_metadata( 'post', $rev_id, self::META_AI_CONFIG, true );
 		if ( $cfg ) {
@@ -236,10 +291,6 @@ class PressGo_AI_Builder {
 			// stored config so future AI edits read the page itself (summarize
 			// path) instead of editing a config that no longer matches reality.
 			delete_post_meta( $post_id, self::META_AI_CONFIG );
-		}
-		$settings = get_metadata( 'post', $rev_id, '_elementor_page_settings', true );
-		if ( $settings ) {
-			update_post_meta( $post_id, '_elementor_page_settings', $settings );
 		}
 
 		$this->purge_post_caches( $post_id );
@@ -748,10 +799,27 @@ class PressGo_AI_Builder {
 		$preview_url = add_query_arg( 'pg_clean', '1', get_preview_post_link( $post ) );
 		// Native Elementor editor URL — bypasses WP post editor and lands
 		// the user in Elementor's drag/drop canvas directly.
-		$wp_edit_url = add_query_arg(
-			array( 'post' => $post->ID, 'action' => 'elementor' ),
-			admin_url( 'post.php' )
-		);
+		// Manual-editor link matches the page's render target. The old
+		// hardcoded action=elementor link opened an EMPTY Elementor canvas on
+		// non-Elementor pages — one "Update" click there wiped the build.
+		$edit_target = class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post->ID ) : 'elementor';
+		switch ( $edit_target ) {
+			case 'gutenberg':
+				$wp_edit_url   = add_query_arg( array( 'post' => $post->ID, 'action' => 'edit' ), admin_url( 'post.php' ) );
+				$wp_edit_label = 'Edit in WordPress';
+				break;
+			case 'divi':
+				$wp_edit_url   = add_query_arg( 'et_fb', '1', get_permalink( $post->ID ) );
+				$wp_edit_label = 'Edit in Divi';
+				break;
+			case 'bricks':
+				$wp_edit_url   = add_query_arg( 'bricks', 'run', get_permalink( $post->ID ) );
+				$wp_edit_label = 'Edit in Bricks';
+				break;
+			default:
+				$wp_edit_url   = add_query_arg( array( 'post' => $post->ID, 'action' => 'elementor' ), admin_url( 'post.php' ) );
+				$wp_edit_label = 'Edit in Elementor';
+		}
 		$list_url    = admin_url( 'admin.php?page=' . self::MENU_SLUG );
 		?><!DOCTYPE html>
 		<html <?php language_attributes(); ?>>
@@ -791,7 +859,7 @@ class PressGo_AI_Builder {
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
 					<span class="pg-credits-pill" id="pg-credits">— credits</span>
-					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank">Edit in Elementor</a>
+					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
 				</div>
 			</header>
 			<div class="pg-builder-shell">
@@ -936,12 +1004,18 @@ class PressGo_AI_Builder {
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
 			wp_send_json_error( 'create failed', 500 );
 		}
-		// Auto-enable AI for new pages and mark as Elementor canvas so the
-		// preview renders edge-to-edge without theme chrome.
+		// Auto-enable AI for new pages. Elementor-target pages get the canvas
+		// template + edit-mode stamp up front (edge-to-edge preview before the
+		// first build); other targets must NOT be claimed for Elementor —
+		// elementor_canvas is an unregistered template without Elementor and
+		// the metas would mark a Gutenberg/Divi page as an Elementor document.
 		update_post_meta( $post_id, self::META_AI_ENABLED, 1 );
-		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
-		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
-		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
+		$new_target = class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post_id ) : 'elementor';
+		if ( 'elementor' === $new_target ) {
+			update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
+			update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+			update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
+		}
 		wp_send_json_success( array( 'post_id' => $post_id ) );
 	}
 
@@ -1197,6 +1271,14 @@ class PressGo_AI_Builder {
 			}
 			if ( 'section' !== $type || empty( $evt['name'] ) ) return;
 			$prog->data[ $evt['name'] ] = isset( $evt['data'] ) && is_array( $evt['data'] ) ? $evt['data'] : array();
+			// Partial renders are Elementor-only: render_partial writes
+			// _elementor_data + canvas metas, which would CLAIM a gutenberg/
+			// divi/bricks-target page for Elementor mid-stream (and on those
+			// targets the growing preview never shows anyway). Non-Elementor
+			// targets keep the build checklist and get the full page at apply.
+			if ( class_exists( 'PressGo_Render_Targets' ) && 'elementor' !== PressGo_Render_Targets::resolve( $post_id ) ) {
+				return;
+			}
 			// Throttle: render the first section immediately (fast first paint),
 			// then at most one render per ~2.5s, capped, so the preview visibly
 			// grows without hammering the renderer.
@@ -1238,6 +1320,10 @@ class PressGo_AI_Builder {
 			// foundation exists, the AI reuses the established palette/fonts/
 			// identity for new pages instead of inventing fresh ones.
 			'siteBrand'                 => ( $brand_state['enabled'] && $brand_state['brand'] ) ? $brand_state['brand'] : null,
+			// Which builder this page renders into. The backend swaps in a
+			// per-target reality addendum (what degrades, what Pro markers
+			// don't apply) and records it in telemetry.
+			'renderTarget'              => class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post_id ) : 'elementor',
 		), $emit, $progressive ? $progress_cb : null );
 
 		if ( ! empty( $result['error'] ) ) {
@@ -1434,36 +1520,55 @@ class PressGo_AI_Builder {
 	 * overwrites it, so the change is reversible from Elementor's History panel.
 	 * Best-effort: never blocks the build.
 	 */
+	/** Per-target snapshot metas: which postmeta constitutes "the design". */
+	private static function target_state_metas() {
+		return array(
+			'_elementor_data', '_elementor_edit_mode', '_elementor_page_settings',
+			'_bricks_page_content_2', '_bricks_editor_mode',
+			'_et_pb_use_builder', '_et_pb_page_layout', '_et_pb_post_hide_nav', '_et_pb_built_for_post_type',
+			'_wp_page_template', '_pressgo_target_builder',
+		);
+	}
+
 	private function snapshot_revision( $post_id ) {
 		try {
-			$current = get_post_meta( $post_id, '_elementor_data', true );
-			if ( empty( $current ) ) {
-				return; // brand-new page — nothing to snapshot yet.
-			}
-			$post = get_post( $post_id );
+			// Snapshot whichever builder's state the page currently carries.
+			// Elementor lives in _elementor_data; Gutenberg lives in
+			// post_content; Divi is post_content + _et_pb_* metas; Bricks is
+			// _bricks_page_content_2. A page with NO design state at all
+			// (brand-new) has nothing to snapshot.
+			$elementor = get_post_meta( $post_id, '_elementor_data', true );
+			$bricks    = get_post_meta( $post_id, '_bricks_page_content_2', true );
+			$post      = get_post( $post_id );
 			if ( ! $post || ! post_type_supports( $post->post_type, 'revisions' ) ) {
 				return;
 			}
+			if ( empty( $elementor ) && empty( $bricks ) && '' === trim( (string) $post->post_content ) ) {
+				return; // brand-new page — nothing to snapshot yet.
+			}
 			// _wp_put_post_revision forces a revision row even when post_content is
-			// unchanged (Elementor edits live in postmeta, not content). We then
-			// attach the current _elementor_data so Elementor's History lists it.
+			// unchanged (Elementor/Bricks edits live in postmeta, not content) and
+			// captures post_content for free (Gutenberg/Divi designs).
 			if ( ! function_exists( '_wp_put_post_revision' ) ) {
 				require_once ABSPATH . WPINC . '/revision.php';
 			}
 			$revision_id = _wp_put_post_revision( $post );
 			if ( $revision_id && ! is_wp_error( $revision_id ) ) {
-				update_metadata( 'post', (int) $revision_id, '_elementor_data', wp_slash( $current ) );
-				update_metadata( 'post', (int) $revision_id, '_elementor_edit_mode', 'builder' );
+				// Attach every design meta the page currently has, so restore can
+				// reproduce the exact builder state regardless of target.
+				foreach ( self::target_state_metas() as $mk ) {
+					$mv = get_post_meta( $post_id, $mk, true );
+					if ( '' !== $mv && null !== $mv && false !== $mv ) {
+						update_metadata( 'post', (int) $revision_id, $mk, is_string( $mv ) ? wp_slash( $mv ) : $mv );
+					}
+				}
 				$cfg = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 				if ( $cfg ) {
 					update_metadata( 'post', (int) $revision_id, self::META_AI_CONFIG, wp_slash( $cfg ) );
 				}
-				// Page settings carry the generated custom CSS (hover colors etc.) —
-				// without them a restore would pair old sections with new styling.
-				$settings = get_post_meta( $post_id, '_elementor_page_settings', true );
-				if ( $settings ) {
-					update_metadata( 'post', (int) $revision_id, '_elementor_page_settings', $settings );
-				}
+				// Marker so ajax_versions can list snapshots without depending on
+				// any one builder's meta being present.
+				update_metadata( 'post', (int) $revision_id, '_pressgo_snapshot', '1' );
 				// Human label for the History panel ("Before: make the hero darker").
 				if ( $this->turn_label ) {
 					update_metadata( 'post', (int) $revision_id, '_pressgo_ai_label', wp_slash( $this->turn_label ) );
@@ -1853,10 +1958,15 @@ class PressGo_AI_Builder {
 			$emit( $type, $data );
 		};
 		$emit( 'vision_progress' );
+		// Full capability context — without it the QA fix call gets the oldest
+		// schema tier and is blind to the page's render target.
 		$result = $this->stream_upstream_to_browser( $api_key, array(
-			'messages'    => $wire,
-			'pageContext' => $page_context,
-			'mode'        => 'edit',
+			'messages'         => $wire,
+			'pageContext'      => $page_context,
+			'mode'             => 'edit',
+			'pluginVersion'    => PRESSGO_VERSION,
+			'siteCapabilities' => array( 'elementorPro' => PressGo::is_elementor_pro_active() ),
+			'renderTarget'     => class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post_id ) : 'elementor',
 		), $silent );
 		if ( ! empty( $result['error'] ) ) { $emit( 'vision_ok' ); return; }
 
@@ -2292,6 +2402,13 @@ class PressGo_AI_Builder {
 		// right there — instead of interrogating from scratch.
 		update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
 
+		// Elementor apply: stamp the target + strip other builders' claims (a
+		// page switched BACK to Elementor must shed Divi/Bricks ownership).
+		if ( class_exists( 'PressGo_Render_Targets' ) ) {
+			PressGo_Render_Targets::neutralize_other_targets( $post_id, 'elementor' );
+			update_post_meta( $post_id, '_pressgo_target_builder', 'elementor' );
+		}
+
 		// Use page-creator's writer if available; otherwise raw write + cache clear.
 		$encoded = wp_json_encode( $elements );
 		update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
@@ -2333,6 +2450,11 @@ class PressGo_AI_Builder {
 		if ( function_exists( 'rocket_clean_post' ) )         rocket_clean_post( $post_id );
 		if ( function_exists( 'rocket_clean_domain' ) )       rocket_clean_domain();
 		if ( function_exists( 'wp_cache_post_change' ) )      wp_cache_post_change( $post_id );
+
+		// Bump post_modified: Elementor applies live entirely in postmeta, so
+		// without this the thumbnail cache key and watch-page poll (both keyed
+		// off post_modified) never notice the change.
+		wp_update_post( array( 'ID' => $post_id ) );
 
 		clean_post_cache( $post_id );
 		do_action( 'clean_post_cache', $post_id, get_post( $post_id ) );

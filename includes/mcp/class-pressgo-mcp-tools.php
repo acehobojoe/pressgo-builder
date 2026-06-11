@@ -2128,6 +2128,14 @@ class PressGo_MCP_Tools {
 		if ( ! user_can( $user, 'edit_post', $post_id ) ) {
 			return new WP_Error( 'mcp_forbidden', "You don't have permission to edit post {$post_id}." );
 		}
+		// MCP section tools read/write _elementor_data only. On a page that
+		// renders through another builder (multi-builder targets), they would
+		// report success while the live page never changes — refuse honestly
+		// instead of lying.
+		$target = (string) get_post_meta( $post_id, '_pressgo_target_builder', true );
+		if ( '' !== $target && 'elementor' !== $target ) {
+			return new WP_Error( 'mcp_wrong_target', "Page {$post_id} renders through {$target}, not Elementor. MCP section tools currently support Elementor pages only — use the AI Builder chat for this page, or switch its render target back to Elementor first." );
+		}
 		return true;
 	}
 

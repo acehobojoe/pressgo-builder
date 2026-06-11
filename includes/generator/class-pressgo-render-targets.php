@@ -54,6 +54,31 @@ class PressGo_Render_Targets {
 		return in_array( 'elementor', $avail, true ) ? 'elementor' : 'gutenberg';
 	}
 
+	/**
+	 * Remove the OTHER builders' claim-metas so a page can never be owned by
+	 * two builders at once. Without this, switching target and rebuilding
+	 * "succeeds" while the page keeps rendering the old build (Divi's
+	 * _et_pb_use_builder / Bricks' _bricks_editor_mode keep winning).
+	 */
+	public static function neutralize_other_targets( $post_id, $incoming ) {
+		$claims = array(
+			'elementor' => array( '_elementor_edit_mode', '_elementor_data', '_elementor_element_cache', '_elementor_template_type' ),
+			'divi'      => array( '_et_pb_use_builder', '_et_pb_page_layout', '_et_pb_post_hide_nav', '_et_pb_built_for_post_type' ),
+			'bricks'    => array( '_bricks_editor_mode', '_bricks_page_content_2' ),
+		);
+		foreach ( $claims as $t => $metas ) {
+			if ( $t === $incoming ) {
+				continue;
+			}
+			foreach ( $metas as $mk ) {
+				delete_post_meta( $post_id, $mk );
+			}
+		}
+		// Divi designs live in post_content as shortcodes; a Gutenberg or
+		// Elementor build replaces/ignores post_content itself, so nothing
+		// further needed there.
+	}
+
 	/** Render + persist for a non-Elementor target. */
 	public static function apply( $target, $config, $post_id ) {
 		$class = 'PressGo_Renderer_' . ucfirst( $target );
@@ -76,11 +101,15 @@ class PressGo_Render_Targets {
 			'post_content' => $out['post_content'],
 		) ) );
 
-		// A page that previously rendered through Elementor must stop doing so,
-		// or Elementor's the_content filter keeps serving the old build.
-		delete_post_meta( $post_id, '_elementor_edit_mode' );
-		delete_post_meta( $post_id, '_elementor_data' );
-		delete_post_meta( $post_id, '_elementor_element_cache' );
+		// Strip every OTHER builder's claim on this page (Elementor's
+		// the_content filter, Divi's use_builder flag, Bricks' editor mode all
+		// keep serving a stale build otherwise).
+		self::neutralize_other_targets( $post_id, $target );
+
+		// Stamp the page with its builder. resolve() can fall back to the site
+		// option, but the canvas template, edit links, and snapshots all need
+		// the page itself to know what it renders through.
+		update_post_meta( $post_id, '_pressgo_target_builder', $target );
 
 		if ( ! empty( $out['meta'] ) && is_array( $out['meta'] ) ) {
 			foreach ( $out['meta'] as $k => $v ) {
@@ -100,6 +129,12 @@ class PressGo_Render_Targets {
 		clean_post_cache( $post_id );
 		if ( function_exists( 'rocket_clean_post' ) ) {
 			rocket_clean_post( $post_id );
+		}
+		// Divi keeps generated CSS in et-cache; without this a rebuilt Divi
+		// page serves stale styles (and a root-owned et-cache dir silently
+		// breaks generation entirely — seen on the sandbox).
+		if ( 'divi' === $target && function_exists( 'et_core_clear_cache' ) ) {
+			et_core_clear_cache();
 		}
 
 		return array( 'ok' => true, 'target' => $target );
