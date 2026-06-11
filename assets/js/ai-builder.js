@@ -950,8 +950,12 @@
 		chip.className = 'pg-builder-ghost';
 		chip.title = 'Site brand: new pages reuse this site\'s saved colors, fonts, and identity' + (b.name ? ' (' + b.name + ')' : '') + '. Click to toggle; off gives a page its own fresh look.';
 		var on = !!b.enabled;
+		// Self-explanatory label: the chip names the brand it's applying
+		// ("Brand: John's Gym"), so nobody needs the tooltip to know what it does.
+		var shortName = (b.name || '').length > 16 ? b.name.slice(0, 15) + '\u2026' : (b.name || '');
 		function paint() {
-			chip.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:' + (on ? '#22C55E' : '#9CA3AF') + ';"></span>Brand';
+			var label = on ? ('Brand: ' + (shortName ? escapeHtml(shortName) : 'on')) : 'Brand: off';
+			chip.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:' + (on ? '#22C55E' : '#9CA3AF') + ';"></span>' + label;
 			chip.style.opacity = on ? '1' : '0.65';
 		}
 		paint();
