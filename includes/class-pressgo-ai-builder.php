@@ -24,6 +24,25 @@ class PressGo_AI_Builder {
 	const META_AI_CHAT    = '_pressgo_ai_chat';   // serialised message history
 	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
 
+	/**
+	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
+	 * so wrapping it in wp_unslash() is wrong: it eats the backslash off every
+	 * \uXXXX escape wp_json_encode() produced ("Sunday · 9 AM" becomes a
+	 * literal "Sunday u00b7 9 AM" on the page, and the corruption persists once
+	 * a patch re-stores the mangled value). Decode raw first; fall back to an
+	 * unslashed parse only for legacy rows that were stored double-slashed.
+	 */
+	private static function decode_meta_json( $raw ) {
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return null;
+		}
+		$decoded = json_decode( $raw, true );
+		if ( null === $decoded ) {
+			$decoded = json_decode( wp_unslash( $raw ), true );
+		}
+		return $decoded;
+	}
+
 	public function init() {
 		add_action( 'admin_menu',    array( $this, 'register_menu' ), 11 );
 		add_action( 'admin_init',    array( $this, 'maybe_intercept_fullscreen' ) );
@@ -109,7 +128,7 @@ class PressGo_AI_Builder {
 			$sections = 0;
 			$cfg_raw  = get_metadata( 'post', $rev->ID, self::META_AI_CONFIG, true );
 			if ( $cfg_raw ) {
-				$cfg = json_decode( wp_unslash( $cfg_raw ), true );
+				$cfg = self::decode_meta_json( $cfg_raw );
 				if ( is_array( $cfg ) && ! empty( $cfg['sections'] ) ) $sections = count( $cfg['sections'] );
 			}
 			if ( ! $sections ) {
@@ -976,11 +995,11 @@ class PressGo_AI_Builder {
 		$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
 		if ( $stored_config ) {
 			$mode = 'edit';
-			$cfg_decoded = json_decode( wp_unslash( $stored_config ), true );
+			$cfg_decoded = self::decode_meta_json( $stored_config );
 			$page_context = array( 'config' => is_array( $cfg_decoded ) ? $cfg_decoded : null );
 		} elseif ( $elementor_raw ) {
 			$mode = 'edit';
-			$decoded = json_decode( wp_unslash( $elementor_raw ), true );
+			$decoded = self::decode_meta_json( $elementor_raw );
 			// No stored config (page predates config-storage). Don't dump raw
 			// Elementor JSON at the model — it can't read it and rebuilds blind.
 			// Hand it a readable summary of the existing copy + images so it
@@ -1218,7 +1237,7 @@ class PressGo_AI_Builder {
 		//    colors/fonts -> sync the foundation so the NEXT page follows.
 		if ( $applied && class_exists( 'PressGo_MCP_Tools' ) && '1' === get_option( 'pressgo_use_site_brand', '1' ) ) {
 			try {
-				$stored_now = json_decode( wp_unslash( (string) get_post_meta( $post_id, self::META_AI_CONFIG, true ) ), true );
+				$stored_now = self::decode_meta_json( (string) get_post_meta( $post_id, self::META_AI_CONFIG, true ) );
 				if ( is_array( $stored_now ) ) {
 					if ( ! $brand_state['brand'] ) {
 						PressGo_MCP_Tools::merge_brand_foundation( array(
@@ -1735,11 +1754,11 @@ class PressGo_AI_Builder {
 
 		$stored_config = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 		if ( $stored_config ) {
-			$cfg_decoded  = json_decode( wp_unslash( $stored_config ), true );
+			$cfg_decoded  = self::decode_meta_json( $stored_config );
 			$page_context = array( 'config' => is_array( $cfg_decoded ) ? $cfg_decoded : null );
 		} else {
 			$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
-			$decoded       = json_decode( wp_unslash( $elementor_raw ), true );
+			$decoded       = self::decode_meta_json( $elementor_raw );
 			$page_context  = array( 'summary' => is_array( $decoded ) ? $this->summarize_page( $decoded ) : '' );
 		}
 
@@ -1871,7 +1890,7 @@ class PressGo_AI_Builder {
 			return array( 'ok' => false, 'error' => 'empty patch' );
 		}
 		$stored = get_post_meta( $post_id, self::META_AI_CONFIG, true );
-		$base   = $stored ? json_decode( wp_unslash( $stored ), true ) : null;
+		$base   = $stored ? self::decode_meta_json( $stored ) : null;
 		if ( ! is_array( $base ) || empty( $base ) ) {
 			if ( empty( $changes['sections'] ) ) {
 				// No stored config AND the patch has no sections — there is
