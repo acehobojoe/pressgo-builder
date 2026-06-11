@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.2
+Stable tag: 2.3.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,19 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.3.4 =
+* Repeatable sections: a page can now have two galleries, several schedule blocks, multiple feature groups ("gallery#2" works in edits too)
+* 14 new section recipes: schedule (class/event timetables), sticky call bar, logo marquee, mesh + split-screen heroes, hero with built-in lead form, donation pricing, course modules, editorial steps, testimonial wall, stats ticker, tabbed features, gallery carousel, gradient headlines
+* Real lead-capture forms (Elementor Pro): hero forms, final-CTA forms, and newsletter sections that actually collect emails — with graceful fallbacks on Elementor Free
+* Continuous branding: the site's colors, fonts, and identity carry across every new page automatically (toggle in the builder topbar)
+* Next-page chips: after a build, one tap starts About / Services / Contact / 404 with the same brand
+* Test Connection now saves a key that validates — no more "tested green, builder says no key"
+* Credit pill warns at 3 credits left; clearer out-of-credits guidance
+* Version History panel: every AI change snapshots the page first, one-click restore
+* Fixed: stored unicode characters (· — etc.) rendering as literal "u00b7" after edits
+* Fixed: settings page said "3 free credits" — it's 10/month
+* Elementor is now declared as a required plugin
 
 = 2.3.3 =
 * MCP: OAuth endpoint responses now include an X-PressGo-OAuth header, so connector errors (like a security plugin or WAF intercepting registration with a 403) are instantly distinguishable from plugin responses. If your AI client fails to connect with a 403, check whether the response has this header: no header means something in front of WordPress blocked the request, and allowlisting /wp-json/pressgo/v1/oauth/ in your security plugin fixes it.
