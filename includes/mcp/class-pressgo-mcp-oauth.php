@@ -383,6 +383,10 @@ class PressGo_MCP_OAuth {
 	}
 
 	private function cors( WP_REST_Response $r ) {
+		// Self-identifying responses: a 4xx WITHOUT this header means a WAF or
+		// security plugin answered before PressGo did — turns every "OAuth
+		// returns 403" support thread into a ten-second diagnosis.
+		$r->header( 'X-PressGo-OAuth', defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '1' );
 		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '*';
 		$r->header( 'Access-Control-Allow-Origin', $origin );
 		$r->header( 'Access-Control-Allow-Methods', 'POST, OPTIONS' );
