@@ -892,6 +892,17 @@ select#pg-target-builder {
 }
 .pg-ed-empty { color: #6b7280; line-height: 1.5; padding: 8px 0; }
 
+/* Explanatory section note (e.g. blog auto-pulls posts) — same purple
+   family as the rest of the editor chrome. */
+.pg-ed-note {
+	background: #f7f6ff;
+	border: 1px solid #e3def9;
+	border-radius: 8px;
+	padding: 9px 12px;
+	font-size: 12px; line-height: 1.5;
+	color: #4a40e0;
+}
+
 .pg-ed-field { display: flex; flex-direction: column; gap: 5px; }
 .pg-ed-label { font-size: 12px; font-weight: 600; color: #50575e; }
 .pg-ed-hint { font-size: 11px; color: #8c8f94; line-height: 1.4; }
@@ -1096,8 +1107,19 @@ select#pg-target-builder {
 .pg-ed-save.is-saved::before { content: '✓'; margin-right: 4px; font-weight: 700; }
 .pg-ed-save.is-error { color: #8a1f2a; font-weight: 600; }
 
-/* Page-token sliders — live-scrub the preview while dragging. */
-.pg-ed-slider { display: flex; align-items: center; gap: 10px; }
+/* Page-token sliders — live-scrub the preview while dragging. The value
+   readout updates on every input event (drag AND keyboard arrows); the
+   min/max scale sits under the track. */
+.pg-ed-slider { display: flex; flex-direction: column; gap: 3px; }
+.pg-ed-slider-row { display: flex; align-items: center; gap: 10px; }
+.pg-ed-slider-scale {
+	display: flex; justify-content: space-between;
+	margin-right: 48px; /* clear of the value readout column */
+	font-size: 10px; color: #a7aaad;
+	font-family: ui-monospace, Menlo, monospace;
+	line-height: 1;
+	user-select: none;
+}
 .pg-ed-slider input[type="range"] {
 	flex: 1; min-width: 0;
 	-webkit-appearance: none;
@@ -1107,6 +1129,10 @@ select#pg-target-builder {
 	border-radius: 999px;
 	cursor: pointer;
 	outline: none;
+}
+/* Keyboard focus — arrows nudge the value; make focus visible. */
+.pg-ed-slider input[type="range"]:focus-visible {
+	box-shadow: 0 0 0 2px rgba(91,79,255,0.35);
 }
 .pg-ed-slider input[type="range"]::-webkit-slider-thumb {
 	-webkit-appearance: none;

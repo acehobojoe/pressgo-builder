@@ -59,17 +59,46 @@ class PressGo_Editor_Fields {
 					$entry['fields'][ $key ] = $field;
 				}
 			}
+
+			// Bare-string sections (disclaimer): the schema types the WHOLE
+			// section as one string, so the loop above finds zero fields. Give
+			// the panel a single textarea and flag the bare shape — the JS
+			// normalizes string → {text} on read; the patch writes the {text}
+			// object form, which every renderer (Elementor/Gutenberg/Bricks/
+			// Divi) accepts as an alias of the flat string.
+			if ( empty( $entry['fields'] ) && isset( $def['type'] ) && is_string( $def['type'] ) && false !== strpos( $def['type'], 'string' ) ) {
+				$entry['bare']           = 'text';
+				$entry['fields']['text'] = array(
+					'kind'  => 'textarea',
+					'label' => 'Text',
+					'hint'  => isset( $def['description'] ) && is_string( $def['description'] ) ? mb_substr( $def['description'], 0, 140 ) : '',
+				);
+			}
+
 			$out[ $type ] = $entry;
+		}
+
+		// Blog renders posts pulled live from WordPress — the panel can only
+		// edit the section header. Say so instead of looking broken.
+		if ( isset( $out['blog'] ) ) {
+			$out['blog']['note'] = 'This section auto-pulls your latest blog posts — the fields below only change its heading. Use chat to change how posts display.';
 		}
 
 		// Page-level tab: brand + layout tokens (the generator owns spacing
 		// math, so sizing is exposed as tokens, not raw per-side pixels).
+		// Color `default`s mirror the validator's fallbacks so a swatch never
+		// renders gray/“–” on a page whose config predates that token — the
+		// accent default is derive_accent_hex(#2563EB) precomputed. Editing a
+		// defaulted swatch writes the value into the config explicitly.
+		// NOTE: the light-section background token is `colors.light_bg` (what
+		// the generator actually consumes) — `colors.background` is not a
+		// config key and edits to it were silently dead.
 		$out['_page'] = array(
 			'label'  => 'Page',
 			'fields' => array(
-				'colors.primary'          => array( 'kind' => 'color', 'label' => 'Primary' ),
-				'colors.accent'           => array( 'kind' => 'color', 'label' => 'Accent (buttons)' ),
-				'colors.background'       => array( 'kind' => 'color', 'label' => 'Background' ),
+				'colors.primary'          => array( 'kind' => 'color', 'label' => 'Primary', 'default' => '#2563EB' ),
+				'colors.accent'           => array( 'kind' => 'color', 'label' => 'Accent (buttons)', 'default' => '#2317F9' ),
+				'colors.light_bg'         => array( 'kind' => 'color', 'label' => 'Background', 'default' => '#F8FAFC' ),
 				'fonts.heading'           => array( 'kind' => 'text', 'label' => 'Heading font' ),
 				'fonts.body'              => array( 'kind' => 'text', 'label' => 'Body font' ),
 				'layout.section_padding'  => array( 'kind' => 'number', 'label' => 'Density (50 compact – 150 airy)', 'min' => 50, 'max' => 150, 'step' => 10 ),

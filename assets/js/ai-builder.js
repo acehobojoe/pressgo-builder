@@ -1993,13 +1993,33 @@
 				hideTextToolbar();
 				if (hovered) { positionHandle(hovered); var r = hovered.getBoundingClientRect(); chip.style.left = Math.max(0, r.left) + 'px'; chip.style.top = Math.max(0, r.top) + 'px'; }
 			}
+			// Viewport switch (desktop/tablet/mobile) resizes the iframe — every
+			// fixed-position overlay inside it (grip handle, label chip, inline
+			// hint) keeps stale coordinates until repositioned. The iframe's own
+			// resize event fires throughout the width transition, so this also
+			// covers parent-window resizes for free.
+			function onWinResize() {
+				hideTextToolbar();
+				if (dragState) return; // mid-drag: the rAF loop owns positioning
+				if (hovered && hovered.isConnected) {
+					positionHandle(hovered);
+					var r = hovered.getBoundingClientRect();
+					chip.style.left = Math.max(0, r.left) + 'px';
+					chip.style.top = Math.max(0, r.top) + 'px';
+				} else {
+					handle.style.display = 'none';
+					chip.style.display = 'none';
+				}
+				if (inline) showInlineHint(inline); // re-anchor the floating hint
+			}
 			doc.addEventListener('mouseover', onOver, true);
 			doc.addEventListener('click', onClick, true);
 			doc.addEventListener('dblclick', onDblClick, true);
 			doc.addEventListener('mouseup', onSelMouseUp, true);
 			doc.addEventListener('selectionchange', onSelChange);
 			doc.defaultView && doc.defaultView.addEventListener('scroll', onDocScroll, { passive: true });
-			docState = { doc: doc, style: style, chip: chip, handle: handle, onOver: onOver, onClick: onClick, onDblClick: onDblClick, onSelMouseUp: onSelMouseUp, onSelChange: onSelChange, onDocScroll: onDocScroll };
+			doc.defaultView && doc.defaultView.addEventListener('resize', onWinResize);
+			docState = { doc: doc, style: style, chip: chip, handle: handle, onOver: onOver, onClick: onClick, onDblClick: onDblClick, onSelMouseUp: onSelMouseUp, onSelChange: onSelChange, onDocScroll: onDocScroll, onWinResize: onWinResize };
 			markSelected();
 
 			if (!doc.querySelector('.pg-sec') && !noSecToastShown) {
@@ -2019,6 +2039,7 @@
 				if (docState.onSelMouseUp) docState.doc.removeEventListener('mouseup', docState.onSelMouseUp, true);
 				if (docState.onSelChange) docState.doc.removeEventListener('selectionchange', docState.onSelChange);
 				if (docState.onDocScroll && docState.doc.defaultView) docState.doc.defaultView.removeEventListener('scroll', docState.onDocScroll);
+				if (docState.onWinResize && docState.doc.defaultView) docState.doc.defaultView.removeEventListener('resize', docState.onWinResize);
 				if (docState.handle) docState.handle.remove();
 				var marked2 = docState.doc.querySelectorAll('.pg-ed-text');
 				for (var j = 0; j < marked2.length; j++) marked2[j].classList.remove('pg-ed-text');
@@ -2262,7 +2283,14 @@
 					}
 				} else {
 					var cur = (cfg.pageConfig || {})[selectedSectionKey];
-					working = (cur && typeof cur === 'object') ? deepClone(cur) : {};
+					if (spec && spec.bare && typeof cur === 'string') {
+						// Bare-string section (disclaimer): promote to the {text}
+						// object shape the panel + renderers both understand.
+						working = {};
+						working[spec.bare] = cur;
+					} else {
+						working = (cur && typeof cur === 'object') ? deepClone(cur) : {};
+					}
 				}
 			}
 			controls = [];
@@ -2276,13 +2304,24 @@
 			var body = panelEl.querySelector('.pg-ed-body');
 			body.innerHTML = '';
 
+			// Explanatory note (e.g. blog: posts are pulled automatically) —
+			// rendered above the fields so a sparse panel reads intentional.
+			if (spec && spec.note) {
+				var noteEl = document.createElement('div');
+				noteEl.className = 'pg-ed-note';
+				noteEl.textContent = spec.note;
+				body.appendChild(noteEl);
+			}
+
 			if (!spec || !Object.keys(spec.fields || {}).length) {
-				var empty = document.createElement('div');
-				empty.className = 'pg-ed-empty';
-				empty.textContent = pageMode
-					? 'No page-level settings available.'
-					: 'No quick-edit fields for this section type yet — describe the change in chat and the AI will handle it.';
-				body.appendChild(empty);
+				if (!spec || !spec.note) {
+					var empty = document.createElement('div');
+					empty.className = 'pg-ed-empty';
+					empty.textContent = pageMode
+						? 'No page-level settings available.'
+						: 'No quick-edit fields for this section type yet — describe the change in chat and the AI will handle it.';
+					body.appendChild(empty);
+				}
 				paintApply();
 				return;
 			}
@@ -2431,7 +2470,10 @@
 					return fieldRow(f.label, wrap, f.hint);
 				}
 				case 'color': {
-					var hex = toHex6(value);
+					// No stored value → show the validator's default (what the
+					// generator actually renders with), never a gray “–” swatch.
+					// First edit writes the value into the config explicitly.
+					var hex = toHex6(value) || toHex6(f.default || '');
 					var c = document.createElement('input');
 					c.type = 'color';
 					c.value = hex || '#cccccc';
@@ -2478,11 +2520,14 @@
 					if (pageMode && f.min != null && f.max != null) {
 						var sbox = document.createElement('div');
 						sbox.className = 'pg-ed-slider';
+						var srow = document.createElement('div');
+						srow.className = 'pg-ed-slider-row';
 						var rg = document.createElement('input');
 						rg.type = 'range';
 						rg.min = f.min;
 						rg.max = f.max;
 						if (f.step != null) rg.step = f.step;
+						rg.setAttribute('aria-label', f.label);
 						var initial = (value == null || isNaN(parseFloat(value)))
 							? (SLIDER_DEFAULTS[fkey] != null ? SLIDER_DEFAULTS[fkey] : (Number(f.min) + Number(f.max)) / 2)
 							: parseFloat(value);
@@ -2490,6 +2535,8 @@
 						var out = document.createElement('span');
 						out.className = 'pg-ed-slider-val';
 						out.textContent = String(initial);
+						// 'input' fires continuously while dragging AND on every
+						// keyboard arrow nudge — readout + live CSS track both.
 						rg.addEventListener('input', function () {
 							var num = parseFloat(rg.value);
 							if (isNaN(num)) return;
@@ -2501,8 +2548,19 @@
 							}
 							markDirty(fkey);
 						});
-						sbox.appendChild(rg);
-						sbox.appendChild(out);
+						srow.appendChild(rg);
+						srow.appendChild(out);
+						sbox.appendChild(srow);
+						// Visible min/max range under the track.
+						var scale = document.createElement('div');
+						scale.className = 'pg-ed-slider-scale';
+						var smin = document.createElement('span');
+						smin.textContent = String(f.min);
+						var smax = document.createElement('span');
+						smax.textContent = String(f.max);
+						scale.appendChild(smin);
+						scale.appendChild(smax);
+						sbox.appendChild(scale);
 						return fieldRow(f.label, sbox, f.hint);
 					}
 					var n = document.createElement('input');
@@ -2874,6 +2932,13 @@
 				var spec = edFields[baseType(key)];
 				if (!spec || !spec.fields) return; // not a section (colors/fonts/…)
 				var sec = (!pageMode && key === selectedSectionKey && working) ? working : pc[key];
+				if (spec.bare && typeof sec === 'string') {
+					// Bare-string section (disclaimer) — index it under the same
+					// {text} shape the panel edits, so click-to-type works on it.
+					var bareObj = {};
+					bareObj[spec.bare] = sec;
+					sec = bareObj;
+				}
 				if (!sec || typeof sec !== 'object') return;
 				Object.keys(spec.fields).forEach(function (fkey) {
 					var f = spec.fields[fkey] || {};
@@ -3816,6 +3881,30 @@
 				e.preventDefault();
 				e.stopPropagation();
 				if (e.shiftKey) doRedo(); else doUndo();
+				return;
+			}
+			// Esc unwinds ONE layer at a time: drag → picker/toolbar → inline
+			// (handled by the editable element's own keydown) → panel field
+			// focus → section selection → select mode off. Never all at once.
+			if (k === 'Escape' && selectMode) {
+				if (document.querySelector('.pg-modal-backdrop')) return; // modal owns Esc
+				if (inline) return; // the inline editor's keydown cancels just the edit
+				if (dragState) { e.preventDefault(); cancelSectionDrag(); return; }
+				if (imgPicker) { e.preventDefault(); closeImagePicker(); return; }
+				if (tbEl) { e.preventDefault(); hideTextToolbar(); return; }
+				if (isEditableTarget(e.target)) {
+					// Focus in a PANEL field: Esc leaves the field (one layer).
+					// Editables elsewhere (page title rename, chat box) keep
+					// their own Esc behavior untouched.
+					if (panelEl && panelEl.contains(e.target)) {
+						e.preventDefault();
+						try { e.target.blur(); } catch (err) {}
+					}
+					return;
+				}
+				if (selectedSectionKey) { e.preventDefault(); clearSelection(); return; }
+				e.preventDefault();
+				setSelectMode(false);
 				return;
 			}
 			if ((k === 'ArrowLeft' || k === 'ArrowRight') && selectMode && selectedSectionKey && !pageMode) {
