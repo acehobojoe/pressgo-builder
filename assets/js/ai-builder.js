@@ -1603,7 +1603,8 @@
 	});
 
 	// ════════════════════════════════════════════════════════════════════
-	// Visual editor — Select mode + schema-driven property panel.
+	// Visual editor — Select mode + schema-driven property panel + inline
+	// text editing (click text in the preview and just type, Word-doc style).
 	//
 	// Every section root in the preview carries `pg-sec pg-key--{key}`
 	// classes (the key encodes "#" as "--": gallery#2 → gallery--2). The
@@ -1629,6 +1630,7 @@
 		var panelEl    = null;
 		var chatChip   = null;
 		var noSecToastShown = false;
+		var inline     = null;   // active inline text edit (see Inline editing block)
 
 		// Auto-apply (autosave) state — one request in flight at a time,
 		// latest-wins queue behind it.
@@ -1792,6 +1794,7 @@
 				armDoc();
 				clearSelection(true); // opens the panel on the Page tab
 			} else {
+				if (inline) commitInline();  // a focused inline edit saves too
 				if (isDirty()) flushApply(); // autosave anything pending on exit
 				disarmDoc();
 				selectedSectionKey = '';
@@ -1821,7 +1824,22 @@
 				'#pg-select-chip { position: fixed; z-index: 2147483646; background: #5b4fff; color: #fff;' +
 					'font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
 					'padding: 3px 9px; border-radius: 0 0 6px 0; pointer-events: none; display: none;' +
-					'box-shadow: 0 2px 8px rgba(91,79,255,0.35); letter-spacing: 0.02em; }'
+					'box-shadow: 0 2px 8px rgba(91,79,255,0.35); letter-spacing: 0.02em; }',
+				// Inline text editing: discoverability (I-beam + dotted underline
+				// shimmer on editable text inside the SELECTED section), the
+				// hairline outline while editing, and the tiny floating hint.
+				'@keyframes pg-ed-shimmer { 0%,100% { text-decoration-color: rgba(91,79,255,0.25); } 50% { text-decoration-color: rgba(91,79,255,0.8); } }',
+				'.pg-sec.pg-ed-selected .pg-ed-text { cursor: text !important; }',
+				'.pg-sec.pg-ed-selected .pg-ed-text:hover { text-decoration-line: underline !important; text-decoration-style: dotted !important;' +
+					'text-decoration-color: rgba(91,79,255,0.55) !important; text-underline-offset: 3px;' +
+					'animation: pg-ed-shimmer 1.6s ease-in-out infinite; }',
+				'.pg-inline-editing { outline: 1px solid rgba(91,79,255,0.95) !important; outline-offset: 3px !important;' +
+					'box-shadow: 0 0 0 5px rgba(91,79,255,0.10); cursor: text !important; border-radius: 2px;' +
+					'text-decoration: none !important; animation: none !important; caret-color: #5b4fff; }',
+				'#pg-inline-hint { position: absolute; z-index: 2147483646; background: rgba(17,17,26,0.92); color: #fff;' +
+					'font: 500 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
+					'padding: 5px 8px; border-radius: 5px; pointer-events: none; display: none;' +
+					'letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }'
 			].join('\n');
 			(doc.head || doc.body).appendChild(style);
 
@@ -1839,7 +1857,11 @@
 				if (sec) {
 					sec.classList.add('pg-ed-hover');
 					var r = sec.getBoundingClientRect();
-					chip.textContent = sectionLabel(keyOfSection(sec));
+					var k = keyOfSection(sec);
+					// Discoverability: the chip on the SELECTED section teaches
+					// the inline-edit gesture.
+					chip.textContent = sectionLabel(k) +
+						(k && k === selectedSectionKey ? ' · double-click text to edit' : '');
 					chip.style.left = Math.max(0, r.left) + 'px';
 					chip.style.top = Math.max(0, r.top) + 'px';
 					chip.style.display = 'block';
@@ -1849,6 +1871,12 @@
 			}
 			function onClick(e) {
 				if (!selectMode) return;
+				// Mid inline edit: clicks INSIDE the editable element must reach
+				// the browser (caret placement) — only links stay inert.
+				if (inline && inline.el && (inline.el === e.target || inline.el.contains(e.target))) {
+					if (e.target.closest && e.target.closest('a')) e.preventDefault();
+					return;
+				}
 				// Select mode owns clicks: never follow links / fire toggles.
 				e.preventDefault();
 				e.stopPropagation();
@@ -1857,14 +1885,34 @@
 				var key = keyOfSection(sec);
 				if (!key) { clearSelection(); return; }
 				if (key === selectedSectionKey) {
-					focusFieldForElement(e.target);
+					// Second click inside the selected section: click-to-type.
+					// Exact-text match → edit in place; no/ambiguous match →
+					// the existing focus-the-panel-field heuristic.
+					if (!attemptInlineEdit(e.target, e.clientX, e.clientY)) {
+						focusFieldForElement(e.target);
+					}
 					return;
 				}
 				selectSection(key);
 			}
+			function onDblClick(e) {
+				if (!selectMode) return;
+				if (inline && inline.el && (inline.el === e.target || inline.el.contains(e.target))) return;
+				e.preventDefault();
+				e.stopPropagation();
+				var sec = e.target && e.target.closest ? e.target.closest('.pg-sec') : null;
+				if (!sec) return;
+				var key = keyOfSection(sec);
+				if (!key) return;
+				if (key !== selectedSectionKey) selectSection(key);
+				if (!attemptInlineEdit(e.target, e.clientX, e.clientY)) {
+					focusFieldForElement(e.target);
+				}
+			}
 			doc.addEventListener('mouseover', onOver, true);
 			doc.addEventListener('click', onClick, true);
-			docState = { doc: doc, style: style, chip: chip, onOver: onOver, onClick: onClick };
+			doc.addEventListener('dblclick', onDblClick, true);
+			docState = { doc: doc, style: style, chip: chip, onOver: onOver, onClick: onClick, onDblClick: onDblClick };
 			markSelected();
 
 			if (!doc.querySelector('.pg-sec') && !noSecToastShown) {
@@ -1878,6 +1926,9 @@
 			try {
 				docState.doc.removeEventListener('mouseover', docState.onOver, true);
 				docState.doc.removeEventListener('click', docState.onClick, true);
+				if (docState.onDblClick) docState.doc.removeEventListener('dblclick', docState.onDblClick, true);
+				var marked2 = docState.doc.querySelectorAll('.pg-ed-text');
+				for (var j = 0; j < marked2.length; j++) marked2[j].classList.remove('pg-ed-text');
 				if (docState.style) docState.style.remove();
 				if (docState.chip) docState.chip.remove();
 				var marked = docState.doc.querySelectorAll('.pg-ed-hover, .pg-ed-selected');
@@ -1899,6 +1950,7 @@
 					var sec = doc.querySelector('.pg-key--' + encodeKey(selectedSectionKey));
 					if (sec) sec.classList.add('pg-ed-selected');
 				}
+				markEditableText();
 			} catch (e) {}
 		}
 
@@ -1934,6 +1986,7 @@
 		}
 
 		function selectSection(key) {
+			if (inline && inline.key !== key) commitInline(); // leaving an edit = save it
 			if (!confirmDiscard()) return;
 			selectedSectionKey = key;
 			markSelected();
@@ -1943,6 +1996,7 @@
 		}
 
 		function clearSelection(keepQuiet) {
+			if (inline) commitInline();
 			if (!keepQuiet && !confirmDiscard()) return;
 			selectedSectionKey = '';
 			markSelected();
@@ -2612,6 +2666,440 @@
 			}
 		}
 
+		// ════════════════════════════════════════════════════════════════
+		// Inline text editing — click text on the page and just type.
+		//
+		// A value→path INDEX is built from cfg.pageConfig, restricted to
+		// section types + fields present in cfg.editorFields (the safety
+		// whitelist — same fields the panel exposes, incl. repeater
+		// sub-fields and list items). A second click (or double-click) on a
+		// text element inside the selected section matches its normalized
+		// textContent against the index: exact match required, section keys
+		// scoped first, whole page as fallback; ambiguous or no match falls
+		// back to the panel-field heuristic above. On match the element goes
+		// contentEditable in place — typing IS the optimistic preview. Blur
+		// or Enter commits the text into `working` at the matched path and
+		// rides the EXISTING markDirty → auto-apply → buffered-swap save
+		// path (no second save pipeline). Esc reverts. If a swap lands
+		// mid-edit, the frameReady hook below carries the editing state into
+		// the fresh document.
+		// ════════════════════════════════════════════════════════════════
+
+		// 'plaintext-only' keeps paste/Enter sane; fall back where unsupported.
+		var ceMode = (function () {
+			try {
+				var d = document.createElement('div');
+				d.contentEditable = 'plaintext-only';
+				return d.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true';
+			} catch (e) { return 'true'; }
+		})();
+
+		function getAtPath(obj, pathArr) {
+			var o = obj;
+			for (var i = 0; i < pathArr.length; i++) {
+				if (o == null || typeof o !== 'object') return undefined;
+				o = o[pathArr[i]];
+			}
+			return o;
+		}
+		function setAtPath(obj, pathArr, val) {
+			var o = obj;
+			for (var i = 0; i < pathArr.length - 1; i++) {
+				var k = pathArr[i];
+				if (o[k] == null || typeof o[k] !== 'object') {
+					o[k] = (typeof pathArr[i + 1] === 'number') ? [] : {};
+				}
+				o = o[k];
+			}
+			o[pathArr[pathArr.length - 1]] = val;
+		}
+		function readText(el) {
+			var t;
+			try { t = el.innerText; } catch (e) { t = el.textContent; }
+			return String(t == null ? '' : t).replace(/\u00a0/g, ' ');
+		}
+		function setElText(el, text) {
+			try { el.innerText = text; }
+			catch (e) { el.textContent = text; }
+		}
+
+		// ── Value→path index ──────────────────────────────────────────
+		// Entry: { key, path:[fkey,(i),(subkey)], norm, single, dirtyKey }.
+		// `single` = Enter commits (headline/eyebrow/cta text…); textarea-ish
+		// fields allow Shift+Enter newlines. Rebuilt on demand (the config is
+		// small), with `working` overlaying the selected section so freshly
+		// committed-but-unsaved text still matches.
+		function pushEntry(idx, key, path, val, single, dirtyKey) {
+			if (typeof val !== 'string') return;
+			var n = normText(val);
+			if (!n || n.length > 400) return;
+			idx.push({ key: key, path: path, norm: n, single: !!single, dirtyKey: dirtyKey });
+		}
+		function pushItemEntries(idx, key, fkey, i, item, sub) {
+			Object.keys(item).forEach(function (sk) {
+				if (typeof item[sk] !== 'string') return;
+				// Whitelist: declared repeater sub-fields use the schema kind;
+				// inferred (list-of-objects) mirror the panel's guessKind.
+				var kind = sub ? (sub[sk] && sub[sk].kind) : guessKind(sk);
+				if (kind !== 'text' && kind !== 'textarea') return;
+				pushEntry(idx, key, [fkey, i, sk], item[sk], kind === 'text', fkey);
+			});
+		}
+		function buildValueIndex() {
+			var idx = [];
+			var pc = cfg.pageConfig || {};
+			Object.keys(pc).forEach(function (key) {
+				var spec = edFields[baseType(key)];
+				if (!spec || !spec.fields) return; // not a section (colors/fonts/…)
+				var sec = (!pageMode && key === selectedSectionKey && working) ? working : pc[key];
+				if (!sec || typeof sec !== 'object') return;
+				Object.keys(spec.fields).forEach(function (fkey) {
+					var f = spec.fields[fkey] || {};
+					var v = sec[fkey];
+					if (v == null) return;
+					switch (f.kind) {
+						case 'text':
+							pushEntry(idx, key, [fkey], v, true, fkey);
+							break;
+						case 'textarea':
+							pushEntry(idx, key, [fkey], v, false, fkey);
+							break;
+						case 'cta':
+							if (typeof v === 'string') pushEntry(idx, key, [fkey], v, true, fkey);
+							else if (typeof v === 'object') pushEntry(idx, key, [fkey, 'text'], v.text, true, fkey + '.text');
+							break;
+						case 'list':
+							if (!Array.isArray(v)) break;
+							for (var i = 0; i < v.length; i++) {
+								if (typeof v[i] === 'string') pushEntry(idx, key, [fkey, i], v[i], true, fkey);
+								else if (v[i] && typeof v[i] === 'object') pushItemEntries(idx, key, fkey, i, v[i], null);
+							}
+							break;
+						case 'repeater':
+							if (!Array.isArray(v)) break;
+							var sub = (f.fields && Object.keys(f.fields).length) ? f.fields : null;
+							for (var j = 0; j < v.length; j++) {
+								if (v[j] && typeof v[j] === 'object') pushItemEntries(idx, key, fkey, j, v[j], sub);
+							}
+							break;
+					}
+				});
+			});
+			return idx;
+		}
+
+		// ── Matcher ───────────────────────────────────────────────────
+		// Walk target → section root; first element whose normalized text
+		// equals exactly ONE index value (section scope first, then page)
+		// becomes editable. Ambiguity at any level = give up (panel opens).
+		function attemptInlineEdit(target, x, y) {
+			if (!target || !target.closest) return false;
+			var sec = target.closest('.pg-sec');
+			if (!sec) return false;
+			var key = keyOfSection(sec);
+			if (!key) return false;
+			var idx = buildValueIndex();
+			var el = target.nodeType === 1 ? target : target.parentElement;
+			while (el && el !== sec) {
+				var tc = el.textContent || '';
+				if (tc.trim() && tc.length <= 600) {
+					var n = normText(tc);
+					var inSec = [], anywhere = [];
+					for (var i = 0; i < idx.length; i++) {
+						if (idx[i].norm !== n) continue;
+						anywhere.push(idx[i]);
+						if (idx[i].key === key) inSec.push(idx[i]);
+					}
+					var entry = inSec.length === 1 ? inSec[0]
+						: (inSec.length === 0 && anywhere.length === 1 ? anywhere[0] : null);
+					if (entry) return startInline(el, entry, x, y);
+					if (anywhere.length > 1) return false; // ambiguous → panel
+				}
+				el = el.parentElement;
+			}
+			return false;
+		}
+
+		// ── Editing state machine ─────────────────────────────────────
+		function startInline(el, entry, x, y) {
+			if (inline && inline.el === el) return true; // already editing it
+			if (inline) commitInline();
+			if (entry.key !== selectedSectionKey) selectSection(entry.key); // sets `working`
+			var st = {
+				el: el,
+				key: entry.key,
+				path: entry.path,
+				dirtyKey: entry.dirtyKey,
+				single: entry.single,
+				original: readText(el),
+				originalHTML: el.innerHTML
+			};
+			st.onKey = function (e) {
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					e.stopPropagation();
+					cancelInline();
+				} else if (e.key === 'Enter') {
+					if (!st.single && e.shiftKey) return; // newline in textarea-kind
+					e.preventDefault();
+					e.stopPropagation();
+					commitInline();
+				}
+			};
+			st.onBlur = function () { commitInline(); };
+			st.onInput = function () { syncPanelControl(st.path.join('.'), readText(st.el)); };
+			inline = st;
+			dressInline(st);
+			try { st.el.focus(); } catch (e) {}
+			if (x != null) placeCaretAtPoint(st.el, x, y);
+			else placeCaretAtEnd(st.el);
+			showInlineHint(st);
+			return true;
+		}
+
+		function dressInline(st) {
+			try {
+				st.el.setAttribute('contenteditable', ceMode);
+				st.el.setAttribute('spellcheck', 'true');
+				st.el.classList.add('pg-inline-editing');
+				st.el.addEventListener('keydown', st.onKey, true);
+				st.el.addEventListener('blur', st.onBlur);
+				st.el.addEventListener('input', st.onInput);
+			} catch (e) {}
+		}
+		function undressInline(st) {
+			try {
+				st.el.removeEventListener('keydown', st.onKey, true);
+				st.el.removeEventListener('blur', st.onBlur);
+				st.el.removeEventListener('input', st.onInput);
+				st.el.removeAttribute('contenteditable');
+				st.el.removeAttribute('spellcheck');
+				st.el.classList.remove('pg-inline-editing');
+			} catch (e) {}
+			hideInlineHint(st);
+		}
+
+		// Commit = Word-doc save: the DOM already shows the text; write it
+		// into `working` at the matched path and let the EXISTING autosave
+		// machinery (markDirty → flush → apply → buffered swap) persist it.
+		function commitInline() {
+			if (!inline) return;
+			var st = inline;
+			inline = null;
+			undressInline(st);
+			var raw = readText(st.el);
+			var text = st.single ? raw.replace(/\s*\n+\s*/g, ' ').trim() : raw.replace(/^\n+|\n+$/g, '');
+			var origCmp = st.single ? st.original.replace(/\s*\n+\s*/g, ' ').trim() : st.original.replace(/^\n+|\n+$/g, '');
+			if (text === origCmp) {
+				// Unchanged — restore the exact original markup (nested spans,
+				// highlights) the browser may have flattened while editing.
+				try { st.el.innerHTML = st.originalHTML; } catch (e) {}
+				return;
+			}
+			if (!normText(text)) {
+				try { st.el.innerHTML = st.originalHTML; } catch (e) {}
+				showToast('Kept the original text — clear a field from the panel instead.');
+				return;
+			}
+			if (st.single && raw !== text) setElText(st.el, text); // show what we save
+			if (pageMode || selectedSectionKey !== st.key) selectSection(st.key);
+			if (!working || typeof working !== 'object') return; // section vanished
+			setAtPath(working, st.path, text);
+			syncPanelControl(st.path.join('.'), text);
+			markDirty(st.dirtyKey);
+			markEditableText(); // re-anchor affordance marks to the new text
+		}
+
+		// Esc: put the element back exactly as it was, save nothing.
+		function cancelInline() {
+			if (!inline) return;
+			var st = inline;
+			inline = null;
+			undressInline(st);
+			try { st.el.innerHTML = st.originalHTML; } catch (e) { setElText(st.el, st.original); }
+			syncPanelControl(st.path.join('.'), st.original);
+		}
+
+		// ── Panel sync (no focus steal) ───────────────────────────────
+		// Inline edits mirror into the open panel's matching control. The
+		// registry paths use the same dotted shape as entry paths.
+		function syncPanelControl(pathStr, text) {
+			if (!panelEl || !panelEl.classList.contains('is-open')) return;
+			for (var i = 0; i < controls.length; i++) {
+				if (controls[i].path === pathStr) {
+					var c = controls[i].el;
+					if (document.activeElement !== c) c.value = text;
+					return;
+				}
+			}
+		}
+
+		// ── Caret helpers ─────────────────────────────────────────────
+		function placeCaretAtPoint(el, x, y) {
+			try {
+				var doc = el.ownerDocument;
+				var win = doc.defaultView;
+				var range = null;
+				if (doc.caretRangeFromPoint) {
+					range = doc.caretRangeFromPoint(x, y);
+				} else if (doc.caretPositionFromPoint) {
+					var p = doc.caretPositionFromPoint(x, y);
+					if (p) {
+						range = doc.createRange();
+						range.setStart(p.offsetNode, p.offset);
+					}
+				}
+				if (!range || !el.contains(range.startContainer)) { placeCaretAtEnd(el); return; }
+				range.collapse(true);
+				var sel = win.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			} catch (e) { placeCaretAtEnd(el); }
+		}
+		function placeCaretAtEnd(el) {
+			try {
+				var doc = el.ownerDocument;
+				var range = doc.createRange();
+				range.selectNodeContents(el);
+				range.collapse(false);
+				var sel = doc.defaultView.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			} catch (e) {}
+		}
+
+		// ── Floating hint ("esc to cancel") ───────────────────────────
+		function showInlineHint(st) {
+			try {
+				var doc = st.el.ownerDocument;
+				var h = doc.getElementById('pg-inline-hint');
+				if (!h) {
+					h = doc.createElement('div');
+					h.id = 'pg-inline-hint';
+					doc.body.appendChild(h);
+				}
+				h.textContent = st.single
+					? 'enter to save · esc to cancel'
+					: 'enter to save · shift+enter = new line · esc to cancel';
+				var r = st.el.getBoundingClientRect();
+				var win = doc.defaultView;
+				var top = r.top + (win.pageYOffset || 0) - 28;
+				if (r.top < 34) top = r.bottom + (win.pageYOffset || 0) + 8;
+				h.style.top = top + 'px';
+				h.style.left = Math.max(4, r.left + (win.pageXOffset || 0)) + 'px';
+				h.style.display = 'block';
+			} catch (e) {}
+		}
+		function hideInlineHint(st) {
+			var docs = [];
+			try { if (st && st.el && st.el.ownerDocument) docs.push(st.el.ownerDocument); } catch (e) {}
+			try { if (frame.contentDocument) docs.push(frame.contentDocument); } catch (e) {}
+			for (var i = 0; i < docs.length; i++) {
+				try {
+					var h = docs[i].getElementById('pg-inline-hint');
+					if (h) h.style.display = 'none';
+				} catch (e) {}
+			}
+		}
+
+		// ── Affordance marks ──────────────────────────────────────────
+		// Tag the deepest element rendering each editable value of the
+		// SELECTED section with .pg-ed-text → I-beam cursor + underline
+		// shimmer on hover, so click-to-type is discoverable.
+		function markEditableText() {
+			if (!docState) return;
+			try {
+				var doc = docState.doc;
+				var old = doc.querySelectorAll('.pg-ed-text');
+				for (var i = 0; i < old.length; i++) old[i].classList.remove('pg-ed-text');
+				if (!selectedSectionKey) return;
+				var root = doc.querySelector('.pg-key--' + encodeKey(selectedSectionKey));
+				if (!root) return;
+				var norms = {};
+				var idx = buildValueIndex();
+				for (var j = 0; j < idx.length; j++) {
+					if (idx[j].key === selectedSectionKey) norms[idx[j].norm] = 1;
+				}
+				var els = root.querySelectorAll('*');
+				var matches = [];
+				for (var k = 0; k < els.length; k++) {
+					var tc = els[k].textContent || '';
+					if (!tc.trim() || tc.length > 600) continue;
+					if (norms[normText(tc)]) matches.push(els[k]);
+				}
+				for (var m = 0; m < matches.length; m++) {
+					var deepest = true;
+					for (var o = 0; o < matches.length; o++) {
+						if (o !== m && matches[m].contains(matches[o])) { deepest = false; break; }
+					}
+					if (deepest) matches[m].classList.add('pg-ed-text');
+				}
+			} catch (e) {}
+		}
+
+		// ── Mid-edit swap carry-over ──────────────────────────────────
+		// A buffered swap mustn't eat a focused inline edit (e.g. an earlier
+		// apply on ANOTHER section lands while the user is typing). Re-find
+		// the element in the fresh document by section key + the value the
+		// server rendered at the path, replay the in-progress text, restore
+		// caret to end. Runs after the re-arm hook above (registration order).
+		function findDeepestByNorm(root, norm) {
+			if (!norm) return null;
+			var els = root.querySelectorAll('*');
+			var matches = [];
+			for (var i = 0; i < els.length; i++) {
+				var tc = els[i].textContent || '';
+				if (!tc.trim() || tc.length > 600) continue;
+				if (normText(tc) === norm) matches.push(els[i]);
+			}
+			for (var m = 0; m < matches.length; m++) {
+				var deepest = true;
+				for (var o = 0; o < matches.length; o++) {
+					if (o !== m && matches[m].contains(matches[o])) { deepest = false; break; }
+				}
+				if (deepest) return matches[m];
+			}
+			return null;
+		}
+		onFrameReady(function () {
+			if (!inline) return;
+			var st = inline;
+			var txt = readText(st.el); // old doc still parked in the spare frame
+			undressInline(st);
+			var target = null;
+			try {
+				var doc = frame.contentDocument;
+				var root = doc && doc.querySelector('.pg-key--' + encodeKey(st.key));
+				if (root) {
+					var savedVal = getAtPath((cfg.pageConfig || {})[st.key], st.path);
+					target = findDeepestByNorm(root, normText(savedVal)) ||
+						findDeepestByNorm(root, normText(st.original)) ||
+						findDeepestByNorm(root, normText(txt));
+				}
+			} catch (e) {}
+			if (!target) {
+				// Can't carry the caret — but never lose the typing: commit
+				// the in-progress text through the normal save path.
+				inline = null;
+				var text = st.single ? txt.replace(/\s*\n+\s*/g, ' ').trim() : txt.replace(/^\n+|\n+$/g, '');
+				var origCmp = st.single ? st.original.replace(/\s*\n+\s*/g, ' ').trim() : st.original;
+				if (normText(text) && text !== origCmp && !pageMode && selectedSectionKey === st.key && working) {
+					setAtPath(working, st.path, text);
+					syncPanelControl(st.path.join('.'), text);
+					markDirty(st.dirtyKey);
+				}
+				return;
+			}
+			if (readText(target) !== txt) setElText(target, txt);
+			st.el = target;
+			inline = st;
+			dressInline(st);
+			try { st.el.focus(); } catch (e) {}
+			placeCaretAtEnd(st.el);
+			showInlineHint(st);
+			window.__pgPerf.inlineCarries = (window.__pgPerf.inlineCarries || 0) + 1;
+		});
+
 		// ── Optimistic text preview ───────────────────────────────────
 		// While typing, live-swap the matching text node inside the selected
 		// section so the edit feels instant. Authoritative render = Apply.
@@ -2775,7 +3263,16 @@
 					dirty: Object.keys(dirtyKeys), working: working,
 					applyBusy: applyBusy, queued: !!queuedPatch, retry: !!retryPatch
 				};
-			}
+			},
+			// Inline-editing introspection + a real apply trigger (used by the
+			// mid-edit swap-carry test: applying ANOTHER section's patch while
+			// an inline edit is focused must not eat the typing).
+			inline: function () {
+				return inline ? { key: inline.key, path: inline.path.join('.'), single: inline.single } : null;
+			},
+			indexSize: function () { return buildValueIndex().length; },
+			config: function () { return cfg.pageConfig; },
+			testApply: function (patch, label) { sendPatch({ patch: patch || {}, label: label || 'test apply' }); }
 		};
 	})();
 
