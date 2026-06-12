@@ -470,39 +470,41 @@
 	// Visual editor selection (set by the Select-mode module below). When a
 	// section is selected, chat requests carry it so the AI scopes its patch.
 	var selectedSectionKey = '';
-	function reloadPreview(bust) {
-		try {
-			// Capture current scroll position before tearing down the doc.
-			try {
-				if (frame.contentWindow && frame.contentWindow.scrollY !== undefined) {
-					savedScrollY = frame.contentWindow.scrollY;
-				}
-			} catch (e) { /* cross-origin would block; we're same-origin so OK */ }
-			previewWrap.classList.add('is-reloading');
-			var url = cfg.previewBase;
-			var sep = url.indexOf('?') === -1 ? '?' : '&';
-			var fresh = url + sep + 'pg_clean=1&_t=' + (bust || Date.now()) + '&_r=' + Math.random().toString(36).slice(2, 8);
-			try {
-				if (frame.contentWindow && frame.contentWindow.location) {
-					frame.contentWindow.location.replace(fresh);
-				} else {
-					frame.src = fresh;
-				}
-			} catch (e) {
-				frame.src = fresh;
-			}
-		} catch (e) { /* noop */ }
+
+	// ─── Double-buffered preview swap ──────────────────────────────────
+	// The old reloadPreview() navigated the visible iframe — a blank flash,
+	// a scroll jump, and a second of "where am I" on every apply. Instead,
+	// every refresh now loads the new render into a HIDDEN spare iframe;
+	// when its load event fires we copy the visible frame's scroll position
+	// into it and atomically swap visibility. Ping-pong: the old frame
+	// becomes the next spare. The user never sees a loading frame.
+	//
+	// Perf probe for tests (no console noise): timestamps land here.
+	window.__pgPerf = { lastInputAt: 0, flushAt: 0, savedAt: 0, swapDoneAt: 0, pendingSwap: false, swaps: 0 };
+
+	var spareFrame   = null;   // hidden buffer iframe (after first swap: the previous active)
+	var swapBusy     = false;  // one swap in flight at a time
+	var swapNextBust = null;   // latest-wins: a reload requested mid-swap
+	var swapWatchdog = null;
+
+	// Hooks run whenever the ACTIVE frame has a fresh, ready document
+	// (initial load, in-frame navigation, or a completed buffered swap).
+	// The visual editor re-arms select mode + re-outlines the selection here.
+	var frameReadyHooks = [];
+	function onFrameReady(fn) { frameReadyHooks.push(fn); }
+	function notifyFrameReady() {
+		for (var i = 0; i < frameReadyHooks.length; i++) {
+			try { frameReadyHooks[i](); } catch (e) { /* keep the rest alive */ }
+		}
 	}
 
-	// Belt-and-suspenders: even with show_admin_bar(false), some
-	// plugins (Elementor Pro Notes, Elementor Debugger, etc.) inject their
-	// own toolbars. Same-origin iframe means we can reach into its document
-	// and strip them on every load. Also drop the reload overlay here so
-	// the fade-in syncs to "actually rendered" not just "src changed".
-	function onIframeLoad() {
+	// Belt-and-suspenders: even with show_admin_bar(false), some plugins
+	// (Elementor Pro Notes, Elementor Debugger, etc.) inject their own
+	// toolbars. Same-origin iframe means we can strip them from any doc.
+	function scrubDoc(doc) {
+		if (!doc) return;
 		try {
-			var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-			if (doc) {
+			if (!doc.getElementById('pg-iframe-scrub')) {
 				var css = doc.createElement('style');
 				css.id = 'pg-iframe-scrub';
 				css.textContent = [
@@ -511,22 +513,137 @@
 					'html { margin-top: 0 !important; }',
 					'#elementor-editor-wrapper-bar, .e-pro-notes, .e-pro-notes-trigger { display: none !important; }'
 				].join('\n');
-				doc.head && doc.head.appendChild(css);
-				var bar = doc.getElementById('wpadminbar');
-				if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+				(doc.head || doc.body).appendChild(css);
 			}
+			var bar = doc.getElementById('wpadminbar');
+			if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
 		} catch (e) { /* cross-origin — give up */ }
-		// Restore the scroll position the user was at before the rebuild
-		// so they stay anchored on whatever section they were editing.
+	}
+
+	function previewUrl(bust) {
+		var url = cfg.previewBase;
+		var sep = url.indexOf('?') === -1 ? '?' : '&';
+		return url + sep + 'pg_clean=1&_t=' + (bust || Date.now()) + '&_r=' + Math.random().toString(36).slice(2, 8);
+	}
+
+	// Per-iframe load dispatch: the ACTIVE frame loading = initial load or
+	// in-frame navigation; a BUFFER frame loading completes a swap.
+	function attachFrameLoad(f) {
+		f.addEventListener('load', function () {
+			if (f === frame) {
+				onActiveFrameLoad();
+			} else if (f.__pgSwapPending) {
+				f.__pgSwapPending = false;
+				completeSwap(f);
+			}
+		});
+	}
+
+	function onActiveFrameLoad() {
+		scrubDoc(frame.contentDocument);
+		// Restore the scroll position the user was at before a hard reload
+		// (the buffered-swap path restores its own scroll in completeSwap).
 		try {
 			if (savedScrollY > 0 && frame.contentWindow) {
 				frame.contentWindow.scrollTo(0, savedScrollY);
 			}
-		} catch (e) { /* cross-origin or detached */ }
-		// Slight delay so the eye sees the sweep + blur before clearing.
+		} catch (e) { /* detached */ }
 		setTimeout(function () { previewWrap.classList.remove('is-reloading'); }, 180);
+		notifyFrameReady();
 	}
-	frame.addEventListener('load', onIframeLoad);
+
+	function ensureSpare() {
+		if (spareFrame) return spareFrame;
+		spareFrame = document.createElement('iframe');
+		spareFrame.className = 'pg-frame-hidden';
+		spareFrame.setAttribute('aria-hidden', 'true');
+		spareFrame.setAttribute('tabindex', '-1');
+		attachFrameLoad(spareFrame);
+		return spareFrame;
+	}
+
+	function reloadPreview(bust) {
+		if (!stageInner) { hardReloadPreview(bust); return; }
+		if (swapBusy) { swapNextBust = bust || Date.now(); return; } // latest-wins queue
+		swapBusy = true;
+		previewWrap.classList.add('is-refreshing'); // 2px shimmer only — never blur/blank
+		var next = ensureSpare();
+		next.__pgSwapPending = true;
+		var fresh = previewUrl(bust);
+		try {
+			if (next.parentNode && next.contentWindow && next.contentWindow.location) {
+				// location.replace: no history entry per refresh.
+				next.contentWindow.location.replace(fresh);
+			} else {
+				next.src = fresh;
+				if (!next.parentNode) stageInner.appendChild(next);
+			}
+		} catch (e) {
+			next.src = fresh;
+			if (!next.parentNode) stageInner.appendChild(next);
+		}
+		clearTimeout(swapWatchdog);
+		swapWatchdog = setTimeout(function () {
+			// Buffer never finished (dropped connection?) — fall back to a
+			// plain reload of the visible frame so the preview never sticks
+			// stale. This is the only path that may show the loading state.
+			if (!swapBusy) return;
+			next.__pgSwapPending = false;
+			swapBusy = false;
+			previewWrap.classList.remove('is-refreshing');
+			hardReloadPreview();
+		}, 20000);
+	}
+
+	// Legacy single-frame reload — watchdog fallback only.
+	function hardReloadPreview(bust) {
+		try {
+			try {
+				if (frame.contentWindow && frame.contentWindow.scrollY !== undefined) {
+					savedScrollY = frame.contentWindow.scrollY;
+				}
+			} catch (e) {}
+			previewWrap.classList.add('is-reloading');
+			var fresh = previewUrl(bust);
+			try {
+				if (frame.contentWindow && frame.contentWindow.location) {
+					frame.contentWindow.location.replace(fresh);
+				} else {
+					frame.src = fresh;
+				}
+			} catch (e) { frame.src = fresh; }
+		} catch (e) { /* noop */ }
+	}
+
+	function completeSwap(next) {
+		clearTimeout(swapWatchdog);
+		var old = frame;
+		// Carry the user's CURRENT scroll into the fresh document before it
+		// becomes visible — captured at swap time, not request time, so any
+		// scrolling done while the buffer loaded is preserved too.
+		var y = savedScrollY;
+		try { y = old.contentWindow.scrollY || 0; } catch (e) {}
+		scrubDoc(next.contentDocument);
+		try { if (next.contentWindow) next.contentWindow.scrollTo(0, y); } catch (e) {}
+		savedScrollY = y;
+		// Atomic visibility flip in one synchronous turn — the compositor
+		// only ever paints exactly one fully-rendered frame.
+		next.classList.remove('pg-frame-hidden');
+		old.classList.add('pg-frame-hidden');
+		frame = next;
+		spareFrame = old;
+		swapBusy = false;
+		previewWrap.classList.remove('is-refreshing');
+		window.__pgPerf.swaps++;
+		if (window.__pgPerf.pendingSwap) {
+			window.__pgPerf.swapDoneAt = performance.now();
+			window.__pgPerf.pendingSwap = false;
+		}
+		notifyFrameReady();
+		if (swapNextBust) { var b = swapNextBust; swapNextBust = null; reloadPreview(b); }
+	}
+
+	attachFrameLoad(frame);
 
 	function refreshCredits() {
 		var fd = new FormData();
@@ -1513,6 +1630,92 @@
 		var chatChip   = null;
 		var noSecToastShown = false;
 
+		// Auto-apply (autosave) state — one request in flight at a time,
+		// latest-wins queue behind it.
+		var AUTO_APPLY_MS = 1200;
+		var autoTimer   = null;   // debounce: ~1.2s after the last edit
+		var applyBusy   = false;  // a patch request is in flight
+		var queuedPatch = null;   // {patch,label} captured while busy (latest wins)
+		var retryPatch  = null;   // last FAILED payload, kept for manual retry
+		// Page-token live preview: which dotted paths the user actually
+		// scrubbed this panel session (only those get live CSS rules).
+		var liveTouched = {};
+
+		// Defaults for sliders whose token isn't in the stored config yet
+		// (match the generator's own defaults).
+		var SLIDER_DEFAULTS = {
+			'layout.section_padding': 100,
+			'layout.boxed_width':     1200,
+			'layout.card_radius':     16,
+			'layout.button_radius':   8
+		};
+		// Which page fields scrub live, and how each maps to preview CSS.
+		// Best-effort visual approximation — the authoritative render
+		// follows via auto-apply and silently corrects any drift.
+		var LIVE_TOKEN_PATHS = {
+			'layout.section_padding': function (v) {
+				return '.pg-sec{padding-top:' + v + 'px !important;padding-bottom:' + v + 'px !important;}';
+			},
+			'layout.boxed_width': function (v) {
+				// Elementor flex containers cap content via these vars (name
+				// changed across versions — set both) + a direct rule.
+				return '.pg-sec{--content-width:' + v + 'px !important;--container-max-width:' + v + 'px !important;}' +
+					'.pg-sec>.e-con-inner{max-width:' + v + 'px !important;}';
+			},
+			'layout.card_radius': function (v) {
+				// Only visible on child containers that paint a background —
+				// rows/cols without one are unaffected visually.
+				return '.pg-sec .e-con.e-child{border-radius:' + v + 'px !important;}';
+			},
+			'layout.button_radius': function (v) {
+				return '.pg-sec .elementor-button{border-radius:' + v + 'px !important;}';
+			},
+			'colors.accent': function (v) {
+				return '.pg-sec .elementor-button{background-color:' + v + ' !important;border-color:' + v + ' !important;}';
+			},
+			'colors.primary': function (v) {
+				// Conservative: progress/star/counter accents would need
+				// per-widget rules; primary shows on the next real render.
+				return '';
+			}
+		};
+
+		function liveTokenCss() {
+			var rules = [];
+			Object.keys(liveTouched).forEach(function (p) {
+				var fn = LIVE_TOKEN_PATHS[p];
+				if (!fn) return;
+				var v = working ? working[p] : undefined;
+				if (v === undefined || v === null || v === '') return;
+				if (p.indexOf('colors.') === 0) {
+					v = toHex6(v);
+					if (!v) return;
+				} else {
+					v = parseFloat(v);
+					if (isNaN(v)) return;
+				}
+				var r = fn(v);
+				if (r) rules.push(r);
+			});
+			return rules.join('\n');
+		}
+
+		// Inject/refresh the live token stylesheet in the preview document.
+		// Pure DOM write — keeps slider drags at 60fps with zero network.
+		function updateLiveTokens() {
+			try {
+				var doc = frame.contentDocument;
+				if (!doc) return;
+				var st = doc.getElementById('pg-live-tokens');
+				if (!st) {
+					st = doc.createElement('style');
+					st.id = 'pg-live-tokens';
+					(doc.head || doc.body).appendChild(st);
+				}
+				st.textContent = liveTokenCss();
+			} catch (e) { /* doc mid-swap */ }
+		}
+
 		function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
 		function baseType(key) { return String(key).replace(/#\d+$/, ''); }
 		function encodeKey(key) { return String(key).replace('#', '--'); }
@@ -1589,6 +1792,7 @@
 				armDoc();
 				clearSelection(true); // opens the panel on the Page tab
 			} else {
+				if (isDirty()) flushApply(); // autosave anything pending on exit
 				disarmDoc();
 				selectedSectionKey = '';
 				renderChatChip();
@@ -1706,16 +1910,27 @@
 			} catch (e) { return null; }
 		}
 
-		// Re-arm on every preview reload (new contentDocument).
-		frame.addEventListener('load', function () {
+		// Re-arm on every preview swap/reload (new contentDocument). Runs
+		// AFTER the buffered swap completes, so the selection outline
+		// re-appears on the fresh frame with zero visible gap.
+		onFrameReady(function () {
 			docState = null; // old doc is gone
 			if (selectMode) armDoc();
+			// Unsaved slider/color drags survive the swap: re-inject the
+			// live token CSS into the fresh document.
+			if (pageMode && panelEl && panelEl.classList.contains('is-open') && Object.keys(liveTouched).length) {
+				updateLiveTokens();
+			}
 		});
 
 		// ── Selection ─────────────────────────────────────────────────
 		function isDirty() { return Object.keys(dirtyKeys).length > 0; }
+		// Word-doc model: leaving a dirty selection FLUSHES the pending save
+		// instead of interrupting with a confirm dialog. The patch payload is
+		// snapshotted synchronously, so the selection can change right after.
 		function confirmDiscard() {
-			return !isDirty() || window.confirm('You have unapplied edits in the panel — discard them?');
+			if (isDirty()) flushApply();
+			return true;
 		}
 
 		function selectSection(key) {
@@ -1766,6 +1981,7 @@
 				'<div class="pg-ed-head">' +
 					'<div class="pg-ed-head-text">' +
 						'<strong class="pg-ed-title"></strong>' +
+						'<span class="pg-ed-save" hidden></span>' +
 						'<span class="pg-ed-key"></span>' +
 					'</div>' +
 					'<button type="button" class="pg-ed-close" aria-label="Close panel">&times;</button>' +
@@ -1787,8 +2003,19 @@
 				if (selectedSectionKey) { selectedSectionKey = ''; markSelected(); renderChatChip(); }
 				closePanel();
 			});
-			panelEl.querySelector('.pg-ed-apply').addEventListener('click', applyPending);
-			panelEl.querySelector('.pg-ed-discard').addEventListener('click', function () { renderPanel(false); });
+			// Apply = immediate flush (autosave covers the normal path).
+			panelEl.querySelector('.pg-ed-apply').addEventListener('click', function () { flushApply(); });
+			panelEl.querySelector('.pg-ed-discard').addEventListener('click', function () {
+				// Discard = drop UNSAVED edits only (anything already saved
+				// or in flight stays; History covers real undo).
+				clearTimeout(autoTimer);
+				autoTimer = null;
+				retryPatch = null;
+				queuedPatch = null;
+				renderPanel(false);
+				setSaveState('idle');
+				setError('');
+			});
 			var ask = panelEl.querySelector('.pg-ed-ask-input');
 			function sendAsk() {
 				var t = (ask.value || '').trim();
@@ -1820,15 +2047,46 @@
 
 		function markDirty(path) {
 			dirtyKeys[path] = 1;
+			window.__pgPerf.lastInputAt = performance.now();
 			paintApply();
+			setSaveState('saving');
+			scheduleAutoApply();
 		}
 		function paintApply() {
 			if (!panelEl) return;
 			var n = Object.keys(dirtyKeys).length;
+			var pending = n > 0 || !!retryPatch || !!queuedPatch;
 			var btn = panelEl.querySelector('.pg-ed-apply');
-			btn.disabled = !n;
-			btn.innerHTML = n ? 'Apply <span class="pg-ed-badge">' + n + '</span>' : 'Apply';
+			btn.disabled = !pending;
+			btn.innerHTML = n ? 'Apply now <span class="pg-ed-badge">' + n + '</span>' : 'Apply now';
 			panelEl.querySelector('.pg-ed-discard').hidden = !n;
+		}
+
+		// ── Save indicator (panel header) ─────────────────────────────
+		// One quiet "Saving… / Saved" readout instead of a toast per apply.
+		var saveStateTimer = null;
+		function setSaveState(state) {
+			if (!panelEl) return;
+			var s = panelEl.querySelector('.pg-ed-save');
+			if (!s) return;
+			clearTimeout(saveStateTimer);
+			s.classList.remove('is-saving', 'is-saved', 'is-error');
+			if (state === 'saving') {
+				s.textContent = 'Saving…';
+				s.classList.add('is-saving');
+				s.hidden = false;
+			} else if (state === 'saved') {
+				s.textContent = 'Saved';
+				s.classList.add('is-saved');
+				s.hidden = false;
+				saveStateTimer = setTimeout(function () { s.hidden = true; }, 2200);
+			} else if (state === 'error') {
+				s.textContent = 'Couldn’t save';
+				s.classList.add('is-error');
+				s.hidden = false;
+			} else {
+				s.hidden = true;
+			}
 		}
 
 		// ── Panel rendering (schema-driven) ───────────────────────────
@@ -1842,6 +2100,7 @@
 
 			if (!preserve) {
 				dirtyKeys = {};
+				liveTouched = {};
 				if (pageMode) {
 					working = {};
 					if (spec) {
@@ -2002,6 +2261,12 @@
 					c.value = hex || '#cccccc';
 					c.addEventListener('input', function () {
 						working[fkey] = c.value;
+						// Page colors scrub live in the iframe while picking —
+						// zero network until the debounce flush.
+						if (pageMode && LIVE_TOKEN_PATHS[fkey]) {
+							liveTouched[fkey] = 1;
+							updateLiveTokens();
+						}
 						markDirty(fkey);
 					});
 					var cw = document.createElement('div');
@@ -2030,6 +2295,40 @@
 					return fieldRow(f.label, s, f.hint);
 				}
 				case 'number': {
+					// Page-level layout tokens (density, content width, radii)
+					// become SLIDERS that scrub the preview live while dragging
+					// — CSS injection only, no network in the loop. The
+					// authoritative render follows via auto-apply.
+					if (pageMode && f.min != null && f.max != null) {
+						var sbox = document.createElement('div');
+						sbox.className = 'pg-ed-slider';
+						var rg = document.createElement('input');
+						rg.type = 'range';
+						rg.min = f.min;
+						rg.max = f.max;
+						if (f.step != null) rg.step = f.step;
+						var initial = (value == null || isNaN(parseFloat(value)))
+							? (SLIDER_DEFAULTS[fkey] != null ? SLIDER_DEFAULTS[fkey] : (Number(f.min) + Number(f.max)) / 2)
+							: parseFloat(value);
+						rg.value = initial;
+						var out = document.createElement('span');
+						out.className = 'pg-ed-slider-val';
+						out.textContent = String(initial);
+						rg.addEventListener('input', function () {
+							var num = parseFloat(rg.value);
+							if (isNaN(num)) return;
+							working[fkey] = num;
+							out.textContent = String(num);
+							if (LIVE_TOKEN_PATHS[fkey]) {
+								liveTouched[fkey] = 1;
+								updateLiveTokens();
+							}
+							markDirty(fkey);
+						});
+						sbox.appendChild(rg);
+						sbox.appendChild(out);
+						return fieldRow(f.label, sbox, f.hint);
+					}
 					var n = document.createElement('input');
 					n.type = 'number';
 					if (f.min != null) n.min = f.min;
@@ -2339,9 +2638,20 @@
 			return null;
 		}
 
-		// ── Apply loop ────────────────────────────────────────────────
-		function applyPending() {
-			if (!isDirty() || !panelEl) return;
+		// ── Apply loop (autosave) ─────────────────────────────────────
+		// Edits flush automatically ~1.2s after the user stops; the Apply
+		// button is just an immediate-flush affordance. One request in
+		// flight at a time; edits made mid-flight snapshot into a queued
+		// patch (latest wins) and send right after. The user's optimistic
+		// DOM state is never torn down — the buffered swap silently
+		// replaces it with the authoritative render when it's ready.
+		function scheduleAutoApply() {
+			clearTimeout(autoTimer);
+			autoTimer = setTimeout(function () { flushApply(); }, AUTO_APPLY_MS);
+		}
+
+		// Snapshot the current panel state into a complete patch payload.
+		function buildPatch() {
 			var patch = {};
 			var label;
 			if (pageMode) {
@@ -2359,45 +2669,96 @@
 					patch[g] = merged;
 				});
 				label = 'edit page settings via panel';
-			} else {
+			} else if (selectedSectionKey) {
 				// COMPLETE section object — repeaters replace wholesale.
-				patch[selectedSectionKey] = working;
+				patch[selectedSectionKey] = deepClone(working);
 				label = 'edit ' + selectedSectionKey + ' via panel';
 			}
+			return { patch: patch, label: label || 'panel edit' };
+		}
 
-			var btn = panelEl.querySelector('.pg-ed-apply');
-			btn.disabled = true;
-			btn.textContent = 'Applying…';
+		function flushApply() {
+			clearTimeout(autoTimer);
+			autoTimer = null;
+			if (!isDirty()) {
+				// Nothing new — but a failed payload may be waiting for retry.
+				if (!applyBusy && retryPatch) {
+					var rp = retryPatch;
+					retryPatch = null;
+					sendPatch(rp);
+				}
+				return;
+			}
+			var built = buildPatch();
+			if (!Object.keys(built.patch).length) return;
+			dirtyKeys = {}; // the edits now live in the snapshot
+			paintApply();
+			if (applyBusy) { queuedPatch = built; return; } // latest wins
+			if (retryPatch) {
+				// A failed save is pending — send it first, then this one.
+				queuedPatch = built;
+				var rp2 = retryPatch;
+				retryPatch = null;
+				sendPatch(rp2);
+				return;
+			}
+			sendPatch(built);
+		}
+
+		function sendPatch(built) {
+			applyBusy = true;
+			setSaveState('saving');
 			setError('');
+			window.__pgPerf.flushAt = performance.now();
 
 			var fd = new FormData();
 			fd.append('action', 'pressgo_ai_apply_patch');
 			fd.append('nonce', cfg.nonce);
 			fd.append('post_id', cfg.postId);
-			fd.append('changes', JSON.stringify(patch));
-			fd.append('label', label);
+			fd.append('changes', JSON.stringify(built.patch));
+			fd.append('label', built.label);
 			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 				.then(function (r) { return r.json(); })
 				.then(function (j) {
+					applyBusy = false;
 					if (j && j.success) {
 						// Sync the local config so the next panel open shows
 						// what the server now has.
 						if (!cfg.pageConfig) cfg.pageConfig = {};
-						Object.keys(patch).forEach(function (k) { cfg.pageConfig[k] = deepClone(patch[k]); });
-						dirtyKeys = {};
-						renderPanel(false);
+						Object.keys(built.patch).forEach(function (k) { cfg.pageConfig[k] = deepClone(built.patch[k]); });
+						// Re-anchor optimistic text matching to the just-saved
+						// values (the swapped-in doc will contain these, modulo
+						// copy-lint — normText is case-insensitive anyway).
+						controls.forEach(function (c) { c.orig = normText(c.get()); c.node = null; });
+						window.__pgPerf.savedAt = performance.now();
+						window.__pgPerf.pendingSwap = true;
+						setSaveState(isDirty() || queuedPatch ? 'saving' : 'saved');
+						paintApply();
 						reloadPreview((j.data && j.data.preview_bust) || Date.now());
-						showToast('Saved — undo in History');
 					} else {
 						var msg = (j && (typeof j.data === 'string' ? j.data : (j.data && j.data.message))) || 'Could not apply that change.';
+						if (!queuedPatch) retryPatch = built; // a newer queued payload supersedes
 						setError(msg);
-						btn.disabled = false;
+						setSaveState('error');
 						paintApply();
+					}
+					if (queuedPatch) {
+						var q = queuedPatch;
+						queuedPatch = null;
+						sendPatch(q);
 					}
 				})
 				.catch(function () {
-					setError('Network error — your edits are still here, try Apply again.');
-					btn.disabled = false;
+					applyBusy = false;
+					// Keep the payload recoverable: it retries on the next
+					// Apply click or the next flush. Anything queued behind a
+					// network failure would likely fail too — drop the chain
+					// (its edits still live in `working`, so the next edit
+					// re-captures them).
+					retryPatch = queuedPatch || built;
+					queuedPatch = null;
+					setError('Network error — your edits are still here; press Apply now to retry.');
+					setSaveState('error');
 					paintApply();
 				});
 		}
@@ -2407,9 +2768,13 @@
 			enable: function (on) { setSelectMode(on !== false); },
 			select: selectSection,
 			deselect: function () { clearSelection(true); },
-			apply: applyPending,
+			apply: flushApply,
 			state: function () {
-				return { selectMode: selectMode, selected: selectedSectionKey, pageMode: pageMode, dirty: Object.keys(dirtyKeys), working: working };
+				return {
+					selectMode: selectMode, selected: selectedSectionKey, pageMode: pageMode,
+					dirty: Object.keys(dirtyKeys), working: working,
+					applyBusy: applyBusy, queued: !!queuedPatch, retry: !!retryPatch
+				};
 			}
 		};
 	})();
