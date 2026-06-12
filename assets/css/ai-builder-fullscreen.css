@@ -1175,3 +1175,161 @@ select#pg-target-builder {
 	from { opacity: 0; transform: translateY(10px); }
 	to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Phase 3: variant carousel chip, image picker, AI micro-toolbar ── */
+
+/* Floating section chip — bottom-center of the preview when a section is
+   selected. ‹ › flips layout variants; ↑ ↓ moves the section. */
+.pg-sec-chip {
+	position: absolute;
+	bottom: 18px; left: 50%;
+	transform: translateX(-50%);
+	z-index: 45;
+	display: flex; align-items: center; gap: 2px;
+	background: rgba(17, 17, 26, 0.92);
+	color: #fff;
+	border-radius: 999px;
+	padding: 5px 8px;
+	box-shadow: 0 10px 28px rgba(20, 16, 60, 0.35);
+	backdrop-filter: blur(6px);
+	font-size: 12px;
+	animation: pg-toast-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+	transition: box-shadow 0.25s ease;
+}
+.pg-sec-chip.is-flash { box-shadow: 0 0 0 3px rgba(91,79,255,0.55), 0 10px 28px rgba(20,16,60,0.35); }
+.pg-sec-chip-mid {
+	display: flex; flex-direction: column; align-items: center;
+	padding: 0 10px; min-width: 130px;
+	line-height: 1.25;
+}
+.pg-sec-chip-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pg-sec-chip-variant { font-size: 10.5px; color: #b9b3ff; white-space: nowrap; }
+.pg-sec-chip-btn {
+	border: none; background: rgba(255,255,255,0.08);
+	color: #fff; cursor: pointer;
+	width: 26px; height: 26px;
+	border-radius: 999px;
+	font-size: 15px; line-height: 1;
+	display: inline-flex; align-items: center; justify-content: center;
+	font-family: inherit;
+	transition: background 0.12s ease;
+}
+.pg-sec-chip-btn:hover:not(:disabled) { background: #5b4fff; }
+.pg-sec-chip-btn:disabled { opacity: 0.3; cursor: default; }
+.pg-sec-chip-sep {
+	width: 1px; height: 18px;
+	background: rgba(255,255,255,0.18);
+	margin: 0 6px;
+}
+
+/* Image hot-swap picker — floats over the preview, under the toolbar. */
+.pg-img-picker {
+	position: absolute;
+	top: 56px; left: 50%;
+	transform: translateX(-50%);
+	width: 460px; max-width: calc(100% - 32px);
+	max-height: calc(100% - 96px);
+	background: #fff;
+	border: 1px solid #e2e0f4;
+	border-radius: 12px;
+	box-shadow: 0 18px 48px rgba(20, 16, 60, 0.25);
+	z-index: 46;
+	display: flex; flex-direction: column;
+	overflow: hidden;
+	animation: pg-toast-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+	font-size: 13px; color: #1d2327;
+}
+.pg-imgp-head {
+	display: flex; align-items: center; justify-content: space-between;
+	padding: 12px 14px 10px;
+	border-bottom: 1px solid #f0effa;
+	flex-shrink: 0;
+}
+.pg-imgp-x {
+	border: none; background: transparent;
+	font-size: 20px; line-height: 1;
+	color: #8c8f94; cursor: pointer;
+	padding: 0 2px; border-radius: 4px;
+}
+.pg-imgp-x:hover { color: #1d2327; background: #f6f7f7; }
+.pg-imgp-paste {
+	display: flex; gap: 8px;
+	padding: 10px 14px;
+	border-bottom: 1px solid #f0effa;
+	flex-shrink: 0;
+}
+.pg-imgp-paste input {
+	flex: 1; min-width: 0;
+	border: 1px solid #c3c4c7;
+	border-radius: 6px;
+	padding: 7px 10px;
+	font-size: 12px; font-family: inherit;
+}
+.pg-imgp-paste input:focus { outline: none; border-color: #5b4fff; box-shadow: 0 0 0 1px #5b4fff; }
+.pg-imgp-paste button {
+	border: 1px solid #d9d6ff; background: #f3f1ff; color: #5b4fff;
+	border-radius: 6px; padding: 7px 14px;
+	font-size: 12px; font-weight: 600;
+	cursor: pointer; font-family: inherit;
+}
+.pg-imgp-paste button:hover { background: #5b4fff; border-color: #5b4fff; color: #fff; }
+.pg-imgp-body { overflow-y: auto; padding: 10px 14px 14px; }
+.pg-imgp-sect {
+	font-size: 11px; font-weight: 700; color: #8c8f94;
+	text-transform: uppercase; letter-spacing: 0.05em;
+	margin: 8px 0 6px;
+}
+.pg-imgp-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+}
+.pg-imgp-cell {
+	border: 2px solid transparent;
+	border-radius: 8px;
+	padding: 0; background: #f6f4ff;
+	cursor: pointer;
+	overflow: hidden;
+	aspect-ratio: 4 / 3;
+	transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.pg-imgp-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pg-imgp-cell:hover { border-color: #5b4fff; transform: scale(1.03); }
+.pg-imgp-cell.is-current { border-color: #22c55e; }
+.pg-imgp-note { color: #8c8f94; font-size: 12px; padding: 6px 0; line-height: 1.5; }
+
+/* Panel image field: clickable thumb + Swap button. */
+.pg-ed-image-swappable { cursor: pointer; }
+.pg-ed-image-swappable:hover { box-shadow: 0 0 0 2px #5b4fff; }
+.pg-ed-image-swap {
+	border: 1px solid #d9d6ff; background: #f3f1ff; color: #5b4fff;
+	border-radius: 6px; padding: 6px 10px;
+	font-size: 11px; font-weight: 600;
+	cursor: pointer; font-family: inherit;
+	flex-shrink: 0;
+}
+.pg-ed-image-swap:hover { background: #5b4fff; border-color: #5b4fff; color: #fff; }
+
+/* AI text micro-toolbar — floats above the iframe text selection. */
+.pg-ai-tb {
+	position: fixed;
+	transform: translateX(-50%);
+	z-index: 100001;
+	display: flex; gap: 2px;
+	background: rgba(17, 17, 26, 0.94);
+	border-radius: 999px;
+	padding: 4px;
+	box-shadow: 0 10px 28px rgba(20, 16, 60, 0.4);
+	animation: pg-toast-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pg-ai-tb button {
+	border: none; background: transparent;
+	color: #fff; cursor: pointer;
+	border-radius: 999px;
+	padding: 6px 12px;
+	font-size: 12px; font-weight: 500;
+	font-family: inherit;
+	white-space: nowrap;
+	transition: background 0.12s ease;
+}
+.pg-ai-tb button:hover { background: #5b4fff; }

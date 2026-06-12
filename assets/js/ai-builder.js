@@ -865,6 +865,8 @@
 					resetAssistantBubble();
 					clearBuildList();
 					builtOnce = true;
+					// A fresh AI change invalidates any pending redo branch.
+					if (window.__pgResetUndo) window.__pgResetUndo();
 					var built = el('pg-msg pg-msg-built');
 					built.innerHTML = '<strong>Built:</strong> ' + escapeHtml(evt.summary || '(page updated)');
 					append(built);
@@ -896,6 +898,7 @@
 					if (visionNotice) { visionNotice.remove(); visionNotice = null; }
 					resetAssistantBubble();
 					builtOnce = true;
+					if (window.__pgResetUndo) window.__pgResetUndo();
 					var fix = el('pg-msg pg-msg-built');
 					fix.innerHTML = '<strong>Vision fix:</strong> ' + escapeHtml(evt.summary || '(corrected after self-review)');
 					append(fix);
@@ -1799,6 +1802,8 @@
 				disarmDoc();
 				selectedSectionKey = '';
 				renderChatChip();
+				renderSecChip();
+				closeImagePicker();
 				closePanel();
 			}
 		}
@@ -1839,7 +1844,26 @@
 				'#pg-inline-hint { position: absolute; z-index: 2147483646; background: rgba(17,17,26,0.92); color: #fff;' +
 					'font: 500 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
 					'padding: 5px 8px; border-radius: 5px; pointer-events: none; display: none;' +
-					'letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }'
+					'letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }',
+				// Drag-to-reorder chrome: grip handle (top-right of the hovered
+				// section), the translucent ghost pill that follows the pointer,
+				// the insert line between sections, and the lifted source state.
+				'#pg-drag-handle { position: fixed; z-index: 2147483645; width: 28px; height: 28px; display: none;' +
+					'align-items: center; justify-content: center; background: #fff; color: #5b4fff;' +
+					'border: 1px solid #d9d6ff; border-radius: 7px; cursor: grab;' +
+					'box-shadow: 0 2px 8px rgba(20,16,60,0.18); touch-action: none; user-select: none; }',
+				'#pg-drag-handle:hover { background: #5b4fff; color: #fff; }',
+				'#pg-drag-handle.is-dragging { cursor: grabbing; }',
+				'#pg-drag-ghost { position: fixed; z-index: 2147483646; pointer-events: none; display: none;' +
+					'background: rgba(91,79,255,0.92); color: #fff; border-radius: 999px; padding: 6px 14px;' +
+					'font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
+					'box-shadow: 0 8px 24px rgba(91,79,255,0.45); white-space: nowrap; }',
+				'#pg-drop-line { position: fixed; z-index: 2147483645; pointer-events: none; display: none;' +
+					'left: 0; right: 0; height: 0; border-top: 3px solid #5b4fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 10px rgba(91,79,255,0.5); }',
+				'#pg-drop-line::before { content: ""; position: absolute; left: 10px; top: -7px; width: 11px; height: 11px;' +
+					'border-radius: 50%; background: #5b4fff; box-shadow: 0 0 0 2px #fff; }',
+				'.pg-drag-source { opacity: 0.35 !important; outline: 2px dashed rgba(91,79,255,0.6) !important; outline-offset: -2px; }',
+				'body.pg-dragging, body.pg-dragging * { cursor: grabbing !important; user-select: none !important; }'
 			].join('\n');
 			(doc.head || doc.body).appendChild(style);
 
@@ -1847,9 +1871,39 @@
 			chip.id = 'pg-select-chip';
 			doc.body.appendChild(chip);
 
+			// Drag-to-reorder grip: one handle per document, repositioned onto
+			// whichever section is hovered. Pointer events drive the drag.
+			var handle = doc.createElement('div');
+			handle.id = 'pg-drag-handle';
+			handle.title = 'Drag to move this section up or down the page';
+			handle.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="5" r="1.7"/><circle cx="15" cy="5" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="19" r="1.7"/><circle cx="15" cy="19" r="1.7"/></svg>';
+			doc.body.appendChild(handle);
+			handle.addEventListener('pointerdown', function (e) { startSectionDrag(e, handle); });
+
 			var hovered = null;
+			function positionHandle(sec) {
+				if (!sec || dragState) { if (!dragState) handle.style.display = 'none'; return; }
+				var r = sec.getBoundingClientRect();
+				var cw = doc.documentElement.clientWidth;
+				// The property panel overlays the preview's right edge — shift
+				// the handle left of the covered strip so it stays clickable.
+				var cover = 0;
+				try {
+					if (panelEl && panelEl.classList.contains('is-open')) {
+						var pr = panelEl.getBoundingClientRect();
+						var fr = frame.getBoundingClientRect();
+						cover = Math.max(0, Math.min(fr.right, pr.right) - Math.max(fr.left, pr.left));
+					}
+				} catch (e) {}
+				handle.__pgSec = sec;
+				handle.style.left = (Math.min(cw - cover, Math.min(cw, r.right)) - 36) + 'px';
+				handle.style.top = (Math.max(0, r.top) + 8) + 'px';
+				handle.style.display = 'flex';
+			}
 			function onOver(e) {
 				if (!selectMode) return;
+				if (dragState) return; // mid-drag: ghost + line own the pointer
+				if (e.target === handle || (handle.contains && handle.contains(e.target))) return;
 				var sec = e.target && e.target.closest ? e.target.closest('.pg-sec') : null;
 				if (sec === hovered) return;
 				if (hovered) hovered.classList.remove('pg-ed-hover');
@@ -1865,12 +1919,20 @@
 					chip.style.left = Math.max(0, r.left) + 'px';
 					chip.style.top = Math.max(0, r.top) + 'px';
 					chip.style.display = 'block';
+					positionHandle(sec);
 				} else {
 					chip.style.display = 'none';
+					handle.style.display = 'none';
+					handle.__pgSec = null;
 				}
 			}
 			function onClick(e) {
 				if (!selectMode) return;
+				// A drag just ended — the pointerup synthesizes a click; eat it.
+				if (Date.now() < dragClickGuard) { e.preventDefault(); e.stopPropagation(); return; }
+				if (e.target === handle || (handle.contains && handle.contains(e.target))) {
+					e.preventDefault(); e.stopPropagation(); return;
+				}
 				// Mid inline edit: clicks INSIDE the editable element must reach
 				// the browser (caret placement) — only links stay inert.
 				if (inline && inline.el && (inline.el === e.target || inline.el.contains(e.target))) {
@@ -1885,10 +1947,25 @@
 				var key = keyOfSection(sec);
 				if (!key) { clearSelection(); return; }
 				if (key === selectedSectionKey) {
+					// A drag-selection of text just finished — that's the AI
+					// micro-toolbar's moment, not click-to-type's.
+					try {
+						var sl = doc.defaultView.getSelection();
+						if (sl && !sl.isCollapsed && String(sl).trim()) { scheduleTbCheck(); return; }
+					} catch (err) {}
+					// Click on an image → image hot-swap picker.
+					var img = e.target.tagName === 'IMG' ? e.target
+						: (e.target.closest ? e.target.closest('img') : null);
+					if (img && openPickerForImage(img, key)) return;
 					// Second click inside the selected section: click-to-type.
 					// Exact-text match → edit in place; no/ambiguous match →
 					// the existing focus-the-panel-field heuristic.
 					if (!attemptInlineEdit(e.target, e.clientX, e.clientY)) {
+						// Background-image sections: clicking non-text area of a
+						// section whose only image lives as a background opens
+						// the picker for that field.
+						var bgEntry = bgImageEntry(e.target, sec, key);
+						if (bgEntry) { openPickerForEntry(bgEntry, null); return; }
 						focusFieldForElement(e.target);
 					}
 					return;
@@ -1909,10 +1986,20 @@
 					focusFieldForElement(e.target);
 				}
 			}
+			// Text-selection watcher for the AI micro-toolbar (✨ Punchier …).
+			function onSelMouseUp() { scheduleTbCheck(); }
+			function onSelChange() { scheduleTbCheck(); }
+			function onDocScroll() {
+				hideTextToolbar();
+				if (hovered) { positionHandle(hovered); var r = hovered.getBoundingClientRect(); chip.style.left = Math.max(0, r.left) + 'px'; chip.style.top = Math.max(0, r.top) + 'px'; }
+			}
 			doc.addEventListener('mouseover', onOver, true);
 			doc.addEventListener('click', onClick, true);
 			doc.addEventListener('dblclick', onDblClick, true);
-			docState = { doc: doc, style: style, chip: chip, onOver: onOver, onClick: onClick, onDblClick: onDblClick };
+			doc.addEventListener('mouseup', onSelMouseUp, true);
+			doc.addEventListener('selectionchange', onSelChange);
+			doc.defaultView && doc.defaultView.addEventListener('scroll', onDocScroll, { passive: true });
+			docState = { doc: doc, style: style, chip: chip, handle: handle, onOver: onOver, onClick: onClick, onDblClick: onDblClick, onSelMouseUp: onSelMouseUp, onSelChange: onSelChange, onDocScroll: onDocScroll };
 			markSelected();
 
 			if (!doc.querySelector('.pg-sec') && !noSecToastShown) {
@@ -1923,10 +2010,16 @@
 
 		function disarmDoc() {
 			if (!docState) return;
+			cancelSectionDrag();
+			hideTextToolbar();
 			try {
 				docState.doc.removeEventListener('mouseover', docState.onOver, true);
 				docState.doc.removeEventListener('click', docState.onClick, true);
 				if (docState.onDblClick) docState.doc.removeEventListener('dblclick', docState.onDblClick, true);
+				if (docState.onSelMouseUp) docState.doc.removeEventListener('mouseup', docState.onSelMouseUp, true);
+				if (docState.onSelChange) docState.doc.removeEventListener('selectionchange', docState.onSelChange);
+				if (docState.onDocScroll && docState.doc.defaultView) docState.doc.defaultView.removeEventListener('scroll', docState.onDocScroll);
+				if (docState.handle) docState.handle.remove();
 				var marked2 = docState.doc.querySelectorAll('.pg-ed-text');
 				for (var j = 0; j < marked2.length; j++) marked2[j].classList.remove('pg-ed-text');
 				if (docState.style) docState.style.remove();
@@ -1952,6 +2045,7 @@
 				}
 				markEditableText();
 			} catch (e) {}
+			renderSecChip();
 		}
 
 		function findSelectedRoot() {
@@ -1988,6 +2082,7 @@
 		function selectSection(key) {
 			if (inline && inline.key !== key) commitInline(); // leaving an edit = save it
 			if (!confirmDiscard()) return;
+			if (selectedSectionKey !== key) { closeImagePicker(); hideTextToolbar(); }
 			selectedSectionKey = key;
 			markSelected();
 			renderChatChip();
@@ -1998,6 +2093,8 @@
 		function clearSelection(keepQuiet) {
 			if (inline) commitInline();
 			if (!keepQuiet && !confirmDiscard()) return;
+			closeImagePicker();
+			hideTextToolbar();
 			selectedSectionKey = '';
 			markSelected();
 			renderChatChip();
@@ -2205,6 +2302,7 @@
 
 		function buildVariantField(variants) {
 			var sel = document.createElement('select');
+			sel.className = 'pg-ed-variant-sel';
 			var current = String(working.variant || 'default');
 			var opts = variants.slice();
 			if (opts.indexOf(current) === -1) opts.unshift(current);
@@ -2218,8 +2316,9 @@
 			sel.addEventListener('change', function () {
 				working.variant = sel.value;
 				markDirty('variant');
+				renderSecChip(); // keep the floating carousel chip in step
 			});
-			return fieldRow('Layout', sel, 'How this section is arranged. Applies on the next Apply.');
+			return fieldRow('Layout', sel, 'How this section is arranged. Tip: ←/→ arrow keys flip through layouts.');
 		}
 
 		function fieldRow(label, controlEl, hint) {
@@ -2304,8 +2403,31 @@
 					thumb.addEventListener('error', function () { thumb.style.display = 'none'; });
 					paintThumb();
 					ii.addEventListener('input', function () { working[fkey] = ii.value; markDirty(fkey); paintThumb(); });
+					// Thumb (or the swap button) opens the image hot-swap picker.
+					thumb.title = 'Click to choose a different image';
+					thumb.classList.add('pg-ed-image-swappable');
+					function openPick() {
+						openImagePicker({
+							current: ii.value,
+							onPick: function (url) {
+								ii.value = url;
+								working[fkey] = url;
+								markDirty(fkey);
+								paintThumb();
+								fastFlush();
+							}
+						});
+					}
+					thumb.addEventListener('click', openPick);
+					var swapBtn = document.createElement('button');
+					swapBtn.type = 'button';
+					swapBtn.className = 'pg-ed-image-swap';
+					swapBtn.textContent = 'Swap';
+					swapBtn.title = 'Pick from your media library or this page’s images';
+					swapBtn.addEventListener('click', openPick);
 					wrap.appendChild(thumb);
 					wrap.appendChild(ii);
+					wrap.appendChild(swapBtn);
 					return fieldRow(f.label, wrap, f.hint);
 				}
 				case 'color': {
@@ -3214,6 +3336,7 @@
 						// what the server now has.
 						if (!cfg.pageConfig) cfg.pageConfig = {};
 						Object.keys(built.patch).forEach(function (k) { cfg.pageConfig[k] = deepClone(built.patch[k]); });
+						resetUndoChain(); // a fresh edit invalidates the redo branch
 						// Re-anchor optimistic text matching to the just-saved
 						// values (the swapped-in doc will contain these, modulo
 						// copy-lint — normText is case-insensitive anyway).
@@ -3228,6 +3351,9 @@
 						if (!queuedPatch) retryPatch = built; // a newer queued payload supersedes
 						setError(msg);
 						setSaveState('error');
+						// Chip/drag mutations can run with the panel closed —
+						// surface the failure somewhere visible.
+						if (!panelEl || !panelEl.classList.contains('is-open')) showToast(msg, true);
 						paintApply();
 					}
 					if (queuedPatch) {
@@ -3251,6 +3377,796 @@
 				});
 		}
 
+		// ════════════════════════════════════════════════════════════════
+		// Phase 3 — the wow features.
+		//
+		// 1. Variant carousel: ←/→ (and ‹ › on the floating section chip)
+		//    flip through cfg.editorFields[base].variants — deterministic,
+		//    zero AI, rides the normal patch pipeline with a snappy debounce.
+		// 2. Drag-to-reorder: a grip on the hovered section lifts a ghost;
+		//    drop between sections patches the full `sections` array.
+		//    ▲/▼ on the chip do the same one step at a time.
+		// 3. ⌘Z / ⌘⇧Z: undo/redo over the server-side snapshot history
+		//    (pressgo_ai_restore snapshots current state first — that
+		//    snapshot becomes the redo target; ids are walked client-side).
+		// 4. Image hot-swap: click any image in the selected section (or a
+		//    panel thumb) → mini-picker of media-library + on-page images.
+		// 5. AI text micro-toolbar: select text in the selected section →
+		//    ✨ Punchier · ✂ Shorter · ✓ Fix, sent as a scoped chat message.
+		//
+		// Every mutation goes through the ONE existing save pipeline
+		// (markDirty → flushApply → sendPatch, or applyDirect → sendPatch
+		// for whole-page patches like reorders).
+		// ════════════════════════════════════════════════════════════════
+
+		// Snappier debounce for direct-manipulation controls (carousel,
+		// image pick) — panel typing keeps the relaxed 1.2s.
+		function fastFlush(ms) {
+			clearTimeout(autoTimer);
+			autoTimer = setTimeout(function () { flushApply(); }, ms || 300);
+		}
+
+		// Whole-page patches (e.g. {sections:[...]}) that don't belong to the
+		// panel's working copy. Same in-flight/queue semantics as flushApply;
+		// disjoint keys merge into anything already queued so nothing is lost.
+		function applyDirect(patch, label) {
+			if (inline) commitInline();
+			if (isDirty()) flushApply(); // panel edits snapshot synchronously
+			var built = { patch: patch, label: label || 'editor action' };
+			if (queuedPatch) {
+				var mergedP = {};
+				Object.keys(queuedPatch.patch).forEach(function (k) { mergedP[k] = queuedPatch.patch[k]; });
+				Object.keys(built.patch).forEach(function (k) { mergedP[k] = built.patch[k]; });
+				queuedPatch = { patch: mergedP, label: built.label };
+				return;
+			}
+			if (applyBusy) { queuedPatch = built; return; }
+			if (retryPatch) {
+				queuedPatch = built;
+				var rp = retryPatch;
+				retryPatch = null;
+				sendPatch(rp);
+				return;
+			}
+			setSaveState('saving');
+			sendPatch(built);
+		}
+
+		// ── 1+2. Floating section chip: ‹ layout › + ▲ ▼ move ─────────
+		var secChip = null, secChipUI = null, secChipFlashT = null;
+
+		function variantList(key) {
+			var spec = edFields[baseType(key)];
+			var vars = (spec && spec.variants && spec.variants.length) ? spec.variants.slice() : ['default'];
+			return vars;
+		}
+
+		function renderSecChip() {
+			if (!selectMode || !selectedSectionKey) {
+				if (secChip) { secChip.remove(); secChip = null; secChipUI = null; }
+				return;
+			}
+			if (!secChip) {
+				secChip = document.createElement('div');
+				secChip.className = 'pg-sec-chip';
+				var prev = document.createElement('button');
+				prev.type = 'button';
+				prev.className = 'pg-sec-chip-btn pg-sec-chip-prev';
+				prev.innerHTML = '&lsaquo;';
+				prev.title = 'Previous layout (←)';
+				var mid = document.createElement('div');
+				mid.className = 'pg-sec-chip-mid';
+				var lbl = document.createElement('strong');
+				lbl.className = 'pg-sec-chip-label';
+				var sub = document.createElement('span');
+				sub.className = 'pg-sec-chip-variant';
+				mid.appendChild(lbl);
+				mid.appendChild(sub);
+				var next = document.createElement('button');
+				next.type = 'button';
+				next.className = 'pg-sec-chip-btn pg-sec-chip-next';
+				next.innerHTML = '&rsaquo;';
+				next.title = 'Next layout (→)';
+				var sep = document.createElement('span');
+				sep.className = 'pg-sec-chip-sep';
+				var up = document.createElement('button');
+				up.type = 'button';
+				up.className = 'pg-sec-chip-btn';
+				up.innerHTML = '&uarr;';
+				up.title = 'Move this section up';
+				var down = document.createElement('button');
+				down.type = 'button';
+				down.className = 'pg-sec-chip-btn';
+				down.innerHTML = '&darr;';
+				down.title = 'Move this section down';
+				secChip.appendChild(prev);
+				secChip.appendChild(mid);
+				secChip.appendChild(next);
+				secChip.appendChild(sep);
+				secChip.appendChild(up);
+				secChip.appendChild(down);
+				prev.addEventListener('click', function () { cycleVariant(-1); });
+				next.addEventListener('click', function () { cycleVariant(1); });
+				up.addEventListener('click', function () { moveSection(-1); });
+				down.addEventListener('click', function () { moveSection(1); });
+				previewWrap.appendChild(secChip);
+				secChipUI = { lbl: lbl, sub: sub, prev: prev, next: next, up: up, down: down };
+			}
+			var vars = variantList(selectedSectionKey);
+			var curSec = (!pageMode && working) ? working : ((cfg.pageConfig || {})[selectedSectionKey] || {});
+			var cur = String(curSec.variant || 'default');
+			var i = vars.indexOf(cur);
+			secChipUI.lbl.textContent = sectionLabel(selectedSectionKey);
+			if (vars.length > 1) {
+				secChipUI.sub.textContent = 'Layout ' + (i === -1 ? '?' : (i + 1)) + '/' + vars.length + ' — ' + titleize(cur);
+				secChipUI.prev.disabled = secChipUI.next.disabled = false;
+			} else {
+				secChipUI.sub.textContent = 'One layout';
+				secChipUI.prev.disabled = secChipUI.next.disabled = true;
+			}
+			var order = sectionsOrder();
+			var oi = order.indexOf(selectedSectionKey);
+			secChipUI.up.disabled = oi <= 0;
+			secChipUI.down.disabled = oi === -1 || oi >= order.length - 1;
+		}
+
+		function flashSecChip() {
+			if (!secChip) return;
+			secChip.classList.remove('is-flash');
+			void secChip.offsetWidth;
+			secChip.classList.add('is-flash');
+			clearTimeout(secChipFlashT);
+			secChipFlashT = setTimeout(function () { if (secChip) secChip.classList.remove('is-flash'); }, 600);
+		}
+
+		// ── 1. Variant carousel ────────────────────────────────────────
+		function cycleVariant(dir) {
+			if (!selectedSectionKey || pageMode || !working) return;
+			var vars = variantList(selectedSectionKey);
+			if (vars.length < 2) { showToast('This section type has only one layout.'); return; }
+			var cur = String(working.variant || 'default');
+			if (vars.indexOf(cur) === -1) vars.unshift(cur);
+			var nextV = vars[(vars.indexOf(cur) + dir + vars.length) % vars.length];
+			working.variant = nextV;
+			// Mirror into the open panel's Layout select without a re-render.
+			if (panelEl) {
+				var s = panelEl.querySelector('.pg-ed-variant-sel');
+				if (s) s.value = nextV;
+			}
+			markDirty('variant');
+			fastFlush(280); // template-flipping must feel snappy
+			renderSecChip();
+			flashSecChip();
+		}
+
+		// ── 2. Reorder (chip buttons + drag) ───────────────────────────
+		function sectionsOrder() {
+			var pc = cfg.pageConfig || {};
+			if (Array.isArray(pc.sections) && pc.sections.length) {
+				return pc.sections.filter(function (k) { return typeof k === 'string'; });
+			}
+			// Fallback: read the DOM order of marked sections.
+			try {
+				return collectSections(frame.contentDocument).map(function (s) { return s.key; });
+			} catch (e) { return []; }
+		}
+
+		function collectSections(doc) {
+			var out = [], list = doc ? doc.querySelectorAll('.pg-sec') : [];
+			for (var i = 0; i < list.length; i++) {
+				var k = keyOfSection(list[i]);
+				if (k) out.push({ key: k, el: list[i] });
+			}
+			return out;
+		}
+
+		// Optimistic DOM move so the drop lands instantly; the buffered swap
+		// brings the authoritative render a beat later.
+		function optimisticMove(key, order) {
+			try {
+				var doc = frame.contentDocument;
+				var els = {};
+				collectSections(doc).forEach(function (s) { els[s.key] = s.el; });
+				var moved = els[key];
+				if (!moved) return;
+				var parent = moved.parentNode;
+				var idx = order.indexOf(key);
+				var ref = null;
+				for (var n = idx + 1; n < order.length; n++) {
+					if (els[order[n]] && els[order[n]].parentNode === parent) { ref = els[order[n]]; break; }
+				}
+				parent.insertBefore(moved, ref); // null ref = append at end
+				try { moved.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
+			} catch (e) {}
+		}
+
+		function moveSection(dir) {
+			if (!selectedSectionKey) return;
+			var order = sectionsOrder();
+			var i = order.indexOf(selectedSectionKey);
+			if (i === -1) return;
+			var j = i + dir;
+			if (j < 0 || j >= order.length) {
+				showToast(dir < 0 ? 'Already at the top.' : 'Already at the bottom.');
+				return;
+			}
+			order.splice(j, 0, order.splice(i, 1)[0]);
+			if (cfg.pageConfig) cfg.pageConfig.sections = order.slice();
+			optimisticMove(selectedSectionKey, order);
+			renderSecChip();
+			applyDirect({ sections: order }, 'Move ' + sectionLabel(selectedSectionKey) + (dir < 0 ? ' up' : ' down'));
+		}
+
+		// Drag state. The grip handle lives in the iframe document (created in
+		// armDoc); pointer capture keeps the stream alive across the drag.
+		var dragState = null, dragClickGuard = 0;
+
+		function startSectionDrag(e, handleEl) {
+			if (!selectMode || dragState) return;
+			var sec = handleEl.__pgSec;
+			if (!sec || !sec.ownerDocument) return;
+			var key = keyOfSection(sec);
+			if (!key) return;
+			e.preventDefault();
+			e.stopPropagation();
+			if (inline) commitInline();
+			var doc = sec.ownerDocument, win = doc.defaultView;
+			var ghost = doc.createElement('div');
+			ghost.id = 'pg-drag-ghost';
+			ghost.textContent = sectionLabel(key);
+			doc.body.appendChild(ghost);
+			var line = doc.createElement('div');
+			line.id = 'pg-drop-line';
+			doc.body.appendChild(line);
+			sec.classList.add('pg-drag-source');
+			doc.body.classList.add('pg-dragging');
+			handleEl.classList.add('is-dragging');
+			var st = {
+				key: key, sec: sec, doc: doc, win: win, handle: handleEl,
+				ghost: ghost, line: line, x: e.clientX, y: e.clientY,
+				insertAt: -1, order: null, raf: 0, pointerId: e.pointerId
+			};
+			dragState = st;
+			try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+			st.onMove = function (ev) { st.x = ev.clientX; st.y = ev.clientY; };
+			st.onUp = function () { finishSectionDrag(true); };
+			st.onCancel = function () { finishSectionDrag(false); };
+			handleEl.addEventListener('pointermove', st.onMove);
+			handleEl.addEventListener('pointerup', st.onUp);
+			handleEl.addEventListener('pointercancel', st.onCancel);
+			function tick() {
+				if (dragState !== st) return;
+				var vh = win.innerHeight;
+				// Autoscroll near the edges, faster the deeper you push.
+				if (st.y < 70) win.scrollBy(0, -(Math.ceil((70 - st.y) / 3) + 4));
+				else if (st.y > vh - 70) win.scrollBy(0, Math.ceil((st.y - (vh - 70)) / 3) + 4);
+				ghost.style.display = 'block';
+				ghost.style.left = (st.x + 14) + 'px';
+				ghost.style.top = (st.y + 12) + 'px';
+				// Drop slot = gap whose boundary is nearest the pointer.
+				var secs = collectSections(doc);
+				var insertAt = secs.length;
+				var lineY = null;
+				for (var i = 0; i < secs.length; i++) {
+					var r = secs[i].el.getBoundingClientRect();
+					if (st.y < r.top + r.height / 2) { insertAt = i; lineY = r.top; break; }
+					lineY = r.bottom;
+				}
+				st.insertAt = insertAt;
+				st.order = secs.map(function (s) { return s.key; });
+				if (lineY != null) {
+					line.style.display = 'block';
+					line.style.top = Math.max(0, Math.min(vh - 3, lineY)) + 'px';
+				}
+				st.raf = win.requestAnimationFrame(tick);
+			}
+			tick();
+		}
+
+		function finishSectionDrag(commit) {
+			var st = dragState;
+			if (!st) return;
+			dragState = null;
+			try { st.win.cancelAnimationFrame(st.raf); } catch (e) {}
+			try { st.handle.releasePointerCapture(st.pointerId); } catch (e) {}
+			st.handle.removeEventListener('pointermove', st.onMove);
+			st.handle.removeEventListener('pointerup', st.onUp);
+			st.handle.removeEventListener('pointercancel', st.onCancel);
+			st.handle.classList.remove('is-dragging');
+			st.handle.style.display = 'none';
+			try { st.ghost.remove(); st.line.remove(); } catch (e) {}
+			try {
+				st.sec.classList.remove('pg-drag-source');
+				st.doc.body.classList.remove('pg-dragging');
+			} catch (e) {}
+			dragClickGuard = Date.now() + 350; // eat the synthesized click
+			if (!commit || st.insertAt < 0 || !st.order) return;
+			var domOrder = st.order;
+			var from = domOrder.indexOf(st.key);
+			if (from === -1) return;
+			var to = st.insertAt > from ? st.insertAt - 1 : st.insertAt;
+			if (to === from) return;
+			// Rebuild on the CONFIG's authoritative order, positioned relative
+			// to the DOM neighbor the user dropped in front of.
+			var order = sectionsOrder();
+			var ci = order.indexOf(st.key);
+			if (ci === -1) return;
+			order.splice(ci, 1);
+			var beforeKey = null;
+			for (var n = st.insertAt; n < domOrder.length; n++) {
+				if (domOrder[n] !== st.key) { beforeKey = domOrder[n]; break; }
+			}
+			var ti = beforeKey ? order.indexOf(beforeKey) : order.length;
+			if (ti < 0) ti = order.length;
+			order.splice(ti, 0, st.key);
+			if (cfg.pageConfig) cfg.pageConfig.sections = order.slice();
+			optimisticMove(st.key, order);
+			renderSecChip();
+			applyDirect({ sections: order }, 'Reorder: move ' + sectionLabel(st.key));
+			showToast('Moved ' + sectionLabel(st.key));
+		}
+
+		function cancelSectionDrag() { if (dragState) finishSectionDrag(false); }
+
+		// ── 3. ⌘Z / ⌘⇧Z undo·redo over snapshot history ────────────────
+		// restore() snapshots the replaced state first, so every restore is
+		// itself restorable. Client-side we track which revision ids we've
+		// already applied (skip on the next undo) and which snapshot ids were
+		// minted BY our restores (the redo stack).
+		var undoBusy = false, redoIds = [], appliedIds = {};
+		function resetUndoChain() { redoIds = []; appliedIds = {}; }
+		window.__pgResetUndo = resetUndoChain; // chat 'built' events invalidate redo
+
+		function ajaxForm(action, extra) {
+			var fd = new FormData();
+			fd.append('action', action);
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			if (extra) Object.keys(extra).forEach(function (k) { fd.append(k, extra[k]); });
+			return fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); });
+		}
+		function fetchVersions() {
+			return ajaxForm('pressgo_ai_versions').then(function (j) {
+				if (!j || !j.success) throw new Error('versions failed');
+				return j.data.versions || [];
+			});
+		}
+		function refreshStoredConfig() {
+			return ajaxForm('pressgo_ai_get_config').then(function (j) {
+				if (j && j.success) cfg.pageConfig = j.data.config || null;
+			}).catch(function () { /* stale local config is survivable */ });
+		}
+		function restoreRevision(revId) {
+			return ajaxForm('pressgo_ai_restore', { revision_id: revId }).then(function (j) {
+				if (!j || !j.success) throw new Error('restore failed');
+				return j.data || {};
+			});
+		}
+		function waitForIdle(cb, tries) {
+			tries = tries == null ? 40 : tries;
+			if ((!applyBusy && !queuedPatch && !isDirty()) || tries <= 0) { cb(); return; }
+			setTimeout(function () { waitForIdle(cb, tries - 1); }, 150);
+		}
+		function afterRestore(data, msg) {
+			return refreshStoredConfig().then(function () {
+				reloadPreview((data && data.preview_bust) || Date.now());
+				if (selectedSectionKey && (!cfg.pageConfig || !cfg.pageConfig[selectedSectionKey])) {
+					selectedSectionKey = '';
+					renderChatChip();
+				}
+				if (panelEl && panelEl.classList.contains('is-open')) renderPanel(false);
+				renderSecChip();
+				showToast(msg);
+			});
+		}
+		function doUndo() {
+			if (undoBusy) return;
+			undoBusy = true;
+			if (inline) commitInline();
+			if (isDirty()) flushApply();
+			waitForIdle(function () {
+				fetchVersions().then(function (vers) {
+					var target = null;
+					for (var i = 0; i < vers.length; i++) {
+						if (redoIds.indexOf(vers[i].id) === -1 && !appliedIds[vers[i].id]) { target = vers[i]; break; }
+					}
+					if (!target) { undoBusy = false; showToast('Nothing to undo.'); return; }
+					restoreRevision(target.id).then(function (data) {
+						appliedIds[target.id] = 1;
+						// The restore snapshotted the replaced state — that new
+						// newest revision is the redo target.
+						return fetchVersions().then(function (v2) {
+							if (v2.length && v2[0].id !== target.id && !appliedIds[v2[0].id] && redoIds.indexOf(v2[0].id) === -1) {
+								redoIds.push(v2[0].id);
+							}
+							return afterRestore(data, 'Undid — ⌘⇧Z to redo');
+						});
+					}).then(function () { undoBusy = false; })
+						.catch(function () { undoBusy = false; showToast('Could not undo — try the History panel.', true); });
+				}).catch(function () { undoBusy = false; showToast('Could not undo — try the History panel.', true); });
+			});
+		}
+		function doRedo() {
+			if (undoBusy) return;
+			if (!redoIds.length) { showToast('Nothing to redo.'); return; }
+			undoBusy = true;
+			var id = redoIds[redoIds.length - 1];
+			restoreRevision(id).then(function (data) {
+				redoIds.pop();
+				appliedIds[id] = 1;
+				return afterRestore(data, 'Redone — ⌘Z to undo');
+			}).then(function () { undoBusy = false; })
+				.catch(function () { undoBusy = false; showToast('Could not redo.', true); });
+		}
+
+		// Keyboard wiring — parent document AND every preview document (focus
+		// usually lives in the iframe). Never while typing.
+		function isEditableTarget(t) {
+			if (!t) return false;
+			var tag = (t.tagName || '').toLowerCase();
+			if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+			return !!t.isContentEditable;
+		}
+		function globalKeys(e) {
+			var k = e.key;
+			var meta = e.metaKey || e.ctrlKey;
+			if (meta && (k === 'z' || k === 'Z')) {
+				if (inline || isEditableTarget(e.target)) return; // native text undo
+				e.preventDefault();
+				e.stopPropagation();
+				if (e.shiftKey) doRedo(); else doUndo();
+				return;
+			}
+			if ((k === 'ArrowLeft' || k === 'ArrowRight') && selectMode && selectedSectionKey && !pageMode) {
+				if (inline || isEditableTarget(e.target) || meta || e.altKey) return;
+				if (imgPicker) return; // picker owns the keyboard while open
+				e.preventDefault();
+				cycleVariant(k === 'ArrowRight' ? 1 : -1);
+			}
+		}
+		document.addEventListener('keydown', globalKeys, true);
+		function armFrameKeys() {
+			try {
+				var doc = frame.contentDocument;
+				if (!doc || doc.__pgP3Keys) return;
+				doc.__pgP3Keys = 1;
+				doc.addEventListener('keydown', globalKeys, true);
+			} catch (e) {}
+		}
+		onFrameReady(armFrameKeys);
+		armFrameKeys();
+
+		// ── 4. Image hot-swap ──────────────────────────────────────────
+		// Value→path index over every image-kind field in the config
+		// (top-level image fields, list items that are image URLs, repeater
+		// sub-fields whose kind is image).
+		function buildImageIndex() {
+			var out = [];
+			var pc = cfg.pageConfig || {};
+			Object.keys(pc).forEach(function (key) {
+				var spec = edFields[baseType(key)];
+				if (!spec || !spec.fields) return;
+				var sec = (!pageMode && key === selectedSectionKey && working) ? working : pc[key];
+				if (!sec || typeof sec !== 'object') return;
+				Object.keys(spec.fields).forEach(function (fkey) {
+					var f = spec.fields[fkey] || {};
+					var v = sec[fkey];
+					if (v == null) return;
+					if (f.kind === 'image' && typeof v === 'string' && v) {
+						out.push({ key: key, path: [fkey], url: v });
+					} else if ((f.kind === 'list' || f.kind === 'repeater') && Array.isArray(v)) {
+						var sub = (f.fields && Object.keys(f.fields).length) ? f.fields : null;
+						v.forEach(function (it, i) {
+							if (typeof it === 'string' && looksLikeImageUrl(it)) {
+								out.push({ key: key, path: [fkey, i], url: it });
+							} else if (it && typeof it === 'object') {
+								Object.keys(it).forEach(function (sk) {
+									if (typeof it[sk] !== 'string' || !it[sk]) return;
+									var kind = sub ? (sub[sk] && sub[sk].kind) : guessKind(sk);
+									if (kind === 'image') out.push({ key: key, path: [fkey, i, sk], url: it[sk] });
+								});
+							}
+						});
+					}
+				});
+			});
+			return out;
+		}
+		function looksLikeImageUrl(s) {
+			return /^https?:\/\//.test(s) &&
+				(/\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i.test(s) || /images\.(pexels|unsplash)\.com/.test(s) || /\/wp-content\/uploads\//.test(s));
+		}
+		function normImgUrl(u) {
+			return String(u || '').replace(/^https?:\/\//, '').split('?')[0].split('#')[0];
+		}
+		// Match a rendered <img> src back to a config path. Exact first, then
+		// query-stripped; section scope first, page-wide as fallback; any
+		// ambiguity = no match (we'd rather do nothing than swap the wrong one).
+		function matchImageEntry(src, key) {
+			var idx = buildImageIndex();
+			var inSec = idx.filter(function (e2) { return e2.key === key; });
+			var i;
+			for (i = 0; i < inSec.length; i++) if (inSec[i].url === src) return inSec[i];
+			var ns = normImgUrl(src);
+			var hits = inSec.filter(function (e2) { return normImgUrl(e2.url) === ns; });
+			if (hits.length === 1) return hits[0];
+			if (hits.length > 1) return null;
+			var anyExact = idx.filter(function (e2) { return e2.url === src; });
+			if (anyExact.length === 1) return anyExact[0];
+			var anyNorm = idx.filter(function (e2) { return normImgUrl(e2.url) === ns; });
+			return anyNorm.length === 1 ? anyNorm[0] : null;
+		}
+		// Background-image sections: when the section has exactly ONE
+		// image-kind field and the clicked area paints a background image,
+		// that field is the unambiguous target.
+		function bgImageEntry(target, sec, key) {
+			var spec = edFields[baseType(key)];
+			if (!spec || !spec.fields) return null;
+			var imgFields = Object.keys(spec.fields).filter(function (k) { return spec.fields[k].kind === 'image'; });
+			if (imgFields.length !== 1) return null;
+			var secObj = (!pageMode && key === selectedSectionKey && working) ? working : ((cfg.pageConfig || {})[key] || {});
+			var v = secObj[imgFields[0]];
+			if (typeof v !== 'string' || !v) return null;
+			try {
+				var win = sec.ownerDocument.defaultView;
+				var el = target.nodeType === 1 ? target : target.parentElement;
+				while (el && el !== sec.parentNode) {
+					var bi = win.getComputedStyle(el).backgroundImage;
+					if (bi && bi !== 'none' && bi.indexOf('url(') !== -1) {
+						return { key: key, path: [imgFields[0]], url: v };
+					}
+					if (el === sec) break;
+					el = el.parentElement;
+				}
+			} catch (e) {}
+			return null;
+		}
+
+		function openPickerForImage(imgEl, key) {
+			var src = imgEl.currentSrc || imgEl.src || '';
+			if (!src) return false;
+			var entry = matchImageEntry(src, key);
+			if (!entry) return false;
+			openPickerForEntry(entry, imgEl);
+			return true;
+		}
+		function openPickerForEntry(entry, imgEl) {
+			openImagePicker({
+				current: entry.url,
+				onPick: function (url) { applyImageSwap(entry, url, imgEl); }
+			});
+		}
+
+		function applyImageSwap(entry, url, imgEl) {
+			url = String(url || '').trim();
+			if (!url) return;
+			if (pageMode || entry.key !== selectedSectionKey) selectSection(entry.key);
+			if (!working || typeof working !== 'object') return;
+			// Adapt the path to working's shape: the panel may have promoted
+			// list strings to {url:...} objects (normalizeRepeaterItems).
+			var path = entry.path.slice();
+			if (path.length === 2) {
+				var arr = working[path[0]];
+				var item = Array.isArray(arr) ? arr[path[1]] : null;
+				if (item && typeof item === 'object') {
+					var sk = null;
+					Object.keys(item).forEach(function (k) { if (!sk && item[k] === entry.url) sk = k; });
+					path.push(sk || ('url' in item ? 'url' : 'url'));
+				}
+			}
+			setAtPath(working, path, url);
+			markDirty(String(path[0]));
+			fastFlush(300);
+			// Optimistic: show the new image immediately.
+			if (imgEl) {
+				try { imgEl.src = url; imgEl.removeAttribute('srcset'); imgEl.removeAttribute('sizes'); } catch (e) {}
+			}
+			// Refresh panel control values if the panel shows this section.
+			if (panelEl && panelEl.classList.contains('is-open') && !pageMode) renderPanel(true);
+		}
+
+		// The mini-picker popover (parent DOM, floats over the preview).
+		var imgPicker = null, libCache = null;
+		function closeImagePicker() {
+			if (imgPicker) { imgPicker.remove(); imgPicker = null; }
+			document.removeEventListener('mousedown', onPickerDocDown, true);
+		}
+		function onPickerDocDown(e) {
+			if (imgPicker && !imgPicker.contains(e.target)) closeImagePicker();
+		}
+		function thumbCell(url, thumbUrl, isCurrent, pick) {
+			var cell = document.createElement('button');
+			cell.type = 'button';
+			cell.className = 'pg-imgp-cell' + (isCurrent ? ' is-current' : '');
+			cell.title = url;
+			var im = document.createElement('img');
+			im.loading = 'lazy';
+			im.src = thumbUrl || url;
+			im.alt = '';
+			im.addEventListener('error', function () { cell.remove(); });
+			cell.appendChild(im);
+			cell.addEventListener('click', function () { pick(url); });
+			return cell;
+		}
+		function openImagePicker(opts) {
+			closeImagePicker();
+			var pick = function (url) {
+				closeImagePicker();
+				opts.onPick(url);
+			};
+			imgPicker = document.createElement('div');
+			imgPicker.className = 'pg-img-picker';
+			var head = document.createElement('div');
+			head.className = 'pg-imgp-head';
+			var ttl = document.createElement('strong');
+			ttl.textContent = 'Choose an image';
+			var x = document.createElement('button');
+			x.type = 'button';
+			x.className = 'pg-imgp-x';
+			x.innerHTML = '&times;';
+			x.setAttribute('aria-label', 'Close');
+			x.addEventListener('click', closeImagePicker);
+			head.appendChild(ttl);
+			head.appendChild(x);
+			imgPicker.appendChild(head);
+
+			// Paste-a-URL row.
+			var row = document.createElement('div');
+			row.className = 'pg-imgp-paste';
+			var pi = document.createElement('input');
+			pi.type = 'url';
+			pi.placeholder = 'Paste an image URL…';
+			var use = document.createElement('button');
+			use.type = 'button';
+			use.textContent = 'Use';
+			function useUrl() {
+				var u = (pi.value || '').trim();
+				if (!/^https?:\/\//.test(u)) { pi.focus(); return; }
+				pick(u);
+			}
+			use.addEventListener('click', useUrl);
+			pi.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); useUrl(); } });
+			row.appendChild(pi);
+			row.appendChild(use);
+			imgPicker.appendChild(row);
+
+			var body = document.createElement('div');
+			body.className = 'pg-imgp-body';
+			imgPicker.appendChild(body);
+
+			// On this page — every unique image URL already in the config.
+			var pageUrls = [];
+			var seenU = {};
+			buildImageIndex().forEach(function (e2) {
+				if (!seenU[e2.url]) { seenU[e2.url] = 1; pageUrls.push(e2.url); }
+			});
+			if (pageUrls.length) {
+				var h1 = document.createElement('div');
+				h1.className = 'pg-imgp-sect';
+				h1.textContent = 'On this page';
+				body.appendChild(h1);
+				var g1 = document.createElement('div');
+				g1.className = 'pg-imgp-grid';
+				pageUrls.forEach(function (u) {
+					g1.appendChild(thumbCell(u, u, u === opts.current, pick));
+				});
+				body.appendChild(g1);
+			}
+
+			// Media library — fetched once per builder session.
+			var h2 = document.createElement('div');
+			h2.className = 'pg-imgp-sect';
+			h2.textContent = 'Media library';
+			body.appendChild(h2);
+			var g2 = document.createElement('div');
+			g2.className = 'pg-imgp-grid';
+			var note = document.createElement('div');
+			note.className = 'pg-imgp-note';
+			note.textContent = 'Loading…';
+			body.appendChild(g2);
+			body.appendChild(note);
+			function renderLib(images) {
+				g2.innerHTML = '';
+				if (!images.length) {
+					note.textContent = 'No images in the media library yet — drop some into wp-admin → Media, or paste a URL above.';
+					return;
+				}
+				note.remove();
+				images.forEach(function (im) {
+					if (seenU[im.url]) return; // already shown under "On this page"
+					g2.appendChild(thumbCell(im.url, im.thumb, im.url === opts.current, pick));
+				});
+			}
+			if (libCache) {
+				renderLib(libCache);
+			} else {
+				ajaxForm('pressgo_ai_list_images').then(function (j) {
+					libCache = (j && j.success && j.data && j.data.images) || [];
+					if (imgPicker) renderLib(libCache);
+				}).catch(function () { note.textContent = 'Couldn’t load the media library — paste a URL above instead.'; });
+			}
+
+			previewWrap.appendChild(imgPicker);
+			setTimeout(function () { document.addEventListener('mousedown', onPickerDocDown, true); }, 0);
+		}
+
+		// ── 5. AI text micro-toolbar (✨ Punchier · ✂ Shorter · ✓ Fix) ──
+		var tbEl = null, tbTimer = null, tbText = '';
+		function scheduleTbCheck() {
+			clearTimeout(tbTimer);
+			tbTimer = setTimeout(checkTextSelection, 140);
+		}
+		function hideTextToolbar() {
+			if (tbEl) { tbEl.remove(); tbEl = null; }
+			tbText = '';
+		}
+		function checkTextSelection() {
+			if (!selectMode || !selectedSectionKey || inline || dragState) { hideTextToolbar(); return; }
+			var win, doc;
+			try { win = frame.contentWindow; doc = frame.contentDocument; } catch (e) { hideTextToolbar(); return; }
+			if (!win || !doc) { hideTextToolbar(); return; }
+			var sel = win.getSelection();
+			if (!sel || sel.isCollapsed || !sel.rangeCount) { hideTextToolbar(); return; }
+			var text = String(sel.toString()).replace(/\s+/g, ' ').trim();
+			if (text.length < 3 || text.length > 300) { hideTextToolbar(); return; }
+			var range = sel.getRangeAt(0);
+			var node = range.commonAncestorContainer;
+			var el = node.nodeType === 1 ? node : node.parentElement;
+			if (!el || !el.closest) { hideTextToolbar(); return; }
+			if (el.closest('[contenteditable]')) { hideTextToolbar(); return; } // inline edit = native
+			var sec = el.closest('.pg-sec');
+			if (!sec || keyOfSection(sec) !== selectedSectionKey) { hideTextToolbar(); return; }
+			showTextToolbar(range, text);
+		}
+		function showTextToolbar(range, text) {
+			tbText = text;
+			if (!tbEl) {
+				tbEl = document.createElement('div');
+				tbEl.className = 'pg-ai-tb';
+				[
+					['✨ Punchier', 'punchier', 'Rewrite this selection to hit harder (1 credit)'],
+					['✂ Shorter', 'shorter', 'Tighten this selection (1 credit)'],
+					['✓ Fix', 'fix', 'Fix spelling and grammar (1 credit)']
+				].forEach(function (def) {
+					var b = document.createElement('button');
+					b.type = 'button';
+					b.textContent = def[0];
+					b.title = def[2];
+					b.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep the iframe selection
+					b.addEventListener('click', function () { quickRewrite(def[1]); });
+					tbEl.appendChild(b);
+				});
+				document.body.appendChild(tbEl);
+			}
+			var fr, r;
+			try {
+				fr = frame.getBoundingClientRect();
+				r = range.getBoundingClientRect();
+			} catch (e) { hideTextToolbar(); return; }
+			if (!r || (!r.width && !r.height) || r.bottom < 0 || r.top > fr.height) { hideTextToolbar(); return; }
+			var left = fr.left + r.left + r.width / 2;
+			left = Math.max(fr.left + 90, Math.min(fr.left + fr.width - 90, left));
+			var top = fr.top + r.top - 42;
+			if (top < fr.top + 6) top = fr.top + r.bottom + 10;
+			tbEl.style.left = left + 'px';
+			tbEl.style.top = top + 'px';
+		}
+		function quickRewrite(kind) {
+			var t = tbText;
+			hideTextToolbar();
+			try { frame.contentWindow.getSelection().removeAllRanges(); } catch (e) {}
+			if (!t) return;
+			if (sendBtn.disabled) { showToast('The AI is still working — try again in a moment.', true); return; }
+			var q = '"' + t.replace(/"/g, '”') + '"';
+			var msgs = {
+				punchier: 'Rewrite this text to be punchier (keep the meaning, similar length): ' + q + ' — change ONLY that text, leave everything else exactly as it is.',
+				shorter:  'Rewrite this text to be shorter and tighter (keep the meaning): ' + q + ' — change ONLY that text, leave everything else exactly as it is.',
+				fix:      'Fix any spelling or grammar mistakes in this text: ' + q + ' — change ONLY that text, leave everything else exactly as it is.'
+			};
+			sendMessage(msgs[kind]); // scoped: selectedSectionKey rides the request
+		}
+
 		// Test hook (also handy from the console).
 		window.__pgEditor = {
 			enable: function (on) { setSelectMode(on !== false); },
@@ -3272,7 +4188,21 @@
 			},
 			indexSize: function () { return buildValueIndex().length; },
 			config: function () { return cfg.pageConfig; },
-			testApply: function (patch, label) { sendPatch({ patch: patch || {}, label: label || 'test apply' }); }
+			testApply: function (patch, label) { sendPatch({ patch: patch || {}, label: label || 'test apply' }); },
+			// Phase 3 hooks.
+			cycleVariant: cycleVariant,
+			moveSection: moveSection,
+			undo: doUndo,
+			redo: doRedo,
+			undoState: function () { return { busy: undoBusy, redoIds: redoIds.slice(), applied: Object.keys(appliedIds) }; },
+			dragInfo: function () { return dragState ? { key: dragState.key, insertAt: dragState.insertAt, order: dragState.order } : null; },
+			imageIndex: buildImageIndex,
+			openImagePicker: openImagePicker,
+			pickerOpen: function () { return !!imgPicker; },
+			toolbar: function () { return { open: !!tbEl, text: tbText }; },
+			checkSelection: checkTextSelection,
+			quickRewrite: quickRewrite,
+			applyDirect: applyDirect
 		};
 	})();
 

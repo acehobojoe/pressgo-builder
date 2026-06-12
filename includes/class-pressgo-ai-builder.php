@@ -88,6 +88,8 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_review_seen',  array( $this, 'ajax_review_seen' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_optout', array( $this, 'ajax_brand_optout' ) );
 		add_action( 'wp_ajax_pressgo_ai_apply_patch',  array( $this, 'ajax_apply_patch' ) );
+		add_action( 'wp_ajax_pressgo_ai_get_config',   array( $this, 'ajax_get_config' ) );
+		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
 	}
 
 	/**
@@ -293,6 +295,60 @@ class PressGo_AI_Builder {
 			wp_send_json_error( isset( $res['error'] ) ? $res['error'] : 'patch failed', 422 );
 		}
 		wp_send_json_success( array( 'preview_bust' => time() ) );
+	}
+
+	/**
+	 * Return the page's stored AI config. The undo/redo client refreshes its
+	 * local copy from this after a restore (the restore swaps the stored config
+	 * underneath the open builder).
+	 */
+	public function ajax_get_config() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
+		$cfg = self::decode_meta_json( (string) get_post_meta( $post_id, self::META_AI_CONFIG, true ) );
+		wp_send_json_success( array( 'config' => is_array( $cfg ) ? $cfg : null ) );
+	}
+
+	/**
+	 * Media-library thumbnails for the image hot-swap picker: attachments
+	 * uploaded to THIS page first, then recent site uploads. Capped at 24.
+	 */
+	public function ajax_list_images() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$out  = array();
+		$seen = array();
+		$collect = function ( $ids ) use ( &$out, &$seen ) {
+			foreach ( (array) $ids as $aid ) {
+				if ( count( $out ) >= 24 ) break;
+				if ( isset( $seen[ $aid ] ) ) continue;
+				$seen[ $aid ] = 1;
+				$full = wp_get_attachment_image_url( $aid, 'large' );
+				if ( ! $full ) $full = wp_get_attachment_url( $aid );
+				if ( ! $full ) continue;
+				$thumb = wp_get_attachment_image_url( $aid, 'medium' );
+				$out[] = array(
+					'id'    => (int) $aid,
+					'url'   => $full,
+					'thumb' => $thumb ? $thumb : $full,
+				);
+			}
+		};
+		$args = array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'post_status'    => 'inherit',
+			'posts_per_page' => 24,
+			'fields'         => 'ids',
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		);
+		if ( $post_id ) {
+			$collect( get_posts( array_merge( $args, array( 'post_parent' => $post_id ) ) ) );
+		}
+		$collect( get_posts( $args ) );
+		wp_send_json_success( array( 'images' => $out ) );
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
