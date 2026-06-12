@@ -691,6 +691,17 @@ class PressGo_AI_Builder {
 		} );
 
 		add_filter( 'show_admin_bar', '__return_false', 99 );
+		// Elementor Pro "Notes" boots a React app on logged-in front-end
+		// views; inside the builder's preview iframe its bootstrap throws a
+		// TypeError (its config rides the top window) — one console error
+		// per preview load. The clean preview never needs Notes; drop it.
+		add_action( 'wp_enqueue_scripts', function () {
+			foreach ( array( 'elementor-pro-notes', 'elementor-pro-notes-app-initiator' ) as $h ) {
+				wp_dequeue_script( $h );
+				wp_deregister_script( $h );
+			}
+			wp_dequeue_style( 'elementor-pro-notes-frontend' );
+		}, 9999 );
 		// Hard belt-and-suspenders: strip the admin-bar styles/scripts and
 		// nuke the bar via CSS in case a theme re-enables it.
 		remove_action( 'wp_head',              '_admin_bar_bump_cb' );
