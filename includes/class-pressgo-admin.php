@@ -128,18 +128,23 @@ class PressGo_Admin {
 			array( 'class' => 'pressgo-field-direct' )
 		);
 
-		register_setting( 'pressgo_settings', 'pressgo_target_builder', array(
-			'type'              => 'string',
-			'sanitize_callback' => 'sanitize_key',
-			'default'           => 'auto',
-		) );
-		add_settings_field(
-			'pressgo_target_builder',
-			'Default Page Builder',
-			array( $this, 'render_target_builder_field' ),
-			'pressgo-settings',
-			'pressgo_api_section'
-		);
+		// The "Default Page Builder" picker only makes sense when multi-builder
+		// is enabled — otherwise it would offer Elementor-only and hint at a
+		// hidden beta. Gate it behind the same flag.
+		if ( class_exists( 'PressGo_Render_Targets' ) && PressGo_Render_Targets::multibuilder_enabled() ) {
+			register_setting( 'pressgo_settings', 'pressgo_target_builder', array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_key',
+				'default'           => 'auto',
+			) );
+			add_settings_field(
+				'pressgo_target_builder',
+				'Default Page Builder',
+				array( $this, 'render_target_builder_field' ),
+				'pressgo-settings',
+				'pressgo_api_section'
+			);
+		}
 	}
 
 	/** Site-wide default render target; each page can override in the builder. */

@@ -1181,7 +1181,17 @@ class PressGo_AI_Builder {
 					// pings ajax_review_seen), not on page load — loading the
 					// builder 3 times without a build used to exhaust the ask.
 				?>,
-				editorFields: <?php echo wp_json_encode( class_exists( 'PressGo_Editor_Fields' ) ? PressGo_Editor_Fields::map() : array() ); ?>,
+				editorFields: <?php
+					// Visual editor (Select mode + property panel + inline edit)
+					// ships DARK behind this flag, default OFF, until it's been
+					// hands-on tested. Empty editorFields makes the entire editor
+					// IIFE early-return — toggle, panel, inline, shortcuts all
+					// inert. Flip via `pressgo_enable_visual_editor` or the
+					// PRESSGO_VISUAL_EDITOR constant.
+					$pg_editor_on = ( defined( 'PRESSGO_VISUAL_EDITOR' ) && PRESSGO_VISUAL_EDITOR )
+						|| (bool) apply_filters( 'pressgo_enable_visual_editor', false );
+					echo wp_json_encode( ( $pg_editor_on && class_exists( 'PressGo_Editor_Fields' ) ) ? PressGo_Editor_Fields::map() : array() );
+				?>,
 				pageConfig: <?php
 					// Current stored config so the panel can show live values
 					// without an extra fetch. null when the page has no build yet.

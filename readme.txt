@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.4
+Stable tag: 2.3.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,13 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.3.5 =
+* New: Brand panel in the AI Builder topbar — view and edit your site's colors, fonts, name and voice, or clear it to relearn from your next build
+* New: Manage pages without leaving the builder — publish/unpublish with a live status pill, rename inline, plus Duplicate and Trash on the page list
+* Fix: the "leave a review" prompt now only counts a view when it's actually shown (it could previously be used up just by opening the builder)
+* Fix: clearer note that the chat AI Builder uses a PressGo key even in Own-API-Key mode
+* Fix: pages no longer scatter the same contact details across several sections — contact info stays in one place
 
 = 2.3.4 =
 * Repeatable sections: a page can now have two galleries, several schedule blocks, multiple feature groups ("gallery#2" works in edits too)

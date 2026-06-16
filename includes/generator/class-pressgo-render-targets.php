@@ -26,8 +26,23 @@ class PressGo_Render_Targets {
 
 	const TARGETS = array( 'elementor', 'gutenberg', 'divi', 'bricks' );
 
+	/**
+	 * Multi-builder (Gutenberg/Divi/Bricks render targets) ships DARK behind
+	 * this flag, default OFF, until it graduates from beta. While off, the
+	 * plugin behaves exactly like the Elementor-only build: no target picker,
+	 * every page renders through Elementor. Flip via the
+	 * `pressgo_enable_multibuilder` filter or the PRESSGO_MULTIBUILDER constant.
+	 */
+	public static function multibuilder_enabled() {
+		return ( defined( 'PRESSGO_MULTIBUILDER' ) && PRESSGO_MULTIBUILDER )
+			|| (bool) apply_filters( 'pressgo_enable_multibuilder', false );
+	}
+
 	/** Which targets can actually render on THIS site right now. */
 	public static function available() {
+		if ( ! self::multibuilder_enabled() ) {
+			return array( 'elementor' ); // plugin Requires Elementor; the only released target
+		}
 		$theme  = wp_get_theme();
 		$parent = $theme ? $theme->get_template() : '';
 		$map    = array(
@@ -45,6 +60,11 @@ class PressGo_Render_Targets {
 	 * Gutenberg, which every WordPress site can render.
 	 */
 	public static function resolve( $post_id ) {
+		// Flag off → always Elementor, regardless of any stored per-post meta
+		// (so a page tagged during beta can never resolve to a dark target).
+		if ( ! self::multibuilder_enabled() ) {
+			return 'elementor';
+		}
 		$per = (string) get_post_meta( $post_id, '_pressgo_target_builder', true );
 		$opt = $per !== '' ? $per : get_option( 'pressgo_target_builder', 'auto' );
 		if ( in_array( $opt, self::TARGETS, true ) ) {
