@@ -1,0 +1,18 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#181a1c",
+    "content_align": "left",
+    "max_width": 1100,
+    "padding": { "top": 140, "right": 40, "bottom": 140, "left": 40 }
+  },
+  "children": [
+    { "type": "heading", "settings": { "text": "Strategy Consulting", "tag": "h6", "size": 13, "weight": "600", "color": "rgba(255,255,255,0.55)", "align": "left", "transform": "uppercase", "letter_spacing": 2 } },
+    { "type": "spacer", "settings": { "height": 18 } },
+    { "type": "heading", "settings": { "text": "Fix your go-to-market before your runway runs out", "tag": "h1", "size": 64, "size_mobile": 36, "weight": "800", "color": "#ffffff", "align": "left", "line_height": 1.1, "letter_spacing": -1.5, "max_text_width": 720 } },
+    { "type": "spacer", "settings": { "height": 20 } },
+    { "type": "text", "settings": { "html": "Northbeam helps Series A founders diagnose what is broken in their sales and marketing engine, then rebuild it to scale.", "size": 18, "color": "rgba(255,255,255,0.7)", "align": "left", "line_height": 1.6, "max_text_width": 520 } },
+    { "type": "spacer", "settings": { "height": 32 } },
+    { "type": "button", "settings": { "text": "Book a Strategy Session", "url": "#", "bg": "#e2b714", "color": "#181a1c", "align": "left", "icon": "fas fa-arrow-right" } }
+  ]
+}

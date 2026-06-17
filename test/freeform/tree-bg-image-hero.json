@@ -1,0 +1,24 @@
+{
+  "type": "section",
+  "settings": {
+    "background_image": "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "overlay": "rgba(0,0,0,0.6)",
+    "content_align": "center",
+    "max_width": 1100,
+    "padding": { "top": 160, "right": 40, "bottom": 160, "left": 40 }
+  },
+  "children": [
+    { "type": "heading", "settings": { "text": "Drive Predictable Revenue with Strategic Go-to-Market Execution", "tag": "h1", "size": 56, "size_mobile": 34, "weight": "800", "color": "#ffffff", "align": "center", "line_height": 1.15, "letter_spacing": -1.2, "max_text_width": 820 } },
+    { "type": "spacer", "settings": { "height": 24 } },
+    { "type": "text", "settings": { "html": "Northbeam partners with B2B SaaS leaders to build repeatable growth systems that scale.", "size": 20, "color": "rgba(255,255,255,0.9)", "align": "center", "line_height": 1.6, "max_text_width": 640 } },
+    { "type": "spacer", "settings": { "height": 40 } },
+    {
+      "type": "row",
+      "settings": { "content_align": "center" },
+      "children": [
+        { "type": "button", "settings": { "text": "Book a Strategy Call", "url": "#", "bg": "#e2b714", "color": "#181a1c", "align": "center", "icon": "fas fa-calendar" } },
+        { "type": "button", "settings": { "text": "View Case Studies", "url": "#", "bg": "transparent", "color": "#ffffff", "border_color": "rgba(255,255,255,0.6)", "align": "center", "icon": "fas fa-arrow-right" } }
+      ]
+    }
+  ]
+}

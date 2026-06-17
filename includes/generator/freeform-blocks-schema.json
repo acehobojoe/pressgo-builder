@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PressGo Freeform Blocks Schema (Pro mode beta — SPIKE)",
+  "description": "A recursive block tree describing ONE landing-page section as a native Elementor flexbox-container layout. The freeform renderer (class-pressgo-freeform-renderer.php) turns this into native, editable Elementor widget JSON. This is the 'build anything' layer: instead of filling a fixed recipe, the AI composes an arbitrary widget tree. Every block is either a CONTAINER (layout) or a WIDGET (leaf content). The root MUST be a container of type 'section'.",
+  "definitions": {
+    "spacing": {
+      "description": "Either a single number (all sides, px) or {top,right,bottom,left} in px.",
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "properties": {
+            "top": { "type": "number" },
+            "right": { "type": "number" },
+            "bottom": { "type": "number" },
+            "left": { "type": "number" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "block": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "section", "row", "col",
+            "heading", "text", "button", "image", "spacer", "icon", "divider"
+          ],
+          "description": "section = top-level container (one per tree, full-width band, holds a boxed content area). row = horizontal flex container (its children become equal/explicit-width columns, stacks on mobile). col = vertical flex container (stacks its children). heading/text/button/image/spacer/icon/divider = leaf widgets."
+        },
+        "settings": {
+          "type": "object",
+          "description": "Layout + style controls. Only the keys relevant to the block type are read; the rest are ignored.",
+          "properties": {
+            "background": {
+              "type": "string",
+              "description": "CONTAINERS only. A hex color (#181a1c), 'transparent', or a CSS-ish gradient spec 'gradient:#hexA,#hexB,135' (colorA, colorB, angle-deg). Sets the band/column background."
+            },
+            "background_image": {
+              "type": "string",
+              "description": "CONTAINERS only. Image URL for a background image (cover). Pair with overlay for legible text."
+            },
+            "overlay": {
+              "type": "string",
+              "description": "CONTAINERS only. An rgba()/hex overlay drawn over background_image for contrast, e.g. 'rgba(0,0,0,0.55)'."
+            },
+            "padding": { "$ref": "#/definitions/spacing", "description": "CONTAINERS. Inner padding (px). Section bands typically want generous vertical padding (80-160)." },
+            "max_width": { "type": "number", "description": "SECTION only. Max width of the boxed content area in px (e.g. 1200, 800 for a narrow column). Default 1200." },
+            "content_align": {
+              "type": "string",
+              "enum": ["left", "center", "right"],
+              "description": "CONTAINERS. Horizontal alignment of children within the container (maps to flex align-items on a column container). 'left' = flex-start."
+            },
+            "vertical_align": {
+              "type": "string",
+              "enum": ["top", "middle", "bottom"],
+              "description": "ROW/COL. Vertical alignment of children (flex justify/align)."
+            },
+            "gap": { "type": "number", "description": "ROW/COL. Flex gap between children in px." },
+            "width": { "type": "number", "description": "COL inside a ROW. Explicit column width as a PERCENT (e.g. 60 for a 60/40 split). Omit for equal columns." },
+            "radius": { "type": "number", "description": "CONTAINERS/image. Border radius in px (rounded cards, rounded images)." },
+            "shadow": { "type": "boolean", "description": "CONTAINERS/image. Soft drop shadow (card lift)." },
+            "margin": { "$ref": "#/definitions/spacing", "description": "CONTAINERS. Outer margin (px). Negative top margin can overlap a card onto the band above." },
+
+            "text": { "type": "string", "description": "heading/button. The visible text (headings: plain text; buttons: label)." },
+            "html": { "type": "string", "description": "text widget. Inline HTML body (<strong>, <em>, <a> allowed)." },
+            "tag": { "type": "string", "enum": ["h1", "h2", "h3", "h4", "h5", "h6"], "description": "heading. Semantic level. Hero headline = h1." },
+            "align": { "type": "string", "enum": ["left", "center", "right"], "description": "heading/text/button/image/icon/divider. Self text/inline alignment." },
+            "color": { "type": "string", "description": "heading/text/icon. Text/glyph color (hex or rgba). On dark backgrounds use light colors." },
+            "size": { "type": "number", "description": "heading/text/icon. Font size (heading/text) or icon size in px." },
+            "size_mobile": { "type": "number", "description": "heading/text. Mobile font-size override (always set for sizes >= 28)." },
+            "weight": { "type": "string", "description": "heading. Font weight ('400'..'800')." },
+            "letter_spacing": { "type": "number", "description": "heading. Letter spacing in px (negative tightens big display type, e.g. -1.5)." },
+            "line_height": { "type": "number", "description": "heading/text. Line height (em, e.g. 1.1 for display, 1.7 for body)." },
+            "transform": { "type": "string", "enum": ["uppercase", "lowercase", "capitalize", "none"], "description": "heading. Text transform (eyebrows are often uppercase)." },
+            "max_text_width": { "type": "number", "description": "text/heading. Cap the measure (readable line length) in px, e.g. 520. The renderer centers it if the block is centered." },
+
+            "url": { "type": "string", "description": "button. Link href (http(s)://, mailto:, tel:, /relative, #anchor)." },
+            "bg": { "type": "string", "description": "button. Button background color (the accent). 'transparent' for outline/ghost buttons." },
+            "border_color": { "type": "string", "description": "button. Border color (outline/ghost buttons)." },
+            "icon": { "type": "string", "description": "button/icon. FontAwesome class, e.g. 'fas fa-arrow-right'." },
+
+            "height": { "type": "number", "description": "spacer. Vertical space in px." },
+            "src": { "type": "string", "description": "image. Image URL (only a real, given URL — never invent one)." },
+            "alt": { "type": "string", "description": "image. Alt text." }
+          },
+          "additionalProperties": true
+        },
+        "children": {
+          "type": "array",
+          "description": "CONTAINERS only (section/row/col). Nested blocks. Widgets have no children.",
+          "items": { "$ref": "#/definitions/block" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    { "$ref": "#/definitions/block" },
+    {
+      "properties": { "type": { "const": "section" } },
+      "description": "The root block MUST be type 'section'."
+    }
+  ]
+}
