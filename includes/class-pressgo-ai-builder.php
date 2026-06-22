@@ -92,6 +92,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_get_config',   array( $this, 'ajax_get_config' ) );
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
+		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 	}
 
 	/**
@@ -1064,6 +1065,37 @@ class PressGo_AI_Builder {
 			$css_v    = file_exists( $css_path ) ? filemtime( $css_path ) : PRESSGO_VERSION;
 			?>
 			<link rel="stylesheet" href="<?php echo esc_url( PRESSGO_PLUGIN_URL . 'assets/css/ai-builder-fullscreen.css?v=' . $css_v ); ?>">
+			<style id="pg-usage-styles">
+			.pg-usage{display:flex;flex-direction:column;gap:3px;min-width:130px;margin:0 4px}
+			.pg-usage-text{font-size:11px;color:#475569;white-space:nowrap;line-height:1.1}
+			.pg-usage-text strong{color:#0f172a;font-weight:700}
+			.pg-usage-reset{color:#94a3b8}
+			.pg-usage-reset:not(:empty)::before{content:"\00b7 "}
+			.pg-usage-track{height:6px;border-radius:999px;background:#e8ebf2;overflow:hidden}
+			.pg-usage-fill{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#5b50e6,#6366f1);transition:width .35s ease}
+			.pg-usage.is-warn .pg-usage-fill{background:linear-gradient(90deg,#f59e0b,#f5b301)}
+			.pg-usage.is-full .pg-usage-fill{background:linear-gradient(90deg,#dc2626,#ef4444)}
+			.pg-usage.is-warn .pg-usage-text strong{color:#b45309}
+			.pg-usage.is-full .pg-usage-text strong{color:#b91c1c}
+			.pg-usage-upgrade{display:none}
+			.pg-usage-upgrade.is-show{display:inline-flex!important;border-color:#f0b429;color:#92400e;background:#fef6e7}
+			.pg-usage-upgrade.is-full{border-color:#ef4444;color:#fff;background:#dc2626}
+			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:600px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
+			.pg-tiers-pop[hidden]{display:none}
+			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
+			.pg-tiers-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+			@media(max-width:680px){.pg-tiers-grid{grid-template-columns:repeat(2,1fr)}.pg-tiers-pop{width:380px}}
+			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:10px;padding:13px 12px}
+			.pg-tier-card.is-pop{border-color:#6366f1;box-shadow:0 4px 14px rgba(99,102,241,.12)}
+			.pg-tier-card.is-current{border-color:#16a34a}
+			.pg-tier-flag{position:absolute;top:-9px;left:11px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:#6366f1;padding:2px 7px;border-radius:999px}
+			.pg-tier-flag.is-now{background:#16a34a}
+			.pg-tier-name{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64748b}
+			.pg-tier-price{font-size:22px;font-weight:800;letter-spacing:-.5px;margin:3px 0 0}
+			.pg-tier-cap{font-size:12.5px;font-weight:700;margin:7px 0 3px;color:#0f172a}
+			.pg-tier-blurb{font-size:11.5px;color:#64748b;line-height:1.35}
+			</style>
 		</head>
 		<body class="pg-builder-body">
 			<header class="pg-builder-topbar">
@@ -1088,11 +1120,40 @@ class PressGo_AI_Builder {
 					?>
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
-					<span class="pg-credits-pill" id="pg-credits">— credits</span>
+					<div class="pg-usage" id="pg-usage" title="Daily build usage, resets every day at 00:00 UTC"><div class="pg-usage-text"><strong id="pg-usage-count">—</strong> <span class="pg-usage-unit">today</span> <span class="pg-usage-reset" id="pg-usage-reset"></span></div><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div></div>
+						<button type="button" class="pg-builder-ghost pg-usage-upgrade" id="pg-usage-upgrade" hidden>Upgrade</button>
+						<span class="pg-credits-pill" id="pg-credits">— credits</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
 				</div>
 			</header>
-			<div class="pg-builder-shell">
+			<?php
+				$pg_tier_now = $this->usage_tier();
+				$pg_tiers = array(
+					'free'    => array( 'Free',    '$0',     3,   'Resets daily, core sections' ),
+					'starter' => array( 'Starter', '$5/mo',  15,  'Sonnet first-builds, all sections' ),
+					'pro'     => array( 'Pro',     '$12/mo', 40,  'Pro mode, header/footer/globals' ),
+					'dev'     => array( 'Dev',     '$49/mo', 100, 'Effectively unlimited, agencies' ),
+				);
+				?>
+				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
+					<div class="pg-tiers-pop-head"><span>Daily build limits, reset every day</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
+					<div class="pg-tiers-grid">
+						<?php foreach ( $pg_tiers as $tk => $t ) :
+							$cls = 'pg-tier-card';
+							if ( $tk === $pg_tier_now ) { $cls .= ' is-current'; }
+							if ( 'pro' === $tk ) { $cls .= ' is-pop'; }
+							?>
+							<div class="<?php echo esc_attr( $cls ); ?>">
+								<?php if ( $tk === $pg_tier_now ) : ?><span class="pg-tier-flag is-now">Current</span><?php elseif ( 'pro' === $tk ) : ?><span class="pg-tier-flag">Popular</span><?php endif; ?>
+								<div class="pg-tier-name"><?php echo esc_html( $t[0] ); ?></div>
+								<div class="pg-tier-price"><?php echo esc_html( $t[1] ); ?></div>
+								<div class="pg-tier-cap"><?php echo (int) $t[2]; ?> builds / day</div>
+								<div class="pg-tier-blurb"><?php echo esc_html( $t[3] ); ?></div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</div>
+				<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
 					<div class="pg-attach-strip" id="pg-attach-strip" hidden></div>
@@ -1170,6 +1231,14 @@ class PressGo_AI_Builder {
 				nonce:   <?php echo wp_json_encode( $nonce ); ?>,
 				ajaxUrl: <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>,
 				previewBase: <?php echo wp_json_encode( $preview_url ); ?>,
+				usage: <?php
+					// Admin-only preview: append ?pg_used=13&pg_tier=starter to the
+					// builder URL to see any bar state live without changing data.
+					$pg_uprev = array();
+					if ( isset( $_GET['pg_used'] ) ) { $pg_uprev['used'] = sanitize_text_field( wp_unslash( $_GET['pg_used'] ) ); }
+					if ( isset( $_GET['pg_tier'] ) ) { $pg_uprev['tier'] = sanitize_key( wp_unslash( $_GET['pg_tier'] ) ); }
+					echo wp_json_encode( $this->usage_state( $pg_uprev ) );
+				?>,
 				firstRun: <?php
 					// Starter prompts for the post-key-save flow AND any site
 					// that has never completed a build — the blank-prompt stall
@@ -1345,11 +1414,69 @@ class PressGo_AI_Builder {
 			\Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
 
+		$this->bump_usage();
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => count( $elements ),
 			'note'         => 'Composed a freeform section (' . count( $elements ) . ' on the page). Add another, or refine by describing the next section.',
+			'usage'        => $this->usage_state(),
 		) );
+	}
+
+	/* ─── Daily usage view (Claude-Code-style bar) ──────────────────────
+	 * A local, daily-resetting build counter that drives the usage bar in
+	 * the builder top bar. Distinct from the backend monthly credits — this
+	 * is the "X builds today, resets at midnight" mechanic. Caps scale by
+	 * tier; tier derives from the Pro license (overridable for testing).
+	 */
+	private function usage_caps() {
+		// Filterable so the numbers can be tuned without a code change.
+		return apply_filters( 'pressgo_usage_caps', array(
+			'free' => 3, 'starter' => 15, 'pro' => 40, 'dev' => 100,
+		) );
+	}
+
+	private function usage_tier() {
+		$caps     = $this->usage_caps();
+		$override = (string) get_option( 'pressgo_usage_tier', '' ); // test override
+		if ( '' !== $override && isset( $caps[ $override ] ) ) { return $override; }
+		if ( class_exists( 'PressGo_License' ) && ( new PressGo_License() )->is_pro() ) { return 'pro'; }
+		return 'free';
+	}
+
+	/**
+	 * @param array $preview Admin-only {used,tier} overrides to demo bar states.
+	 */
+	public function usage_state( $preview = array() ) {
+		$caps  = $this->usage_caps();
+		$today = gmdate( 'Y-m-d' );
+		$data  = get_option( 'pressgo_daily_usage', array() );
+		$used  = ( is_array( $data ) && isset( $data['day'], $data['count'] ) && $data['day'] === $today ) ? (int) $data['count'] : 0;
+		$tier  = $this->usage_tier();
+		if ( ! empty( $preview['tier'] ) && isset( $caps[ $preview['tier'] ] ) ) { $tier = $preview['tier']; }
+		if ( isset( $preview['used'] ) && '' !== $preview['used'] )              { $used = max( 0, (int) $preview['used'] ); }
+		$midnight = ( intdiv( time(), DAY_IN_SECONDS ) + 1 ) * DAY_IN_SECONDS; // next 00:00 UTC
+		return array(
+			'used'      => $used,
+			'cap'       => (int) $caps[ $tier ],
+			'tier'      => $tier,
+			'resets_in' => max( 0, $midnight - time() ),
+		);
+	}
+
+	private function bump_usage() {
+		$today = gmdate( 'Y-m-d' );
+		$data  = get_option( 'pressgo_daily_usage', array() );
+		$count = ( is_array( $data ) && isset( $data['day'], $data['count'] ) && $data['day'] === $today ) ? (int) $data['count'] + 1 : 1;
+		update_option( 'pressgo_daily_usage', array( 'day' => $today, 'count' => $count ), false );
+	}
+
+	public function ajax_usage() {
+		$this->check_auth();
+		$preview = array();
+		if ( isset( $_GET['used'] ) ) { $preview['used'] = sanitize_text_field( wp_unslash( $_GET['used'] ) ); }
+		if ( isset( $_GET['tier'] ) ) { $preview['tier'] = sanitize_key( wp_unslash( $_GET['tier'] ) ); }
+		wp_send_json_success( $this->usage_state( $preview ) );
 	}
 
 	public function ajax_toggle() {
@@ -1793,6 +1920,7 @@ class PressGo_AI_Builder {
 			// Site-wide successful-build counter: drives the first-run starter
 			// prompts (0 builds yet) and the 5-build review ask.
 			update_option( 'pressgo_build_count', (int) get_option( 'pressgo_build_count', 0 ) + 1, false );
+			$this->bump_usage();
 		}
 
 		// Continuous branding bookkeeping after a successful apply:

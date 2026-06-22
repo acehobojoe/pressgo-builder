@@ -243,6 +243,60 @@
 		});
 	}
 
+	// ─── Daily usage view (Claude-Code-style bar) ───────────────────────
+	var usageEl    = document.getElementById('pg-usage');
+	var usageCount = document.getElementById('pg-usage-count');
+	var usageFill  = document.getElementById('pg-usage-fill');
+	var usageReset = document.getElementById('pg-usage-reset');
+	var usageUpg   = document.getElementById('pg-usage-upgrade');
+	var tiersPop   = document.getElementById('pg-tiers-pop');
+	var tiersPopX  = document.getElementById('pg-tiers-pop-x');
+	var usageResetTarget = 0; // epoch secs when the bar resets
+
+	function fmtReset(secs) {
+		if (secs <= 0) return 'resetting…';
+		var h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+		return 'resets in ' + (h > 0 ? h + 'h ' + m + 'm' : (m > 0 ? m + 'm' : '<1m'));
+	}
+	function renderUsage(u) {
+		if (!usageEl || !u) return;
+		var used = u.used || 0, cap = u.cap || 0;
+		usageCount.textContent = used + ' / ' + cap + ' builds';
+		var pct  = cap > 0 ? Math.min(100, Math.round(used / cap * 100)) : 0;
+		usageFill.style.width = pct + '%';
+		var full = cap > 0 && used >= cap, warn = !full && pct >= 80;
+		usageEl.classList.toggle('is-warn', warn);
+		usageEl.classList.toggle('is-full', full);
+		if (usageUpg) {
+			var show = warn || full;
+			usageUpg.hidden = !show;
+			usageUpg.classList.toggle('is-show', show);
+			usageUpg.classList.toggle('is-full', full);
+		}
+		usageResetTarget = Math.floor(Date.now() / 1000) + (u.resets_in || 0);
+		usageReset.textContent = fmtReset(u.resets_in || 0);
+	}
+	function refreshUsage() {
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_usage');
+		fd.append('nonce', cfg.nonce);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.json(); })
+			.then(function (j) { if (j && j.success) renderUsage(j.data); })
+			.catch(function () {});
+	}
+	if (usageEl) {
+		renderUsage(cfg.usage);
+		setInterval(function () {
+			if (usageResetTarget) usageReset.textContent = fmtReset(usageResetTarget - Math.floor(Date.now() / 1000));
+		}, 30000);
+		if (usageUpg)  usageUpg.addEventListener('click', function () { if (tiersPop) tiersPop.hidden = !tiersPop.hidden; });
+		if (tiersPopX) tiersPopX.addEventListener('click', function () { tiersPop.hidden = true; });
+		document.addEventListener('click', function (e) {
+			if (tiersPop && !tiersPop.hidden && !tiersPop.contains(e.target) && e.target !== usageUpg) tiersPop.hidden = true;
+		});
+	}
+
 	function typingNode() {
 		var d = document.createElement('div');
 		d.className = 'pg-typing';
@@ -884,6 +938,7 @@
 					// Stagger: when the review ask renders this turn, hold the
 					// next-page chips for the following build — two cards
 					// stacking after one event buries both.
+					refreshUsage(); // a build just landed — update the daily bar
 					if (!maybeAskReview()) { maybeOfferNextPages(); }
 					// First build on a brand-less site just LEARNED the brand —
 					// surface it without requiring a reload.
@@ -1088,6 +1143,7 @@
 					var d = res.data || {};
 					append(el('pg-msg pg-msg-ai', d.note || 'Composed a freeform section.'));
 					reloadPreview(d.preview_bust || Date.now());
+					if (d.usage) renderUsage(d.usage); else refreshUsage();
 				} else {
 					var msg = (res && res.data) ? (typeof res.data === 'string' ? res.data : (res.data.message || 'Pro mode compose failed.')) : 'Pro mode compose failed.';
 					append(el('pg-msg-error', msg));
