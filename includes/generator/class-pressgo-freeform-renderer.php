@@ -242,6 +242,10 @@ class PressGo_Freeform_Renderer {
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap, 'isLinked' => true,
 			),
+			'flex_gap_tablet'       => array(
+				'unit' => 'px', 'column' => (string) max( 16, intdiv( $gap * 3, 4 ) ),
+				'row' => (string) max( 16, intdiv( $gap * 3, 4 ) ), 'isLinked' => true,
+			),
 			'flex_gap_mobile'       => array(
 				'unit' => 'px', 'column' => (string) max( 16, intdiv( $gap * 2, 3 ) ),
 				'row' => (string) max( 16, intdiv( $gap * 2, 3 ) ), 'isLinked' => true,
