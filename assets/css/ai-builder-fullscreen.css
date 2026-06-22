@@ -325,7 +325,7 @@ select#pg-target-builder {
    thumbnail when an image is staged. */
 
 .pg-chat-input {
-	padding: 12px 16px 16px;
+	padding: 8px 14px 6px;
 	border-top: 1px solid #dcdcde;
 	background: #fff;
 	display: flex; gap: 8px;
@@ -349,7 +349,7 @@ select#pg-target-builder {
 	background: transparent;
 	border: 1px solid #c3c4c7;
 	color: #50575e;
-	width: 44px; height: 44px;
+	width: 38px; height: 38px;
 	padding: 0;
 	border-radius: 6px;
 	cursor: pointer;
@@ -433,7 +433,7 @@ select#pg-target-builder {
 	padding: 10px 12px;
 	font-size: 13px; font-family: inherit;
 	line-height: 1.5;
-	min-height: 44px; max-height: 200px;
+	min-height: 38px; max-height: 160px;
 	transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .pg-chat-input textarea:focus {
@@ -445,7 +445,7 @@ select#pg-target-builder {
 	background: #5b4fff;
 	color: #fff;
 	border: 1px solid #5b4fff;
-	padding: 0 18px; height: 44px;
+	padding: 0 16px; height: 38px;
 	border-radius: 6px;
 	font-size: 13px; font-weight: 600;
 	cursor: pointer;
@@ -464,7 +464,7 @@ select#pg-target-builder {
 .pg-chat-footer {
 	display: flex; flex-wrap: wrap; align-items: center;
 	gap: 2px 4px;
-	padding: 2px 12px 12px;
+	padding: 0 14px 10px;
 	background: #fff;
 	border-top: 0;
 }

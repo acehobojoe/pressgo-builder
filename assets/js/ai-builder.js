@@ -312,10 +312,12 @@
 		setInterval(function () {
 			if (usageResetTarget) usageReset.textContent = fmtReset(usageResetTarget - Math.floor(Date.now() / 1000));
 		}, 30000);
-		if (usageUpg)  usageUpg.addEventListener('click', function () { if (tiersPop) tiersPop.hidden = !tiersPop.hidden; });
-		if (tiersPopX) tiersPopX.addEventListener('click', function () { tiersPop.hidden = true; });
+		function toggleTiers(e) { if (e) e.stopPropagation(); if (tiersPop) tiersPop.hidden = !tiersPop.hidden; }
+		usageEl.addEventListener('click', toggleTiers);          // the whole meter is the upgrade entry point
+		if (usageUpg)  usageUpg.addEventListener('click', toggleTiers);
+		if (tiersPopX) tiersPopX.addEventListener('click', function (e) { e.stopPropagation(); tiersPop.hidden = true; });
 		document.addEventListener('click', function (e) {
-			if (tiersPop && !tiersPop.hidden && !tiersPop.contains(e.target) && e.target !== usageUpg) tiersPop.hidden = true;
+			if (tiersPop && !tiersPop.hidden && !tiersPop.contains(e.target) && !usageEl.contains(e.target)) tiersPop.hidden = true;
 		});
 	}
 

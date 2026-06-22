@@ -1110,6 +1110,16 @@ class PressGo_AI_Builder {
 			.pg-mode-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:5px}
 			.pg-mode-check{color:#5b4fff;opacity:0;flex-shrink:0}
 			.pg-mode-opt.is-active .pg-mode-check{opacity:1}
+			/* credits retired in favour of the usage meter */
+			.pg-credits-pill{display:none!important}
+			/* the usage meter is now the upgrade entry point */
+			.pg-usage{cursor:pointer;border-radius:7px;padding:3px 6px;margin:0 2px;transition:background .12s}
+			.pg-usage:hover{background:#f4f5f7}
+			.pg-tier-cur{margin-top:11px;font-size:11.5px;font-weight:700;color:#16a34a;text-align:center}
+			.pg-tier-cta{display:block;margin-top:11px;padding:8px;border-radius:8px;text-align:center;font-size:12.5px;font-weight:700;text-decoration:none;color:#1d2230;background:#fff;border:1px solid #d7dbe2;transition:background .12s,border-color .12s}
+			.pg-tier-cta:hover{background:#f4f5f7;border-color:#c3c8d2}
+			.pg-tier-cta.is-pop{background:#5b4fff;color:#fff;border-color:#5b4fff}
+			.pg-tier-cta.is-pop:hover{background:#4a40e0;border-color:#4a40e0}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -1164,6 +1174,11 @@ class PressGo_AI_Builder {
 								<div class="pg-tier-price"><?php echo esc_html( $t[1] ); ?></div>
 								<div class="pg-tier-cap"><?php echo esc_html( $t[2] ); ?></div>
 								<div class="pg-tier-blurb"><?php echo esc_html( $t[3] ); ?></div>
+								<?php if ( $tk === $pg_tier_now ) : ?>
+									<div class="pg-tier-cur">Current plan</div>
+								<?php elseif ( 'free' !== $tk ) : ?>
+									<a class="pg-tier-cta<?php echo 'pro' === $tk ? ' is-pop' : ''; ?>" href="https://pressgo.app/upgrade?plan=<?php echo esc_attr( $tk ); ?>" target="_blank" rel="noopener">Upgrade to <?php echo esc_html( $t[0] ); ?></a>
+								<?php endif; ?>
 							</div>
 						<?php endforeach; ?>
 					</div>
@@ -1180,7 +1195,7 @@ class PressGo_AI_Builder {
 						<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
 						<textarea
 							id="pg-chat-text"
-							rows="2"
+							rows="1"
 							placeholder="Describe your page, or drop a screenshot…"
 							required></textarea>
 						<button type="submit" id="pg-chat-send">Send</button>
@@ -1374,7 +1389,7 @@ class PressGo_AI_Builder {
 					// Frame the ask so the model returns JSON only and never tries to
 					// "wire up" backend behavior or rewrite the system prompt (a
 					// "form, wire it up" message otherwise derails it).
-					'content' => 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only, no prose, no code fences. Do not add backend wiring or form submission; represent any form/accordion/toggle/carousel honestly with the available static widgets. Request: ' . $message,
+					'content' => 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message,
 				) ),
 			) ),
 		) );
