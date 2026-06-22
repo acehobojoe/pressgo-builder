@@ -23,6 +23,7 @@ class PressGo_AI_Builder {
 	const META_AI_ENABLED = '_pressgo_ai_enabled';
 	const META_AI_CHAT    = '_pressgo_ai_chat';   // serialised message history
 	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
+	const META_FREEFORM   = '_pressgo_freeform';  // marks a freeform "build anything" page (native tree, no recipe config)
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -1606,7 +1607,23 @@ class PressGo_AI_Builder {
 		// The backend always sets mode ('patch' or 'full') — trust it. Only fall
 		// back to changes-presence for a hypothetical older backend with no mode.
 		$is_patch = isset( $tool_use['mode'] ) ? ( 'patch' === $tool_use['mode'] ) : ! empty( $tool_use['changes'] );
-		if ( $tool_use && $is_patch && ! empty( $tool_use['changes'] ) ) {
+
+		// Guard against the freeform-clobber bug: a page that has a rendered
+		// _elementor_data layout but NO PressGo config (freeform "build anything"
+		// pages, or any imported/hand-built Elementor page) has nothing for a patch
+		// to merge onto. The model therefore answers even a tiny edit with a FULL
+		// config, and applying it overwrites _elementor_data wholesale — destroying
+		// the native tree. Refuse the destructive full apply instead of silently
+		// clobbering the user's layout.
+		$is_foreign_layout    = ( ! $stored_config && ! empty( $elementor_raw ) ) || get_post_meta( $post_id, self::META_FREEFORM, true );
+		$wants_full_overwrite = $tool_use && ! $is_patch && ! empty( $tool_use['config'] ) && ! empty( $tool_use['config']['sections'] );
+
+		if ( $is_foreign_layout && $wants_full_overwrite ) {
+			$apply = array(
+				'ok'    => false,
+				'error' => "This page has a custom layout I didn't build from a PressGo design, so editing it through chat would rewrite the whole page and lose your work. Duplicate it as a new PressGo page first, or start a fresh page and I'll build there.",
+			);
+		} elseif ( $tool_use && $is_patch && ! empty( $tool_use['changes'] ) ) {
 			$apply = $this->apply_patch_to_post( $post_id, $tool_use['changes'] );
 		} elseif ( $tool_use && ! empty( $tool_use['config'] ) ) {
 			$cfg_in = is_array( $tool_use['config'] ) ? $tool_use['config'] : array();
