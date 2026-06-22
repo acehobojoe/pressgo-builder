@@ -1066,12 +1066,10 @@ class PressGo_AI_Builder {
 			?>
 			<link rel="stylesheet" href="<?php echo esc_url( PRESSGO_PLUGIN_URL . 'assets/css/ai-builder-fullscreen.css?v=' . $css_v ); ?>">
 			<style id="pg-usage-styles">
-			.pg-usage{display:flex;flex-direction:column;gap:3px;min-width:130px;margin:0 4px}
-			.pg-usage-text{font-size:11px;color:#475569;white-space:nowrap;line-height:1.1}
-			.pg-usage-text strong{color:#0f172a;font-weight:700}
-			.pg-usage-reset{color:#94a3b8}
-			.pg-usage-reset:not(:empty)::before{content:"\00b7 "}
-			.pg-usage-track{height:6px;border-radius:999px;background:#e8ebf2;overflow:hidden}
+			.pg-usage{display:flex;align-items:center;gap:7px;margin:0 4px}
+			.pg-usage-label{font-size:11px;color:#64748b;white-space:nowrap}
+			.pg-usage-reset{font-size:11px;color:#94a3b8;white-space:nowrap}
+			.pg-usage-track{width:84px;height:6px;border-radius:999px;background:#e8ebf2;overflow:hidden;flex-shrink:0}
 			.pg-usage-fill{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#5b50e6,#6366f1);transition:width .35s ease}
 			.pg-usage.is-warn .pg-usage-fill{background:linear-gradient(90deg,#f59e0b,#f5b301)}
 			.pg-usage.is-full .pg-usage-fill{background:linear-gradient(90deg,#dc2626,#ef4444)}
@@ -1095,6 +1093,23 @@ class PressGo_AI_Builder {
 			.pg-tier-price{font-size:22px;font-weight:800;letter-spacing:-.5px;margin:3px 0 0}
 			.pg-tier-cap{font-size:12.5px;font-weight:700;margin:7px 0 3px;color:#0f172a}
 			.pg-tier-blurb{font-size:11.5px;color:#64748b;line-height:1.35}
+			/* mode selector (Ada / Iris / Nova) */
+			.pg-mode{position:relative}
+			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #e2e4e9;border-radius:9px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
+			.pg-mode-btn:hover{background:#f6f7f9;border-color:#d4d7dd}
+			.pg-mode-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a8;flex-shrink:0}
+			.pg-mode.is-eyes .pg-mode-dot{background:#5b4fff}
+			.pg-mode.is-freeform .pg-mode-dot{background:linear-gradient(135deg,#5b4fff,#b893ff)}
+			.pg-mode-caret{color:#9aa0a8}
+			.pg-mode-menu{position:absolute;bottom:calc(100% + 8px);left:0;z-index:200;width:296px;max-width:78vw;background:#fff;border:1px solid #e6e8ec;border-radius:12px;box-shadow:0 14px 36px rgba(15,23,42,.17);padding:6px}
+			.pg-mode-menu[hidden]{display:none}
+			.pg-mode-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;background:none;cursor:pointer;padding:9px 10px;border-radius:8px}
+			.pg-mode-opt:hover{background:#f4f5f7}
+			.pg-mode-opt-name{display:block;font-size:13.5px;font-weight:700;color:#1d2230}
+			.pg-mode-opt-desc{display:block;font-size:11.5px;color:#757b85;margin-top:1px;line-height:1.3}
+			.pg-mode-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:5px}
+			.pg-mode-check{color:#5b4fff;opacity:0;flex-shrink:0}
+			.pg-mode-opt.is-active .pg-mode-check{opacity:1}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -1120,7 +1135,7 @@ class PressGo_AI_Builder {
 					?>
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
-					<div class="pg-usage" id="pg-usage" title="Daily build usage, resets every day at 00:00 UTC"><div class="pg-usage-text"><strong id="pg-usage-count">—</strong> <span class="pg-usage-unit">today</span> <span class="pg-usage-reset" id="pg-usage-reset"></span></div><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div></div>
+					<div class="pg-usage" id="pg-usage" title="Daily usage, resets every day at 00:00 UTC"><span class="pg-usage-label">Usage</span><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div><span class="pg-usage-reset" id="pg-usage-reset"></span></div>
 						<button type="button" class="pg-builder-ghost pg-usage-upgrade" id="pg-usage-upgrade" hidden>Upgrade</button>
 						<span class="pg-credits-pill" id="pg-credits">— credits</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
@@ -1129,10 +1144,10 @@ class PressGo_AI_Builder {
 			<?php
 				$pg_tier_now = $this->usage_tier();
 				$pg_tiers = array(
-					'free'    => array( 'Free',    '$0',     3,   'Resets daily, core sections' ),
-					'starter' => array( 'Starter', '$5/mo',  15,  'Sonnet first-builds, all sections' ),
-					'pro'     => array( 'Pro',     '$12/mo', 40,  'Pro mode, header/footer/globals' ),
-					'dev'     => array( 'Dev',     '$49/mo', 100, 'Effectively unlimited, agencies' ),
+					'free'    => array( 'Free',    '$0',     'Light daily use',       'Resets daily, core sections' ),
+					'starter' => array( 'Starter', '$5/mo',  'More daily headroom',   'Sonnet first-builds, all sections' ),
+					'pro'     => array( 'Pro',     '$12/mo', 'Lots of headroom',      'Pro mode, header/footer/globals' ),
+					'dev'     => array( 'Dev',     '$49/mo', 'Effectively unlimited', 'Agencies, multiple sites' ),
 				);
 				?>
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
@@ -1147,7 +1162,7 @@ class PressGo_AI_Builder {
 								<?php if ( $tk === $pg_tier_now ) : ?><span class="pg-tier-flag is-now">Current</span><?php elseif ( 'pro' === $tk ) : ?><span class="pg-tier-flag">Popular</span><?php endif; ?>
 								<div class="pg-tier-name"><?php echo esc_html( $t[0] ); ?></div>
 								<div class="pg-tier-price"><?php echo esc_html( $t[1] ); ?></div>
-								<div class="pg-tier-cap"><?php echo (int) $t[2]; ?> builds / day</div>
+								<div class="pg-tier-cap"><?php echo esc_html( $t[2] ); ?></div>
 								<div class="pg-tier-blurb"><?php echo esc_html( $t[3] ); ?></div>
 							</div>
 						<?php endforeach; ?>
@@ -1177,27 +1192,27 @@ class PressGo_AI_Builder {
 						</div>
 					</div>
 					<div class="pg-chat-footer">
-						<label class="pg-vision-toggle" data-tooltip="With A(eyes) on, after each build the AI screenshots the page and reviews its own work — applying one correction pass if it spots a visual problem. ~3× tokens but much better accuracy. Strongly recommended for color/styling changes.">
-							<input type="checkbox" id="pg-vision" class="pg-vision-input">
-							<span class="pg-vision-track">
-								<span class="pg-vision-thumb"></span>
-							</span>
-							<span class="pg-vision-label">
-								<span class="pg-vision-icon" aria-hidden="true"><?php echo $this->eye_svg(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — inline SVG literal ?></span>
-								<span class="pg-vision-name">A(<em>eyes</em>)</span>
-								<span class="pg-vision-hint">3× tokens · better accuracy</span>
-							</span>
-						</label>
-						<label class="pg-vision-toggle pg-pro-toggle" data-tooltip="Pro mode (beta): compose freeform 'build anything' sections that aren't limited to the section templates. Each message adds one custom section to this page.">
-							<input type="checkbox" id="pg-freeform" class="pg-vision-input">
-							<span class="pg-vision-track">
-								<span class="pg-vision-thumb"></span>
-							</span>
-							<span class="pg-vision-label">
-								<span class="pg-vision-name">Pro mode</span>
-								<span class="pg-vision-hint">beta · build anything</span>
-							</span>
-						</label>
+						<div class="pg-mode" id="pg-mode">
+							<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
+								<span class="pg-mode-dot"></span>
+								<span class="pg-mode-current" id="pg-mode-current">Ada</span>
+								<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+							</button>
+							<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
+								<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
+									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
+									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+								</button>
+								<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
+									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
+									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+								</button>
+								<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
+									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+								</button>
+							</div>
+						</div>
 					</div>
 				</aside>
 				<main class="pg-preview" id="pg-preview">
@@ -1425,7 +1440,7 @@ class PressGo_AI_Builder {
 			\Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
 
-		$this->bump_usage();
+		$this->bump_usage( 4 ); // Nova (freeform) is the heaviest mode
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => count( $elements ),
@@ -1441,9 +1456,11 @@ class PressGo_AI_Builder {
 	 * tier; tier derives from the Pro license (overridable for testing).
 	 */
 	private function usage_caps() {
-		// Filterable so the numbers can be tuned without a code change.
+		// Daily budgets in weighted "usage units" (not build count) — a build
+		// costs more units the heavier its mode (basic 1, Iris/vision 3, Nova/
+		// freeform 4), so the meter reflects real token burn. Filterable.
 		return apply_filters( 'pressgo_usage_caps', array(
-			'free' => 3, 'starter' => 15, 'pro' => 40, 'dev' => 100,
+			'free' => 12, 'starter' => 60, 'pro' => 160, 'dev' => 400,
 		) );
 	}
 
@@ -1475,10 +1492,11 @@ class PressGo_AI_Builder {
 		);
 	}
 
-	private function bump_usage() {
-		$today = gmdate( 'Y-m-d' );
-		$data  = get_option( 'pressgo_daily_usage', array() );
-		$count = ( is_array( $data ) && isset( $data['day'], $data['count'] ) && $data['day'] === $today ) ? (int) $data['count'] + 1 : 1;
+	private function bump_usage( $weight = 1 ) {
+		$weight = max( 1, (int) $weight );
+		$today  = gmdate( 'Y-m-d' );
+		$data   = get_option( 'pressgo_daily_usage', array() );
+		$count  = ( is_array( $data ) && isset( $data['day'], $data['count'] ) && $data['day'] === $today ) ? (int) $data['count'] + $weight : $weight;
 		update_option( 'pressgo_daily_usage', array( 'day' => $today, 'count' => $count ), false );
 	}
 
@@ -1931,7 +1949,7 @@ class PressGo_AI_Builder {
 			// Site-wide successful-build counter: drives the first-run starter
 			// prompts (0 builds yet) and the 5-build review ask.
 			update_option( 'pressgo_build_count', (int) get_option( 'pressgo_build_count', 0 ) + 1, false );
-			$this->bump_usage();
+			$this->bump_usage( $vision ? 3 : 1 ); // Iris (vision) costs ~3x, Ada (basic) 1x
 		}
 
 		// Continuous branding bookkeeping after a successful apply:

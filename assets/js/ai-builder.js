@@ -12,9 +12,9 @@
 	// immediate parent .pg-preview-frame-wrap, so the sweep overlay can paint.
 	var previewWrap = document.querySelector('.pg-preview');
 	var credPill = document.getElementById('pg-credits');
-	var visionInput = document.getElementById('pg-vision');
-	var freeformInput = document.getElementById('pg-freeform');
 	var lastCreditValue = null;
+	// Build mode (Ada=basic recipe, Iris=recipe+A(eyes) review, Nova=freeform).
+	var pgMode = 'basic';
 
 	// ─── Viewport switcher ─────────────────────────────────────────────
 	var stageInner = document.getElementById('pg-preview-stage-inner');
@@ -220,32 +220,55 @@
 		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
 	});
 
-	// Restore vision toggle from localStorage so the user's preference sticks.
-	// On the very first build we force it ON regardless of any stored value, so
-	// new users get the self-review QA pass out of the box (they can still turn
-	// it off — the change handler below persists that choice for next time).
+	// ─── Build mode selector (Ada / Iris / Nova) ────────────────────────
+	// One dropdown replaces the old vision + Pro-mode toggles. Modes are
+	// mutually exclusive: basic = recipe build, eyes = recipe + A(eyes)
+	// self-review pass, freeform = Nova "build anything" composer.
+	var MODE_NAMES = { basic: 'Ada', eyes: 'Iris', freeform: 'Nova' };
+	var modeWrap    = document.getElementById('pg-mode');
+	var modeBtn     = document.getElementById('pg-mode-btn');
+	var modeMenu    = document.getElementById('pg-mode-menu');
+	var modeCurrent = document.getElementById('pg-mode-current');
 	try {
-		if (cfg.firstRun) {
-			if (visionInput) visionInput.checked = true;
-		} else if (localStorage.getItem('pgVision') === '1') {
-			visionInput.checked = true;
-		}
+		var storedMode = localStorage.getItem('pgMode');
+		if (storedMode && MODE_NAMES[storedMode]) pgMode = storedMode;
+		else if (cfg.firstRun || localStorage.getItem('pgVision') === '1') pgMode = 'eyes'; // default/migrate to self-review
 	} catch (e) {}
-	visionInput && visionInput.addEventListener('change', function () {
-		try { localStorage.setItem('pgVision', visionInput.checked ? '1' : '0'); } catch (e) {}
-	});
 
-	// Pro mode (freeform) toggle — persisted like vision.
-	if (freeformInput) {
-		try { if (localStorage.getItem('pgFreeform') === '1') freeformInput.checked = true; } catch (e) {}
-		freeformInput.addEventListener('change', function () {
-			try { localStorage.setItem('pgFreeform', freeformInput.checked ? '1' : '0'); } catch (e) {}
+	function applyMode(m) {
+		if (!MODE_NAMES[m]) m = 'basic';
+		pgMode = m;
+		try { localStorage.setItem('pgMode', m); } catch (e) {}
+		if (modeCurrent) modeCurrent.textContent = MODE_NAMES[m];
+		if (modeWrap) {
+			modeWrap.classList.toggle('is-eyes', m === 'eyes');
+			modeWrap.classList.toggle('is-freeform', m === 'freeform');
+		}
+		if (modeMenu) modeMenu.querySelectorAll('.pg-mode-opt').forEach(function (o) {
+			o.classList.toggle('is-active', o.getAttribute('data-mode') === m);
+		});
+	}
+	function closeModeMenu() {
+		if (modeMenu) { modeMenu.hidden = true; if (modeBtn) modeBtn.setAttribute('aria-expanded', 'false'); }
+	}
+	if (modeBtn && modeMenu) {
+		applyMode(pgMode);
+		modeBtn.addEventListener('click', function (e) {
+			e.stopPropagation();
+			var open = modeMenu.hidden;
+			modeMenu.hidden = !open;
+			modeBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+		});
+		modeMenu.querySelectorAll('.pg-mode-opt').forEach(function (o) {
+			o.addEventListener('click', function () { applyMode(o.getAttribute('data-mode')); closeModeMenu(); });
+		});
+		document.addEventListener('click', function (e) {
+			if (modeWrap && !modeWrap.contains(e.target)) closeModeMenu();
 		});
 	}
 
 	// ─── Daily usage view (Claude-Code-style bar) ───────────────────────
 	var usageEl    = document.getElementById('pg-usage');
-	var usageCount = document.getElementById('pg-usage-count');
 	var usageFill  = document.getElementById('pg-usage-fill');
 	var usageReset = document.getElementById('pg-usage-reset');
 	var usageUpg   = document.getElementById('pg-usage-upgrade');
@@ -261,7 +284,6 @@
 	function renderUsage(u) {
 		if (!usageEl || !u) return;
 		var used = u.used || 0, cap = u.cap || 0;
-		usageCount.textContent = used + ' / ' + cap + ' builds';
 		var pct  = cap > 0 ? Math.min(100, Math.round(used / cap * 100)) : 0;
 		usageFill.style.width = pct + '%';
 		var full = cap > 0 && used >= cap, warn = !full && pct >= 80;
@@ -801,7 +823,7 @@
 		// Visual editor scoping: with a section selected, the server narrows
 		// the AI's patch to that key.
 		if (selectedSectionKey) fd.append('selected_section', selectedSectionKey);
-		if (visionInput && visionInput.checked) fd.append('vision', '1');
+		if (pgMode === 'eyes') fd.append('vision', '1');
 		if (pendingImages.length) {
 			fd.append('images', JSON.stringify(pendingImages.map(function (im) {
 				return { base64: im.base64, mediaType: im.mediaType };
@@ -1173,7 +1195,7 @@
 		e.preventDefault();
 		var text = (input.value || '').trim();
 		if (!text) return;
-		if (freeformInput && freeformInput.checked) { sendFreeform(text); }
+		if (pgMode === 'freeform') { sendFreeform(text); }
 		else { sendMessage(text); }
 	});
 
