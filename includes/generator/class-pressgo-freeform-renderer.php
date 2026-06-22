@@ -119,6 +119,8 @@ class PressGo_Freeform_Renderer {
 				return self::render_icon( $s, $cfg );
 			case 'divider':
 				return self::render_divider( $s, $cfg );
+			case 'form':
+				return self::render_form( $s, $cfg );
 			default:
 				return null;
 		}
@@ -391,6 +393,103 @@ class PressGo_Freeform_Renderer {
 		$align = isset( $s['align'] ) ? $s['align'] : 'center';
 		$weight = isset( $s['weight'] ) && is_numeric( $s['weight'] ) ? (int) $s['weight'] : 1;
 		return PressGo_Widget_Helpers::divider_w( $color, $width, $align, $weight );
+	}
+
+	/**
+	 * A REAL working form — native Elementor Pro Form widget (real inputs, email
+	 * submit to the site admin). Mirrors the production-verified shape used by the
+	 * recipe builder's cta_final.form. Returns null without Elementor Pro (the
+	 * caller/composer should not emit a form on a free site).
+	 *
+	 * settings: fields[{label,type,required,width,options}], button, on_dark, recipient.
+	 */
+	private static function render_form( $s, $cfg ) {
+		if ( ! class_exists( 'PressGo' ) || ! PressGo::is_elementor_pro_active() ) {
+			return null;
+		}
+		$c         = isset( $cfg['colors'] ) && is_array( $cfg['colors'] ) ? $cfg['colors'] : array();
+		$accent    = isset( $c['accent'] ) ? $c['accent'] : '#2563EB';
+		$white     = isset( $c['white'] ) ? $c['white'] : '#FFFFFF';
+		$text_dark = isset( $c['text_dark'] ) ? $c['text_dark'] : '#0F172A';
+		$radius    = isset( $cfg['layout']['button_radius'] ) ? (int) $cfg['layout']['button_radius'] : 10;
+		$on_dark   = ! empty( $s['on_dark'] );
+
+		$spec = isset( $s['fields'] ) && is_array( $s['fields'] ) && ! empty( $s['fields'] ) ? $s['fields'] : array(
+			array( 'label' => 'Name',  'type' => 'text',  'required' => true, 'width' => '100' ),
+			array( 'label' => 'Email', 'type' => 'email', 'required' => true, 'width' => '100' ),
+		);
+		$types          = array( 'text' => 'text', 'tel' => 'tel', 'phone' => 'tel', 'email' => 'email', 'textarea' => 'textarea', 'select' => 'select' );
+		$form_fields    = array();
+		$email_field_id = '';
+		foreach ( array_slice( $spec, 0, 7 ) as $i => $f ) {
+			if ( ! is_array( $f ) || empty( $f['label'] ) || ! is_scalar( $f['label'] ) ) { continue; }
+			$label = trim( (string) $f['label'] );
+			$type  = isset( $f['type'] ) && isset( $types[ $f['type'] ] ) ? $types[ $f['type'] ] : 'text';
+			$cid   = sanitize_key( str_replace( ' ', '_', strtolower( $label ) ) );
+			if ( '' === $cid ) { $cid = 'field_' . $i; }
+			$row = array(
+				'_id'              => 'fld_' . $cid,
+				'custom_id'        => $cid,
+				'field_label'      => $label,
+				'placeholder'      => $label,
+				'required'         => ! empty( $f['required'] ) ? 'true' : '',
+				'width'            => isset( $f['width'] ) && in_array( (string) $f['width'], array( '50', '100' ), true ) ? (string) $f['width'] : '100',
+				'field_label_show' => '',
+			);
+			if ( 'text' !== $type ) { $row['field_type'] = $type; }
+			if ( 'textarea' === $type ) { $row['rows'] = 4; }
+			if ( 'select' === $type && ! empty( $f['options'] ) && is_array( $f['options'] ) ) {
+				$opts_list = array();
+				foreach ( array_slice( $f['options'], 0, 10 ) as $o ) {
+					if ( is_scalar( $o ) && '' !== trim( (string) $o ) ) { $opts_list[] = trim( (string) $o ); }
+				}
+				$row['field_options'] = implode( "\n", $opts_list );
+			}
+			if ( 'email' === $type && '' === $email_field_id ) { $email_field_id = 'fld_' . $cid; }
+			$form_fields[] = $row;
+		}
+		if ( empty( $form_fields ) ) { return null; }
+
+		$recipient = isset( $s['recipient'] ) && is_scalar( $s['recipient'] ) && is_email( trim( (string) $s['recipient'] ) )
+			? trim( (string) $s['recipient'] ) : get_option( 'admin_email' );
+		$host   = preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		$biz    = isset( $cfg['business_name'] ) && is_scalar( $cfg['business_name'] ) ? (string) $cfg['business_name'] : 'your website';
+		$button = isset( $s['button'] ) && is_scalar( $s['button'] ) && '' !== $s['button'] ? (string) $s['button'] : 'Submit';
+
+		$form_settings = array(
+			'form_name'               => 'PressGo Form',
+			'form_fields'             => $form_fields,
+			'show_labels'             => '',
+			'button_text'             => $button,
+			'button_size'             => 'md',
+			'button_background_color' => $accent,
+			'button_color'            => $on_dark && isset( $c['dark_bg'] ) ? $c['dark_bg'] : $white,
+			'button_border_radius'    => array( 'unit' => 'px', 'size' => $radius, 'sizes' => array() ),
+			'field_border_width'      => array( 'unit' => 'px', 'top' => '1', 'right' => '1', 'bottom' => '1', 'left' => '1', 'isLinked' => true ),
+			'field_border_radius'     => array( 'unit' => 'px', 'size' => max( 6, min( 12, $radius ) ), 'sizes' => array() ),
+			'submit_actions'          => array( 'email' ),
+			'email_to'                => $recipient,
+			'email_subject'           => 'New submission from ' . $biz,
+			'email_content'           => '[all-fields]',
+			'email_from'              => 'wordpress@' . $host,
+			'email_from_name'         => $biz,
+			'column_gap'              => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+			'row_gap'                 => array( 'unit' => 'px', 'size' => 14, 'sizes' => array() ),
+		);
+		if ( $on_dark ) {
+			$form_settings['field_background_color'] = 'rgba(255,255,255,0.08)';
+			$form_settings['field_border_color']     = 'rgba(255,255,255,0.22)';
+			$form_settings['field_text_color']       = '#FFFFFF';
+		} else {
+			$form_settings['field_background_color'] = '#F8FAFC';
+			$form_settings['field_border_color']     = '#E2E8F0';
+			$form_settings['field_text_color']       = $text_dark;
+		}
+		if ( $email_field_id ) {
+			$form_settings['email_reply_to'] = 'field_' . $email_field_id;
+		}
+
+		return PressGo_Element_Factory::widget( 'form', $form_settings );
 	}
 
 	// ───────────────────────────────────────────────────────────────────

@@ -462,16 +462,18 @@ select#pg-target-builder {
 
 /* Composer footer — vision toggle lives here under the textarea. */
 .pg-chat-footer {
-	padding: 0 16px 14px;
+	display: flex; flex-wrap: wrap; align-items: center;
+	gap: 2px 4px;
+	padding: 2px 12px 12px;
 	background: #fff;
 	border-top: 0;
 }
 .pg-vision-toggle {
-	display: inline-flex; align-items: center; gap: 10px;
+	display: inline-flex; align-items: center; gap: 8px;
 	cursor: pointer;
 	user-select: none;
-	padding: 6px 8px;
-	border-radius: 6px;
+	padding: 5px 7px;
+	border-radius: 7px;
 	transition: background 0.12s ease;
 	position: relative;
 }

@@ -6,7 +6,7 @@ Return ONLY a single JSON object: the root block. No prose, no markdown fences, 
 
 Every block is `{ "type": ..., "settings": {...}, "children": [...] }`.
 
-Containers (`section`, `row`, `col`) hold `children`. Widgets (`heading`, `text`, `button`, `image`, `spacer`, `icon`, `divider`) are leaves with no children.
+Containers (`section`, `row`, `col`) hold `children`. Widgets (`heading`, `text`, `button`, `image`, `spacer`, `icon`, `divider`, `form`) are leaves with no children.
 
 - `section` — the top-level full-width band. Exactly one, the root. It holds a boxed, centered content area (set `max_width`). Give it the band `background` and generous vertical `padding`.
 - `row` — a horizontal band. Its direct children become columns and sit side by side on desktop, stacking on mobile. Put a `col` per column. For an asymmetric split, set each col's `width` (a percent: 60 and 40).
@@ -18,6 +18,7 @@ Containers (`section`, `row`, `col`) hold `children`. Widgets (`heading`, `text`
 - `spacer` — vertical rhythm. `height` in px. Use spacers between stacked widgets (12-32 typical).
 - `icon` — a FontAwesome glyph. `icon` (e.g. `fas fa-bolt`), `color`, `size`.
 - `divider` — a thin rule. `color`, `width` (percent), `align`.
+- `form` — a REAL working form (native Elementor Pro). Use this for any signup / contact / lead capture / newsletter-with-fields. Settings: `fields` (array of `{label, type, required, width}` where type is `text|email|tel|textarea|select`, width is `50` or `100`, and select adds `options:[...]`), `button` (submit label), `on_dark` (true on a dark background so fields render translucent/light), optional `recipient` (a real email; defaults to the site admin). Submissions email the site owner. Example: `{"type":"form","settings":{"on_dark":true,"button":"Subscribe","fields":[{"label":"First Name","type":"text","width":"50"},{"label":"Email","type":"email","required":true,"width":"50"}]}}`.
 
 ## Settings cheat sheet
 
@@ -48,7 +49,7 @@ Layout tricks you have:
 6. ZERO em dashes or en dashes in any copy. Straight quotes only. Write like a sharp human, not a chatbot.
 7. Don't over-nest. A hero is usually section → (heading, text, spacer, button) or section → row → 2 cols. Keep the tree as shallow as the layout allows.
 8. Use `spacer` blocks for vertical rhythm between stacked widgets; don't rely on gaps you can't see.
-9. NEVER fake interactivity. Your widgets are static — buttons link, nothing else moves. Do NOT draw a text-input box that can't be typed in, a "Subscribe" button wired to nothing, an accordion with a chevron and "tap to expand" (the answer can't hide), a billing toggle that can't switch, or carousel arrows/dots that can't slide. Build the honest static version: a form becomes a clear CTA button that links out, an FAQ becomes a clean question/answer list with NO expand affordance, testimonials become visible cards (no arrows), pricing shows one set of prices with no toggle. An affordance that implies behavior you can't deliver is worse than omitting it.
+9. NEVER fake interactivity. Your widgets are static — buttons link, nothing else moves. For a signup / contact / newsletter-with-fields, USE the real `form` block (it makes working inputs that email the owner). Do NOT draw fake input boxes out of text/col widgets. But accordions, billing toggles, and carousels are NOT possible, so do not fake them: no chevron + "tap to expand" (the answer can't hide), no toggle that can't switch, no slider arrows/dots that can't move. Build the honest static version of those: an FAQ becomes a clean question/answer list with NO expand affordance, testimonials become visible cards (no arrows), pricing shows one set of prices with no toggle. An affordance that implies behavior you can't deliver is worse than omitting it.
 10. Icons must be Font Awesome 5 names (Elementor bundles FA5). Use `fa-times` not `fa-xmark`; `fa-check`, `fa-check-circle`, `fa-shield-alt`, `fa-long-arrow-alt-right`, `fa-search`, `fa-home` are safe. Avoid FA6-only names (fa-xmark, fa-shield-halved, fa-wand-magic-sparkles, fa-circle-check/xmark) — they render blank. Brand/social glyphs are unreliable; prefer text labels.
 11. Some things this toolbox CANNOT express: background video, position:sticky/fixed bars, true fixed-size circles, a continuous line connecting separate rows, container left-border accent rules. If asked for one, build the closest honest static layout (a strong static hero instead of a video bg) rather than a broken fake. Note: columns in a `row` stack 1-up (full width) on mobile. Design for that — keep stat/feature rows to a count that reads well stacked, and don't rely on a 2-up mobile grid.
 
