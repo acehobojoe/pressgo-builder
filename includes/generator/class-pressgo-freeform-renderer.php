@@ -211,33 +211,31 @@ class PressGo_Freeform_Renderer {
 			$widths[]   = $cw;
 		}
 
-		$n     = count( $rendered );
+		$n   = count( $rendered );
+		$gap = isset( $s['gap'] ) && is_numeric( $s['gap'] ) ? (int) $s['gap'] : 24;
+		// NOTE: a reliable "stay N-up on mobile" needs Elementor grid columns,
+		// whose value format this Elementor build (4.0.9) ignored — it fell back
+		// to a default 3-col grid that regressed desktop. So columns cleanly stack
+		// 1-up on mobile (looks fine for stats/features); mobile_cols is a no-op
+		// until the grid columns control is pinned down. Don't promise 2-up.
 		$equal = $n > 0 ? round( 100 / $n, 3 ) : 100;
-		// Opt-in mobile wrap: mobile_cols=2|3 keeps columns side-by-side on phones
-		// (e.g. a 4-up stat band collapsing to 2x2) instead of one-per-row. Default
-		// stays full-width stacking.
-		$mobile_cols = isset( $s['mobile_cols'] ) && in_array( (int) $s['mobile_cols'], array( 2, 3 ), true ) ? (int) $s['mobile_cols'] : 0;
-		$wm          = $mobile_cols ? ( 2 === $mobile_cols ? 48 : 31 ) : 100;
 		foreach ( $rendered as $i => &$col ) {
 			$w = null !== $widths[ $i ] ? $widths[ $i ] : $equal;
 			if ( ! isset( $col['settings']['width'] ) ) {
 				$col['settings']['width'] = array( 'unit' => '%', 'size' => $w, 'sizes' => array() );
 			}
 			if ( ! isset( $col['settings']['width_mobile'] ) ) {
-				$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => $wm, 'sizes' => array() );
+				$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
 			}
 		}
 		unset( $col );
-
-		$gap = isset( $s['gap'] ) && is_numeric( $s['gap'] ) ? (int) $s['gap'] : 24;
 
 		$settings = array(
 			'container_type'        => 'flex',
 			'content_width'         => 'full',
 			'flex_direction'        => 'row',
-			'flex_direction_mobile' => $mobile_cols ? 'row' : 'column',
+			'flex_direction_mobile' => 'column',
 			'flex_wrap'             => 'nowrap',
-			'flex_wrap_mobile'      => $mobile_cols ? 'wrap' : 'nowrap',
 			'flex_align_items'      => self::map_vertical_align( isset( $s['vertical_align'] ) ? $s['vertical_align'] : 'top' ),
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap, 'isLinked' => true,
@@ -330,6 +328,11 @@ class PressGo_Freeform_Renderer {
 		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : 1.7;
+		// Inline links should take the widget's text color, not the theme's link
+		// color (often a clashing magenta on dark footers). Inject it on each <a>.
+		if ( $color && false !== strpos( $html, '<a' ) ) {
+			$html = preg_replace( '/<a(\s)/i', '<a style="color:' . esc_attr( $color ) . '"$1', $html );
+		}
 		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh );
 		// text_w doesn't expose transform/letter-spacing; plumb them directly so
 		// freeform labels honor uppercase + tracking the way the heading widget does.
@@ -351,7 +354,7 @@ class PressGo_Freeform_Renderer {
 		$bg     = isset( $s['bg'] ) ? $s['bg'] : ( isset( $cfg['colors']['accent'] ) ? $cfg['colors']['accent'] : '#2563EB' );
 		$tcolor = isset( $s['color'] ) ? $s['color'] : null;
 		$border = isset( $s['border_color'] ) ? $s['border_color'] : null;
-		$icon   = isset( $s['icon'] ) ? $s['icon'] : null;
+		$icon   = isset( $s['icon'] ) ? self::normalize_icon( $s['icon'] ) : null;
 		$align  = isset( $s['align'] ) ? $s['align'] : '';
 		return PressGo_Widget_Helpers::btn_w( $cfg, $text, $url, $bg, $tcolor, $border, $icon, $align );
 	}
@@ -372,7 +375,7 @@ class PressGo_Freeform_Renderer {
 	}
 
 	private static function render_icon( $s, $cfg ) {
-		$icon  = isset( $s['icon'] ) ? $s['icon'] : 'fas fa-star';
+		$icon  = self::normalize_icon( isset( $s['icon'] ) ? $s['icon'] : 'fas fa-star' );
 		$color = isset( $s['color'] ) ? $s['color'] : ( isset( $cfg['colors']['primary'] ) ? $cfg['colors']['primary'] : '#2563EB' );
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 32;
 		$w     = PressGo_Widget_Helpers::icon_w( $icon, $color, $size, 'default' );
@@ -524,6 +527,44 @@ class PressGo_Freeform_Renderer {
 	// ───────────────────────────────────────────────────────────────────
 	// Mappers / normalizers
 	// ───────────────────────────────────────────────────────────────────
+
+	/**
+	 * Map common Font Awesome 6 glyph names to their FA5 equivalents. Elementor
+	 * bundles FA5, so FA6-only names (fa-xmark, fa-shield-halved, ...) render to
+	 * NOTHING and trip PHP warnings in Elementor's icon data manager. Unmapped
+	 * names pass through (the display_errors guard catches their warnings).
+	 */
+	private static function normalize_icon( $icon ) {
+		if ( ! is_string( $icon ) || '' === $icon ) { return $icon; }
+		static $map = array(
+			'fa-xmark'                  => 'fa-times',
+			'fa-circle-xmark'           => 'fa-times-circle',
+			'fa-circle-check'           => 'fa-check-circle',
+			'fa-circle-info'            => 'fa-info-circle',
+			'fa-circle-question'        => 'fa-question-circle',
+			'fa-triangle-exclamation'   => 'fa-exclamation-triangle',
+			'fa-shield-halved'          => 'fa-shield-alt',
+			'fa-wand-magic-sparkles'    => 'fa-magic',
+			'fa-arrow-right-long'       => 'fa-long-arrow-alt-right',
+			'fa-arrow-left-long'        => 'fa-long-arrow-alt-left',
+			'fa-pen-to-square'          => 'fa-edit',
+			'fa-trash-can'              => 'fa-trash-alt',
+			'fa-gauge-high'             => 'fa-tachometer-alt',
+			'fa-gauge'                  => 'fa-tachometer-alt',
+			'fa-magnifying-glass'       => 'fa-search',
+			'fa-arrow-right-to-bracket' => 'fa-sign-in-alt',
+			'fa-right-to-bracket'       => 'fa-sign-in-alt',
+			'fa-house'                  => 'fa-home',
+			'fa-envelope-open-text'     => 'fa-envelope-open',
+			'fa-mobile-screen'          => 'fa-mobile-alt',
+			'fa-truck-fast'             => 'fa-shipping-fast',
+			'fa-rectangle-list'         => 'fa-list-alt',
+		);
+		foreach ( $map as $fa6 => $fa5 ) {
+			if ( false !== strpos( $icon, $fa6 ) ) { return str_replace( $fa6, $fa5, $icon ); }
+		}
+		return $icon;
+	}
 
 	private static function map_content_align( $align ) {
 		switch ( $align ) {

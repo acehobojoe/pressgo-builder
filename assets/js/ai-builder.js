@@ -1136,17 +1136,29 @@
 		fd.append('message', text);
 
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
-			.then(function (r) { return r.json(); })
+			.then(function (r) {
+				// Read as text first so a non-JSON body (PHP warning/HTML) surfaces a
+				// real message instead of a blind "network error".
+				return r.text().then(function (body) {
+					var json = null;
+					try { json = JSON.parse(body); } catch (e) {}
+					return { json: json, body: body };
+				});
+			})
 			.then(function (res) {
 				if (typing) typing.remove();
-				if (res && res.success) {
-					var d = res.data || {};
-					append(el('pg-msg pg-msg-ai', d.note || 'Composed a freeform section.'));
-					reloadPreview(d.preview_bust || Date.now());
-					if (d.usage) renderUsage(d.usage); else refreshUsage();
+				var d = res.json;
+				if (d && d.success) {
+					var data = d.data || {};
+					append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
+					reloadPreview(data.preview_bust || Date.now());
+					if (data.usage) renderUsage(data.usage); else refreshUsage();
+				} else if (d && d.data) {
+					append(el('pg-msg-error', typeof d.data === 'string' ? d.data : (d.data.message || 'Pro mode compose failed.')));
 				} else {
-					var msg = (res && res.data) ? (typeof res.data === 'string' ? res.data : (res.data.message || 'Pro mode compose failed.')) : 'Pro mode compose failed.';
-					append(el('pg-msg-error', msg));
+					// Non-JSON body — show a trimmed snippet so the real cause is visible.
+					var snip = (res.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+					append(el('pg-msg-error', 'Pro mode compose failed' + (snip ? ': ' + snip : ' — try again.')));
 				}
 				setBusy(false);
 			})

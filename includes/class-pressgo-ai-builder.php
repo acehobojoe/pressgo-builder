@@ -1320,6 +1320,11 @@ class PressGo_AI_Builder {
 	 */
 	public function ajax_freeform() {
 		$this->check_auth();
+		// Keep stray PHP warnings (e.g. Elementor's font-awesome data manager on an
+		// unknown glyph during clear_cache) out of the JSON body — otherwise they
+		// prepend the response, response.json() throws, and the UI shows a generic
+		// "Network error during Pro mode compose". Mirrors ajax_chat().
+		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet,WordPress.PHP.NoSilencedErrors
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		$message = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
 		if ( ! $post_id || '' === trim( $message ) ) {
@@ -1347,9 +1352,15 @@ class PressGo_AI_Builder {
 			),
 			'body'    => wp_json_encode( array(
 				'model'      => 'claude-sonnet-4-5-20250929',
-				'max_tokens' => 4096,
+				'max_tokens' => 8192, // headroom so a large section isn't truncated into invalid JSON
 				'system'     => $system,
-				'messages'   => array( array( 'role' => 'user', 'content' => $message ) ),
+				'messages'   => array( array(
+					'role'    => 'user',
+					// Frame the ask so the model returns JSON only and never tries to
+					// "wire up" backend behavior or rewrite the system prompt (a
+					// "form, wire it up" message otherwise derails it).
+					'content' => 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only, no prose, no code fences. Do not add backend wiring or form submission; represent any form/accordion/toggle/carousel honestly with the available static widgets. Request: ' . $message,
+				) ),
 			) ),
 		) );
 		if ( is_wp_error( $resp ) ) {
