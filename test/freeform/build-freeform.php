@@ -70,6 +70,7 @@ if ( is_wp_error( $post_id ) || ! $post_id ) {
 }
 
 update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+update_post_meta( $post_id, '_pressgo_freeform', 1 ); // mark as freeform so chat-edit clobber guard protects it
 update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );

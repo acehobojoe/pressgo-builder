@@ -213,13 +213,18 @@ class PressGo_Freeform_Renderer {
 
 		$n     = count( $rendered );
 		$equal = $n > 0 ? round( 100 / $n, 3 ) : 100;
+		// Opt-in mobile wrap: mobile_cols=2|3 keeps columns side-by-side on phones
+		// (e.g. a 4-up stat band collapsing to 2x2) instead of one-per-row. Default
+		// stays full-width stacking.
+		$mobile_cols = isset( $s['mobile_cols'] ) && in_array( (int) $s['mobile_cols'], array( 2, 3 ), true ) ? (int) $s['mobile_cols'] : 0;
+		$wm          = $mobile_cols ? ( 2 === $mobile_cols ? 48 : 31 ) : 100;
 		foreach ( $rendered as $i => &$col ) {
 			$w = null !== $widths[ $i ] ? $widths[ $i ] : $equal;
 			if ( ! isset( $col['settings']['width'] ) ) {
 				$col['settings']['width'] = array( 'unit' => '%', 'size' => $w, 'sizes' => array() );
 			}
 			if ( ! isset( $col['settings']['width_mobile'] ) ) {
-				$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+				$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => $wm, 'sizes' => array() );
 			}
 		}
 		unset( $col );
@@ -230,8 +235,9 @@ class PressGo_Freeform_Renderer {
 			'container_type'        => 'flex',
 			'content_width'         => 'full',
 			'flex_direction'        => 'row',
-			'flex_direction_mobile' => 'column',
+			'flex_direction_mobile' => $mobile_cols ? 'row' : 'column',
 			'flex_wrap'             => 'nowrap',
+			'flex_wrap_mobile'      => $mobile_cols ? 'wrap' : 'nowrap',
 			'flex_align_items'      => self::map_vertical_align( isset( $s['vertical_align'] ) ? $s['vertical_align'] : 'top' ),
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap, 'isLinked' => true,
@@ -325,6 +331,16 @@ class PressGo_Freeform_Renderer {
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : 1.7;
 		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh );
+		// text_w doesn't expose transform/letter-spacing; plumb them directly so
+		// freeform labels honor uppercase + tracking the way the heading widget does.
+		if ( isset( $s['transform'] ) && in_array( $s['transform'], array( 'uppercase', 'lowercase', 'capitalize', 'none' ), true ) ) {
+			$w['settings']['typography_typography']     = 'custom';
+			$w['settings']['typography_text_transform'] = $s['transform'];
+		}
+		if ( isset( $s['letter_spacing'] ) && is_numeric( $s['letter_spacing'] ) ) {
+			$w['settings']['typography_typography']     = 'custom';
+			$w['settings']['typography_letter_spacing'] = array( 'unit' => 'px', 'size' => (float) $s['letter_spacing'], 'sizes' => array() );
+		}
 		self::apply_measure( $w, $s );
 		return $w;
 	}
@@ -414,6 +430,16 @@ class PressGo_Freeform_Renderer {
 		}
 		$m = self::normalize_spacing( $s['margin'] );
 		$settings['margin'] = self::spacing_to_dimension( $m );
+		// Negative top/bottom margins create desktop overlap (a card pulled up onto
+		// the band above). On mobile, columns stack full-width and that same negative
+		// margin just crowds/overlaps the stacked block — zero the negative verticals
+		// at the mobile breakpoint.
+		if ( (int) $m['top'] < 0 || (int) $m['bottom'] < 0 ) {
+			$mm = $m;
+			if ( (int) $mm['top'] < 0 )    { $mm['top'] = 0; }
+			if ( (int) $mm['bottom'] < 0 ) { $mm['bottom'] = 0; }
+			$settings['margin_mobile'] = self::spacing_to_dimension( $mm );
+		}
 	}
 
 	/**
@@ -430,6 +456,10 @@ class PressGo_Freeform_Renderer {
 			if ( isset( $s['overlay'] ) && '' !== $s['overlay'] ) {
 				$settings['background_overlay_background'] = 'classic';
 				$settings['background_overlay_color']      = $s['overlay'];
+				// Make the rgba alpha the sole opacity lever — Elementor's overlay
+				// opacity defaults to 0.5 and would multiply the requested alpha down,
+				// leaving a weaker scrim than asked for over a bright photo.
+				$settings['background_overlay_opacity']    = array( 'unit' => 'px', 'size' => 1, 'sizes' => array() );
 			}
 			return;
 		}
