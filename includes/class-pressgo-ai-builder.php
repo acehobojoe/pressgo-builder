@@ -91,6 +91,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_apply_patch',  array( $this, 'ajax_apply_patch' ) );
 		add_action( 'wp_ajax_pressgo_ai_get_config',   array( $this, 'ajax_get_config' ) );
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
+		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 	}
 
 	/**
@@ -1126,6 +1127,16 @@ class PressGo_AI_Builder {
 								<span class="pg-vision-hint">3× tokens · better accuracy</span>
 							</span>
 						</label>
+						<label class="pg-vision-toggle pg-pro-toggle" data-tooltip="Pro mode (beta): compose freeform 'build anything' sections that aren't limited to the section templates. Each message adds one custom section to this page.">
+							<input type="checkbox" id="pg-freeform" class="pg-vision-input">
+							<span class="pg-vision-track">
+								<span class="pg-vision-thumb"></span>
+							</span>
+							<span class="pg-vision-label">
+								<span class="pg-vision-name">Pro mode</span>
+								<span class="pg-vision-hint">beta · build anything</span>
+							</span>
+						</label>
 					</div>
 				</aside>
 				<main class="pg-preview" id="pg-preview">
@@ -1226,6 +1237,119 @@ class PressGo_AI_Builder {
 	private function check_auth() {
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'forbidden', 403 );
 		check_ajax_referer( 'pressgo_ai_admin', 'nonce' );
+	}
+
+	/**
+	 * Pro mode (beta) — freeform "build anything" compose.
+	 *
+	 * SANDBOX TEST PATH: composes ONE freeform section from the user's message
+	 * (Claude + the freeform-composition prompt), renders it through
+	 * PressGo_Freeform_Renderer, and APPENDS it to the page's _elementor_data so
+	 * a page is built section by section. Stamps _pressgo_freeform so the
+	 * chat-edit clobber guard protects it. Not the production wiring — the key
+	 * lives in a wp option for testing, and the call is synchronous (no SSE).
+	 */
+	public function ajax_freeform() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		$message = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
+		if ( ! $post_id || '' === trim( $message ) ) {
+			wp_send_json_error( 'Tell me what section to build.', 400 );
+		}
+
+		$key = (string) get_option( 'pressgo_freeform_key', '' );
+		if ( '' === $key ) {
+			wp_send_json_error( 'Pro mode is not configured on this site (no compose key).', 500 );
+		}
+
+		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
+		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
+		if ( '' === $system ) {
+			wp_send_json_error( 'Freeform composition prompt is missing.', 500 );
+		}
+
+		// Compose the block tree (Claude, freeform system prompt → JSON section).
+		$resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+			'timeout' => 60,
+			'headers' => array(
+				'content-type'      => 'application/json',
+				'x-api-key'         => $key,
+				'anthropic-version' => '2023-06-01',
+			),
+			'body'    => wp_json_encode( array(
+				'model'      => 'claude-sonnet-4-5-20250929',
+				'max_tokens' => 4096,
+				'system'     => $system,
+				'messages'   => array( array( 'role' => 'user', 'content' => $message ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) ) {
+			wp_send_json_error( 'Compose request failed: ' . $resp->get_error_message(), 502 );
+		}
+		$code = wp_remote_retrieve_response_code( $resp );
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		if ( 200 !== (int) $code ) {
+			$err = isset( $data['error']['message'] ) ? $data['error']['message'] : ( 'HTTP ' . $code );
+			wp_send_json_error( 'Compose error: ' . $err, 502 );
+		}
+		$text = '';
+		if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
+			foreach ( $data['content'] as $blk ) {
+				if ( isset( $blk['type'], $blk['text'] ) && 'text' === $blk['type'] ) { $text .= $blk['text']; }
+			}
+		}
+		$text = trim( $text );
+		if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $text, $m ) ) { $text = trim( $m[1] ); }
+		$tree = json_decode( $text, true );
+		if ( ! is_array( $tree ) || ( isset( $tree['type'] ) && 'section' !== $tree['type'] ) ) {
+			wp_send_json_error( 'The composer did not return a valid section. Try rewording.', 422 );
+		}
+
+		// Render through the freeform renderer.
+		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
+		require_once $gen . 'class-pressgo-style-utils.php';
+		require_once $gen . 'class-pressgo-element-factory.php';
+		require_once $gen . 'class-pressgo-widget-helpers.php';
+		require_once $gen . 'class-pressgo-freeform-renderer.php';
+		$cfg = array(
+			'colors' => array(
+				'primary' => '#2563EB', 'primary_dark' => '#1E40AF', 'accent' => '#e2b714',
+				'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF',
+				'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.75)', 'gold' => '#F59E0B',
+			),
+			'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
+			'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
+		);
+		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
+		if ( null === $section ) {
+			wp_send_json_error( 'Renderer rejected the composed tree.', 422 );
+		}
+
+		// Append to the existing page (build section by section).
+		$existing = get_post_meta( $post_id, '_elementor_data', true );
+		$elements = array();
+		if ( is_string( $existing ) && '' !== $existing ) {
+			$decoded = json_decode( $existing, true );
+			if ( ! is_array( $decoded ) ) { $decoded = json_decode( wp_unslash( $existing ), true ); }
+			if ( is_array( $decoded ) ) { $elements = $decoded; }
+		}
+		$elements[] = $section;
+
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		update_post_meta( $post_id, self::META_FREEFORM, 1 );
+		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
+		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
+		update_post_meta( $post_id, '_elementor_version', defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : '3.0.0' );
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
+
+		wp_send_json_success( array(
+			'preview_bust' => time(),
+			'sections'     => count( $elements ),
+			'note'         => 'Composed a freeform section (' . count( $elements ) . ' on the page). Add another, or refine by describing the next section.',
+		) );
 	}
 
 	public function ajax_toggle() {

@@ -13,6 +13,7 @@
 	var previewWrap = document.querySelector('.pg-preview');
 	var credPill = document.getElementById('pg-credits');
 	var visionInput = document.getElementById('pg-vision');
+	var freeformInput = document.getElementById('pg-freeform');
 	var lastCreditValue = null;
 
 	// ─── Viewport switcher ─────────────────────────────────────────────
@@ -233,6 +234,14 @@
 	visionInput && visionInput.addEventListener('change', function () {
 		try { localStorage.setItem('pgVision', visionInput.checked ? '1' : '0'); } catch (e) {}
 	});
+
+	// Pro mode (freeform) toggle — persisted like vision.
+	if (freeformInput) {
+		try { if (localStorage.getItem('pgFreeform') === '1') freeformInput.checked = true; } catch (e) {}
+		freeformInput.addEventListener('change', function () {
+			try { localStorage.setItem('pgFreeform', freeformInput.checked ? '1' : '0'); } catch (e) {}
+		});
+	}
 
 	function typingNode() {
 		var d = document.createElement('div');
@@ -1050,11 +1059,54 @@
 		});
 	}
 
+	// Pro mode (beta): compose a freeform "build anything" section instead of
+	// routing through the recipe chat. Non-streaming — appends one custom
+	// section to the page per message.
+	function sendFreeform(text) {
+		chatStarted = true;
+		var userBubble = el('pg-msg pg-msg-user');
+		var txt = document.createElement('div');
+		txt.textContent = text;
+		userBubble.appendChild(txt);
+		append(userBubble);
+		input.value = '';
+		var typing = typingNode();
+		append(typing);
+		setBusy(true);
+
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_freeform');
+		fd.append('nonce', cfg.nonce);
+		fd.append('post_id', cfg.postId);
+		fd.append('message', text);
+
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.json(); })
+			.then(function (res) {
+				if (typing) typing.remove();
+				if (res && res.success) {
+					var d = res.data || {};
+					append(el('pg-msg pg-msg-ai', d.note || 'Composed a freeform section.'));
+					reloadPreview(d.preview_bust || Date.now());
+				} else {
+					var msg = (res && res.data) ? (typeof res.data === 'string' ? res.data : (res.data.message || 'Pro mode compose failed.')) : 'Pro mode compose failed.';
+					append(el('pg-msg-error', msg));
+				}
+				setBusy(false);
+			})
+			.catch(function () {
+				if (typing) typing.remove();
+				append(el('pg-msg-error', 'Network error during Pro mode compose — try again.'));
+				setBusy(false);
+			});
+	}
+
 	form.addEventListener('submit', function (e) {
 		e.preventDefault();
 		var text = (input.value || '').trim();
 		if (!text) return;
-		sendMessage(text);
+		if (freeformInput && freeformInput.checked) { sendFreeform(text); }
+		else { sendMessage(text); }
 	});
 
 	// Clear-chat button — drops the stored conversation for this page and
