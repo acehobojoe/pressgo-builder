@@ -1212,7 +1212,7 @@ class PressGo_AI_Builder {
 		if ( $is_first ) { return 'hero'; }
 		$b = strtolower( (string) $blob );
 		if ( preg_match( '/\b(faq|frequently asked|questions?)\b/', $b ) )                       { return 'faq'; }
-		if ( preg_match( '/\b(reviews?|testimonial|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
+		if ( preg_match( '/\b(reviews?|testimonials?|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
 		if ( preg_match( '/\b(how it works|steps?|get started|simple)\b/', $b ) )               { return 'steps'; }
 		if ( preg_match( '/\b(about|our story|why us|who we are|meet )\b/', $b ) )               { return 'about'; }
 		if ( preg_match( '/\b(team|staff|coaches|trainers|experts)\b/', $b ) )                   { return 'team'; }
@@ -1332,12 +1332,27 @@ class PressGo_AI_Builder {
 		return ( $known && $lum < 0.28 ) ? $d : '#111418';
 	}
 
-	/** Recursively recolor a tree for contrast, preserving deliberately-bespoke colors. */
+	/** Recursively recolor a tree for contrast, preserving deliberately-bespoke colors.
+	 *  Background-context aware: when it enters a CARD (a row/col with its own solid
+	 *  background), it recolors that card's text for the CARD's background, not the
+	 *  section's — so a white card on a now-dark section keeps dark, legible text. */
 	private function overlay_walk( &$node, $on_dark, $heading_color, $text_color, $accent, $role, $colors ) {
 		if ( ! is_array( $node ) ) { return; }
 		$type = isset( $node['type'] ) ? $node['type'] : '';
 		if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) { $node['settings'] = array(); }
 		$s       =& $node['settings'];
+
+		// A nested container with its OWN solid background is a card: switch the
+		// contrast context to that background for everything inside it.
+		if ( in_array( $type, array( 'row', 'col' ), true ) && isset( $s['background'] ) && is_string( $s['background'] )
+			&& '' !== $s['background'] && 'transparent' !== $s['background'] && 0 !== strpos( $s['background'], 'gradient:' ) ) {
+			list( $clum, , $cknown ) = $this->color_lum_sat( $s['background'] );
+			if ( $cknown ) {
+				$on_dark       = ( $clum < 0.5 );
+				$heading_color = $on_dark ? '#ffffff' : ( isset( $colors['text_dark'] ) ? $colors['text_dark'] : '#0F172A' );
+				$text_color    = $on_dark ? 'rgba(255,255,255,0.72)' : ( isset( $colors['text_muted'] ) ? $colors['text_muted'] : '#4B5563' );
+			}
+		}
 		$generic = array( '', '#fff', '#ffffff', 'white', '#000', '#000000', '#0f172a', '#1c1917', '#111827', '#0a0a0a', '#0f1115',
 			'rgba(255,255,255,0.72)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0.7)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.55)',
 			'#64748b', '#4b5563', '#6b7280', '#78716c', '#5b6470' );
@@ -1662,6 +1677,12 @@ class PressGo_AI_Builder {
 	/** Screenshot the reorganized page, ask a vision model to audit it, apply the
 	 *  bounded background fixes it flags. Returns a short user-facing note, or ''. */
 	private function cohesion_vision_fixes( $post_id, $plan ) {
+		// Legacy pages (mostly backfilled, no source trees) are reorder-only by
+		// contract — don't let the critic recolor or merge them. Skip the vision pass.
+		$with_trees = 0;
+		foreach ( $plan as $rec ) { if ( ! empty( $rec['source_tree'] ) ) { $with_trees++; } }
+		if ( $with_trees < ceil( count( $plan ) / 2 ) ) { return ''; }
+
 		$data_url = $this->cohesion_screenshot( $post_id );
 		if ( '' === $data_url ) { return ''; }
 		$lines = array();
@@ -1750,7 +1771,7 @@ class PressGo_AI_Builder {
 	private function find_target_section( $records, $message ) {
 		$m    = strtolower( (string) $message );
 		$role = '';
-		if ( preg_match( '/\b(testimonial|reviews?|proof)\b/', $m ) )            { $role = 'proof'; }
+		if ( preg_match( '/\b(testimonials?|reviews?|proof)\b/', $m ) )         { $role = 'proof'; }
 		elseif ( preg_match( '/\babout\b/', $m ) )                              { $role = 'about'; }
 		elseif ( preg_match( '/\b(faq|questions?)\b/', $m ) )                   { $role = 'faq'; }
 		elseif ( preg_match( '/\b(team|staff)\b/', $m ) )                       { $role = 'team'; }
@@ -1798,6 +1819,17 @@ class PressGo_AI_Builder {
 		}
 		$idx = $this->find_target_section( $records, $message );
 		if ( $idx < 0 ) {
+			// Distinguish "that section doesn't exist here" from "be more specific".
+			$roles = array();
+			foreach ( $records as $r ) { $roles[ $r['semantic_role'] ?? '' ] = true; }
+			$want = '';
+			$m    = strtolower( $message );
+			foreach ( array( 'testimonial' => 'proof', 'review' => 'proof', 'about' => 'about', 'faq' => 'faq', 'team' => 'team', 'gallery' => 'gallery', 'pricing' => 'pricing', 'service' => 'services', 'feature' => 'features', 'contact' => 'contact', 'how it works' => 'steps' ) as $kw => $role ) {
+				if ( false !== strpos( $m, $kw ) ) { $want = $role; break; }
+			}
+			if ( '' !== $want && empty( $roles[ $want ] ) ) {
+				return array( 'note' => 'There isn\'t a ' . $this->role_label( $want ) . ' section on this page to remove.' );
+			}
 			return array( 'note' => 'I wasn\'t sure which section to remove. Try "remove the testimonials section" or "remove the last section".' );
 		}
 		if ( 'hero' === ( $records[ $idx ]['semantic_role'] ?? '' ) ) {
