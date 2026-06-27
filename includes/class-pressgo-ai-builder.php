@@ -1030,6 +1030,13 @@ class PressGo_AI_Builder {
 			$this->save_discovery_state( $post_id, $state );
 			return $state;
 		}
+		// One-tap industry confirm: "Something else" drops the guess so the next
+		// industry step shows the full menu instead of recording a wrong answer.
+		if ( 'industry' === $stage && '__more' === $value ) {
+			$state['industry_guess'] = '';
+			$this->save_discovery_state( $post_id, $state );
+			return $state;
+		}
 		if ( '' === $value ) { // free-text fallback: the user typed instead of tapping a chip
 			switch ( $stage ) {
 				case 'goal':     $value = $this->goal_from_text( $message ); if ( '' === $value ) { $value = 'browse'; } break;
@@ -1099,22 +1106,29 @@ class PressGo_AI_Builder {
 				) );
 			case 'industry':
 				$guess = isset( $state['industry_guess'] ) ? $state['industry_guess'] : '';
-				$chips = array(
-					array( 'label' => 'Fitness / gym', 'value' => 'fitness' ),
-					array( 'label' => 'Food / restaurant', 'value' => 'food' ),
-					array( 'label' => 'Home services', 'value' => 'home_services' ),
-					array( 'label' => 'Health / medical', 'value' => 'health' ),
-					array( 'label' => 'Professional services', 'value' => 'professional' ),
-					array( 'label' => 'Shop / retail', 'value' => 'retail' ),
-					array( 'label' => 'Something else', 'value' => 'other' ),
-				);
+				// Confident guess -> one-tap confirm (don't re-show the whole menu, which
+				// reads as if we didn't listen). "Something else" reopens the full list.
 				if ( '' !== $guess ) {
-					foreach ( $chips as $i => $c ) { if ( $c['value'] === $guess ) { $chips[ $i ]['selected'] = true; } }
+					return array_merge( $base, array(
+						'question' => "Got it — sounds like " . $this->industry_label( $guess ) . ". Right?",
+						'chips'    => array(
+							array( 'label' => 'Yes, that\'s right', 'value' => $guess, 'selected' => true ),
+							array( 'label' => 'Something else', 'value' => '__more' ),
+						),
+					) );
 				}
-				$q = '' !== $guess
-					? "Got it. I'm guessing this is " . $this->industry_label( $guess ) . " — right?"
-					: "What kind of business is this?";
-				return array_merge( $base, array( 'question' => $q, 'chips' => $chips ) );
+				return array_merge( $base, array(
+					'question' => "What kind of business is this?",
+					'chips'    => array(
+						array( 'label' => 'Fitness / gym', 'value' => 'fitness' ),
+						array( 'label' => 'Food / restaurant', 'value' => 'food' ),
+						array( 'label' => 'Home services', 'value' => 'home_services' ),
+						array( 'label' => 'Health / medical', 'value' => 'health' ),
+						array( 'label' => 'Professional services', 'value' => 'professional' ),
+						array( 'label' => 'Shop / retail', 'value' => 'retail' ),
+						array( 'label' => 'Something else', 'value' => 'other' ),
+					),
+				) );
 			case 'vibe':
 				return array_merge( $base, array(
 					'question' => "Pick a vibe and I'll set your colors and fonts.",
@@ -1128,10 +1142,11 @@ class PressGo_AI_Builder {
 			case 'photos':
 				return array_merge( $base, array(
 					'question'       => "Last thing, then I'll build your hero — what should I use for photos?",
-					'allow_freetext' => false,
+					'allow_freetext' => true, // typed/voice answers welcome ("use my own", "stock is fine")
+					'freetext_hint'  => '…or just tell me',
 					'chips'          => array(
 						array( 'label' => 'Use my media library', 'value' => 'media_library' ),
-						array( 'label' => "I'll drop one in now", 'value' => 'upload' ),
+						array( 'label' => "I'll add my own later", 'value' => 'media_library' ),
 						array( 'label' => 'Use great stock photos', 'value' => 'stock' ),
 					),
 				) );
@@ -3903,13 +3918,23 @@ class PressGo_AI_Builder {
 		if ( '' !== $disclosure ) { $note .= ' ' . $disclosure; }
 		$note .= $auto_note;
 
+		// Usage legibility: a heads-up when the daily builds are running low (editing,
+		// reordering, "make it flow" and delete are all free — only new builds count).
+		$usage = $this->usage_state();
+		$left  = isset( $usage['builds_left'] ) ? (int) $usage['builds_left'] : 99;
+		if ( 0 === $left ) {
+			$note .= ' That\'s your last build for today — editing, reordering and "make it flow" are still free, and your builds reset in ' . $this->human_hours( $usage['resets_in'] ) . '.';
+		} elseif ( $left <= 3 ) {
+			$note .= ' (' . $left . ' more new-section build' . ( 1 === $left ? '' : 's' ) . ' left today — edits & reorders are free.)';
+		}
+
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => $sections_now,
 			'model'        => $used_model,
 			'note'         => $note,
 			'suggest'      => $suggest,
-			'usage'        => $this->usage_state(),
+			'usage'        => $usage,
 		) );
 	}
 
@@ -4135,6 +4160,14 @@ class PressGo_AI_Builder {
 	 * is the "X builds today, resets at midnight" mechanic. Caps scale by
 	 * tier; tier derives from the Pro license (overridable for testing).
 	 */
+	/** "2 hours" / "45 min" from a seconds count, for friendly reset copy. */
+	private function human_hours( $seconds ) {
+		$seconds = max( 0, (int) $seconds );
+		if ( $seconds >= 3600 ) { $h = (int) round( $seconds / 3600 ); return $h . ' hour' . ( 1 === $h ? '' : 's' ); }
+		$m = max( 1, (int) round( $seconds / 60 ) );
+		return $m . ' min';
+	}
+
 	private function usage_caps() {
 		// Daily budgets in weighted "usage units" (not build count) — a build
 		// costs more units the heavier its mode (basic 1, Iris/vision 3, Nova/
@@ -4164,11 +4197,13 @@ class PressGo_AI_Builder {
 		if ( ! empty( $preview['tier'] ) && isset( $caps[ $preview['tier'] ] ) ) { $tier = $preview['tier']; }
 		if ( isset( $preview['used'] ) && '' !== $preview['used'] )              { $used = max( 0, (int) $preview['used'] ); }
 		$midnight = ( intdiv( time(), DAY_IN_SECONDS ) + 1 ) * DAY_IN_SECONDS; // next 00:00 UTC
+		$cap      = (int) $caps[ $tier ];
 		return array(
-			'used'      => $used,
-			'cap'       => (int) $caps[ $tier ],
-			'tier'      => $tier,
-			'resets_in' => max( 0, $midnight - time() ),
+			'used'        => $used,
+			'cap'         => $cap,
+			'tier'        => $tier,
+			'resets_in'   => max( 0, $midnight - time() ),
+			'builds_left' => max( 0, intdiv( $cap - $used, 4 ) ), // Nova sections cost 4 units each
 		);
 	}
 

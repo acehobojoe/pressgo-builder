@@ -339,6 +339,11 @@
 		}
 		usageResetTarget = Math.floor(Date.now() / 1000) + (u.resets_in || 0);
 		usageReset.textContent = fmtReset(u.resets_in || 0);
+		// Make the bar legible: hover shows builds-left + that edits are free.
+		if (u.builds_left != null) {
+			usageEl.title = u.builds_left + ' new-section build' + (u.builds_left === 1 ? '' : 's') +
+				' left today. Editing, reordering, delete and "make it flow" are free. Click to see plans.';
+		}
 	}
 	function refreshUsage() {
 		var fd = new FormData();
