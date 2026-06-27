@@ -16,6 +16,26 @@
 	// Build mode (Ada=basic recipe, Iris=recipe+A(eyes) review, Nova=freeform).
 	var pgMode = 'basic';
 
+	// ─── Inline composer error toast ───────────────────────────────────
+	var composerError = document.getElementById('pg-composer-error');
+	function showComposerError(msg, retryFn) {
+		if (!composerError) return;
+		composerError.innerHTML = '';
+		composerError.textContent = msg;
+		if (retryFn) {
+			var retry = document.createElement('a');
+			retry.textContent = 'Retry';
+			retry.className = 'pg-composer-error-retry';
+			retry.href = '#';
+			retry.addEventListener('click', function (e) { e.preventDefault(); hideComposerError(); retryFn(); });
+			composerError.appendChild(retry);
+		}
+		composerError.hidden = false;
+	}
+	function hideComposerError() {
+		if (composerError) { composerError.hidden = true; composerError.innerHTML = ''; }
+	}
+
 	// ─── Viewport switcher ─────────────────────────────────────────────
 	var stageInner = document.getElementById('pg-preview-stage-inner');
 	document.querySelectorAll('.pg-vp-btn').forEach(function (btn) {
@@ -57,6 +77,7 @@
 			resized.id = 'img' + (++imgSeq);
 			pendingImages.push(resized);
 			renderStrip();
+			updateSendState();
 		});
 	}
 
@@ -129,17 +150,20 @@
 				id:        'img' + (++imgSeq),
 			});
 			renderStrip();
+			updateSendState();
 		};
 		reader.readAsDataURL(file);
 	}
 	function removePendingImage(id) {
 		pendingImages = pendingImages.filter(function (im) { return im.id !== id; });
 		renderStrip();
+		updateSendState();
 	}
 	function clearPendingImages() {
 		pendingImages = [];
 		if (attachInput) attachInput.value = '';
 		renderStrip();
+		updateSendState();
 	}
 	// Render the thumbnail strip (each thumb has a remove ×) + the count badge.
 	function renderStrip() {
@@ -181,6 +205,24 @@
 		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
 		attachInput.value = ''; // allow re-picking the same file
 	});
+
+	// ── Composer: auto-grow textarea + send-button disabled state ──
+	function autoGrow() {
+		if (!input) return;
+		input.style.height = 'auto';
+		input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+	}
+	function updateSendState() {
+		if (!sendBtn) return;
+		if (sendBtn.classList.contains('is-responding')) return; // stay clickable as Stop
+		var hasText = input.value.trim().length > 0;
+		var hasImages = pendingImages.length > 0;
+		sendBtn.disabled = !hasText && !hasImages;
+	}
+	input.addEventListener('input', autoGrow);
+	input.addEventListener('input', updateSendState);
+	autoGrow();
+	updateSendState();
 
 	// Paste from clipboard inside the textarea (adds each pasted image).
 	input.addEventListener('paste', function (e) {
@@ -412,7 +454,7 @@
 	];
 
 	function renderFirstRun() {
-		append(el('pg-msg-system', 'You\'re in — let\'s build your first page. I dropped an example below; tweak it to match your business (or tap a different starter), then hit Send.'));
+		append(el('pg-msg-system', 'You\'re in. Tell me the page you want to build, or tap a starter below to fill in an idea, then hit Send.'));
 		// Starter chips row.
 		var chips = document.createElement('div');
 		chips.className = 'pg-starter-chips';
@@ -425,15 +467,16 @@
 			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
 			b.addEventListener('click', function () {
 				input.value = s.text;
+				autoGrow();        // grow to fit the filled-in text
+				updateSendState(); // enable Send now, not on the next keystroke
 				input.focus();
 			});
 			chips.appendChild(b);
 		});
 		append(chips);
-		// Pre-fill the box with the first example, ready to edit + Send — but
-		// never overwrite something the user already started typing (a late
-		// history retry can land here seconds after page load).
-		if (!input.value) input.value = STARTERS[0].text;
+		// Leave the box blank — the placeholder + starter chips carry the
+		// first run. Tapping a chip fills the box (and enables Send); we never
+		// auto-drop text the user then has to delete.
 		setTimeout(function () { input.focus(); }, 50);
 	}
 
@@ -523,27 +566,39 @@
 	}
 
 	function setBusy(busy) {
-		sendBtn.disabled = busy;
-		input.disabled = busy;
-		if (busy) startElapsed();
-		else { stopElapsed(); sendBtn.textContent = 'Send'; }
+		if (busy) {
+			startElapsed();
+			sendBtn.classList.add('is-responding');
+			sendBtn.disabled = false; // clickable as Stop
+		} else {
+			stopElapsed();
+			sendBtn.classList.remove('is-responding');
+			updateSendState(); // re-evaluate disabled based on input/images
+		}
 	}
 
-	// Lightweight elapsed-time readout on the Send button so a 20–40s build
-	// doesn't feel hung. "~30s typical" sets the expectation.
+	// Stop button: clicking the send button while responding aborts the
+	// in-flight stream (if one exists) instead of submitting a new message.
+	sendBtn.addEventListener('click', function (e) {
+		if (sendBtn.classList.contains('is-responding')) {
+			e.preventDefault();
+			try { if (window.__pgActiveStream) window.__pgActiveStream.abort(); } catch (err) {}
+			setBusy(false);
+		}
+	});
+
+	// Lightweight elapsed-time readout (kept for potential status UI; the
+	// send button itself now morphs to a stop icon while responding, so we
+	// no longer overwrite its label here).
 	var elapsedTimer = null;
 	function startElapsed() {
 		stopElapsed();
 		var t0 = Date.now();
-		function tick() {
+		elapsedTimer = setInterval(function () {
 			var s = Math.round((Date.now() - t0) / 1000);
-			// Compact: the long "Thinking… 37s · almost there" label squeezed
-			// the textarea into a sliver. Status swaps text, never grows.
-			sendBtn.textContent = s < 1 ? 'Thinking…' : ( s < 30 ? s + 's…' : 'Almost…' );
-		}
-		tick();
-		elapsedTimer = setInterval(tick, 1000);
-		sendBtn.title = 'A full page build usually takes ~30 seconds';
+			sendBtn.title = s < 1 ? 'Generating…' : ( s < 30 ? s + 's elapsed' : 'Almost there' );
+		}, 1000);
+		sendBtn.title = 'Generating…';
 	}
 	function stopElapsed() {
 		if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
@@ -1917,11 +1972,16 @@
 		btn.addEventListener('click', open);
 	})();
 
-	// Enter to send (Shift+Enter for newline)
+	// Enter to send (Shift+Enter for newline) — desktop only. On touch
+	// devices Enter inserts a newline; the send button is the only way to
+	// submit, which avoids the mobile soft-keyboard "go" trap.
+	function isMobileDevice() {
+		return (navigator.maxTouchPoints || 0) > 0 || window.innerWidth < 768;
+	}
 	input.addEventListener('keydown', function (e) {
-		if (e.key === 'Enter' && !e.shiftKey) {
+		if (e.key === 'Enter' && !e.shiftKey && !isMobileDevice()) {
 			e.preventDefault();
-			form.dispatchEvent(new Event('submit', { cancelable: true }));
+			form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 		}
 	});
 
@@ -4617,4 +4677,329 @@
 
 	loadHistory();
 	refreshCredits();
+
+	// ===== Voice input (mic button + live waveform) =====
+	// States: idle → recording → transcribing → error → idle
+	// Records audio via MediaRecorder, shows a live canvas waveform driven by
+	// AnalyserNode — a scrolling amplitude trace (newest sample on the right,
+	// older samples ease left), in the composer accent color. POSTs to
+	// pressgo_ai_transcribe, fills the textarea. Does NOT auto-send — the spec
+	// says let the user edit before sending.
+	(function () {
+		var micBtn = document.querySelector('.pg-mic-btn') || document.getElementById('pg-mic-btn');
+		if (!micBtn) return;
+		if (!navigator.mediaDevices || !window.MediaRecorder || !window.AudioContext) {
+			micBtn.style.display = 'none';
+			return;
+		}
+
+		var voiceBar   = document.getElementById('pg-voice-bar');
+		var voiceTimer = document.getElementById('pg-voice-timer');
+		var voiceHint  = document.getElementById('pg-voice-hint');
+		var canvas     = document.getElementById('pg-voice-canvas');
+		var ctx        = canvas ? canvas.getContext('2d') : null;
+		var composerEl = document.querySelector('.pg-composer');
+
+		var mediaRecorder = null;
+		var audioChunks   = [];
+		var stream        = null;
+		var audioCtx      = null;
+		var analyser      = null;
+		var sourceNode    = null;
+		var timeData      = null;   // time-domain buffer (for RMS amplitude)
+		var rafId         = null;
+		var recording     = false;
+		var timerInterval = null;
+		var timerStart    = 0;
+
+		// Cap a runaway recording so the payload can't blow past PHP limits —
+		// auto-stops and transcribes what we have. Mirrors the server guard.
+		var MAX_SECONDS = 60;
+
+		// Accent color for the trace (matches --pg-accent: #5b4fff).
+		var ACCENT = '91, 79, 255';
+
+		// Scrolling amplitude trace: `levels` holds recent mic amplitudes
+		// (0–1, oldest → newest); `displayed` are the eased heights we draw, so
+		// the motion is fluid rather than steppy. We advance the scroll on a
+		// fixed cadence (not every frame) so it reads at a calm, voice-like pace.
+		var NUM_BARS  = 40;
+		var levels    = [];
+		var displayed = [];
+		for (var i = 0; i < NUM_BARS; i++) { levels.push(0); displayed.push(0); }
+		var lastShift = 0;          // timestamp of the last scroll advance
+		var SHIFT_MS  = 55;         // ~18 new bars/sec → ~2.2s of trace on screen
+
+		function setState(s) {
+			micBtn.setAttribute('data-state', s);
+		}
+
+		function showVoiceBar(hint) {
+			if (voiceHint) voiceHint.textContent = hint;
+			// Voice bar replaces the textarea area inside the composer.
+			if (input) input.style.display = 'none';
+			if (voiceBar) {
+				voiceBar.hidden = false;
+				requestAnimationFrame(function () { voiceBar.classList.add('is-visible'); });
+			}
+			if (composerEl) composerEl.classList.add('pg-voice-active');
+		}
+
+		function hideVoiceBar() {
+			if (voiceBar) {
+				voiceBar.classList.remove('is-visible');
+				voiceBar.hidden = true;
+			}
+			if (composerEl) composerEl.classList.remove('pg-voice-active');
+			if (input) {
+				input.style.display = '';
+				input.focus();
+			}
+		}
+
+		function startTimer() {
+			timerStart = Date.now();
+			if (voiceTimer) voiceTimer.textContent = '0:00';
+			timerInterval = setInterval(function () {
+				var secs = Math.floor((Date.now() - timerStart) / 1000);
+				// Auto-stop at the cap so the payload can't exceed server limits.
+				if (secs >= MAX_SECONDS) {
+					if (recording) stopRecording();
+					return;
+				}
+				if (!voiceTimer) return;
+				var m = Math.floor(secs / 60);
+				var s = secs % 60;
+				voiceTimer.textContent = m + ':' + (s < 10 ? '0' + s : s);
+			}, 250);
+		}
+
+		function stopTimer() {
+			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+		}
+
+		// ── Canvas waveform rendering ──
+		function resizeCanvas() {
+			if (!canvas || !ctx) return;
+			var rect = canvas.getBoundingClientRect();
+			var dpr = window.devicePixelRatio || 1;
+			canvas.width = rect.width * dpr;
+			canvas.height = rect.height * dpr;
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.scale(dpr, dpr);
+		}
+
+		// Rounded-rect path helper (caps clamp to half-height for pill ends).
+		function roundRect(c, x, y, ww, hh, rad) {
+			if (rad > hh / 2) rad = hh / 2;
+			if (rad > ww / 2) rad = ww / 2;
+			c.beginPath();
+			c.moveTo(x + rad, y);
+			c.lineTo(x + ww - rad, y);
+			c.quadraticCurveTo(x + ww, y, x + ww, y + rad);
+			c.lineTo(x + ww, y + hh - rad);
+			c.quadraticCurveTo(x + ww, y + hh, x + ww - rad, y + hh);
+			c.lineTo(x + rad, y + hh);
+			c.quadraticCurveTo(x, y + hh, x, y + hh - rad);
+			c.lineTo(x, y + rad);
+			c.quadraticCurveTo(x, y, x + rad, y);
+			c.closePath();
+		}
+
+		function drawWaveform() {
+			rafId = requestAnimationFrame(drawWaveform);
+			if (!canvas || !ctx) return;
+
+			var rect = canvas.getBoundingClientRect();
+			var w = rect.width;
+			var h = rect.height;
+			ctx.clearRect(0, 0, w, h);
+
+			// Current mic amplitude — RMS of the time-domain signal (0–1).
+			// Time domain (not frequency) reads as a single "loudness" level,
+			// which is what a voice trace should follow.
+			var amp = 0;
+			if (analyser && timeData) {
+				analyser.getByteTimeDomainData(timeData);
+				var sum = 0;
+				for (var k = 0; k < timeData.length; k++) {
+					var s = (timeData[k] - 128) / 128; // −1…1
+					sum += s * s;
+				}
+				var rms = Math.sqrt(sum / timeData.length);
+				// Perceptual lift so quiet speech still moves; clamp to 1.
+				amp = Math.min(1, Math.pow(rms, 0.7) * 2.4);
+			}
+
+			// Advance the scroll on a fixed cadence: drop the oldest bar and
+			// append the live amplitude on the right. Between shifts, let the
+			// newest bar track the loudest sample so a quick syllable registers.
+			var now = Date.now();
+			if (now - lastShift >= SHIFT_MS) {
+				lastShift = now;
+				levels.shift();
+				levels.push(amp);
+			} else if (amp > levels[NUM_BARS - 1]) {
+				levels[NUM_BARS - 1] = amp;
+			}
+
+			var barW  = w / NUM_BARS;
+			var gap   = Math.max(1, barW * 0.34);
+			var drawW = Math.max(1, barW - gap);
+			var maxH  = h * 0.92;
+			var mid   = h / 2;
+			var rad   = Math.min(drawW / 2, 2);
+
+			for (var j = 0; j < NUM_BARS; j++) {
+				// Ease the drawn height toward the target — fluid, not steppy.
+				displayed[j] += (levels[j] - displayed[j]) * 0.35;
+				var lvl = displayed[j];
+
+				var barH = Math.max(2, lvl * maxH);   // thin idle baseline
+				var x = j * barW + gap / 2;
+				var y = mid - barH / 2;               // mirror around centerline
+
+				// Newer bars (right) read a touch stronger than the fading tail.
+				var pos = NUM_BARS > 1 ? j / (NUM_BARS - 1) : 1; // 0 oldest … 1 newest
+				var alpha = 0.22 + lvl * 0.62 + pos * 0.16;
+				if (alpha > 1) alpha = 1;
+				ctx.fillStyle = 'rgba(' + ACCENT + ', ' + alpha.toFixed(3) + ')';
+
+				roundRect(ctx, x, y, drawW, barH, rad);
+				ctx.fill();
+			}
+		}
+
+		// ── Recording lifecycle ──
+		function startRecording() {
+			hideComposerError();
+			navigator.mediaDevices.getUserMedia({ audio: true })
+				.then(function (s) {
+					stream = s;
+					audioChunks = [];
+
+					// Set up AudioContext + AnalyserNode for live waveform
+					audioCtx = new AudioContext();
+					sourceNode = audioCtx.createMediaStreamSource(s);
+					analyser = audioCtx.createAnalyser();
+					analyser.fftSize = 1024; // finer time-domain sampling for RMS
+					analyser.smoothingTimeConstant = 0.8;
+					timeData = new Uint8Array(analyser.fftSize);
+					sourceNode.connect(analyser);
+
+					// Reset the scrolling trace for a clean start.
+					for (var bi = 0; bi < NUM_BARS; bi++) { levels[bi] = 0; displayed[bi] = 0; }
+					lastShift = 0;
+
+					// MediaRecorder for actual recording
+					mediaRecorder = new MediaRecorder(s);
+					mediaRecorder.ondataavailable = function (e) {
+						if (e.data && e.data.size) audioChunks.push(e.data);
+					};
+					mediaRecorder.onstop = function () {
+						var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+						audioChunks = [];
+						transcribe(blob);
+					};
+					mediaRecorder.start();
+					recording = true;
+
+					setState('recording');
+					showVoiceBar('Listening…');
+					resizeCanvas();
+					drawWaveform();
+					startTimer();
+
+					window.addEventListener('resize', resizeCanvas);
+				})
+				.catch(function (err) {
+					var msg = 'Microphone access denied. Check your browser permissions.';
+					if (err && err.name === 'NotAllowedError') {
+						msg = 'Microphone access denied. Click the camera icon in your address bar to allow.';
+					}
+					setState('error');
+					showComposerError(msg, startRecording);
+				});
+		}
+
+		function stopRecording() {
+			recording = false;
+			if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+			stopTimer();
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+			if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+			if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
+			if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; analyser = null; }
+			window.removeEventListener('resize', resizeCanvas);
+
+			setState('transcribing');
+			if (voiceBar) voiceBar.classList.add('is-processing');
+			if (voiceHint) voiceHint.textContent = 'Transcribing…';
+		}
+
+		function transcribe(blob) {
+			var reader = new FileReader();
+			reader.onload = function () {
+				var dataUrl = reader.result;
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_transcribe');
+				fd.append('nonce', cfg.nonce);
+				fd.append('audio', dataUrl);
+				fd.append('mime', blob.type || 'audio/webm');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (data) {
+						if (data && data.success && data.data && data.data.text) {
+							var text = data.data.text;
+							if (input.value.trim()) {
+								input.value = input.value.replace(/\s+$/, '') + ' ' + text;
+							} else {
+								input.value = text;
+							}
+							if (voiceBar) voiceBar.classList.remove('is-processing');
+							hideVoiceBar();
+							setState('idle');
+							// Refresh textarea height + send state — do NOT auto-send.
+							if (typeof autoGrow === 'function') autoGrow();
+							if (typeof updateSendState === 'function') updateSendState();
+						} else {
+							failTranscribe();
+						}
+					})
+					.catch(failTranscribe);
+			};
+			reader.onerror = failTranscribe;
+			reader.readAsDataURL(blob);
+		}
+
+		function failTranscribe() {
+			setState('error');
+			if (voiceBar) voiceBar.classList.remove('is-processing');
+			hideVoiceBar();
+			showComposerError("Couldn't transcribe — try again.", startRecording);
+		}
+
+		micBtn.addEventListener('click', function () {
+			if (recording) stopRecording();
+			else startRecording();
+		});
+
+		// Spacebar on the mic button toggles recording (accessibility)
+		micBtn.addEventListener('keydown', function (e) {
+			if (e.key === ' ' || e.key === 'Spacebar') {
+				e.preventDefault();
+				if (recording) stopRecording();
+				else startRecording();
+			}
+		});
+
+		window.addEventListener('beforeunload', function () {
+			if (recording) {
+				if (rafId) cancelAnimationFrame(rafId);
+				if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+				if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+				if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
+			}
+		});
+	})();
 })();

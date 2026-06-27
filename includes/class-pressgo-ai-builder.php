@@ -96,6 +96,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
+		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 	}
 
 	/**
@@ -357,6 +358,146 @@ class PressGo_AI_Builder {
 		}
 		$collect( get_posts( $args ) );
 		wp_send_json_success( array( 'images' => $out ) );
+	}
+
+	/**
+	 * Voice-input transcription model. Audio→text is its own capability: the
+	 * freeform brain (GLM-5.2) takes no audio, so transcription routes through
+	 * a dedicated, audio-capable model over the same OpenRouter key — kept
+	 * filterable so it lives in the model config, not buried in the handler.
+	 */
+	public static function transcribe_model() {
+		return (string) apply_filters( 'pressgo_transcribe_model', 'google/gemini-2.5-flash-lite' );
+	}
+
+	/**
+	 * Transcribe a base64 audio blob via OpenRouter. Thin handler — mirrors
+	 * ajax_freeform → compose_freeform_tree: validate, hand off to the provider
+	 * helper, map the result. Powers the voice-input button in the chat builder.
+	 */
+	public function ajax_transcribe() {
+		$this->check_auth();
+
+		$audio = isset( $_POST['audio'] ) ? (string) wp_unslash( $_POST['audio'] ) : '';
+		$mime  = isset( $_POST['mime'] ) ? sanitize_text_field( wp_unslash( $_POST['mime'] ) ) : '';
+		if ( '' === $audio || '' === $mime ) {
+			wp_send_json_error( 'missing audio or mime', 400 );
+		}
+
+		// Strip the data URL prefix (data:audio/webm;base64,XXXX) if present.
+		$b64   = $audio;
+		$comma = strpos( $audio, ',' );
+		if ( false !== $comma && 0 === strpos( $audio, 'data:' ) ) {
+			$b64 = substr( $audio, $comma + 1 );
+		}
+		$b64 = preg_replace( '/\s+/', '', $b64 );
+		if ( '' === $b64 ) {
+			wp_send_json_error( 'empty audio payload', 400 );
+		}
+
+		// Payload guard — a runaway recording shouldn't blow past PHP's
+		// post_max_size and fail with a generic error. Base64 inflates ~4/3,
+		// so cap on the decoded size (~8MB ≈ a few minutes of Opus). Filterable.
+		$max_bytes = (int) apply_filters( 'pressgo_transcribe_max_bytes', 8 * 1024 * 1024 );
+		if ( ( strlen( $b64 ) * 3 ) / 4 > $max_bytes ) {
+			wp_send_json_error( 'Recording is too long. Keep it under a minute or so.', 413 );
+		}
+
+		$api_key = get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $api_key ) {
+			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
+		}
+
+		// Normalize the MediaRecorder mime to a bare OpenRouter format:
+		// "audio/webm;codecs=opus" → "webm". The codecs suffix made the API reject it.
+		$format = $mime;
+		if ( 0 === strpos( $format, 'audio/' ) ) {
+			$format = substr( $format, 6 );
+		}
+		$semi = strpos( $format, ';' );
+		if ( false !== $semi ) {
+			$format = substr( $format, 0, $semi );
+		}
+		$format = trim( $format );
+
+		$result = self::transcribe_via_openrouter( $api_key, $b64, $format );
+		if ( is_wp_error( $result ) ) {
+			$status = (int) ( $result->get_error_data()['status'] ?? 502 );
+			wp_send_json_error( $result->get_error_message(), $status );
+		}
+
+		wp_send_json_success( array( 'text' => $result, 'model' => self::transcribe_model() ) );
+	}
+
+	/**
+	 * Provider call for transcription — same shape as glm_compose(): one
+	 * OpenRouter request, returns the transcribed string or a WP_Error that
+	 * carries a user-facing message + HTTP status for the handler to relay.
+	 */
+	private static function transcribe_via_openrouter( $key, $b64, $format ) {
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 120,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'body'    => wp_json_encode( array(
+				'model'    => self::transcribe_model(),
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							array(
+								'type' => 'text',
+								'text' => 'Transcribe this audio recording. Output ONLY the transcribed text, no preamble, no quotes, no commentary.',
+							),
+							array(
+								'type'        => 'input_audio',
+								'input_audio' => array( 'data' => $b64, 'format' => $format ),
+							),
+						),
+					),
+				),
+			) ),
+		) );
+
+		if ( is_wp_error( $resp ) ) {
+			return new WP_Error( 'transcribe_http', 'Transcription failed: ' . $resp->get_error_message(), array( 'status' => 502 ) );
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $resp );
+		$raw    = wp_remote_retrieve_body( $resp );
+		if ( 200 !== $status ) {
+			$err    = json_decode( $raw, true );
+			$detail = $err['error']['message'] ?? ( 'HTTP ' . $status );
+			return new WP_Error( 'transcribe_api', 'Transcription failed: ' . $detail, array( 'status' => 502 ) );
+		}
+
+		$json = json_decode( $raw, true );
+		$text = trim( self::openrouter_message_text( $json['choices'][0]['message']['content'] ?? '' ) );
+		if ( '' === $text ) {
+			return new WP_Error( 'transcribe_empty', 'Transcription failed: empty response', array( 'status' => 502 ) );
+		}
+		return $text;
+	}
+
+	/**
+	 * Flatten an OpenRouter chat message `content` (string, or array of
+	 * {type,text} / string blocks) into plain text.
+	 */
+	private static function openrouter_message_text( $content ) {
+		if ( is_string( $content ) ) {
+			return $content;
+		}
+		if ( is_array( $content ) ) {
+			$parts = array();
+			foreach ( $content as $block ) {
+				if ( is_array( $block ) && isset( $block['text'] ) && is_string( $block['text'] ) ) {
+					$parts[] = $block['text'];
+				} elseif ( is_string( $block ) ) {
+					$parts[] = $block;
+				}
+			}
+			return implode( '', $parts );
+		}
+		return '';
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
@@ -1860,9 +2001,9 @@ class PressGo_AI_Builder {
 			.pg-tier-cap{font-size:12.5px;font-weight:700;margin:7px 0 3px;color:#0f172a}
 			.pg-tier-blurb{font-size:11.5px;color:#64748b;line-height:1.35}
 			/* mode selector (Ada / Iris / Nova) */
-			.pg-mode{position:relative}
-			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #e2e4e9;border-radius:9px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
-			.pg-mode-btn:hover{background:#f6f7f9;border-color:#d4d7dd}
+			.pg-mode{position:relative;flex-shrink:0}
+			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 10px;border:1px solid #e5e5e5;border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
+			.pg-mode-btn:hover{background:#fafaf8;border-color:#d4d7dd}
 			.pg-mode-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a8;flex-shrink:0}
 			.pg-mode.is-eyes .pg-mode-dot{background:#5b4fff}
 			.pg-mode.is-freeform .pg-mode-dot{background:linear-gradient(135deg,#5b4fff,#b893ff)}
@@ -1952,47 +2093,78 @@ class PressGo_AI_Builder {
 				<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
-					<div class="pg-attach-strip" id="pg-attach-strip" hidden></div>
 					<form class="pg-chat-input" id="pg-chat-form">
-						<button type="button" class="pg-attach-btn" id="pg-attach-btn" title="Attach images (or drag/drop / paste — you can add several)" aria-label="Attach images">
-							<svg class="pg-attach-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-							<span class="pg-attach-count" id="pg-attach-count" hidden>0</span>
-						</button>
-						<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
-						<textarea
-							id="pg-chat-text"
-							rows="1"
-							placeholder="Describe your page, or drop a screenshot…"
-							required></textarea>
-						<button type="submit" id="pg-chat-send">Send</button>
+						<div class="pg-composer" id="pg-composer">
+							<div class="pg-attach-row" id="pg-attach-strip" hidden></div>
+							<textarea
+								id="pg-chat-text"
+								rows="1"
+								placeholder="Describe your page, or drop a screenshot…"
+								required></textarea>
+							<div class="pg-voice-bar" id="pg-voice-bar" hidden>
+								<span class="pg-voice-timer" id="pg-voice-timer">0:00</span>
+								<canvas class="pg-voice-canvas" id="pg-voice-canvas"></canvas>
+								<span class="pg-voice-hint" id="pg-voice-hint">Listening…</span>
+							</div>
+							<div class="pg-action-bar">
+								<div class="pg-action-left">
+									<div class="pg-mode" id="pg-mode">
+										<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
+											<span class="pg-mode-dot"></span>
+											<span class="pg-mode-current" id="pg-mode-current">Ada</span>
+											<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+										</button>
+										<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+										</div>
+									</div>
+									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images" aria-label="Attach images">
+										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+									</button>
+									<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
+									<button type="button" class="pg-icon-btn pg-mic-btn" id="pg-mic-btn" data-state="idle" title="Record voice message" aria-label="Record voice message">
+										<svg class="pg-mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<rect x="9" y="2" width="6" height="11" rx="3"/>
+											<path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+											<line x1="12" y1="18" x2="12" y2="22"/>
+											<line x1="8" y1="22" x2="16" y2="22"/>
+										</svg>
+										<svg class="pg-mic-stop-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+											<rect x="6" y="6" width="12" height="12" rx="2"/>
+										</svg>
+									</button>
+								</div>
+								<div class="pg-action-right">
+									<button type="submit" class="pg-send-btn" id="pg-chat-send" disabled>
+										<svg class="pg-send-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<line x1="22" y1="2" x2="11" y2="13"/>
+											<polygon points="22 2 15 22 11 13 2 9 22 2"/>
+										</svg>
+										<svg class="pg-stop-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+											<rect x="6" y="6" width="12" height="12" rx="2"/>
+										</svg>
+										<span class="pg-send-label">Send</span>
+									</button>
+								</div>
+							</div>
+							<div class="pg-composer-error" id="pg-composer-error" hidden></div>
+						</div>
 					</form>
 					<div class="pg-drop-overlay" id="pg-drop-overlay">
 						<div class="pg-drop-message">
 							<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
 							<div>Drop a screenshot to attach</div>
-						</div>
-					</div>
-					<div class="pg-chat-footer">
-						<div class="pg-mode" id="pg-mode">
-							<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
-								<span class="pg-mode-dot"></span>
-								<span class="pg-mode-current" id="pg-mode-current">Ada</span>
-								<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-							</button>
-							<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-							</div>
 						</div>
 					</div>
 				</aside>
