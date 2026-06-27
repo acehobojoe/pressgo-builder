@@ -1638,6 +1638,102 @@ class PressGo_AI_Builder {
 		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Put it back the way it was.' );
 	}
 
+	/** Friendly label for a semantic role. */
+	private function role_label( $role ) {
+		$map = array(
+			'hero' => 'hero', 'services' => 'services', 'features' => 'features', 'about' => 'about',
+			'proof' => 'testimonials', 'steps' => 'how-it-works', 'team' => 'team', 'gallery' => 'gallery',
+			'pricing' => 'pricing', 'faq' => 'FAQ', 'cta' => 'call-to-action', 'contact' => 'contact', 'unknown' => 'that',
+		);
+		return isset( $map[ $role ] ) ? $map[ $role ] : 'that';
+	}
+
+	/** Which section a "remove the X" message refers to: a record index, or -1. */
+	private function find_target_section( $records, $message ) {
+		$m    = strtolower( (string) $message );
+		$role = '';
+		if ( preg_match( '/\b(testimonial|reviews?|proof)\b/', $m ) )            { $role = 'proof'; }
+		elseif ( preg_match( '/\babout\b/', $m ) )                              { $role = 'about'; }
+		elseif ( preg_match( '/\b(faq|questions?)\b/', $m ) )                   { $role = 'faq'; }
+		elseif ( preg_match( '/\b(team|staff)\b/', $m ) )                       { $role = 'team'; }
+		elseif ( preg_match( '/\b(gallery|our work)\b/', $m ) )                 { $role = 'gallery'; }
+		elseif ( preg_match( '/\b(pricing|prices?|plans?)\b/', $m ) )           { $role = 'pricing'; }
+		elseif ( preg_match( '/\b(services?|features?)\b/', $m ) )              { $role = 'services'; }
+		elseif ( preg_match( '/\b(cta|call to action|final cta)\b/', $m ) )     { $role = 'cta'; }
+		elseif ( preg_match( '/\bcontact\b/', $m ) )                            { $role = 'contact'; }
+		elseif ( preg_match( '/\b(how it works|steps?)\b/', $m ) )              { $role = 'steps'; }
+		elseif ( preg_match( '/\b(hero|header)\b/', $m ) )                      { $role = 'hero'; }
+
+		$want_top    = (bool) preg_match( '/\b(top|first)\b/', $m );
+		$want_bottom = (bool) preg_match( '/\b(bottom|last|final)\b/', $m );
+
+		// Role match wins; with multiple, "bottom" picks the last, else first.
+		if ( '' !== $role ) {
+			$cands = array();
+			foreach ( $records as $i => $r ) {
+				if ( ( $r['semantic_role'] ?? '' ) === $role ) { $cands[] = $i; }
+			}
+			if ( $cands ) { return $want_top ? $cands[0] : end( $cands ); }
+		}
+		// No role: try a distinctive word from the message against headings.
+		$words = preg_split( '/\s+/', preg_replace( '/[^a-z0-9 ]/', ' ', $m ) );
+		$stop  = array( 'remove', 'delete', 'the', 'a', 'an', 'get', 'rid', 'of', 'take', 'out', 'kill', 'section', 'bottom', 'top', 'last', 'first', 'final', 'please', 'that', 'this' );
+		foreach ( $records as $i => $r ) {
+			$h = strtolower( (string) ( $r['heading'] ?? '' ) );
+			if ( '' === $h ) { continue; }
+			foreach ( $words as $w ) {
+				if ( strlen( $w ) >= 4 && ! in_array( $w, $stop, true ) && false !== strpos( $h, $w ) ) { return $i; }
+			}
+		}
+		// Pure position.
+		if ( $want_bottom ) { return count( $records ) - 1; }
+		if ( $want_top )    { return count( $records ) > 1 ? 1 : -1; }
+		return -1;
+	}
+
+	/** Delete a section the user asked to remove (snapshot first so "undo" restores it). */
+	private function cohesion_delete_section( $post_id, $message ) {
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
+		if ( count( $records ) <= 1 ) {
+			return array( 'note' => "There's only the hero here — nothing else to remove yet." );
+		}
+		$idx = $this->find_target_section( $records, $message );
+		if ( $idx < 0 ) {
+			return array( 'note' => 'I wasn\'t sure which section to remove. Try "remove the testimonials section" or "remove the last section".' );
+		}
+		if ( 'hero' === ( $records[ $idx ]['semantic_role'] ?? '' ) ) {
+			return array( 'note' => "I'll keep the hero — tell me another section to remove." );
+		}
+		$target = $records[ $idx ];
+		$this->cohesion_snapshot( $post_id, $records );
+
+		$elements = $this->read_elements( $post_id );
+		$key      = $target['pg_key'];
+		$new      = array();
+		$removed  = false;
+		$tgt_json = ( isset( $target['element'] ) && is_array( $target['element'] ) ) ? wp_json_encode( $target['element'] ) : '';
+		foreach ( $elements as $el ) {
+			if ( ! $removed && '' !== $key && $this->element_pg_key( $el ) === $key ) { $removed = true; continue; }
+			if ( ! $removed && '' !== $tgt_json && wp_json_encode( $el ) === $tgt_json ) { $removed = true; continue; }
+			$new[] = $el;
+		}
+		if ( ! $removed ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't safely find that section to remove — left the page as it is." );
+		}
+		array_splice( $records, $idx, 1 );
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+		$this->save_ff_sections( $post_id, $records );
+		$this->cohesion_flush( $post_id );
+
+		return array(
+			'preview_bust' => time(),
+			'cohesion'     => true,
+			'note'         => 'Removed the ' . $this->role_label( $target['semantic_role'] ?? 'unknown' ) . ' section. Say "undo" to put it back.',
+		);
+	}
+
 	/** Guess the industry enum from the first message (drives copy + stock photos). */
 	private function infer_industry_from_message( $message ) {
 		$m   = strtolower( (string) $message );
@@ -2883,6 +2979,11 @@ class PressGo_AI_Builder {
 		if ( ! $page_empty ) {
 			if ( preg_match( '/^\s*(undo|put it back|revert)\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_undo( $post_id ) );
+			}
+			// Delete: "remove / delete / get rid of the [X] section" removes a section
+			// instead of composing a new one (Nova used to only ever append).
+			if ( preg_match( '/\b(remove|delete|get rid of|take out|kill)\b/i', $message ) && ! preg_match( '/\badd\b/i', $message ) ) {
+				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message ) );
 			}
 			if ( preg_match( '/\b(make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this) up|clean (it|this) up|smart order)\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_reorganize( $post_id ) );
