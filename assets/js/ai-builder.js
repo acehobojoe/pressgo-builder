@@ -1212,10 +1212,10 @@
 	// reasoning model) composes — so a ~15s build reads as working through steps,
 	// not a frozen bubble. Captions are progress, not the literal model tokens.
 	var THINK = {
-		hero:    ['Reading your brief…', 'Sketching the hero layout…', 'Choosing an on-brand palette…', 'Writing the headline and copy…', 'Finding the right photo…', 'Assembling your hero…'],
-		section: ['Planning the section…', 'Matching your brand…', 'Writing the copy…', 'Finding imagery…', 'Putting it together…'],
-		recolor: ['Rethinking the look…', 'Trying a fresh palette and type…', 'Rewriting to fit…', 'Rebuilding your hero…'],
-		cohesion: ['Stepping back to look at your whole page…', 'Reading the flow, section by section…', 'Finding a smarter order…', 'Balancing the dark and light so it all flows…', 'Putting it back together…'],
+		hero:    ['Reading your brief…', 'Sketching the hero layout…', 'Choosing an on-brand palette…', 'Writing the headline and copy…', 'Finding the right photo…', 'Laying out the section…', 'Assembling your hero…', 'Polishing the details…', 'Almost there…'],
+		section: ['Planning the section…', 'Matching your brand…', 'Choosing the right layout…', 'Writing the copy…', 'Finding imagery…', 'Putting it together…', 'Polishing the details…', 'Almost there…'],
+		recolor: ['Rethinking the look…', 'Trying a fresh palette and type…', 'Rewriting to fit…', 'Rebuilding your hero…', 'Polishing the details…', 'Almost there…'],
+		cohesion: ['Stepping back to look at your whole page…', 'Reading the flow, section by section…', 'Finding a smarter order…', 'Balancing the dark and light so it all flows…', 'Recoloring each section to stay readable…', 'Putting it back together…', 'Checking it all reads well…', 'Almost there…'],
 		quick:   ['Thinking…']
 	};
 	function makeThinking(steps) {
@@ -1231,11 +1231,12 @@
 			cap.textContent = steps[0];
 			node.appendChild(cap);
 			var i = 0;
+			// Loop (don't stop at the last step) so a slow build/reorganize never sits
+			// frozen on one caption — it keeps visibly working until the response lands.
 			timer = setInterval(function () {
-				i++;
-				if (i >= steps.length) { clearInterval(timer); timer = null; return; }
+				i = ( i + 1 ) % steps.length;
 				cap.textContent = steps[i];
-			}, 2200);
+			}, 2400);
 		}
 		return { node: node, stop: function () { if (timer) { clearInterval(timer); timer = null; } } };
 	}
@@ -1369,16 +1370,21 @@
 		s.chips.forEach(function (c) {
 			var b = document.createElement('button');
 			b.type = 'button';
-			b.textContent = '+ ' + c.label;
-			b.className = 'pg-suggest-chip';
-			b.style.cssText = 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
+			var isFlow = (c.key === 'cohesion');
+			b.textContent = isFlow ? '✨ ' + c.label : '+ ' + c.label;
+			b.className = 'pg-suggest-chip' + (isFlow ? ' pg-suggest-flow' : '');
+			// The cohesion action is a different kind of thing than "add a section",
+			// so it gets a filled, accented pill that visibly stands apart.
+			b.style.cssText = isFlow
+				? 'border:none;background:linear-gradient(135deg,#5b4fff,#8b5cf6);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:700;box-shadow:0 2px 10px rgba(91,79,255,0.4);margin-right:2px;'
+				: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
 			b.addEventListener('click', function () {
 				Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (x) {
 					x.disabled = true; x.style.cursor = 'default';
 					if (x !== b) x.style.opacity = '0.4';
 				});
-				b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca';
-				postFreeform({ message: c.request, section_key: c.key }, c.label, c.key === 'cohesion' ? 'cohesion' : 'section');
+				if (!isFlow) { b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca'; }
+				postFreeform({ message: c.request, section_key: c.key }, c.label, isFlow ? 'cohesion' : 'section');
 			});
 			wrap.appendChild(b);
 		});
