@@ -4298,53 +4298,265 @@
 	loadHistory();
 	refreshCredits();
 
-	// ===== Voice input (mic button) =====
-	// Records audio via MediaRecorder, POSTs the data URL to the
-	// pressgo_ai_transcribe ajax endpoint, fills the chat textarea with the
-	// returned text, and auto-submits unless the user typed during recording.
+	// ===== Voice input (mic button + live waveform) =====
+	// 5-state machine: idle → recording → processing → success/error → idle
+	// Records audio via MediaRecorder, shows a live canvas waveform driven
+	// by AnalyserNode (real mic input with per-bar randomized spring physics),
+	// POSTs to pressgo_ai_transcribe, fills the textarea, auto-sends.
 	(function () {
 		var micBtn = document.getElementById('pg-mic-btn');
 		if (!micBtn) return;
-		if (!navigator.mediaDevices || !window.MediaRecorder) {
+		if (!navigator.mediaDevices || !window.MediaRecorder || !window.AudioContext) {
 			micBtn.style.display = 'none';
 			return;
 		}
 
-		var timerSpan     = micBtn.querySelector('.pg-mic-timer');
-		var micIcon       = micBtn.querySelector('.pg-mic-icon');
-		var micStopIcon   = micBtn.querySelector('.pg-mic-stop-icon');
+		var micWrap    = document.getElementById('pg-mic-wrap');
+		var voiceBar   = document.getElementById('pg-voice-bar');
+		var voiceTimer = document.getElementById('pg-voice-timer');
+		var voiceHint  = document.getElementById('pg-voice-hint');
+		var canvas     = document.getElementById('pg-voice-canvas');
+		var ctx        = canvas.getContext('2d');
+		var formEl     = document.getElementById('pg-chat-form');
 
 		var mediaRecorder = null;
 		var audioChunks   = [];
-		var recording     = false;
 		var stream        = null;
+		var audioCtx      = null;
+		var analyser      = null;
+		var sourceNode    = null;
+		var freqData      = null;
+		var rafId         = null;
+		var recording     = false;
 		var timerInterval = null;
-		var timerStart     = 0;
-		var userTypedDuringRecording = false;
+		var timerStart    = 0;
+		var userTyped     = false;
+		var revertTimer   = null;
+
+		// Waveform bar state — per-bar spring physics for organic motion
+		var NUM_BARS = 48;
+		var bars = [];
+		for (var i = 0; i < NUM_BARS; i++) {
+			bars.push({
+				height: 0.1,
+				vel: 0,
+				stiffness: 300 + Math.random() * 80,
+				damping: 18 + Math.random() * 6,
+				target: 0.1
+			});
+		}
+
+		function setState(s) {
+			micBtn.setAttribute('data-state', s);
+			if (revertTimer) { clearTimeout(revertTimer); revertTimer = null; }
+			if (s === 'success' || s === 'error') {
+				revertTimer = setTimeout(function () { setState('idle'); }, 1500);
+			}
+		}
+
+		function showVoiceBar(hint) {
+			if (voiceHint) voiceHint.textContent = hint;
+			if (voiceBar) {
+				voiceBar.hidden = false;
+				requestAnimationFrame(function () { voiceBar.classList.add('is-visible'); });
+			}
+			if (formEl) formEl.classList.add('pg-voice-active');
+		}
+
+		function hideVoiceBar() {
+			if (voiceBar) {
+				voiceBar.classList.remove('is-visible');
+				setTimeout(function () { voiceBar.hidden = true; }, 250);
+			}
+			if (formEl) formEl.classList.remove('pg-voice-active');
+		}
 
 		function startTimer() {
 			timerStart = Date.now();
-			if (timerSpan) {
-				timerSpan.hidden = false;
-				timerSpan.textContent = '0:00';
-			}
+			if (voiceTimer) voiceTimer.textContent = '0:00';
 			timerInterval = setInterval(function () {
-				if (!timerSpan) return;
+				if (!voiceTimer) return;
 				var secs = Math.floor((Date.now() - timerStart) / 1000);
 				var m = Math.floor(secs / 60);
 				var s = secs % 60;
-				timerSpan.textContent = m + ':' + (s < 10 ? '0' + s : s);
-			}, 1000);
+				voiceTimer.textContent = m + ':' + (s < 10 ? '0' + s : s);
+			}, 250);
 		}
 
 		function stopTimer() {
 			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-			if (timerSpan) { timerSpan.hidden = true; }
 		}
 
-		function onInputWhileRecording() {
-			userTypedDuringRecording = true;
+		// ── Canvas waveform rendering ──
+		function resizeCanvas() {
+			if (!canvas) return;
+			var rect = canvas.getBoundingClientRect();
+			var dpr = window.devicePixelRatio || 1;
+			canvas.width = rect.width * dpr;
+			canvas.height = rect.height * dpr;
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.scale(dpr, dpr);
 		}
+
+		function drawWaveform() {
+			rafId = requestAnimationFrame(drawWaveform);
+			if (!canvas || !ctx) return;
+
+			var rect = canvas.getBoundingClientRect();
+			var w = rect.width;
+			var h = rect.height;
+			ctx.clearRect(0, 0, w, h);
+
+			// Get mic volume data
+			var avgVol = 0;
+			if (analyser && freqData) {
+				analyser.getByteFrequencyData(freqData);
+				var sum = 0;
+				for (var k = 0; k < freqData.length; k++) sum += freqData[k];
+				avgVol = sum / freqData.length / 255; // 0–1
+			}
+
+			// Update bar targets from frequency data, with per-bar spring physics
+			var barW = w / NUM_BARS;
+			var gap = 2;
+			var drawW = barW - gap;
+			if (drawW < 1) drawW = 1;
+
+			for (var i = 0; i < NUM_BARS; i++) {
+				var bar = bars[i];
+				if (analyser && freqData) {
+					// Map bar index to frequency bin (skip the lowest bins — mostly noise)
+					var binIdx = Math.floor(2 + (i / NUM_BARS) * (freqData.length * 0.7));
+					var raw = (freqData[binIdx] || 0) / 255;
+					// Add slight randomness to avoid mechanical feel
+					raw = raw * (0.85 + Math.random() * 0.3);
+					bar.target = Math.max(0.05, raw);
+				} else {
+					bar.target = 0.05;
+				}
+
+				// Spring physics: F = -kx - cv
+				var force = (bar.target - bar.height) * bar.stiffness;
+				var dampingForce = -bar.vel * bar.damping;
+				bar.vel += (force + dampingForce) * 0.016; // ~60fps
+				bar.height += bar.vel * 0.016;
+
+				// Clamp
+				if (bar.height < 0.03) bar.height = 0.03;
+				if (bar.height > 1) bar.height = 1;
+			}
+
+			// Draw bars with gradient + glow
+			var maxH = h * 0.9;
+			for (var j = 0; j < NUM_BARS; j++) {
+				var barH = bars[j].height * maxH;
+				var x = j * barW + gap / 2;
+				var y = (h - barH) / 2;
+
+				// Gradient: center brighter, edges softer
+				var intensity = bars[j].height;
+				var alpha = 0.4 + intensity * 0.6;
+				ctx.fillStyle = 'rgba(139, 92, 246, ' + alpha + ')';
+
+				// Rounded bars
+				var r = Math.min(drawW / 2, 2);
+				ctx.beginPath();
+				ctx.moveTo(x + r, y);
+				ctx.lineTo(x + drawW - r, y);
+				ctx.quadraticCurveTo(x + drawW, y, x + drawW, y + r);
+				ctx.lineTo(x + drawW, y + barH - r);
+				ctx.quadraticCurveTo(x + drawW, y + barH, x + drawW - r, y + barH);
+				ctx.lineTo(x + r, y + barH);
+				ctx.quadraticCurveTo(x, y + barH, x, y + barH - r);
+				ctx.lineTo(x, y + r);
+				ctx.quadraticCurveTo(x, y, x + r, y);
+				ctx.closePath();
+				ctx.fill();
+			}
+
+			// Edge fade (left/right gradient mask)
+			var fadeW = 24;
+			if (w > fadeW * 2) {
+				var gradL = ctx.createLinearGradient(0, 0, fadeW, 0);
+				gradL.addColorStop(0, 'rgba(30, 27, 46, 1)');
+				gradL.addColorStop(1, 'rgba(30, 27, 46, 0)');
+				ctx.fillStyle = gradL;
+				ctx.fillRect(0, 0, fadeW, h);
+
+				var gradR = ctx.createLinearGradient(w - fadeW, 0, w, 0);
+				gradR.addColorStop(0, 'rgba(30, 27, 46, 0)');
+				gradR.addColorStop(1, 'rgba(30, 27, 46, 1)');
+				ctx.fillStyle = gradR;
+				ctx.fillRect(w - fadeW, 0, fadeW, h);
+			}
+		}
+
+		// ── Recording lifecycle ──
+		function startRecording() {
+			navigator.mediaDevices.getUserMedia({ audio: true })
+				.then(function (s) {
+					stream = s;
+					audioChunks = [];
+					userTyped = false;
+
+					// Set up AudioContext + AnalyserNode for live waveform
+					audioCtx = new AudioContext();
+					sourceNode = audioCtx.createMediaStreamSource(s);
+					analyser = audioCtx.createAnalyser();
+					analyser.fftSize = 256;
+					analyser.smoothingTimeConstant = 0.8;
+					freqData = new Uint8Array(analyser.frequencyBinCount);
+					sourceNode.connect(analyser);
+
+					// MediaRecorder for actual recording
+					mediaRecorder = new MediaRecorder(s);
+					mediaRecorder.ondataavailable = function (e) {
+						if (e.data && e.data.size) audioChunks.push(e.data);
+					};
+					mediaRecorder.onstop = function () {
+						var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+						audioChunks = [];
+						transcribe(blob);
+					};
+					mediaRecorder.start();
+					recording = true;
+
+					setState('recording');
+					showVoiceBar('Listening…');
+					resizeCanvas();
+					drawWaveform();
+					startTimer();
+
+					if (input) input.addEventListener('input', onInputWhileRecording);
+					window.addEventListener('resize', resizeCanvas);
+				})
+				.catch(function (err) {
+					var msg = 'Microphone access denied. Check your browser permissions.';
+					if (err && err.name === 'NotAllowedError') {
+						msg = 'Microphone access denied. Click the camera icon in your address bar to allow.';
+					}
+					appendMessage('pg-msg pg-msg-error', msg);
+					setState('error');
+				});
+		}
+
+		function stopRecording() {
+			recording = false;
+			if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+			stopTimer();
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+			if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+			if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
+			if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; analyser = null; }
+			if (input) input.removeEventListener('input', onInputWhileRecording);
+			window.removeEventListener('resize', resizeCanvas);
+
+			setState('processing');
+			if (voiceBar) voiceBar.classList.add('is-processing');
+			if (voiceHint) voiceHint.textContent = 'Transcribing…';
+		}
+
+		function onInputWhileRecording() { userTyped = true; }
 
 		function transcribe(blob) {
 			var reader = new FileReader();
@@ -4367,22 +4579,30 @@
 							}
 							input.focus();
 							input.dispatchEvent(new Event('input', { bubbles: true }));
-							if (!userTypedDuringRecording && input.value.trim()) {
+							setState('success');
+							hideVoiceBar();
+							if (voiceBar) voiceBar.classList.remove('is-processing');
+							if (!userTyped && input.value.trim()) {
 								form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 							}
 						} else {
+							setState('error');
+							if (voiceBar) voiceBar.classList.remove('is-processing');
+							hideVoiceBar();
 							appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
 						}
 					})
 					.catch(function () {
+						setState('error');
+						if (voiceBar) voiceBar.classList.remove('is-processing');
+						hideVoiceBar();
 						appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
-					})
-					.finally(function () {
-						micBtn.classList.remove('is-loading');
 					});
 			};
 			reader.onerror = function () {
-				micBtn.classList.remove('is-loading');
+				setState('error');
+				if (voiceBar) voiceBar.classList.remove('is-processing');
+				hideVoiceBar();
 				appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
 			};
 			reader.readAsDataURL(blob);
@@ -4397,62 +4617,26 @@
 			log.scrollTop = log.scrollHeight;
 		}
 
-		function startRecording() {
-			navigator.mediaDevices.getUserMedia({ audio: true })
-				.then(function (s) {
-					stream = s;
-					audioChunks = [];
-					userTypedDuringRecording = false;
-					mediaRecorder = new MediaRecorder(stream);
-					mediaRecorder.ondataavailable = function (e) {
-						if (e.data && e.data.size) audioChunks.push(e.data);
-					};
-					mediaRecorder.onstop = function () {
-						var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-						audioChunks = [];
-						transcribe(blob);
-					};
-					mediaRecorder.start();
-					recording = true;
-					micBtn.classList.add('is-recording');
-					if (micIcon) micIcon.style.display = 'none';
-					if (micStopIcon) micStopIcon.style.display = '';
-					if (input) input.addEventListener('input', onInputWhileRecording);
-					startTimer();
-				})
-				.catch(function () {
-					appendMessage('pg-msg pg-msg-error', 'Microphone access denied. Check your browser permissions.');
-				});
-		}
-
-		function stopRecording() {
-			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-				mediaRecorder.stop();
-			}
-			if (stream) {
-				stream.getTracks().forEach(function (t) { t.stop(); });
-			}
-			recording = false;
-			micBtn.classList.remove('is-recording');
-			micBtn.classList.add('is-loading');
-			if (micIcon) micIcon.style.display = '';
-			if (micStopIcon) micStopIcon.style.display = 'none';
-			if (input) input.removeEventListener('input', onInputWhileRecording);
-			stopTimer();
-		}
-
 		micBtn.addEventListener('click', function () {
-			if (recording) {
-				stopRecording();
-			} else {
-				startRecording();
+			if (recording) stopRecording();
+			else startRecording();
+		});
+
+		// Spacebar on the mic button toggles recording (accessibility)
+		micBtn.addEventListener('keydown', function (e) {
+			if (e.key === ' ' || e.key === 'Spacebar') {
+				e.preventDefault();
+				if (recording) stopRecording();
+				else startRecording();
 			}
 		});
 
 		window.addEventListener('beforeunload', function () {
 			if (recording) {
+				if (rafId) cancelAnimationFrame(rafId);
 				if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
 				if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+				if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
 			}
 		});
 	})();

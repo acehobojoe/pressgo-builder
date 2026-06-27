@@ -1360,9 +1360,17 @@ select#pg-target-builder {
 }
 .pg-ai-tb button:hover { background: #5b4fff; }
 
-/* ─── Voice input (mic button) ─────────────────────────────────────── */
-/* Same specificity pattern as .pg-attach-btn so we beat the .pg-chat-input
-   button rule that styles Send purple. */
+/* ─── Voice input (mic button + live waveform) ──────────────────────── */
+
+/* Mic button wrapper — holds the button + the expandable voice bar. */
+.pg-chat-input .pg-mic-wrap {
+	position: relative;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+}
+
+/* ── Button: 5 states (idle, recording, processing, success, error) ── */
 .pg-chat-input .pg-mic-btn,
 .pg-chat-input button.pg-mic-btn {
 	background: transparent;
@@ -1370,59 +1378,164 @@ select#pg-target-builder {
 	color: #50575e;
 	width: 38px; height: 38px;
 	padding: 0;
-	border-radius: 6px;
+	border-radius: 9999px;
 	cursor: pointer;
 	display: inline-flex; align-items: center; justify-content: center;
 	flex-shrink: 0;
 	overflow: visible;
-	transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+	position: relative; z-index: 2;
+	transition: background 250ms cubic-bezier(0.4,0,0.2,1),
+	            color 250ms cubic-bezier(0.4,0,0.2,1),
+	            border-color 250ms cubic-bezier(0.4,0,0.2,1),
+	            transform 200ms cubic-bezier(0.4,0,0.2,1),
+	            box-shadow 300ms ease;
 }
 .pg-chat-input .pg-mic-btn:hover {
 	border-color: #5b4fff;
 	color: #5b4fff;
 	background: #f7f5ff;
+	transform: scale(1.05);
 }
-.pg-chat-input .pg-mic-btn:active { background: #ede9ff; transform: scale(0.96); }
+.pg-chat-input .pg-mic-btn:active { transform: scale(0.95); }
 
-/* Icon visibility — mic by default, stop square when recording. */
-.pg-chat-input .pg-mic-btn .pg-mic-icon { display: block; }
-.pg-chat-input .pg-mic-btn .pg-mic-stop-icon { display: none; }
-.pg-chat-input .pg-mic-btn.is-recording .pg-mic-icon { display: none; }
-.pg-chat-input .pg-mic-btn.is-recording .pg-mic-stop-icon { display: block; }
+/* ── State: idle ── */
+.pg-chat-input .pg-mic-btn[data-state="idle"] .pg-mic-icon { display: block; }
+.pg-chat-input .pg-mic-btn[data-state="idle"] .pg-mic-stop-icon,
+.pg-chat-input .pg-mic-btn[data-state="idle"] .pg-mic-check-icon { display: none; }
 
-/* Recording state — red accent + pulsing border. */
-.pg-chat-input .pg-mic-btn.is-recording {
-	border-color: #d63638;
-	color: #d63638;
-	background: #fef0f0;
-	animation: pg-mic-pulse 1.4s ease-out infinite;
+/* ── State: recording — red accent + pulsing glow ── */
+.pg-chat-input .pg-mic-btn[data-state="recording"] {
+	background: #ef4444;
+	border-color: #ef4444;
+	color: #fff;
+	box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+	animation: pg-mic-pulse 1.6s cubic-bezier(0.4,0,0.2,1) infinite;
 }
+.pg-chat-input .pg-mic-btn[data-state="recording"] .pg-mic-icon,
+.pg-chat-input .pg-mic-btn[data-state="recording"] .pg-mic-check-icon { display: none; }
+.pg-chat-input .pg-mic-btn[data-state="recording"] .pg-mic-stop-icon { display: block; }
 @keyframes pg-mic-pulse {
-	from { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.4); }
-	to   { box-shadow: 0 0 0 8px rgba(214, 54, 56, 0); }
+	0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+	70%  { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-/* Recording timer — elapsed seconds shown beside the stop icon. */
-.pg-chat-input .pg-mic-btn .pg-mic-timer {
-	font-size: 11px;
-	font-variant-numeric: tabular-nums;
-	margin-left: 4px;
-	display: none;
-}
-.pg-chat-input .pg-mic-btn.is-recording .pg-mic-timer { display: inline; }
-
-/* Loading state — after recording stops, brief spinner wait. No pulse. */
-.pg-chat-input .pg-mic-btn.is-loading {
-	opacity: 0.6;
+/* ── State: processing — breathing shimmer ── */
+.pg-chat-input .pg-mic-btn[data-state="processing"] {
+	background: #f7f5ff;
+	border-color: #5b4fff;
+	color: #5b4fff;
+	opacity: 0.7;
 	cursor: wait;
-	animation: none;
+	animation: pg-mic-breathe 1.2s ease-in-out infinite;
+}
+.pg-chat-input .pg-mic-btn[data-state="processing"] .pg-mic-icon,
+.pg-chat-input .pg-mic-btn[data-state="processing"] .pg-mic-check-icon { display: none; }
+.pg-chat-input .pg-mic-btn[data-state="processing"] .pg-mic-stop-icon { display: block; }
+@keyframes pg-mic-breathe {
+	0%, 100% { opacity: 0.5; transform: scale(1); }
+	50%      { opacity: 1;   transform: scale(1.08); }
 }
 
-/* Disabled — match the existing .pg-chat-input button:disabled greying. */
+/* ── State: success — green flash, auto-reverts ── */
+.pg-chat-input .pg-mic-btn[data-state="success"] {
+	background: #22c55e;
+	border-color: #22c55e;
+	color: #fff;
+}
+.pg-chat-input .pg-mic-btn[data-state="success"] .pg-mic-icon,
+.pg-chat-input .pg-mic-btn[data-state="success"] .pg-mic-stop-icon { display: none; }
+.pg-chat-input .pg-mic-btn[data-state="success"] .pg-mic-check-icon { display: block; }
+
+/* ── State: error — red flash, auto-reverts ── */
+.pg-chat-input .pg-mic-btn[data-state="error"] {
+	background: #ef4444;
+	border-color: #ef4444;
+	color: #fff;
+}
+.pg-chat-input .pg-mic-btn[data-state="error"] .pg-mic-stop-icon,
+.pg-chat-input .pg-mic-btn[data-state="error"] .pg-mic-check-icon { display: none; }
+.pg-chat-input .pg-mic-btn[data-state="error"] .pg-mic-icon { display: block; }
+
+/* ── Disabled ── */
 .pg-chat-input .pg-mic-btn:disabled {
 	background: #dcdcde;
 	color: #8c8f94;
 	border-color: #dcdcde;
 	cursor: not-allowed;
 	animation: none;
+}
+
+/* ── Voice bar: expandable waveform bar that replaces the textarea ── */
+.pg-voice-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex: 1;
+	height: 38px;
+	padding: 0 14px;
+	background: linear-gradient(135deg, #1e1b2e 0%, #2d1b3d 100%);
+	border-radius: 8px;
+	overflow: hidden;
+	opacity: 0;
+	transform: translateX(-8px) scale(0.98);
+	transition: opacity 250ms cubic-bezier(0.4,0,0.2,1),
+	            transform 250ms cubic-bezier(0.4,0,0.2,1);
+}
+.pg-voice-bar.is-visible {
+	opacity: 1;
+	transform: translateX(0) scale(1);
+}
+
+/* Timer (left side of waveform) */
+.pg-voice-timer {
+	font-size: 12px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: rgba(255, 255, 255, 0.9);
+	letter-spacing: 0.03em;
+	flex-shrink: 0;
+	min-width: 34px;
+}
+
+/* Canvas waveform (center) */
+.pg-voice-canvas {
+	flex: 1;
+	height: 28px;
+	width: 100%;
+	display: block;
+}
+
+/* Hint text (right side — "Listening…" / "Transcribing…") */
+.pg-voice-hint {
+	font-size: 11px;
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.5);
+	flex-shrink: 0;
+	letter-spacing: 0.02em;
+	transition: opacity 0.2s ease;
+}
+
+/* Shimmer overlay on the voice bar during processing */
+.pg-voice-bar.is-processing::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg,
+		transparent 0%,
+		rgba(91, 79, 255, 0.15) 50%,
+		transparent 100%);
+	background-size: 200% 100%;
+	animation: pg-voice-shimmer 1.2s linear infinite;
+	pointer-events: none;
+}
+@keyframes pg-voice-shimmer {
+	0%   { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}
+.pg-voice-bar { position: relative; }
+
+/* When the voice bar is visible, hide the textarea to avoid layout shift */
+.pg-chat-input.pg-voice-active #pg-chat-text {
+	display: none;
 }
