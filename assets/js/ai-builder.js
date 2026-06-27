@@ -4297,4 +4297,163 @@
 
 	loadHistory();
 	refreshCredits();
+
+	// ===== Voice input (mic button) =====
+	// Records audio via MediaRecorder, POSTs the data URL to the
+	// pressgo_ai_transcribe ajax endpoint, fills the chat textarea with the
+	// returned text, and auto-submits unless the user typed during recording.
+	(function () {
+		var micBtn = document.getElementById('pg-mic-btn');
+		if (!micBtn) return;
+		if (!navigator.mediaDevices || !window.MediaRecorder) {
+			micBtn.style.display = 'none';
+			return;
+		}
+
+		var timerSpan     = micBtn.querySelector('.pg-mic-timer');
+		var micIcon       = micBtn.querySelector('.pg-mic-icon');
+		var micStopIcon   = micBtn.querySelector('.pg-mic-stop-icon');
+
+		var mediaRecorder = null;
+		var audioChunks   = [];
+		var recording     = false;
+		var stream        = null;
+		var timerInterval = null;
+		var timerStart     = 0;
+		var userTypedDuringRecording = false;
+
+		function startTimer() {
+			timerStart = Date.now();
+			if (timerSpan) {
+				timerSpan.hidden = false;
+				timerSpan.textContent = '0:00';
+			}
+			timerInterval = setInterval(function () {
+				if (!timerSpan) return;
+				var secs = Math.floor((Date.now() - timerStart) / 1000);
+				var m = Math.floor(secs / 60);
+				var s = secs % 60;
+				timerSpan.textContent = m + ':' + (s < 10 ? '0' + s : s);
+			}, 1000);
+		}
+
+		function stopTimer() {
+			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+			if (timerSpan) { timerSpan.hidden = true; }
+		}
+
+		function onInputWhileRecording() {
+			userTypedDuringRecording = true;
+		}
+
+		function transcribe(blob) {
+			var reader = new FileReader();
+			reader.onload = function () {
+				var dataUrl = reader.result;
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_transcribe');
+				fd.append('nonce', cfg.nonce);
+				fd.append('audio', dataUrl);
+				fd.append('mime', blob.type || 'audio/webm');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (data) {
+						if (data && data.success && data.data && data.data.text) {
+							var text = data.data.text;
+							if (input.value.trim()) {
+								input.value = input.value.replace(/\s+$/, '') + ' ' + text;
+							} else {
+								input.value = text;
+							}
+							input.focus();
+							input.dispatchEvent(new Event('input', { bubbles: true }));
+							if (!userTypedDuringRecording && input.value.trim()) {
+								form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+							}
+						} else {
+							appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
+						}
+					})
+					.catch(function () {
+						appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
+					})
+					.finally(function () {
+						micBtn.classList.remove('is-loading');
+					});
+			};
+			reader.onerror = function () {
+				micBtn.classList.remove('is-loading');
+				appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
+			};
+			reader.readAsDataURL(blob);
+		}
+
+		function appendMessage(cls, text) {
+			if (!log) return;
+			var node = document.createElement('div');
+			node.className = cls;
+			node.textContent = text;
+			log.appendChild(node);
+			log.scrollTop = log.scrollHeight;
+		}
+
+		function startRecording() {
+			navigator.mediaDevices.getUserMedia({ audio: true })
+				.then(function (s) {
+					stream = s;
+					audioChunks = [];
+					userTypedDuringRecording = false;
+					mediaRecorder = new MediaRecorder(stream);
+					mediaRecorder.ondataavailable = function (e) {
+						if (e.data && e.data.size) audioChunks.push(e.data);
+					};
+					mediaRecorder.onstop = function () {
+						var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+						audioChunks = [];
+						transcribe(blob);
+					};
+					mediaRecorder.start();
+					recording = true;
+					micBtn.classList.add('is-recording');
+					if (micIcon) micIcon.style.display = 'none';
+					if (micStopIcon) micStopIcon.style.display = '';
+					if (input) input.addEventListener('input', onInputWhileRecording);
+					startTimer();
+				})
+				.catch(function () {
+					appendMessage('pg-msg pg-msg-error', 'Microphone access denied. Check your browser permissions.');
+				});
+		}
+
+		function stopRecording() {
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+				mediaRecorder.stop();
+			}
+			if (stream) {
+				stream.getTracks().forEach(function (t) { t.stop(); });
+			}
+			recording = false;
+			micBtn.classList.remove('is-recording');
+			micBtn.classList.add('is-loading');
+			if (micIcon) micIcon.style.display = '';
+			if (micStopIcon) micStopIcon.style.display = 'none';
+			if (input) input.removeEventListener('input', onInputWhileRecording);
+			stopTimer();
+		}
+
+		micBtn.addEventListener('click', function () {
+			if (recording) {
+				stopRecording();
+			} else {
+				startRecording();
+			}
+		});
+
+		window.addEventListener('beforeunload', function () {
+			if (recording) {
+				if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+				if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+			}
+		});
+	})();
 })();

@@ -1100,6 +1100,18 @@ class PressGo_AI_Builder {
 							<span class="pg-attach-count" id="pg-attach-count" hidden>0</span>
 						</button>
 						<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
+						<button type="button" class="pg-mic-btn" id="pg-mic-btn" title="Record voice message" aria-label="Record voice message">
+							<svg class="pg-mic-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<rect x="9" y="2" width="6" height="11" rx="3"/>
+								<path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+								<line x1="12" y1="18" x2="12" y2="22"/>
+								<line x1="8" y1="22" x2="16" y2="22"/>
+							</svg>
+							<svg class="pg-mic-stop-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="display:none">
+								<rect x="6" y="6" width="12" height="12" rx="2"/>
+							</svg>
+							<span class="pg-mic-timer" hidden></span>
+						</button>
 						<textarea
 							id="pg-chat-text"
 							rows="2"
