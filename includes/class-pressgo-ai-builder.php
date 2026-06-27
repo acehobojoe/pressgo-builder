@@ -90,6 +90,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_apply_patch',  array( $this, 'ajax_apply_patch' ) );
 		add_action( 'wp_ajax_pressgo_ai_get_config',   array( $this, 'ajax_get_config' ) );
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
+		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 	}
 
 	/**
@@ -349,6 +350,104 @@ class PressGo_AI_Builder {
 		}
 		$collect( get_posts( $args ) );
 		wp_send_json_success( array( 'images' => $out ) );
+	}
+
+	/**
+	 * Transcribe a base64-encoded audio blob via OpenRouter's Voxtral model.
+	 * Powers the voice-input button in the chat builder.
+	 */
+	public function ajax_transcribe() {
+		$this->check_auth();
+
+		$audio = isset( $_POST['audio'] ) ? (string) wp_unslash( $_POST['audio'] ) : '';
+		$mime  = isset( $_POST['mime'] ) ? sanitize_text_field( wp_unslash( $_POST['mime'] ) ) : '';
+		if ( '' === $audio || '' === $mime ) {
+			wp_send_json_error( 'missing audio or mime', 400 );
+		}
+
+		// Strip the data URL prefix (data:audio/webm;base64,XXXX) if present.
+		$b64 = $audio;
+		$comma = strpos( $audio, ',' );
+		if ( false !== $comma && 0 === strpos( $audio, 'data:' ) ) {
+			$b64 = substr( $audio, $comma + 1 );
+		}
+		$b64 = preg_replace( '/\s+/', '', $b64 );
+		if ( '' === $b64 ) {
+			wp_send_json_error( 'empty audio payload', 400 );
+		}
+
+		$api_key = get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $api_key ) {
+			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
+		}
+
+		$body = wp_json_encode( array(
+			'model'    => 'mistralai/voxtral-small-24b-2507',
+			'messages' => array(
+				array(
+					'role'    => 'user',
+					'content' => array(
+						array(
+							'type' => 'text',
+							'text' => 'Transcribe this audio recording. Output ONLY the transcribed text, no preamble, no quotes, no commentary.',
+						),
+						array(
+							'type'        => 'input_audio',
+							'input_audio' => array(
+								'data'   => $b64,
+								'format' => $mime,
+							),
+						),
+					),
+				),
+			),
+		) );
+
+		$response = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 120,
+			'headers' => array(
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $api_key,
+			),
+			'body'    => $body,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( 'Transcription failed: ' . $response->get_error_message(), 502 );
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status ) {
+			$err_body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$detail   = isset( $err_body['error']['message'] ) ? $err_body['error']['message'] : 'HTTP ' . $status;
+			wp_send_json_error( 'Transcription failed: ' . $detail, 502 );
+		}
+
+		$json   = json_decode( wp_remote_retrieve_body( $response ), true );
+		$text   = '';
+		if ( isset( $json['choices'][0]['message']['content'] ) ) {
+			$content = $json['choices'][0]['message']['content'];
+			if ( is_string( $content ) ) {
+				$text = $content;
+			} elseif ( is_array( $content ) ) {
+				$parts = array();
+				foreach ( $content as $block ) {
+					if ( is_array( $block ) && isset( $block['text'] ) && is_string( $block['text'] ) ) {
+						$parts[] = $block['text'];
+					} elseif ( is_string( $block ) ) {
+						$parts[] = $block;
+					}
+				}
+				$text = implode( '', $parts );
+			}
+		}
+
+		$text = trim( $text );
+		if ( '' === $text ) {
+			wp_send_json_error( 'Transcription failed: empty response', 502 );
+		}
+
+		wp_send_json_success( array( 'text' => $text ) );
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
