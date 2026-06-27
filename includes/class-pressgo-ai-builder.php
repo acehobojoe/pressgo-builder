@@ -1333,7 +1333,7 @@ class PressGo_AI_Builder {
 							<textarea
 								id="pg-chat-text"
 								rows="1"
-								placeholder="Describe your page, or tweak the example…"
+								placeholder="Describe your page, or drop a screenshot…"
 								required></textarea>
 							<div class="pg-voice-bar" id="pg-voice-bar" hidden>
 								<span class="pg-voice-timer" id="pg-voice-timer">0:00</span>

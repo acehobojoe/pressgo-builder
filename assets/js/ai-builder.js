@@ -454,7 +454,7 @@
 	];
 
 	function renderFirstRun() {
-		append(el('pg-msg-system', 'You\'re in — let\'s build your first page. I dropped an example below; tweak it to match your business (or tap a different starter), then hit Send.'));
+		append(el('pg-msg-system', 'You\'re in. Tell me the page you want to build, or tap a starter below to fill in an idea, then hit Send.'));
 		// Starter chips row.
 		var chips = document.createElement('div');
 		chips.className = 'pg-starter-chips';
@@ -467,15 +467,16 @@
 			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
 			b.addEventListener('click', function () {
 				input.value = s.text;
+				autoGrow();        // grow to fit the filled-in text
+				updateSendState(); // enable Send now, not on the next keystroke
 				input.focus();
 			});
 			chips.appendChild(b);
 		});
 		append(chips);
-		// Pre-fill the box with the first example, ready to edit + Send — but
-		// never overwrite something the user already started typing (a late
-		// history retry can land here seconds after page load).
-		if (!input.value) input.value = STARTERS[0].text;
+		// Leave the box blank — the placeholder + starter chips carry the
+		// first run. Tapping a chip fills the box (and enables Send); we never
+		// auto-drop text the user then has to delete.
 		setTimeout(function () { input.focus(); }, 50);
 	}
 
