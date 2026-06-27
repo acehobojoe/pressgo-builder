@@ -24,6 +24,7 @@ class PressGo_AI_Builder {
 	const META_AI_CHAT    = '_pressgo_ai_chat';   // serialised message history
 	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
 	const META_FREEFORM   = '_pressgo_freeform';  // marks a freeform "build anything" page (native tree, no recipe config)
+	const META_FREEFORM_BRIEF = '_pressgo_freeform_brief'; // persistent page brief (business + goal) for Nova discovery
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -488,7 +489,23 @@ class PressGo_AI_Builder {
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
 		delete_post_meta( $post_id, self::META_AI_CHAT );
+		delete_post_meta( $post_id, self::META_FREEFORM_BRIEF ); // reset Nova discovery on a fresh chat
 		wp_send_json_success();
+	}
+
+	/** Is a fresh-page Nova request too vague to build well without a quick brief? */
+	private static function ff_is_vague( $message ) {
+		$m = strtolower( trim( (string) $message ) );
+		if ( mb_strlen( $m ) > 70 ) { return false; } // detailed enough to infer a brief
+		$specific = array(
+			'for my', 'for a', 'for an', 'business', 'company', 'agency', 'studio', 'shop', 'store',
+			'restaurant', 'clinic', 'salon', 'gym', 'cafe', 'saas', ' app', 'brand', 'startup', 'product',
+			'service', 'sell', 'book', 'sign up', 'signup', 'subscribe', 'donate', 'roof', 'plumb', 'dent',
+			'law', 'real estate', 'realtor', 'coach', 'consult', 'fitness', 'yoga', 'coffee', 'bakery',
+			'photograph', 'church', 'school', 'dental', 'medical', 'landscap', 'tutor', 'market',
+		);
+		foreach ( $specific as $kw ) { if ( false !== strpos( $m, $kw ) ) { return false; } }
+		return true; // short + names no business/goal -> ask
 	}
 
 	/**
@@ -1361,6 +1378,27 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
 
+		// ── Discovery gate ─────────────────────────────────────────────────
+		// On a FRESH page (no sections) with a VAGUE first request, ask 1-2 sharp
+		// questions before building blind — so every section shares one business,
+		// goal, and vibe (the post-3143 "three businesses" failure). Mirrors the
+		// recipe chat's "ask 1-2 follow-ups then build". Ask at most once.
+		$existing   = get_post_meta( $post_id, '_elementor_data', true );
+		$page_empty = ! ( is_string( $existing ) && false !== strpos( $existing, '"type"' ) );
+		$brief      = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		if ( $page_empty && '' === $brief && self::ff_is_vague( $message ) ) {
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, 'pending' );
+			wp_send_json_success( array(
+				'needs_discovery' => true,
+				'note'            => "Before I build, two quick things so the page actually fits:\n\n1. What's the business or page about, and who is it for?\n2. What's the ONE thing you want a visitor to do — sign up, call, buy, or book?\n\n(A word on the vibe helps too: premium, playful, no-nonsense…)",
+			) );
+		}
+		// If we just asked, this message is the answer — capture it as the brief.
+		if ( 'pending' === $brief ) {
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $message );
+			$brief = $message;
+		}
+
 		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
 			wp_send_json_error( 'Pro mode is not configured on this site (no compose key).', 500 );
 		}
@@ -1375,6 +1413,11 @@ class PressGo_AI_Builder {
 		// brain — render-validated at parity with Claude, ~4x cheaper; Claude is the
 		// automatic fallback on any failure or invalid output.
 		$framed = 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message;
+		// Persistent page brief (from the discovery answer): every section stays
+		// consistent with the one business + goal the user gave up front.
+		if ( '' !== $brief && 'pending' !== $brief ) {
+			$framed = "PAGE BRIEF (the business + goal for this whole page — keep EVERY section consistent with this; do not introduce a different business):\n" . $brief . "\n\n" . $framed;
+		}
 		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
 		// already on the page, so the new section continues the same business,
 		// palette, and goal instead of re-inventing them statelessly.

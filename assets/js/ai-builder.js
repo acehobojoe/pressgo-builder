@@ -1175,6 +1175,7 @@
 				if (d && d.success) {
 					var data = d.data || {};
 					append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
+					if (data.needs_discovery) { setBusy(false); return; } // asked 1-2 questions; wait for the answer, build nothing yet
 					reloadPreview(data.preview_bust || Date.now());
 					if (data.usage) renderUsage(data.usage); else refreshUsage();
 				} else if (d && d.data) {
