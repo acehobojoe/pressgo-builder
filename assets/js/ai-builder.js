@@ -1153,7 +1153,7 @@
 	// One shared POST + response path for Nova, used by both a typed message and a
 	// discovery chip tap. `fields` are extra POST fields; `userText`, if given, is
 	// echoed as the user's chat bubble first.
-	function postFreeform(fields, userText) {
+	function postFreeform(fields, userText, statusText) {
 		if (userText != null) {
 			var userBubble = el('pg-msg pg-msg-user');
 			var txt = document.createElement('div');
@@ -1161,6 +1161,8 @@
 			userBubble.appendChild(txt);
 			append(userBubble);
 		}
+		// For the slow paths (a full hero (re)build) say so, so it never reads as frozen.
+		if (statusText) append(el('pg-msg pg-msg-ai', statusText));
 		var typing = typingNode();
 		append(typing);
 		setBusy(true);
@@ -1280,17 +1282,26 @@
 				btn.style.opacity = '0.4';
 			}
 		});
-		postFreeform({ message: chip.label, discovery_stage: currentDiscoveryStage, discovery_value: chip.value }, chip.label);
+		var stage = currentDiscoveryStage;
+		var status = null;
+		if (stage === 'photos') status = 'Designing your hero now — give me a few seconds…';
+		else if (stage === 'brand_confirm' && (chip.value === 'recolor' || chip.value === 'refont')) status = 'On it — redrawing your hero. This takes a few seconds…';
+		postFreeform({ message: chip.label, discovery_stage: stage, discovery_value: chip.value }, chip.label, status);
 	}
 
 	function sendFreeform(text) {
 		chatStarted = true;
 		input.value = '';
 		var fields = { message: text };
+		var status = null;
 		// Typed answer during an interview: route it into the awaited stage so it
 		// lands in the same slot a chip tap would (server parses the text).
-		if (currentDiscoveryStage) { fields.discovery_stage = currentDiscoveryStage; fields.discovery_value = ''; }
-		postFreeform(fields, text);
+		if (currentDiscoveryStage) {
+			fields.discovery_stage = currentDiscoveryStage;
+			fields.discovery_value = '';
+			if (currentDiscoveryStage === 'brand_confirm') status = 'On it — redrawing your hero. This takes a few seconds…';
+		}
+		postFreeform(fields, text, status);
 	}
 
 	form.addEventListener('submit', function (e) {
@@ -1567,7 +1578,7 @@
 		}
 		function isHex(v) { return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')); }
 
-		function openBrandPanel(state) {
+		function openBrandPanel(state, justSaved) {
 			closeBrandPanel();
 			var b = state.brand || {};
 			brandPanel = document.createElement('div');
@@ -1587,6 +1598,15 @@
 			toggleWrap.appendChild(document.createTextNode(' apply to new pages'));
 			head.appendChild(toggleWrap);
 			brandPanel.appendChild(head);
+
+			// Just locked in: make it read as a confirmation, not a pending form —
+			// the brand is already saved; this panel is just showing what got locked.
+			if (justSaved) {
+				var saved = document.createElement('div');
+				saved.style.cssText = 'margin:2px 0 10px;padding:8px 11px;border-radius:8px;background:#ecfdf5;color:#047857;font-size:12px;font-weight:600;line-height:1.35;';
+				saved.textContent = '✓ Saved. This brand now applies to every new page automatically — nothing else to do. Tweak anything below if you like.';
+				brandPanel.appendChild(saved);
+			}
 
 			var nameI = textInput(b.brand_name, 'Business name');
 			var indI  = textInput(b.industry, 'Industry');
@@ -1757,7 +1777,7 @@
 						paint();
 					}
 					closeBrandPanel();
-					openBrandPanel(st);
+					openBrandPanel(st, true); // confirmation state — already saved
 				})
 				.catch(function () {});
 		};
