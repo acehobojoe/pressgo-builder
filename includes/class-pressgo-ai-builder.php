@@ -847,6 +847,214 @@ class PressGo_AI_Builder {
 		return $cfg;
 	}
 
+	// ── Brand confirm / lock-in (Phase 3) ───────────────────────────────────
+
+	/** The original hardcoded renderer cfg (legacy default + DRY base). */
+	private function default_freeform_cfg() {
+		return array(
+			'colors' => array(
+				'primary' => '#2563EB', 'primary_dark' => '#1E40AF', 'accent' => '#e2b714',
+				'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF',
+				'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.75)', 'gold' => '#F59E0B',
+			),
+			'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
+			'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
+		);
+	}
+
+	/** Is the site brand locked? (this page confirmed it, or a foundation exists). */
+	private function brand_is_locked( $post_id ) {
+		$s = $this->discovery_state( $post_id );
+		if ( is_array( $s ) && ! empty( $s['brand_locked'] ) ) { return true; }
+		if ( class_exists( 'PressGo_MCP_Tools' ) ) {
+			$f = PressGo_MCP_Tools::brand_foundation();
+			if ( ! empty( $f['colors'] ) && is_array( $f['colors'] ) ) { return true; }
+		}
+		return false;
+	}
+
+	/** Renderer cfg built from the saved brand foundation (overlaid on the default). */
+	private function cfg_from_foundation() {
+		$base = $this->default_freeform_cfg();
+		if ( class_exists( 'PressGo_MCP_Tools' ) ) {
+			$f = PressGo_MCP_Tools::brand_foundation();
+			foreach ( array( 'colors', 'fonts', 'layout' ) as $k ) {
+				if ( ! empty( $f[ $k ] ) && is_array( $f[ $k ] ) ) { $base[ $k ] = array_merge( $base[ $k ], $f[ $k ] ); }
+			}
+		}
+		return $base;
+	}
+
+	/** Recursively find the first settings[$key] on a node of $type in the tree. */
+	private function ff_find_setting( $node, $type, $key ) {
+		if ( ! is_array( $node ) ) { return null; }
+		if ( ( isset( $node['type'] ) ? $node['type'] : '' ) === $type && isset( $node['settings'][ $key ] ) ) {
+			return $node['settings'][ $key ];
+		}
+		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
+			foreach ( $node['children'] as $child ) {
+				$r = $this->ff_find_setting( $child, $type, $key );
+				if ( null !== $r ) { return $r; }
+			}
+		}
+		return null;
+	}
+
+	/** True if a #rrggbb hex reads as a dark color (relative luminance < 0.5). */
+	private function hex_is_dark( $hex ) {
+		$hex = ltrim( (string) $hex, '#' );
+		if ( 6 !== strlen( $hex ) ) { return true; }
+		$r = hexdec( substr( $hex, 0, 2 ) );
+		$g = hexdec( substr( $hex, 2, 2 ) );
+		$b = hexdec( substr( $hex, 4, 2 ) );
+		return ( ( 0.2126 * $r + 0.7152 * $g + 0.0722 * $b ) / 255 ) < 0.5;
+	}
+
+	/** The brand palette as it actually rendered: vibe cfg + the hero's real accent/bg. */
+	private function extract_hero_palette( $tree, $cfg ) {
+		$colors = $cfg['colors'];
+		$fonts  = $cfg['fonts'];
+		$accent = $this->ff_find_setting( $tree, 'button', 'bg' );
+		if ( is_string( $accent ) && preg_match( '/^#[0-9a-f]{6}$/i', $accent ) ) {
+			$colors['accent']  = $accent;
+			$colors['primary'] = $accent;
+		}
+		$bg = isset( $tree['settings']['background'] ) ? $tree['settings']['background'] : '';
+		if ( is_string( $bg ) && preg_match( '/^#[0-9a-f]{6}$/i', $bg ) ) {
+			if ( $this->hex_is_dark( $bg ) ) { $colors['dark_bg'] = $bg; } else { $colors['light_bg'] = $bg; }
+		}
+		return array( 'colors' => $colors, 'fonts' => $fonts );
+	}
+
+	/** A short brand voice string for a vibe (stored in the foundation). */
+	private function vibe_voice( $vibe ) {
+		$map = array(
+			'bold'    => 'energetic, direct, motivating',
+			'premium' => 'refined, confident, understated',
+			'warm'    => 'warm, friendly, approachable',
+			'calm'    => 'calm, clear, reassuring',
+		);
+		return isset( $map[ $vibe ] ) ? $map[ $vibe ] : 'clear and professional';
+	}
+
+	/** The confirm step JS renders after the hero: swatches + lock/recolor/refont. */
+	private function brand_confirm_envelope( $palette, $sections ) {
+		$c = $palette['colors'];
+		$f = $palette['fonts'];
+		return array(
+			'needs_discovery' => true,
+			'mode'            => 'confirm',
+			'stage'           => 'brand_confirm',
+			'question'        => "Here's your hero. I went with this palette and " . $f['heading'] . " headlines — lock this in as your brand? Every page you build after this will match it.",
+			'swatches'        => array(
+				array( 'label' => 'Accent', 'color' => $c['accent'] ),
+				array( 'label' => 'Background', 'color' => $c['dark_bg'] ),
+				array( 'label' => 'Surface', 'color' => $c['light_bg'] ),
+			),
+			'fonts'           => array( 'heading' => $f['heading'], 'body' => $f['body'] ),
+			'chips'           => array(
+				array( 'label' => 'Lock it in', 'value' => 'lock' ),
+				array( 'label' => 'Different colors', 'value' => 'recolor' ),
+				array( 'label' => 'Different font', 'value' => 'refont' ),
+			),
+			'allow_freetext'  => true,
+			'freetext_hint'   => '…or tell me what to change',
+			'preview_bust'    => time(),
+			'sections'        => $sections,
+		);
+	}
+
+	/** Handle a brand_confirm answer: lock the brand, or rebuild the hero + re-confirm. */
+	private function handle_brand_confirm( $post_id, $value, $message ) {
+		$state = $this->discovery_state( $post_id );
+		if ( ! is_array( $state ) ) { $state = array(); }
+
+		if ( 'lock' === $value ) {
+			$palette = isset( $state['hero_palette'] ) && is_array( $state['hero_palette'] )
+				? $state['hero_palette']
+				: array( 'colors' => $this->default_freeform_cfg()['colors'], 'fonts' => $this->default_freeform_cfg()['fonts'] );
+			$args = array( 'colors' => $palette['colors'], 'fonts' => $palette['fonts'] );
+			$ind  = isset( $state['answers']['industry'] ) ? $state['answers']['industry'] : '';
+			if ( '' !== $ind && 'other' !== $ind ) { $args['industry'] = $this->industry_label( $ind ); }
+			$vibe = isset( $state['answers']['vibe'] ) ? $state['answers']['vibe'] : '';
+			if ( '' !== $vibe ) { $args['voice'] = $this->vibe_voice( $vibe ); }
+			$f = class_exists( 'PressGo_MCP_Tools' ) ? PressGo_MCP_Tools::merge_brand_foundation( $args ) : $args;
+			update_option( 'pressgo_use_site_brand', '1', false );
+			$state['brand_locked'] = true;
+			$this->save_discovery_state( $post_id, $state );
+			if ( is_array( $f ) ) { unset( $f['updated'] ); }
+			return array(
+				'note'         => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent. Want me to keep building? Tell me the next section.',
+				'brand_synced' => true,
+				'brand'        => $f,
+				'preview_bust' => time(),
+			);
+		}
+
+		// recolor / refont / typed tweak -> rebuild just the hero and re-confirm.
+		return $this->rebuild_hero( $post_id, $state, $this->brand_tweak_nudge( $value, $message ) );
+	}
+
+	/** The compose nudge for a hero tweak (recolor / refont / a typed instruction). */
+	private function brand_tweak_nudge( $value, $message ) {
+		if ( 'recolor' === $value ) { return 'Use a noticeably different color palette and accent than the previous version, while staying tasteful and on-brand for this business.'; }
+		if ( 'refont' === $value )  { return 'Use a different, distinctive heading font pairing than the previous version.'; }
+		if ( '' !== trim( (string) $message ) ) { return 'Apply this change to the hero: ' . trim( $message ) . '.'; }
+		return 'Try a fresh take on the hero design.';
+	}
+
+	/** Read the page's Elementor element array (slashing-tolerant). */
+	private function read_elements( $post_id ) {
+		$existing = get_post_meta( $post_id, '_elementor_data', true );
+		$elements = array();
+		if ( is_string( $existing ) && '' !== $existing ) {
+			$decoded = json_decode( $existing, true );
+			if ( ! is_array( $decoded ) ) { $decoded = json_decode( wp_unslash( $existing ), true ); }
+			if ( is_array( $decoded ) ) { $elements = $decoded; }
+		}
+		return $elements;
+	}
+
+	/** Recompose the hero with a tweak, replace the last section, return a fresh confirm. */
+	private function rebuild_hero( $post_id, $state, $nudge ) {
+		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
+		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
+		$brief       = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		$biz         = ! empty( $state['business'] ) ? $state['business'] : $brief;
+		$framed      = "PAGE BRIEF (keep EVERY detail consistent with this):\n" . $brief . "\n\nREVISION: " . $nudge .
+			"\n\nCompose ONE landing-page HERO section as a JSON block tree (root {\"type\":\"section\"}). Output the JSON object only: no prose, no code fences. Request: " . $biz;
+		$composed = $this->compose_freeform_tree( $system, $framed );
+		if ( empty( $composed['tree'] ) ) {
+			return array( 'note' => "I couldn't generate a different version just now — your current hero is still in place. Lock it in, or tell me a specific change.", 'preview_bust' => time() );
+		}
+		$tree = $this->resolve_freeform_images( $composed['tree'] );
+		$vibe = isset( $state['answers']['vibe'] ) ? $state['answers']['vibe'] : '';
+		$cfg  = ( '' !== $vibe ) ? $this->vibe_to_palette( $vibe ) : null;
+		if ( null === $cfg ) { $cfg = $this->default_freeform_cfg(); }
+
+		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
+		require_once $gen . 'class-pressgo-style-utils.php';
+		require_once $gen . 'class-pressgo-element-factory.php';
+		require_once $gen . 'class-pressgo-widget-helpers.php';
+		require_once $gen . 'class-pressgo-freeform-renderer.php';
+		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
+		if ( null === $section ) {
+			return array( 'note' => "That revision didn't render cleanly — keeping your current hero. Lock it in, or tell me a change.", 'preview_bust' => time() );
+		}
+
+		$elements = $this->read_elements( $post_id );
+		if ( ! empty( $elements ) ) { $elements[ count( $elements ) - 1 ] = $section; } else { $elements[] = $section; }
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		if ( class_exists( '\Elementor\Plugin' ) ) { \Elementor\Plugin::$instance->files_manager->clear_cache(); }
+
+		$palette                = $this->extract_hero_palette( $tree, $cfg );
+		$state['hero_palette']  = $palette;
+		$state['hero_index']    = count( $elements ) - 1;
+		$this->save_discovery_state( $post_id, $state );
+		$this->bump_usage( 4 );
+		return $this->brand_confirm_envelope( $palette, count( $elements ) );
+	}
+
 	/**
 	 * Serve a cached thumbnail of the given post, generating it on first
 	 * request via screenshot.pressgo.app.
@@ -1731,6 +1939,14 @@ class PressGo_AI_Builder {
 		$existing   = get_post_meta( $post_id, '_elementor_data', true );
 		$page_empty = ! ( is_string( $existing ) && false !== strpos( $existing, '"type"' ) );
 		$brief      = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		$was_first  = $page_empty; // true => this turn builds the page's first section
+
+		// Brand confirm: the hero is already on the page and we asked the user to
+		// lock in its palette. Handle their answer (lock / recolor / refont / typed
+		// tweak) before anything else — the page is no longer empty here.
+		if ( 'brand_confirm' === $discovery_stage ) {
+			wp_send_json_success( $this->handle_brand_confirm( $post_id, $discovery_value, $message ) );
+		}
 
 		if ( $page_empty && '' === $brief ) {
 			$state = $this->discovery_state( $post_id );
@@ -1798,24 +2014,17 @@ class PressGo_AI_Builder {
 		require_once $gen . 'class-pressgo-element-factory.php';
 		require_once $gen . 'class-pressgo-widget-helpers.php';
 		require_once $gen . 'class-pressgo-freeform-renderer.php';
-		// Palette: the chosen vibe drives colors + fonts (Phase 3 will lock these
-		// into the site brand foundation). Falls back to the original default so
-		// in-flight pages with no vibe render exactly as before.
-		$cfg   = null;
+		// Palette priority: a LOCKED site brand foundation wins (so sections 2+ and
+		// every later page stay on-brand), else the chosen vibe, else the original
+		// default so in-flight pages with no vibe render exactly as before.
+		$cfg    = null;
 		$dstate = $this->discovery_state( $post_id );
-		$vibe   = ( is_array( $dstate ) && ! empty( $dstate['answers']['vibe'] ) ) ? $dstate['answers']['vibe'] : '';
-		if ( '' !== $vibe ) { $cfg = $this->vibe_to_palette( $vibe ); }
-		if ( null === $cfg ) {
-			$cfg = array(
-				'colors' => array(
-					'primary' => '#2563EB', 'primary_dark' => '#1E40AF', 'accent' => '#e2b714',
-					'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF',
-					'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.75)', 'gold' => '#F59E0B',
-				),
-				'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
-				'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
-			);
+		if ( $this->brand_is_locked( $post_id ) ) {
+			$cfg = $this->cfg_from_foundation();
 		}
+		$vibe = ( is_array( $dstate ) && ! empty( $dstate['answers']['vibe'] ) ) ? $dstate['answers']['vibe'] : '';
+		if ( null === $cfg && '' !== $vibe ) { $cfg = $this->vibe_to_palette( $vibe ); }
+		if ( null === $cfg ) { $cfg = $this->default_freeform_cfg(); }
 		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
 		if ( null === $section ) {
 			wp_send_json_error( 'Renderer rejected the composed tree.', 422 );
@@ -1842,6 +2051,18 @@ class PressGo_AI_Builder {
 		}
 
 		$this->bump_usage( 4 ); // Nova (freeform) is the heaviest mode
+
+		// Brand-first: on the very first section, before continuing, show the hero's
+		// real palette and ask the user to lock it in as the site brand. Stash the
+		// hero so a recolor/refont can rebuild just this section (append-then-confirm).
+		if ( $was_first && is_array( $dstate ) && ! $this->brand_is_locked( $post_id ) ) {
+			$palette                = $this->extract_hero_palette( $tree, $cfg );
+			$dstate['hero_palette'] = $palette;
+			$dstate['hero_index']   = count( $elements ) - 1;
+			$this->save_discovery_state( $post_id, $dstate );
+			wp_send_json_success( $this->brand_confirm_envelope( $palette, count( $elements ) ) );
+		}
+
 		$model_tag = 'glm-5.2' === $used_model ? 'GLM-5.2' : 'Claude';
 		wp_send_json_success( array(
 			'preview_bust' => time(),

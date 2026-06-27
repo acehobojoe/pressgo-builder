@@ -1146,6 +1146,9 @@
 	// a chip tap (the free-text fallback). Cleared once a section actually builds.
 	var currentDiscoveryStage = null;
 	var defaultPlaceholder = input ? input.placeholder : '';
+	// Assigned by the brand-panel module below; opens the panel showing the saved
+	// brand so the user watches discovery become their brand on lock-in.
+	var refreshBrandPanel = function () {};
 
 	// One shared POST + response path for Nova, used by both a typed message and a
 	// discovery chip tap. `fields` are extra POST fields; `userText`, if given, is
@@ -1195,11 +1198,18 @@
 		var d = res.json;
 		if (d && d.success) {
 			var data = d.data || {};
-			// Mid-interview: render the question + chips and wait, build nothing yet.
-			if (data.needs_discovery) { renderDiscovery(data); return; }
+			// Mid-interview / confirm: render the question + chips and wait. A confirm
+			// step (brand lock) shows the freshly-built hero, so reload the preview
+			// first, then render its swatches + chips.
+			if (data.needs_discovery) {
+				if (data.preview_bust) reloadPreview(data.preview_bust);
+				renderDiscovery(data);
+				return;
+			}
 			append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
 			currentDiscoveryStage = null; // a section built — discovery is done
 			if (input) input.placeholder = defaultPlaceholder;
+			if (data.brand_synced) refreshBrandPanel(data.brand); // watch the panel fill in
 			reloadPreview(data.preview_bust || Date.now());
 			if (data.usage) renderUsage(data.usage); else refreshUsage();
 		} else if (d && d.data) {
@@ -1216,6 +1226,28 @@
 	// chips. Tapping sends the value back; the user can still type a free answer.
 	function renderDiscovery(data) {
 		append(el('pg-msg pg-msg-ai', data.question || 'Quick question:'));
+		// Brand-confirm: show the hero's real colors as dots + the chosen fonts.
+		if (data.swatches && data.swatches.length) {
+			var sw = document.createElement('div');
+			sw.className = 'pg-brand-swatches';
+			sw.style.cssText = 'display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:8px 0 4px;';
+			data.swatches.forEach(function (s) {
+				var item = document.createElement('div');
+				item.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;color:#555;';
+				var dot = document.createElement('span');
+				dot.style.cssText = 'width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);display:inline-block;background:' + (s.color || '#ccc') + ';';
+				item.appendChild(dot);
+				item.appendChild(document.createTextNode(s.label || ''));
+				sw.appendChild(item);
+			});
+			if (data.fonts && data.fonts.heading) {
+				var ft = document.createElement('div');
+				ft.style.cssText = 'font-size:12px;color:#555;font-weight:600;';
+				ft.textContent = 'Aa ' + data.fonts.heading + ' / ' + (data.fonts.body || data.fonts.heading);
+				sw.appendChild(ft);
+			}
+			append(sw);
+		}
 		var wrap = document.createElement('div');
 		wrap.className = 'pg-discovery-chips';
 		wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px;';
@@ -1483,8 +1515,7 @@
 	// build, or set via MCP). ON = new pages reuse the site's palette/fonts/
 	// identity; OFF = each page gets a fresh brand.
 	(function () {
-		var b = cfg.brand;
-		if (!b || !b.exists) return;
+		var b = cfg.brand || {};
 		// Compact topbar chip (next to History/Clear chat) instead of a second
 		// footer toggle — the footer stays A(eyes)-only and uncluttered.
 		var actions = document.querySelector('.pg-builder-actions');
@@ -1503,6 +1534,8 @@
 			chip.style.opacity = on ? '1' : '0.65';
 		}
 		paint();
+		// No brand yet: keep the chip in the DOM but hidden — lock-in reveals it.
+		if (!b.exists) chip.style.display = 'none';
 		actions.insertBefore(chip, actions.firstChild);
 
 		// ===== Brand control panel =====
@@ -1703,6 +1736,31 @@
 				.then(function (j) { if (j && j.success) openBrandPanel(j.data); })
 				.catch(function () {});
 		});
+
+		// Exposed to the chat: on brand lock-in, re-fetch, reveal + repaint the chip,
+		// and open the panel so the user watches their colors/fonts populate it.
+		refreshBrandPanel = function () {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_brand_get');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (!j || !j.success) return;
+					var st = j.data || {};
+					if (st.brand) {
+						on = st.enabled !== false;
+						var nm = st.brand.brand_name || st.brand.name || '';
+						shortName = nm.length > 16 ? nm.slice(0, 15) + '…' : nm;
+						chip.style.display = '';
+						paint();
+					}
+					closeBrandPanel();
+					openBrandPanel(st);
+				})
+				.catch(function () {});
+		};
 	})();
 
 	// ===== Version history (design snapshots) =====
