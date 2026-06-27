@@ -694,6 +694,7 @@ class PressGo_AI_Builder {
 				case 'industry': $g = $this->infer_industry_from_message( $message ); $value = '' !== $g ? $g : 'other'; break;
 				case 'vibe':     $value = $this->vibe_from_text( $message ); break;
 				case 'photos':   $value = ( false !== stripos( $message, 'stock' ) ) ? 'stock' : ( ( false !== stripos( $message, 'upload' ) || false !== stripos( $message, 'drop' ) ) ? 'upload' : 'media_library' ); break;
+				case 'showcase': $value = sanitize_text_field( $message ); break;
 			}
 		}
 		$value = sanitize_text_field( $value );
@@ -713,7 +714,12 @@ class PressGo_AI_Builder {
 			if ( empty( $answers['goal'] ) ) { return 'goal'; }
 			return '';
 		}
-		foreach ( array( 'goal', 'industry', 'vibe', 'photos' ) as $stage ) {
+		// Homepage (goal "browse") asks one extra "what to showcase" step; a paid
+		// landing page skips it and goes straight to the look.
+		$order = ( ! empty( $answers['goal'] ) && 'browse' === $answers['goal'] )
+			? array( 'goal', 'industry', 'showcase', 'vibe', 'photos' )
+			: array( 'goal', 'industry', 'vibe', 'photos' );
+		foreach ( $order as $stage ) {
 			if ( empty( $answers[ $stage ] ) ) { return $stage; }
 		}
 		return '';
@@ -787,6 +793,41 @@ class PressGo_AI_Builder {
 						array( 'label' => 'Use great stock photos', 'value' => 'stock' ),
 					),
 				) );
+			case 'showcase':
+				return array_merge( $base, array(
+					'question' => "What should the homepage show off first?",
+					'chips'    => array(
+						array( 'label' => 'What we do / services', 'value' => 'services' ),
+						array( 'label' => 'Our work / gallery', 'value' => 'gallery' ),
+						array( 'label' => 'Why us / about', 'value' => 'about' ),
+						array( 'label' => 'Reviews & trust', 'value' => 'reviews' ),
+						array( 'label' => 'Get in touch', 'value' => 'contact' ),
+					),
+				) );
+			case 'proof':
+				return array_merge( $base, array(
+					'question'  => "Quick one before the reviews — what proof can we show?",
+					'skippable' => true,
+					'chips'     => array(
+						array( 'label' => 'Customer reviews', 'value' => 'reviews' ),
+						array( 'label' => 'Photos of our work', 'value' => 'work_photos' ),
+						array( 'label' => 'Results / numbers', 'value' => 'stats' ),
+						array( 'label' => 'Just trust copy', 'value' => 'trust' ),
+						array( 'label' => 'Skip — just build', 'value' => 'skip' ),
+					),
+				) );
+			case 'offer':
+				return array_merge( $base, array(
+					'question'  => "What's the offer that gets them to act?",
+					'skippable' => true,
+					'chips'     => array(
+						array( 'label' => 'A free first session', 'value' => 'free_session' ),
+						array( 'label' => 'A discount / promo', 'value' => 'discount' ),
+						array( 'label' => 'A free consult', 'value' => 'consult' ),
+						array( 'label' => 'Just the CTA', 'value' => 'cta_only' ),
+						array( 'label' => 'Skip — just build', 'value' => 'skip' ),
+					),
+				) );
 		}
 		return array_merge( $base, array( 'question' => 'Quick question:', 'chips' => array() ) );
 	}
@@ -802,6 +843,7 @@ class PressGo_AI_Builder {
 		if ( ! empty( $state['audience'] ) ) { $parts[] = 'Audience: ' . $state['audience'] . '.'; }
 		if ( ! empty( $a['vibe'] ) )         { $parts[] = 'Vibe: ' . $a['vibe'] . '.'; }
 		if ( ! empty( $a['photos'] ) )       { $parts[] = 'Photos: ' . str_replace( '_', ' ', $a['photos'] ) . '.'; }
+		if ( ! empty( $a['showcase'] ) )     { $parts[] = 'Showcase first: ' . str_replace( '_', ' ', $a['showcase'] ) . '.'; }
 		return implode( "\n", $parts );
 	}
 
@@ -829,6 +871,37 @@ class PressGo_AI_Builder {
 			'other'         => 'a business',
 		);
 		return isset( $map[ $industry ] ) ? $map[ $industry ] : 'a business';
+	}
+
+	/** Classify a follow-up section request so the right just-in-time drip can fire. */
+	private function ff_section_intent( $message ) {
+		$m = strtolower( (string) $message );
+		if ( preg_match( '/\b(reviews?|testimonials?|social proof|ratings?|wall of love)\b/', $m ) || preg_match( '/what (our )?(clients|customers) say/', $m ) ) {
+			return 'social_proof';
+		}
+		if ( preg_match( '/\b(call to action|cta|final cta|closing section|ready to|get started section|sign[- ]?up section|book now section)\b/', $m ) ) {
+			return 'cta';
+		}
+		return '';
+	}
+
+	/** The brief phrase for a proof/offer drip answer ('' for skip / generic). */
+	private function proof_offer_phrase( $stage, $value ) {
+		if ( 'proof' === $stage ) {
+			$map = array(
+				'reviews'     => 'real customer reviews and testimonials',
+				'work_photos' => 'photos of real work and results',
+				'stats'       => 'concrete results and numbers',
+				'trust'       => 'trust and credibility copy (guarantees, credentials)',
+			);
+			return isset( $map[ $value ] ) ? $map[ $value ] : '';
+		}
+		$map = array(
+			'free_session' => 'a free first session',
+			'discount'     => 'a discount or limited-time promo',
+			'consult'      => 'a free consultation',
+		);
+		return isset( $map[ $value ] ) ? $map[ $value ] : '';
 	}
 
 	/** Guess the industry enum from the first message (drives copy + stock photos). */
@@ -2018,8 +2091,15 @@ class PressGo_AI_Builder {
 		// discovery_stage + discovery_value (value '' = a typed free-text answer).
 		$discovery_stage = isset( $_POST['discovery_stage'] ) ? sanitize_key( wp_unslash( $_POST['discovery_stage'] ) ) : '';
 		$discovery_value = isset( $_POST['discovery_value'] ) ? sanitize_text_field( wp_unslash( $_POST['discovery_value'] ) ) : '';
-		$existing   = get_post_meta( $post_id, '_elementor_data', true );
-		$page_empty = ! ( is_string( $existing ) && false !== strpos( $existing, '"type"' ) );
+		// Page empty? Decode the data and check for any element. (The old check
+		// looked for "type", but rendered Elementor data uses "elType" — so it read
+		// every built page as empty, which silently disabled the follow-up drips.)
+		$existing      = get_post_meta( $post_id, '_elementor_data', true );
+		$decoded_exist = ( is_string( $existing ) && '' !== $existing ) ? json_decode( $existing, true ) : null;
+		if ( ! is_array( $decoded_exist ) && is_string( $existing ) && '' !== $existing ) {
+			$decoded_exist = json_decode( wp_unslash( $existing ), true );
+		}
+		$page_empty = empty( $decoded_exist );
 		$brief      = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
 		$was_first  = $page_empty; // true => this turn builds the page's first section
 
@@ -2028,6 +2108,49 @@ class PressGo_AI_Builder {
 		// tweak) before anything else — the page is no longer empty here.
 		if ( 'brand_confirm' === $discovery_stage ) {
 			wp_send_json_success( $this->handle_brand_confirm( $post_id, $discovery_value, $message ) );
+		}
+
+		// Just-in-time conversion drips: when the user asks for a reviews or CTA
+		// section and we don't yet know their proof/offer, ask once (skippable)
+		// before composing it. Follow-up sections only — never the hero.
+		if ( ! $page_empty && '' === $discovery_stage ) {
+			$jit = $this->discovery_state( $post_id );
+			if ( is_array( $jit ) ) {
+				$intent = $this->ff_section_intent( $message );
+				if ( 'social_proof' === $intent && empty( $jit['answers']['proof'] ) && empty( $jit['proof_asked'] ) ) {
+					$jit['proof_asked']     = true;
+					$jit['pending_request'] = $message;
+					$this->save_discovery_state( $post_id, $jit );
+					wp_send_json_success( $this->discovery_envelope( 'proof', $jit ) );
+				}
+				if ( 'cta' === $intent && empty( $jit['answers']['offer'] ) && empty( $jit['offer_asked'] ) ) {
+					$jit['offer_asked']     = true;
+					$jit['pending_request'] = $message;
+					$this->save_discovery_state( $post_id, $jit );
+					wp_send_json_success( $this->discovery_envelope( 'offer', $jit ) );
+				}
+			}
+		}
+
+		// A drip answer came back: record it, fold it into the brief, and resume
+		// the section the user originally asked for.
+		if ( 'proof' === $discovery_stage || 'offer' === $discovery_stage ) {
+			$dr = $this->discovery_state( $post_id );
+			if ( is_array( $dr ) ) {
+				$val = '' !== $discovery_value ? $discovery_value : 'skip';
+				if ( ! isset( $dr['answers'] ) || ! is_array( $dr['answers'] ) ) { $dr['answers'] = array(); }
+				$dr['answers'][ $discovery_stage ] = $val;
+				if ( ! empty( $dr['pending_request'] ) ) { $message = $dr['pending_request']; }
+				unset( $dr['pending_request'] );
+				$this->save_discovery_state( $post_id, $dr );
+				$phrase = $this->proof_offer_phrase( $discovery_stage, $val );
+				if ( '' !== $phrase ) {
+					$label = ( 'proof' === $discovery_stage ) ? 'Proof to feature' : 'Offer';
+					$brief = ( '' !== $brief ? $brief . "\n" : '' ) . $label . ': ' . $phrase . '.';
+					update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $brief );
+				}
+			}
+			$discovery_stage = ''; // consumed — fall through and build the section
 		}
 
 		if ( $page_empty && '' === $brief ) {
