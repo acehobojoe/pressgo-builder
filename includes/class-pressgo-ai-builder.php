@@ -1361,8 +1361,7 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
 
-		$key = (string) get_option( 'pressgo_freeform_key', '' );
-		if ( '' === $key ) {
+		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
 			wp_send_json_error( 'Pro mode is not configured on this site (no compose key).', 500 );
 		}
 
@@ -1372,48 +1371,16 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Freeform composition prompt is missing.', 500 );
 		}
 
-		// Compose the block tree (Claude, freeform system prompt → JSON section).
-		$resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
-			'timeout' => 60,
-			'headers' => array(
-				'content-type'      => 'application/json',
-				'x-api-key'         => $key,
-				'anthropic-version' => '2023-06-01',
-			),
-			'body'    => wp_json_encode( array(
-				'model'      => 'claude-sonnet-4-5-20250929',
-				'max_tokens' => 8192, // headroom so a large section isn't truncated into invalid JSON
-				'system'     => $system,
-				'messages'   => array( array(
-					'role'    => 'user',
-					// Frame the ask so the model returns JSON only and never tries to
-					// "wire up" backend behavior or rewrite the system prompt (a
-					// "form, wire it up" message otherwise derails it).
-					'content' => 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message,
-				) ),
-			) ),
-		) );
-		if ( is_wp_error( $resp ) ) {
-			wp_send_json_error( 'Compose request failed: ' . $resp->get_error_message(), 502 );
+		// Compose the block tree. GLM-5.2 (OpenRouter, json_object) is the primary
+		// brain — render-validated at parity with Claude, ~4x cheaper; Claude is the
+		// automatic fallback on any failure or invalid output.
+		$framed = 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message;
+		$composed = $this->compose_freeform_tree( $system, $framed );
+		if ( empty( $composed['tree'] ) ) {
+			wp_send_json_error( $composed['error'] ?? 'The composer did not return a valid section. Try rewording.', 422 );
 		}
-		$code = wp_remote_retrieve_response_code( $resp );
-		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
-		if ( 200 !== (int) $code ) {
-			$err = isset( $data['error']['message'] ) ? $data['error']['message'] : ( 'HTTP ' . $code );
-			wp_send_json_error( 'Compose error: ' . $err, 502 );
-		}
-		$text = '';
-		if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
-			foreach ( $data['content'] as $blk ) {
-				if ( isset( $blk['type'], $blk['text'] ) && 'text' === $blk['type'] ) { $text .= $blk['text']; }
-			}
-		}
-		$text = trim( $text );
-		if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $text, $m ) ) { $text = trim( $m[1] ); }
-		$tree = json_decode( $text, true );
-		if ( ! is_array( $tree ) || ( isset( $tree['type'] ) && 'section' !== $tree['type'] ) ) {
-			wp_send_json_error( 'The composer did not return a valid section. Try rewording.', 422 );
-		}
+		$tree       = $composed['tree'];
+		$used_model = $composed['model'];
 
 		// Render through the freeform renderer.
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
@@ -1456,12 +1423,81 @@ class PressGo_AI_Builder {
 		}
 
 		$this->bump_usage( 4 ); // Nova (freeform) is the heaviest mode
+		$model_tag = 'glm-5.2' === $used_model ? 'GLM-5.2' : 'Claude';
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => count( $elements ),
-			'note'         => 'Composed a freeform section (' . count( $elements ) . ' on the page). Add another, or refine by describing the next section.',
+			'model'        => $used_model,
+			'note'         => 'Composed a freeform section with ' . $model_tag . ' (' . count( $elements ) . ' on the page). Add another, or refine by describing the next section.',
 			'usage'        => $this->usage_state(),
 		) );
+	}
+
+	/**
+	 * Compose a freeform section tree. Primary brain = GLM-5.2 via OpenRouter
+	 * (response_format json_object — render-validated at parity with Claude, ~4x
+	 * cheaper). Falls back to Claude on any failure or invalid output. Returns
+	 * ['tree'=>array,'model'=>string] or ['error'=>string].
+	 */
+	public function compose_freeform_tree( $system, $framed ) {
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' !== $or_key ) {
+			$tree = self::glm_compose( $or_key, $system, $framed );
+			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
+		}
+		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
+		if ( '' !== $cl_key ) {
+			$tree = self::claude_compose( $cl_key, $system, $framed );
+			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
+		}
+		return array( 'error' => 'Both models failed to return a valid section. Try rewording.' );
+	}
+
+	private static function extract_section_json( $text ) {
+		$text = trim( (string) $text );
+		if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $text, $m ) ) { $text = trim( $m[1] ); }
+		$tree = json_decode( $text, true );
+		if ( ! is_array( $tree ) || ( isset( $tree['type'] ) && 'section' !== $tree['type'] ) ) { return null; }
+		return $tree;
+	}
+
+	private static function glm_compose( $key, $system, $framed ) {
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 240, // GLM reasons; big sections can take 60-100s
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'body'    => wp_json_encode( array(
+				'model'           => 'z-ai/glm-5.2',
+				'max_tokens'      => 12000,
+				'response_format' => array( 'type' => 'json_object' ), // forces valid JSON, tames runaway reasoning
+				'messages'        => array(
+					array( 'role' => 'system', 'content' => $system ),
+					array( 'role' => 'user',   'content' => $framed ),
+				),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		return self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
+	}
+
+	private static function claude_compose( $key, $system, $framed ) {
+		$resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+			'timeout' => 90,
+			'headers' => array( 'content-type' => 'application/json', 'x-api-key' => $key, 'anthropic-version' => '2023-06-01' ),
+			'body'    => wp_json_encode( array(
+				'model'      => 'claude-sonnet-4-5-20250929',
+				'max_tokens' => 8192,
+				'system'     => $system,
+				'messages'   => array( array( 'role' => 'user', 'content' => $framed ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$text = '';
+		if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
+			foreach ( $data['content'] as $blk ) { if ( ( $blk['type'] ?? '' ) === 'text' ) { $text .= $blk['text']; } }
+		}
+		return self::extract_section_json( $text );
 	}
 
 	/* ─── Daily usage view (Claude-Code-style bar) ──────────────────────
