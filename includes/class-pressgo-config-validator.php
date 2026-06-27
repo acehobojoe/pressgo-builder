@@ -297,7 +297,7 @@ class PressGo_Config_Validator {
 				'Inter', 'Manrope', 'Poppins', 'Montserrat', 'Open Sans', 'Work Sans',
 				'Roboto', 'Mulish', 'Karla', 'Nunito Sans', 'Outfit', 'Sora',
 				'Archivo', 'Bricolage Grotesque', 'Space Grotesk', 'DM Sans',
-				'Onest', 'Plus Jakarta Sans', 'Figtree', 'Hanken Grotesk',
+				'Onest', 'Plus Jakarta Sans', 'Figtree', 'Hanken Grotesk', 'Source Sans Pro',
 			),
 			'Serif' => array(
 				'Playfair Display', 'Cormorant Garamond', 'Libre Baskerville',

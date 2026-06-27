@@ -29,6 +29,7 @@ class PressGo_AI_Builder {
 	const MASTER_PROFILE_OPTION = 'pressgo_master_profile';  // site-level discovery memory (goal/vibe/photos/location) — compounds across pages
 	const META_FF_SECTIONS  = '_pressgo_ff_sections';        // ordered records of every freeform section (source tree + roles) for the cohesion engine
 	const META_COHESION_UNDO = '_pressgo_cohesion_undo';     // one-step snapshot so "undo" restores a reorganize
+	const META_BRAND_VERSION = '_pressgo_brand_version';     // foundation 'updated' stamp the page was last repainted to (lazy site-wide repaint)
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -101,6 +102,35 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
+		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
+	}
+
+	/**
+	 * Load the brand's Google Fonts on PressGo-built freeform pages so the heading/
+	 * body families the renderer assigns actually render (instead of falling back to
+	 * a system font when Elementor's own font loading misses them). Scoped to PressGo
+	 * pages only — never loads brand fonts site-wide.
+	 */
+	public function enqueue_brand_fonts() {
+		if ( ! is_singular() ) { return; }
+		$post_id = get_queried_object_id();
+		if ( ! $post_id || ! get_post_meta( $post_id, self::META_FF_SECTIONS, true ) ) { return; }
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) { return; }
+		$f    = PressGo_MCP_Tools::brand_foundation();
+		$fams = array();
+		foreach ( array( 'heading', 'body' ) as $slot ) {
+			$fam = isset( $f['fonts'][ $slot ] ) ? trim( (string) $f['fonts'][ $slot ] ) : '';
+			// Skip system stacks (commas) and empties — only real Google families.
+			if ( '' !== $fam && false === strpos( $fam, ',' ) ) { $fams[ $fam ] = true; }
+		}
+		if ( empty( $fams ) ) { return; }
+		$parts = array();
+		foreach ( array_keys( $fams ) as $fam ) {
+			$parts[] = 'family=' . rawurlencode( $fam ) . ':wght@400;500;600;700;800';
+		}
+		$url = 'https://fonts.googleapis.com/css2?' . str_replace( '%20', '+', implode( '&', $parts ) ) . '&display=swap';
+		echo "\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n";
+		echo '<link rel="stylesheet" href="' . esc_url( $url ) . '" />' . "\n";
 	}
 
 	/**
@@ -294,57 +324,67 @@ class PressGo_AI_Builder {
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
 
-		$records = $this->ff_sections( $post_id );
-		if ( empty( $records ) ) {
-			$records = $this->ff_backfill_records( $post_id );
-		}
-		if ( empty( $records ) ) {
+		$res = $this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
+		if ( false === $res ) {
 			wp_send_json_error( 'no sections to re-render' );
 		}
+		wp_send_json_success( array_merge( $res, array( 'preview_bust' => time(), 'undo' => true ) ) );
+	}
 
-		// Load the renderer dependencies.
+	/** The brand "version" a page is repainted to — the foundation's last-updated stamp. */
+	private function brand_version() {
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) { return 0; }
+		$f = PressGo_MCP_Tools::brand_foundation();
+		return isset( $f['updated'] ) ? (int) $f['updated'] : 0;
+	}
+
+	/**
+	 * Huemint-style GLOBAL repaint of ONE page's freeform sections onto the given
+	 * brand cfg. Snapshots first (so "undo" restores), restores the original data
+	 * if nothing renders, never drops a section, and stamps the page's brand
+	 * version so the lazy site-wide repaint knows it's current. Returns
+	 * array(sections, rendered, kept) or false when there's nothing to repaint.
+	 */
+	private function repaint_page_to_brand( $post_id, $cfg ) {
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
+		if ( empty( $records ) ) { return false; }
+
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
 		require_once $gen . 'class-pressgo-style-utils.php';
 		require_once $gen . 'class-pressgo-element-factory.php';
 		require_once $gen . 'class-pressgo-widget-helpers.php';
 		require_once $gen . 'class-pressgo-freeform-renderer.php';
 
-		$cfg      = $this->cfg_from_foundation();
-		$elements = $this->read_elements( $post_id );
+		$elements  = $this->read_elements( $post_id );
 		$by_marker = $this->index_elements_by_marker( $elements );
+		$backup    = (string) get_post_meta( $post_id, '_elementor_data', true );
 
-		// Snapshot the current data so we can restore on failure.
-		$backup = (string) get_post_meta( $post_id, '_elementor_data', true );
+		// One-step undo snapshot (shared with "make it flow").
+		$this->cohesion_snapshot( $post_id, $records );
 
 		$new = array();
 		$rendered = 0;
-		$failed = 0;
 		foreach ( $records as $idx => $rec ) {
 			$el = null;
 			if ( ! empty( $rec['source_tree'] ) ) {
-				// The source tree bakes the colors the composer chose — re-rendering it
-				// verbatim with a new cfg changes almost nothing (cfg colors are only
-				// fallbacks for blocks that omit a color). To actually repaint the page
-				// to the new brand we overlay the section's background ROLE: this flips
-				// the section bg, contrast-driven heading/body text, and accent buttons/
-				// icons to the new palette, while preserving deliberately-bespoke colors.
-				// The source tree itself is passed by value and never mutated.
+				// The source tree bakes the composer's literal colors, so to actually
+				// repaint to the new brand we overlay the section's background ROLE with
+				// $force=true (global recolor). The source tree is passed by value and
+				// never mutated.
 				$role     = ! empty( $rec['rendered_bg_role'] ) ? $rec['rendered_bg_role'] : ( ! empty( $rec['bg_role'] ) ? $rec['bg_role'] : 'light' );
 				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $cfg, true );
 				$el       = PressGo_Freeform_Renderer::render( $overlaid, $cfg, $rec['pg_key'] );
 				if ( null === $el ) {
-					$failed++;
 					// Keep the existing element instead of dropping it.
-					if ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
-						$el = $by_marker[ $rec['pg_key'] ];
-					}
+					if ( isset( $by_marker[ $rec['pg_key'] ] ) ) { $el = $by_marker[ $rec['pg_key'] ]; }
 				} else {
 					$rendered++;
-					// Remember the brand we rendered with so a later "make it flow"
-					// reorganize starts from the new palette, not the stale one.
-					$records[ $idx ]['palette']          = $cfg;
 					$records[ $idx ]['rendered_bg_role'] = $role;
 				}
+				// Stamp the new palette regardless, so a later reorganize starts from the
+				// current brand (and repaints any kept-on-failure section next pass).
+				$records[ $idx ]['palette'] = $cfg;
 			} elseif ( isset( $rec['element'] ) && is_array( $rec['element'] ) ) {
 				$el = $rec['element'];
 			} elseif ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
@@ -354,21 +394,40 @@ class PressGo_AI_Builder {
 		}
 
 		if ( empty( $new ) ) {
-			// Nothing rendered at all — don't touch the page.
-			wp_send_json_error( 're-render produced no sections' );
+			// Nothing rendered — restore the original and drop the dead snapshot.
+			if ( '' !== $backup ) { update_post_meta( $post_id, '_elementor_data', wp_slash( $backup ) ); }
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return false;
 		}
 
-		// Write the new elements.
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
 		$this->save_ff_sections( $post_id, $records );
+		update_post_meta( $post_id, self::META_BRAND_VERSION, $this->brand_version() );
 		$this->cohesion_flush( $post_id );
 
-		wp_send_json_success( array(
-			'preview_bust' => time(),
-			'sections'     => count( $new ),
-			'rendered'     => $rendered,
-			'kept'         => count( $new ) - $rendered,
-		) );
+		return array(
+			'sections' => count( $new ),
+			'rendered' => $rendered,
+			'kept'     => count( $new ) - $rendered,
+		);
+	}
+
+	/**
+	 * Lazy site-wide repaint: when a page is opened in the builder and the brand has
+	 * changed since this page was last painted (and the brand is on + the page isn't
+	 * opted out), bring it onto the current brand before the editor renders. Keeps
+	 * "Save & apply" fast (one page now) while every other page catches up on open.
+	 */
+	private function maybe_lazy_repaint( $post_id ) {
+		if ( '1' !== get_option( 'pressgo_use_site_brand', '1' ) ) { return; }
+		if ( get_post_meta( $post_id, '_pressgo_brand_optout', true ) ) { return; }
+		$current = $this->brand_version();
+		if ( ! $current ) { return; }
+		$stamped = (int) get_post_meta( $post_id, self::META_BRAND_VERSION, true );
+		if ( $stamped === $current ) { return; }
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { return; } // only freeform pages repaint
+		$this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
 	}
 
 	/**
@@ -1472,8 +1531,19 @@ class PressGo_AI_Builder {
 				$tree['settings']['background'] = 'gradient:' . $target_bg . ',' . $stop_b . ',' . $angle;
 			}
 		}
-		$heading_color = $on_dark ? '#ffffff' : ( $colors['text_dark'] ?? '#0F172A' );
-		$text_color    = $on_dark ? 'rgba(255,255,255,0.72)' : ( $colors['text_muted'] ?? '#4B5563' );
+		// On an accent band the surface IS the accent color — text/icons must contrast
+		// against the accent, not sit in it. Elsewhere honor the editable brand swatches
+		// (white / text_light) for dark bands instead of hardcoded white.
+		if ( 'accent' === $role ) {
+			$heading_color = PressGo_Style_Utils::text_on_color( $target_bg );
+			$text_color    = $this->hex_is_dark( $target_bg ) ? 'rgba(255,255,255,0.82)' : 'rgba(15,23,42,0.78)';
+		} elseif ( $on_dark ) {
+			$heading_color = $colors['white'] ?? '#ffffff';
+			$text_color    = $colors['text_light'] ?? 'rgba(255,255,255,0.72)';
+		} else {
+			$heading_color = $colors['text_dark'] ?? '#0F172A';
+			$text_color    = $colors['text_muted'] ?? '#4B5563';
+		}
 		$accent        = $colors['accent'] ?? '#e2b714';
 		$this->overlay_walk( $tree, $on_dark, $heading_color, $text_color, $accent, $role, $colors, $force );
 		return $tree;
@@ -1507,7 +1577,9 @@ class PressGo_AI_Builder {
 			if ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $text_color; }
 		} elseif ( 'button' === $type ) {
 			if ( 'accent' === $role ) {
-				$s['bg']    = $on_dark ? '#ffffff' : '#0F172A';
+				// On an accent band the CTA inverts: a brand-dark (or white) pill with
+				// the accent as its label, so it still reads as the primary action.
+				$s['bg']    = $on_dark ? ( $colors['white'] ?? '#ffffff' ) : ( $colors['primary_dark'] ?? $colors['dark_bg'] ?? '#0F172A' );
 				$s['color'] = $accent;
 			} else {
 				if ( $force || ! isset( $s['bg'] ) || $is_generic( $s['bg'] ) ) { $s['bg'] = $accent; }
@@ -1515,7 +1587,13 @@ class PressGo_AI_Builder {
 			}
 			if ( isset( $s['border_color'] ) && ( $force || $is_generic( $s['border_color'] ) ) ) { $s['border_color'] = $s['bg'] ?? $heading_color; }
 		} elseif ( 'icon' === $type ) {
-			if ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $accent; }
+			if ( 'accent' === $role ) {
+				// Icon sits ON the accent surface — paint it the contrast color, not the
+				// accent (which would vanish into the band).
+				$s['color'] = $on_dark ? ( $colors['white'] ?? '#ffffff' ) : ( $colors['dark_bg'] ?? '#0F172A' );
+			} elseif ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) {
+				$s['color'] = $accent;
+			}
 		} elseif ( 'divider' === $type ) {
 			$s['color'] = $on_dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
 		} elseif ( 'form' === $type ) {
@@ -1928,6 +2006,43 @@ class PressGo_AI_Builder {
 		return false;
 	}
 
+	/**
+	 * Should NEW sections on this page be built on-brand? A foundation must exist AND
+	 * the "apply to new pages" toggle on AND this page not opted out. This gates both
+	 * the render cfg and the compose-time brand instructions so the toggle/opt-out the
+	 * user sees in the panel actually mean something at build time.
+	 */
+	private function brand_active_for( $post_id ) {
+		if ( '1' !== get_option( 'pressgo_use_site_brand', '1' ) ) { return false; }
+		if ( get_post_meta( $post_id, '_pressgo_brand_optout', true ) ) { return false; }
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) { return false; }
+		$f = PressGo_MCP_Tools::brand_foundation();
+		return ! empty( $f['colors'] ) && is_array( $f['colors'] );
+	}
+
+	/**
+	 * Compose-time brand instructions so the AI builds ON-brand from the first draft
+	 * instead of being generated blind and repainted afterward. Returns '' when the
+	 * brand isn't active for this page.
+	 */
+	private function brand_prompt_block( $post_id ) {
+		if ( ! $this->brand_active_for( $post_id ) ) { return ''; }
+		$f = PressGo_MCP_Tools::brand_foundation();
+		$c = isset( $f['colors'] ) && is_array( $f['colors'] ) ? $f['colors'] : array();
+		$pal = array();
+		if ( ! empty( $c['light_bg'] ) )  { $pal[] = 'light background ' . $c['light_bg']; }
+		if ( ! empty( $c['dark_bg'] ) )   { $pal[] = 'dark background ' . $c['dark_bg']; }
+		if ( ! empty( $c['accent'] ) )    { $pal[] = 'accent (CTAs, icons) ' . $c['accent']; }
+		if ( ! empty( $c['text_dark'] ) ) { $pal[] = 'dark text ' . $c['text_dark']; }
+		$L = array( '=== SITE BRAND (this site has a locked brand — every section MUST match it) ===' );
+		if ( $pal ) { $L[] = 'LOCKED PALETTE — use ONLY these colors: ' . implode( ', ', $pal ) . '. Introduce NO other dark, light, or accent color.'; }
+		if ( ! empty( $f['fonts']['heading'] ) ) { $L[] = 'BRAND FONTS — headings in ' . $f['fonts']['heading'] . ', body in ' . ( $f['fonts']['body'] ?? 'a clean sans' ) . '.'; }
+		if ( ! empty( $f['voice'] ) )   { $L[] = 'BRAND VOICE — write copy that is ' . $f['voice'] . '.'; }
+		if ( ! empty( $f['brand_name'] ) ) { $L[] = 'BUSINESS NAME — ' . $f['brand_name'] . '.'; }
+		$L[] = '=== END SITE BRAND ===';
+		return implode( "\n", $L ) . "\n\n";
+	}
+
 	/** Renderer cfg built from the saved brand foundation (overlaid on the default). */
 	private function cfg_from_foundation() {
 		$base = $this->default_freeform_cfg();
@@ -1965,7 +2080,7 @@ class PressGo_AI_Builder {
 		return ( ( 0.2126 * $r + 0.7152 * $g + 0.0722 * $b ) / 255 ) < 0.5;
 	}
 
-	/** The brand palette as it actually rendered: vibe cfg + the hero's real accent/bg. */
+	/** The brand palette as it actually rendered: vibe cfg + the hero's real accent/bg, harmonized. */
 	private function extract_hero_palette( $tree, $cfg ) {
 		$colors = $cfg['colors'];
 		$fonts  = $cfg['fonts'];
@@ -1975,10 +2090,69 @@ class PressGo_AI_Builder {
 			$colors['primary'] = $accent;
 		}
 		$bg = isset( $tree['settings']['background'] ) ? $tree['settings']['background'] : '';
-		if ( is_string( $bg ) && preg_match( '/^#[0-9a-f]{6}$/i', $bg ) ) {
-			if ( $this->hex_is_dark( $bg ) ) { $colors['dark_bg'] = $bg; } else { $colors['light_bg'] = $bg; }
+		if ( is_string( $bg ) && '' !== $bg ) {
+			// A solid hero bg becomes a surface pole; a gradient contributes its first stop.
+			if ( 0 === strpos( $bg, 'gradient:' ) ) {
+				$parts = explode( ',', substr( $bg, strlen( 'gradient:' ) ) );
+				$bg    = isset( $parts[0] ) ? trim( $parts[0] ) : '';
+			}
+			if ( preg_match( '/^#[0-9a-f]{6}$/i', $bg ) ) {
+				if ( $this->hex_is_dark( $bg ) ) { $colors['dark_bg'] = $bg; } else { $colors['light_bg'] = $bg; }
+			}
 		}
+		$colors = $this->harmonize_palette( $colors );
 		return array( 'colors' => $colors, 'fonts' => $fonts );
+	}
+
+	/**
+	 * Make a (partially-learned) palette coherent before it's stored as the brand:
+	 * derive a related primary_dark, synthesize the missing light/dark surface from
+	 * the learned one so both poles share a hue family, retune text colors for
+	 * readability, and snap a low-contrast accent up so the CTA always pops. Keeps
+	 * the system from shipping a learned hot-pink accent next to default-blue
+	 * primary_dark and default-amber gold. Returns the filled color array.
+	 */
+	private function harmonize_palette( $colors ) {
+		if ( ! class_exists( 'PressGo_Style_Utils' ) ) {
+			require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		}
+		$U      = 'PressGo_Style_Utils';
+		$is_hex = function ( $v ) use ( $U ) { return $U::is_hex( $v ); };
+
+		$accent  = ! empty( $colors['accent'] ) && $is_hex( $colors['accent'] ) ? $colors['accent'] : '#2563EB';
+		$primary = ! empty( $colors['primary'] ) && $is_hex( $colors['primary'] ) ? $colors['primary'] : $accent;
+		$colors['accent']  = $accent;
+		$colors['primary'] = $primary;
+		// primary_dark: a deeper relative of primary (used for dark gradients, accent-band CTAs).
+		$colors['primary_dark'] = $U::shade( $primary, -0.16 );
+
+		// Surfaces: keep the learned pole, synthesize the other from it so they share a hue.
+		$has_light = ! empty( $colors['light_bg'] ) && $is_hex( $colors['light_bg'] );
+		$has_dark  = ! empty( $colors['dark_bg'] ) && $is_hex( $colors['dark_bg'] );
+		if ( $has_light && ! $has_dark ) {
+			$colors['dark_bg'] = $U::shade( $colors['light_bg'], -0.78 );
+		} elseif ( $has_dark && ! $has_light ) {
+			$colors['light_bg'] = $U::shade( $colors['dark_bg'], 0.86 );
+		} elseif ( ! $has_light && ! $has_dark ) {
+			$colors['light_bg'] = '#F8FAFC';
+			$colors['dark_bg']  = '#0F172A';
+		}
+		$colors['white'] = '#FFFFFF';
+
+		// Text: faintly hue-tinted but DESATURATED neutrals so body copy reads as text,
+		// not a muddy brown/tan. Both are contrast-guarded against the light surface.
+		$dhsl = $U::hex_to_hsl( $colors['dark_bg'] );
+		$colors['text_dark'] = $U::hsl_to_hex( $dhsl['h'], min( 0.22, $dhsl['s'] ), 0.14 );
+		if ( $U::contrast_ratio( $colors['text_dark'], $colors['light_bg'] ) < 4.5 ) { $colors['text_dark'] = '#0F172A'; }
+		$colors['text_muted'] = $U::hsl_to_hex( $dhsl['h'], min( 0.12, $dhsl['s'] ), 0.42 );
+		if ( $U::contrast_ratio( $colors['text_muted'], $colors['light_bg'] ) < 4.0 ) { $colors['text_muted'] = '#64748B'; }
+		$colors['text_light'] = 'rgba(255,255,255,0.78)';
+
+		// Accent must pop on the light surface; if it's too low-contrast, snap to a derived accent.
+		if ( $U::contrast_ratio( $colors['accent'], $colors['light_bg'] ) < 2.6 ) {
+			$colors['accent'] = $U::derive_accent( $primary );
+		}
+		return $colors;
 	}
 
 	/** A short brand voice string for a vibe (stored in the foundation). */
@@ -2061,7 +2235,38 @@ class PressGo_AI_Builder {
 		}
 
 		// recolor / refont / typed tweak -> rebuild just the hero and re-confirm.
-		return $this->rebuild_hero( $post_id, $state, $this->brand_tweak_nudge( $value, $message ) );
+		// "Different font" must ACTUALLY change the rendered heading — the freeform
+		// tree carries no font, so rotate the cfg font pairing here and pass it down.
+		$font_override = null;
+		if ( 'refont' === $value ) {
+			$cur = isset( $state['hero_palette']['fonts']['heading'] ) ? $state['hero_palette']['fonts']['heading'] : $this->default_freeform_cfg()['fonts']['heading'];
+			$font_override = $this->next_font_pairing( $cur );
+		}
+		return $this->rebuild_hero( $post_id, $state, $this->brand_tweak_nudge( $value, $message ), $font_override );
+	}
+
+	/** A curated set of tasteful Google Font heading/body pairings for the refont chip. */
+	private function font_pairings() {
+		return array(
+			array( 'heading' => 'Manrope',           'body' => 'Inter' ),
+			array( 'heading' => 'Poppins',           'body' => 'Inter' ),
+			array( 'heading' => 'Playfair Display',  'body' => 'Source Sans Pro' ),
+			array( 'heading' => 'Montserrat',        'body' => 'Open Sans' ),
+			array( 'heading' => 'Fraunces',          'body' => 'Inter' ),
+			array( 'heading' => 'Space Grotesk',     'body' => 'Inter' ),
+			array( 'heading' => 'DM Serif Display',  'body' => 'DM Sans' ),
+			array( 'heading' => 'Sora',              'body' => 'Inter' ),
+		);
+	}
+
+	/** The next pairing after the current heading font (wraps around), for "Different font". */
+	private function next_font_pairing( $current_heading ) {
+		$pairs = $this->font_pairings();
+		$idx   = -1;
+		foreach ( $pairs as $i => $p ) {
+			if ( strcasecmp( $p['heading'], (string) $current_heading ) === 0 ) { $idx = $i; break; }
+		}
+		return $pairs[ ( $idx + 1 ) % count( $pairs ) ];
 	}
 
 	/** The compose nudge for a hero tweak (recolor / refont / a typed instruction). */
@@ -2085,7 +2290,7 @@ class PressGo_AI_Builder {
 	}
 
 	/** Recompose the hero with a tweak, replace the last section, return a fresh confirm. */
-	private function rebuild_hero( $post_id, $state, $nudge ) {
+	private function rebuild_hero( $post_id, $state, $nudge, $font_override = null ) {
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
 		$brief       = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
@@ -2100,6 +2305,8 @@ class PressGo_AI_Builder {
 		$vibe = isset( $state['answers']['vibe'] ) ? $state['answers']['vibe'] : '';
 		$cfg  = ( '' !== $vibe ) ? $this->vibe_to_palette( $vibe ) : null;
 		if ( null === $cfg ) { $cfg = $this->default_freeform_cfg(); }
+		// "Different font" rotates the pairing so the re-rendered hero genuinely changes.
+		if ( is_array( $font_override ) && ! empty( $font_override['heading'] ) ) { $cfg['fonts'] = $font_override; }
 
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
 		require_once $gen . 'class-pressgo-style-utils.php';
@@ -2658,6 +2865,10 @@ class PressGo_AI_Builder {
 		$post = get_post( $post_id );
 		if ( ! $post ) wp_die( 'Page not found' );
 
+		// Lazy site-wide repaint: if the brand changed since this page was last
+		// painted, bring it on-brand before we render the preview.
+		$this->maybe_lazy_repaint( $post_id );
+
 		$nonce       = wp_create_nonce( 'pressgo_ai_admin' );
 		$preview_url = add_query_arg( 'pg_clean', '1', get_preview_post_link( $post ) );
 		// Native Elementor editor URL — bypasses WP post editor and lands
@@ -3169,6 +3380,10 @@ class PressGo_AI_Builder {
 		// palette, and goal instead of re-inventing them statelessly.
 		$page_state = $this->freeform_page_state( $post_id );
 		if ( '' !== $page_state ) { $framed = $page_state . $framed; }
+		// Build ON-brand from the first draft when a site brand is active (toggle on,
+		// page not opted out) — not generated blind then repainted.
+		$brand_block = $this->brand_prompt_block( $post_id );
+		if ( '' !== $brand_block ) { $framed = $brand_block . $framed; }
 		$composed = $this->compose_freeform_tree( $system, $framed );
 		if ( empty( $composed['tree'] ) ) {
 			wp_send_json_error( $composed['error'] ?? 'The composer did not return a valid section. Try rewording.', 422 );
@@ -3191,7 +3406,7 @@ class PressGo_AI_Builder {
 		// default so in-flight pages with no vibe render exactly as before.
 		$cfg    = null;
 		$dstate = $this->discovery_state( $post_id );
-		if ( $this->brand_is_locked( $post_id ) ) {
+		if ( $this->brand_active_for( $post_id ) ) {
 			$cfg = $this->cfg_from_foundation();
 		}
 		$vibe = ( is_array( $dstate ) && ! empty( $dstate['answers']['vibe'] ) ) ? $dstate['answers']['vibe'] : '';

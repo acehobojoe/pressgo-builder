@@ -1449,16 +1449,38 @@ class PressGo_MCP_Tools {
 			) );
 		}
 
-		$logo_widget = self::widget( 'heading', array(
-			'title' => $tpl['logo']['text'] ?? get_bloginfo( 'name' ),
-			'header_size' => 'h3',
-			'link' => array( 'url' => $tpl['logo']['url'] ?? home_url( '/' ), 'is_external' => false ),
-			'typography_typography' => 'custom',
-			'typography_font_family' => $fonts['heading'],
-			'typography_font_weight' => '700',
-			'typography_font_size' => array( 'unit' => 'px', 'size' => 22, 'sizes' => array() ),
-			'title_color' => $colors['text_dark'],
-		) );
+		// Prefer a real logo image — explicit template logo, else the brand
+		// foundation's saved logo so an uploaded logo actually shows up in the header.
+		$brand_logo = self::brand_foundation();
+		$logo_img   = '';
+		$logo_id    = 0;
+		if ( ! empty( $tpl['logo']['image_url'] ) && is_string( $tpl['logo']['image_url'] ) ) {
+			$logo_img = $tpl['logo']['image_url'];
+		} elseif ( ! empty( $brand_logo['logo_url'] ) && is_string( $brand_logo['logo_url'] ) ) {
+			$logo_img = $brand_logo['logo_url'];
+			$logo_id  = ! empty( $brand_logo['logo_url_id'] ) ? (int) $brand_logo['logo_url_id'] : 0;
+		}
+		$logo_link = $tpl['logo']['url'] ?? home_url( '/' );
+		if ( '' !== $logo_img ) {
+			$logo_widget = self::widget( 'image', array(
+				'image'        => array( 'url' => $logo_img, 'id' => $logo_id, 'alt' => ( $tpl['logo']['text'] ?? get_bloginfo( 'name' ) ) ),
+				'width'        => array( 'unit' => 'px', 'size' => 150, 'sizes' => array() ),
+				'link_to'      => 'custom',
+				'link'         => array( 'url' => $logo_link, 'is_external' => false ),
+				'align'        => 'left',
+			) );
+		} else {
+			$logo_widget = self::widget( 'heading', array(
+				'title' => $tpl['logo']['text'] ?? get_bloginfo( 'name' ),
+				'header_size' => 'h3',
+				'link' => array( 'url' => $logo_link, 'is_external' => false ),
+				'typography_typography' => 'custom',
+				'typography_font_family' => $fonts['heading'],
+				'typography_font_weight' => '700',
+				'typography_font_size' => array( 'unit' => 'px', 'size' => 22, 'sizes' => array() ),
+				'title_color' => $colors['text_dark'],
+			) );
+		}
 
 		$logo_col = self::col( array( $logo_widget ), array( 'flex_align_items' => 'center' ) );
 		$nav_col  = self::col( $nav_widgets, array(
@@ -2774,6 +2796,16 @@ class PressGo_MCP_Tools {
 	 * set_brand_foundation tool AND the AI Builder's continuous-branding
 	 * auto-learn — ONE brand store for both paths. Returns the saved array.
 	 */
+	/** True for a color the renderer/Elementor can consume: hex, rgb(a), hsl(a), transparent. */
+	private static function is_color_value( $v ) {
+		if ( ! is_string( $v ) ) { return false; }
+		$v = trim( $v );
+		if ( '' === $v ) { return false; }
+		if ( 'transparent' === strtolower( $v ) ) { return true; }
+		if ( preg_match( '/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i', $v ) ) { return true; }
+		return (bool) preg_match( '/^(rgb|rgba|hsl|hsla)\(\s*[\d.,%\s\/]+\)$/i', $v );
+	}
+
 	public static function merge_brand_foundation( $args ) {
 		$f = self::brand_foundation();
 		if ( isset( $args['brand_name'] ) && is_string( $args['brand_name'] ) ) { $f['brand_name'] = sanitize_text_field( $args['brand_name'] ); }
@@ -2789,13 +2821,26 @@ class PressGo_MCP_Tools {
 				$clean = array();
 				foreach ( $args[ $k ] as $kk => $vv ) {
 					if ( is_array( $vv ) ) { continue; }
-					$clean[ sanitize_key( (string) $kk ) ] = is_numeric( $vv ) ? ( $vv + 0 ) : sanitize_text_field( (string) $vv );
+					$key = sanitize_key( (string) $kk );
+					if ( 'colors' === $k ) {
+						// Reject garbage so a bad save (e.g. an <input type=color> coercing an
+						// rgba token to #000000, or an empty value) can't poison a color role.
+						$val = trim( (string) $vv );
+						if ( ! self::is_color_value( $val ) ) { continue; }
+						$clean[ $key ] = $val;
+					} else {
+						$clean[ $key ] = is_numeric( $vv ) ? ( $vv + 0 ) : sanitize_text_field( (string) $vv );
+					}
 				}
 				$f[ $k ] = array_merge( $cur, $clean );
 			}
 		}
 		$f['updated'] = time();
 		update_option( self::BRAND_FOUNDATION_OPTION, $f );
+		// A favicon is only "applied" when WordPress knows it as the site icon.
+		if ( ! empty( $f['favicon_url_id'] ) && get_post( (int) $f['favicon_url_id'] ) ) {
+			update_option( 'site_icon', (int) $f['favicon_url_id'] );
+		}
 		return $f;
 	}
 

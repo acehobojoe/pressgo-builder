@@ -25,11 +25,71 @@ class PressGo_Style_Utils {
 	 */
 	public static function hex_to_rgb( $hex_color ) {
 		$hex = ltrim( $hex_color, '#' );
+		if ( 3 === strlen( $hex ) ) { $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2]; }
 		return array(
 			'r' => hexdec( substr( $hex, 0, 2 ) ),
 			'g' => hexdec( substr( $hex, 2, 2 ) ),
 			'b' => hexdec( substr( $hex, 4, 2 ) ),
 		);
+	}
+
+	/**
+	 * Lighten ($delta > 0) or darken ($delta < 0) a hex color by shifting its HSL
+	 * lightness by $delta (range -1..1). Used to derive a coherent primary_dark or
+	 * a matching surface tint from a single learned brand color.
+	 */
+	public static function shade( $hex, $delta ) {
+		if ( ! self::is_hex( $hex ) ) { return $hex; }
+		$hsl = self::hex_to_hsl( $hex );
+		$l   = max( 0.0, min( 1.0, $hsl['l'] + $delta ) );
+		return self::hsl_to_hex( $hsl['h'], $hsl['s'], $l );
+	}
+
+	/** True for a 3/6-digit hex color. */
+	public static function is_hex( $v ) {
+		return is_string( $v ) && (bool) preg_match( '/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', trim( $v ) );
+	}
+
+	/**
+	 * True for any color value the renderer/Elementor can consume: hex, rgb()/
+	 * rgba(), hsl()/hsla(), or 'transparent'. Used to reject garbage on write so
+	 * a bad save can't poison the stored brand foundation.
+	 */
+	public static function is_valid_color( $v ) {
+		if ( ! is_string( $v ) ) { return false; }
+		$v = trim( $v );
+		if ( '' === $v ) { return false; }
+		if ( 'transparent' === strtolower( $v ) ) { return true; }
+		if ( self::is_hex( $v ) ) { return true; }
+		return (bool) preg_match( '/^(rgb|rgba|hsl|hsla)\(\s*[\d.,%\s\/]+\)$/i', $v );
+	}
+
+	/**
+	 * WCAG relative-luminance contrast ratio (1..21) between two colors. Non-hex
+	 * inputs are treated as their nearest solid for a rough but safe estimate.
+	 */
+	public static function contrast_ratio( $a, $b ) {
+		$la = self::rel_luminance( $a );
+		$lb = self::rel_luminance( $b );
+		$hi = max( $la, $lb );
+		$lo = min( $la, $lb );
+		return ( $hi + 0.05 ) / ( $lo + 0.05 );
+	}
+
+	private static function rel_luminance( $color ) {
+		if ( self::is_hex( $color ) ) {
+			$rgb = self::hex_to_rgb( $color );
+		} elseif ( preg_match( '/(\d+)\D+(\d+)\D+(\d+)/', (string) $color, $m ) ) {
+			$rgb = array( 'r' => (int) $m[1], 'g' => (int) $m[2], 'b' => (int) $m[3] );
+		} else {
+			return 1.0; // assume light
+		}
+		$chan = array();
+		foreach ( array( 'r', 'g', 'b' ) as $k ) {
+			$c = $rgb[ $k ] / 255;
+			$chan[ $k ] = $c <= 0.03928 ? $c / 12.92 : pow( ( $c + 0.055 ) / 1.055, 2.4 );
+		}
+		return 0.2126 * $chan['r'] + 0.7152 * $chan['g'] + 0.0722 * $chan['b'];
 	}
 
 	/**

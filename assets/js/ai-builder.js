@@ -1689,8 +1689,10 @@
 		function isColorLike(v) { return isHex(v) || /^rgba?\(/i.test(String(v || '')); }
 
 		// Ordered color groups for the swatch grid.
+		// Only roles the global recolor engine actually reads — no dead controls.
+		// (primary + gold were removed: the repaint never used them.)
 		var COLOR_GROUPS = [
-			{ label: 'Brand', keys: ['primary', 'primary_dark', 'accent', 'gold'] },
+			{ label: 'Brand', keys: ['accent', 'primary_dark'] },
 			{ label: 'Backgrounds', keys: ['dark_bg', 'light_bg', 'white'] },
 			{ label: 'Text', keys: ['text_dark', 'text_muted', 'text_light'] },
 		];
@@ -1709,6 +1711,20 @@
 			blank.value = '';
 			blank.textContent = 'Choose a font\u2026';
 			sel.appendChild(blank);
+			// If the saved/learned font isn't in our list, surface it as a selected
+			// option so the dropdown doesn't fall back to blank and clobber it on save.
+			var inList = false;
+			Object.keys(groups).forEach(function (cat) {
+				(groups[cat] || []).forEach(function (n) { if (n === selected) inList = true; });
+			});
+			if (selected && !inList) {
+				var cur = document.createElement('option');
+				cur.value = selected;
+				cur.textContent = selected + ' (current)';
+				cur.selected = true;
+				cur.style.fontFamily = "'" + selected + "', sans-serif";
+				sel.appendChild(cur);
+			}
 			Object.keys(groups).forEach(function (cat) {
 				var og = document.createElement('optgroup');
 				og.label = cat;
@@ -1748,7 +1764,14 @@
 			var hexVal = document.createElement('span');
 			hexVal.className = 'pg-brand-swatch2-hex';
 			hexVal.textContent = isHex(hex) ? hex.toUpperCase() : String(hex || '').slice(0, 20);
+			// Only colors the user actually drags get sent on save. Without this, an
+			// <input type=color> reports its coerced value (#000000 for an rgba role
+			// like text_light) for every swatch, so a plain Save would overwrite those
+			// roles with black. The dirty flag means an untouched swatch is left alone.
+			if (!isHex(hex)) { wrap.classList.add('is-nonhex'); }
+			ci.dataset.dirty = '';
 			ci.addEventListener('input', function () {
+				ci.dataset.dirty = '1';
 				preview.style.background = ci.value;
 				hexVal.textContent = ci.value.toUpperCase();
 			});
@@ -1888,14 +1911,6 @@
 				var groupKeys = grp.keys.filter(function (k) {
 					return colors[k] && !usedKeys[k] && (isHex(colors[k]) || isColorLike(colors[k]));
 				});
-				// Also include any unknown hex keys not in our groups.
-				if (grp.label === 'Brand') {
-					Object.keys(colors).forEach(function (k) {
-						if (!usedKeys[k] && isColorLike(colors[k]) && COLOR_GROUPS.every(function (g) { return g.keys.indexOf(k) === -1; })) {
-							groupKeys.push(k);
-						}
-					});
-				}
 				if (!groupKeys.length) return;
 				if (grp.label !== 'Brand') colorSection.appendChild(el('div', 'pg-brand-color-group-label', grp.label));
 				var grid = document.createElement('div');
@@ -1982,10 +1997,18 @@
 					brand_name: nameI.value.trim(),
 					industry: indI.value.trim(),
 					voice: voiceI.value.trim(),
-					fonts: { heading: headF.value.trim(), body: bodyF.value.trim() },
 					colors: {},
 				};
-				Object.keys(colorInputs).forEach(function (k) { payload.colors[k] = colorInputs[k].value; });
+				// Only send fonts the user actually chose — an empty select must not
+				// overwrite a real brand font with ''.
+				var fonts = {};
+				if (headF.value.trim()) fonts.heading = headF.value.trim();
+				if (bodyF.value.trim()) fonts.body = bodyF.value.trim();
+				if (Object.keys(fonts).length) payload.fonts = fonts;
+				// Only send swatches the user edited (see colorSwatch dirty flag).
+				Object.keys(colorInputs).forEach(function (k) {
+					if (colorInputs[k].dataset.dirty === '1') payload.colors[k] = colorInputs[k].value;
+				});
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_brand_save');
 				fd.append('nonce', cfg.nonce);
@@ -2016,7 +2039,7 @@
 								if (rj && rj.success) {
 									reloadPreview(rj.data.preview_bust || Date.now());
 									closeBrandPanel();
-									append(el('pg-msg-system', 'Done. ' + (rj.data.sections || 0) + ' sections updated with the new brand.'));
+									append(el('pg-msg-system', 'Done. ' + (rj.data.sections || 0) + ' sections recolored to the new brand. Say "undo" to put it back.'));
 								} else {
 									closeBrandPanel();
 									append(el('pg-msg-system', 'Brand saved. New pages will follow it.'));
