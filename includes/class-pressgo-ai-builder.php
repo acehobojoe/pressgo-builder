@@ -26,6 +26,7 @@ class PressGo_AI_Builder {
 	const META_FREEFORM   = '_pressgo_freeform';  // marks a freeform "build anything" page (native tree, no recipe config)
 	const META_FREEFORM_BRIEF = '_pressgo_freeform_brief'; // persistent page brief (business + goal) for Nova discovery
 	const META_DISCOVERY_STATE = '_pressgo_discovery_state'; // per-page chip interview state (transient, cleared on chat reset)
+	const MASTER_PROFILE_OPTION = 'pressgo_master_profile';  // site-level discovery memory (goal/vibe/photos/location) — compounds across pages
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -603,6 +604,46 @@ class PressGo_AI_Builder {
 		update_post_meta( $post_id, self::META_DISCOVERY_STATE, wp_slash( $state ) );
 	}
 
+	/** The site-level master profile (discovery memory that compounds across pages). */
+	private function master_profile() {
+		$m = get_option( self::MASTER_PROFILE_OPTION, array() );
+		return is_array( $m ) ? $m : array();
+	}
+
+	/** Merge fields into the master profile (site option, not per page). */
+	private function merge_master_profile( $fields ) {
+		$m = $this->master_profile();
+		foreach ( $fields as $k => $v ) { $m[ $k ] = $v; }
+		$m['updated'] = time();
+		update_option( self::MASTER_PROFILE_OPTION, $m, false );
+		return $m;
+	}
+
+	/** Page 2+: seed a collapsed interview that reuses the saved brand + business. */
+	private function init_reuse_state( $message, $master ) {
+		$answers = array(
+			'industry' => ! empty( $master['industry'] ) ? $master['industry'] : 'other',
+			'vibe'     => ! empty( $master['vibe'] ) ? $master['vibe'] : 'premium',
+			'photos'   => ! empty( $master['photo_source'] ) ? $master['photo_source'] : 'stock',
+		);
+		// Goal is the one genuinely per-page thing — pre-fill only if stated outright.
+		$g = $this->goal_from_text( $message );
+		if ( '' !== $g && self::ff_has_goal( $message ) ) {
+			$answers['goal']       = $g;
+			$answers['goal_label'] = $this->goal_cta_phrase( $g );
+		}
+		return array(
+			'branch'          => 'reuse',
+			'answers'         => $answers,
+			'business'        => trim( (string) $message ),
+			'industry_guess'  => ! empty( $master['industry'] ) ? $master['industry'] : '',
+			'location'        => ! empty( $master['location'] ) ? $master['location'] : $this->infer_location_from_message( $message ),
+			'audience'        => ! empty( $master['audience'] ) ? $master['audience'] : '',
+			'reuse_confirmed' => false,
+			'hero_built'      => false,
+		);
+	}
+
 	/** Seed a fresh interview from the user's first message, inferring what we can. */
 	private function init_discovery_state( $message ) {
 		$answers = array();
@@ -635,6 +676,18 @@ class PressGo_AI_Builder {
 	/** Record an answer (parsing typed free-text into the stage enum when value is ''). */
 	private function run_discovery_step( $post_id, $state, $stage, $value, $message ) {
 		if ( ! isset( $state['answers'] ) || ! is_array( $state['answers'] ) ) { $state['answers'] = array(); }
+
+		// Page 2+ "same brand?" answer: confirm reuse, or drop into a fresh interview.
+		if ( 'reuse_confirm' === $stage ) {
+			if ( 'different' === $value ) {
+				$fresh = $this->init_discovery_state( ! empty( $state['business'] ) ? $state['business'] : $message );
+				$this->save_discovery_state( $post_id, $fresh );
+				return $fresh;
+			}
+			$state['reuse_confirmed'] = true;
+			$this->save_discovery_state( $post_id, $state );
+			return $state;
+		}
 		if ( '' === $value ) { // free-text fallback: the user typed instead of tapping a chip
 			switch ( $stage ) {
 				case 'goal':     $value = $this->goal_from_text( $message ); if ( '' === $value ) { $value = 'browse'; } break;
@@ -653,6 +706,13 @@ class PressGo_AI_Builder {
 	/** The next unanswered required stage, or '' when the interview is complete. */
 	private function next_discovery_stage( $state ) {
 		$answers = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
+		// Page 2+ reuse: confirm the brand, then just the page goal — everything
+		// else (industry/vibe/photos) is inherited from the master profile.
+		if ( ( isset( $state['branch'] ) ? $state['branch'] : '' ) === 'reuse' ) {
+			if ( empty( $state['reuse_confirmed'] ) ) { return 'reuse_confirm'; }
+			if ( empty( $answers['goal'] ) ) { return 'goal'; }
+			return '';
+		}
 		foreach ( array( 'goal', 'industry', 'vibe', 'photos' ) as $stage ) {
 			if ( empty( $answers[ $stage ] ) ) { return $stage; }
 		}
@@ -669,6 +729,15 @@ class PressGo_AI_Builder {
 			'freetext_hint'   => '…or just type it',
 		);
 		switch ( $stage ) {
+			case 'reuse_confirm':
+				return array_merge( $base, array(
+					'question'       => "Welcome back. I'll build this one on your saved brand — same colors, fonts, and style. Sound good?",
+					'allow_freetext' => false,
+					'chips'          => array(
+						array( 'label' => 'Yes, same brand', 'value' => 'yes' ),
+						array( 'label' => 'Start fresh', 'value' => 'different' ),
+					),
+				) );
 			case 'goal':
 				return array_merge( $base, array(
 					'question' => "Love it. One quick thing and I'll start designing: what should this page get people to do?",
@@ -982,6 +1051,19 @@ class PressGo_AI_Builder {
 			update_option( 'pressgo_use_site_brand', '1', false );
 			$state['brand_locked'] = true;
 			$this->save_discovery_state( $post_id, $state );
+			// Master profile: the site-level discovery memory every later page reuses
+			// so it collapses to "same brand? -> what's this page for? -> build".
+			$a = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
+			$this->merge_master_profile( array(
+				'industry'           => isset( $a['industry'] ) ? $a['industry'] : '',
+				'vibe'               => isset( $a['vibe'] ) ? $a['vibe'] : '',
+				'photo_source'       => isset( $a['photos'] ) ? $a['photos'] : '',
+				'default_goal'       => isset( $a['goal'] ) ? $a['goal'] : '',
+				'location'           => isset( $state['location'] ) ? $state['location'] : '',
+				'audience'           => isset( $state['audience'] ) ? $state['audience'] : '',
+				'palette_locked'     => true,
+				'discovery_complete' => true,
+			) );
 			if ( is_array( $f ) ) { unset( $f['updated'] ); }
 			return array(
 				'note'         => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent. Want me to keep building? Tell me the next section.',
@@ -1949,10 +2031,14 @@ class PressGo_AI_Builder {
 		}
 
 		if ( $page_empty && '' === $brief ) {
-			$state = $this->discovery_state( $post_id );
-			// First contact: seed state from the user's own words (infer what we can).
+			$state  = $this->discovery_state( $post_id );
+			$master = $this->master_profile();
+			$reuse  = ! empty( $master['discovery_complete'] );
+			// First contact: seed state from the user's words. If the site already
+			// has a completed brand (page 2+), collapse to a "same brand?" + goal
+			// flow that reuses everything; otherwise run the full first-page interview.
 			if ( ! is_array( $state ) ) {
-				$state = $this->init_discovery_state( $message );
+				$state = $reuse ? $this->init_reuse_state( $message, $master ) : $this->init_discovery_state( $message );
 				$this->save_discovery_state( $post_id, $state );
 			}
 			// An answer just came in (a chip tap, or typed text routed to a stage).
