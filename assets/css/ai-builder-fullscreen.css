@@ -498,11 +498,11 @@ select#pg-target-builder {
 	margin-top: 8px;
 	padding-top: 4px;
 }
-.pg-action-bar-left,
-.pg-action-bar-right {
+.pg-action-left,
+.pg-action-right {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: 6px;
 }
 
 /* Icon buttons — attach + mic share this base. */
@@ -637,7 +637,6 @@ select#pg-target-builder {
 /* Responsive — mobile: full-width composer with 12px gutters. */
 @media (max-width: 640px) {
 	.pg-composer,
-	.pg-chat-footer,
 	.pg-composer-error {
 		max-width: none;
 		margin-left: 12px;
@@ -662,17 +661,6 @@ select#pg-target-builder {
 	.pg-voice-bar.is-processing::after { animation: none !important; }
 }
 
-/* Composer footer — vision toggle + usage meter live here under the textarea.
-   Centered to match the 768px composer; flex layout drives the footer row. */
-.pg-chat-footer {
-	max-width: 768px;
-	margin: 0 auto;
-	display: flex; flex-wrap: wrap; align-items: center;
-	gap: 2px 4px;
-	padding: 0 16px 14px;
-	background: #fff;
-	border-top: 0;
-}
 .pg-vision-toggle {
 	display: inline-flex; align-items: center; gap: 8px;
 	cursor: pointer;

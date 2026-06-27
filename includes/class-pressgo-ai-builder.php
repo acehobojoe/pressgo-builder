@@ -1235,9 +1235,9 @@ class PressGo_AI_Builder {
 			.pg-tier-cap{font-size:12.5px;font-weight:700;margin:7px 0 3px;color:#0f172a}
 			.pg-tier-blurb{font-size:11.5px;color:#64748b;line-height:1.35}
 			/* mode selector (Ada / Iris / Nova) */
-			.pg-mode{position:relative}
-			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #e2e4e9;border-radius:9px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
-			.pg-mode-btn:hover{background:#f6f7f9;border-color:#d4d7dd}
+			.pg-mode{position:relative;flex-shrink:0}
+			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 10px;border:1px solid #e5e5e5;border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
+			.pg-mode-btn:hover{background:#fafaf8;border-color:#d4d7dd}
 			.pg-mode-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a8;flex-shrink:0}
 			.pg-mode.is-eyes .pg-mode-dot{background:#5b4fff}
 			.pg-mode.is-freeform .pg-mode-dot{background:linear-gradient(135deg,#5b4fff,#b893ff)}
@@ -1342,6 +1342,27 @@ class PressGo_AI_Builder {
 							</div>
 							<div class="pg-action-bar">
 								<div class="pg-action-left">
+									<div class="pg-mode" id="pg-mode">
+										<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
+											<span class="pg-mode-dot"></span>
+											<span class="pg-mode-current" id="pg-mode-current">Ada</span>
+											<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+										</button>
+										<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+											</button>
+										</div>
+									</div>
 									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images" aria-label="Attach images">
 										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 									</button>
@@ -1378,29 +1399,6 @@ class PressGo_AI_Builder {
 						<div class="pg-drop-message">
 							<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
 							<div>Drop a screenshot to attach</div>
-						</div>
-					</div>
-					<div class="pg-chat-footer">
-						<div class="pg-mode" id="pg-mode">
-							<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
-								<span class="pg-mode-dot"></span>
-								<span class="pg-mode-current" id="pg-mode-current">Ada</span>
-								<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-							</button>
-							<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-								<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
-									<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
-									<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-								</button>
-							</div>
 						</div>
 					</div>
 				</aside>
