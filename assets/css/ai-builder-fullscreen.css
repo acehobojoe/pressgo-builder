@@ -1359,3 +1359,70 @@ select#pg-target-builder {
 	transition: background 0.12s ease;
 }
 .pg-ai-tb button:hover { background: #5b4fff; }
+
+/* ─── Voice input (mic button) ─────────────────────────────────────── */
+/* Same specificity pattern as .pg-attach-btn so we beat the .pg-chat-input
+   button rule that styles Send purple. */
+.pg-chat-input .pg-mic-btn,
+.pg-chat-input button.pg-mic-btn {
+	background: transparent;
+	border: 1px solid #c3c4c7;
+	color: #50575e;
+	width: 38px; height: 38px;
+	padding: 0;
+	border-radius: 6px;
+	cursor: pointer;
+	display: inline-flex; align-items: center; justify-content: center;
+	flex-shrink: 0;
+	overflow: visible;
+	transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+}
+.pg-chat-input .pg-mic-btn:hover {
+	border-color: #5b4fff;
+	color: #5b4fff;
+	background: #f7f5ff;
+}
+.pg-chat-input .pg-mic-btn:active { background: #ede9ff; transform: scale(0.96); }
+
+/* Icon visibility — mic by default, stop square when recording. */
+.pg-chat-input .pg-mic-btn .pg-mic-icon { display: block; }
+.pg-chat-input .pg-mic-btn .pg-mic-stop-icon { display: none; }
+.pg-chat-input .pg-mic-btn.is-recording .pg-mic-icon { display: none; }
+.pg-chat-input .pg-mic-btn.is-recording .pg-mic-stop-icon { display: block; }
+
+/* Recording state — red accent + pulsing border. */
+.pg-chat-input .pg-mic-btn.is-recording {
+	border-color: #d63638;
+	color: #d63638;
+	background: #fef0f0;
+	animation: pg-mic-pulse 1.4s ease-out infinite;
+}
+@keyframes pg-mic-pulse {
+	from { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.4); }
+	to   { box-shadow: 0 0 0 8px rgba(214, 54, 56, 0); }
+}
+
+/* Recording timer — elapsed seconds shown beside the stop icon. */
+.pg-chat-input .pg-mic-btn .pg-mic-timer {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	margin-left: 4px;
+	display: none;
+}
+.pg-chat-input .pg-mic-btn.is-recording .pg-mic-timer { display: inline; }
+
+/* Loading state — after recording stops, brief spinner wait. No pulse. */
+.pg-chat-input .pg-mic-btn.is-loading {
+	opacity: 0.6;
+	cursor: wait;
+	animation: none;
+}
+
+/* Disabled — match the existing .pg-chat-input button:disabled greying. */
+.pg-chat-input .pg-mic-btn:disabled {
+	background: #dcdcde;
+	color: #8c8f94;
+	border-color: #dcdcde;
+	cursor: not-allowed;
+	animation: none;
+}
