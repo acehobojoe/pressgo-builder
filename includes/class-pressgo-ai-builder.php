@@ -638,6 +638,7 @@ class PressGo_AI_Builder {
 		delete_post_meta( $post_id, self::META_AI_CHAT );
 		delete_post_meta( $post_id, self::META_FREEFORM_BRIEF );    // reset Nova discovery on a fresh chat
 		delete_post_meta( $post_id, self::META_DISCOVERY_STATE );  // and its in-progress interview state
+		delete_post_meta( $post_id, '_pressgo_cohesion_autosig' ); // let auto-tidy run fresh
 		wp_send_json_success();
 	}
 
@@ -1454,7 +1455,7 @@ class PressGo_AI_Builder {
 	}
 
 	/** Reorganize the page: smart order + dark/light/accent rhythm + contrast-safe recolor. */
-	private function cohesion_reorganize( $post_id ) {
+	private function cohesion_reorganize( $post_id, $with_vision = true ) {
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
 		if ( count( $records ) < 3 ) {
@@ -1489,18 +1490,68 @@ class PressGo_AI_Builder {
 
 		// Vision critic (C3): screenshot the reorganized page and let a vision model
 		// catch any contrast/rhythm miss the deterministic pass made. Non-blocking —
-		// any failure leaves the already-good deterministic page in place.
+		// any failure leaves the already-good deterministic page in place. Skipped on
+		// the auto-trigger (C4), which keeps things fast (deterministic only).
 		$vnote = '';
-		try {
-			$vnote = (string) $this->cohesion_vision_fixes( $post_id, $plan );
-		} catch ( \Throwable $e ) {
-			$vnote = '';
+		if ( $with_vision ) {
+			try {
+				$vnote = (string) $this->cohesion_vision_fixes( $post_id, $plan );
+			} catch ( \Throwable $e ) {
+				$vnote = '';
+			}
 		}
 
 		$note = 'Reorganized your page — a smarter order, an even dark and light rhythm, and your call to action moved to the end where it pops.';
 		if ( '' !== $vnote ) { $note .= ' ' . $vnote; }
 		$note .= ' Say "undo" to put it back.';
 		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => $note );
+	}
+
+	/** The visual shade of a bg role (accent is its own beat). */
+	private function shade_of( $bg_role ) {
+		if ( 'light' === $bg_role ) { return 'light'; }
+		if ( 'accent' === $bg_role ) { return 'accent'; }
+		return 'dark';
+	}
+
+	/** A clear rhythm/order problem worth auto-fixing? (3+ same shade in a row, or a
+	 *  CTA that isn't the last section). Minor reorderings are left alone. */
+	private function cohesion_has_violation( $records ) {
+		$n = count( $records );
+		$run = 1;
+		for ( $i = 1; $i < $n; $i++ ) {
+			if ( $this->shade_of( $records[ $i ]['bg_role'] ?? '' ) === $this->shade_of( $records[ $i - 1 ]['bg_role'] ?? '' ) ) {
+				$run++;
+				if ( $run >= 3 ) { return true; }
+			} else {
+				$run = 1;
+			}
+		}
+		for ( $i = 0; $i < $n - 1; $i++ ) {
+			if ( 'cta' === ( $records[ $i ]['semantic_role'] ?? '' ) ) { return true; } // a CTA with sections after it
+		}
+		return false;
+	}
+
+	/** C4: after a build, on a DRAFT with a clear violation, quietly run the FAST
+	 *  deterministic reorganize (no vision). Debounced so it never thrashes; the
+	 *  explicit "make it flow" still does the full vision pass. Returns a note or ''. */
+	private function cohesion_autorun( $post_id ) {
+		if ( 'publish' === get_post_status( $post_id ) ) { return ''; } // never auto-touch live pages (ad landers etc.)
+		$records = $this->ff_sections( $post_id );
+		if ( count( $records ) < 4 ) { return ''; }
+		if ( ! $this->cohesion_has_violation( $records ) ) { return ''; }
+
+		$plan      = $this->build_cohesion_plan( $records );
+		$plan_keys = array(); $plan_bg = array();
+		foreach ( $plan as $r ) { $plan_keys[] = $r['pg_key']; $plan_bg[] = $r['bg_role']; }
+		$sig = md5( implode( ',', $plan_keys ) . '|' . implode( ',', $plan_bg ) );
+		if ( get_post_meta( $post_id, '_pressgo_cohesion_autosig', true ) === $sig ) { return ''; } // already auto-tidied this exact state
+
+		$res = $this->cohesion_reorganize( $post_id, false ); // deterministic only — fast
+		update_post_meta( $post_id, '_pressgo_cohesion_autosig', $sig );
+		if ( empty( $res['cohesion'] ) ) { return ''; }
+		return ' I also tidied the order and evened out the dark/light rhythm (say "undo" to put it back).';
 	}
 
 	/** Render a plan to an _elementor_data element list (recolor + reorder). */
@@ -3227,12 +3278,23 @@ class PressGo_AI_Builder {
 			$suggest = $this->suggest_payload( $dstate3 );
 		}
 
+		// C4: auto-tidy the page when a new section creates a clear order/rhythm
+		// problem (draft pages only, deterministic + fast, debounced). Non-blocking.
+		$auto_note = '';
+		try {
+			$auto_note = (string) $this->cohesion_autorun( $post_id );
+		} catch ( \Throwable $e ) {
+			$auto_note = '';
+		}
+		// If we reorganized, the section count is unchanged but the data was rewritten.
+		$sections_now = count( $this->read_elements( $post_id ) );
+
 		$model_tag = 'glm-5.2' === $used_model ? 'GLM-5.2' : 'Claude';
 		wp_send_json_success( array(
 			'preview_bust' => time(),
-			'sections'     => count( $elements ),
+			'sections'     => $sections_now,
 			'model'        => $used_model,
-			'note'         => 'Done — added that section (' . count( $elements ) . ' on the page now).',
+			'note'         => 'Done — added that section (' . $sections_now . ' on the page now).' . $auto_note,
 			'suggest'      => $suggest,
 			'usage'        => $this->usage_state(),
 		) );
