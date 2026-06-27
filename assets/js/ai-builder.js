@@ -1425,6 +1425,10 @@
 			fields.discovery_value = '';
 			kind = (currentDiscoveryStage === 'brand_confirm') ? 'recolor'
 				: (currentDiscoveryStage === 'photos') ? 'hero' : 'quick';
+		} else if (selectedSectionKey) {
+			// A section is selected in the preview — scope this edit to it (the server
+			// re-composes that section in place instead of adding a new one).
+			fields.selected_section = selectedSectionKey;
 		}
 		postFreeform(fields, text, kind);
 	}

@@ -2040,6 +2040,80 @@ class PressGo_AI_Builder {
 		return '';
 	}
 
+	/** The stored record for a section by its pg-key marker, or null. */
+	private function ff_record_by_key( $post_id, $key ) {
+		if ( '' === $key ) { return null; }
+		foreach ( $this->ff_sections( $post_id ) as $r ) {
+			if ( ( $r['pg_key'] ?? '' ) === $key ) { return $r; }
+		}
+		return null;
+	}
+
+	/** Edit a SELECTED section in place: re-compose just that section's tree with the
+	 *  user's change, re-render it under the same marker, and swap it into the page —
+	 *  so "change the headline" / "here's my menu" edits the section you're on, not a
+	 *  brand-new one. Snapshot-protected ("undo"). */
+	private function scoped_edit_section( $post_id, $rec, $message ) {
+		$tree = isset( $rec['source_tree'] ) ? $rec['source_tree'] : null;
+		if ( empty( $tree ) ) {
+			return array( 'note' => "I can't edit that section in place yet (it was built before this feature). Tell me what to add or remove instead." );
+		}
+		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
+		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
+		$framed = "EDIT AN EXISTING SECTION (do not start over). Here is the current section as a JSON block tree:\n"
+			. wp_json_encode( $tree )
+			. "\n\nApply ONLY this change and keep everything else (layout, structure, other copy, images, colors) identical:\n" . $message
+			. "\n\nOutput the FULL updated section as one JSON block tree (root {\"type\":\"section\"}). No prose, no code fences.";
+		$composed = $this->compose_freeform_tree( $system, $framed );
+		if ( empty( $composed['tree'] ) ) {
+			return array( 'note' => "I couldn't make that change cleanly — try rewording it." );
+		}
+		$newtree = $this->resolve_freeform_images( $composed['tree'] );
+
+		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
+		require_once $gen . 'class-pressgo-style-utils.php';
+		require_once $gen . 'class-pressgo-element-factory.php';
+		require_once $gen . 'class-pressgo-widget-helpers.php';
+		require_once $gen . 'class-pressgo-freeform-renderer.php';
+		$cfg     = ( ! empty( $rec['palette'] ) && is_array( $rec['palette'] ) ) ? $rec['palette'] : $this->cohesion_cfg( $post_id );
+		$section = PressGo_Freeform_Renderer::render( $newtree, $cfg, $rec['pg_key'] );
+		if ( null === $section ) {
+			return array( 'note' => "That edit didn't render cleanly — left the section exactly as it was." );
+		}
+
+		$records = $this->ff_sections( $post_id );
+		$this->cohesion_snapshot( $post_id, $records );
+
+		$elements = $this->read_elements( $post_id );
+		$replaced = false;
+		foreach ( $elements as $i => $el ) {
+			if ( $this->element_pg_key( $el ) === $rec['pg_key'] ) { $elements[ $i ] = $section; $replaced = true; break; }
+		}
+		if ( ! $replaced ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't find that section on the page to update — nothing changed." );
+		}
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
+		foreach ( $records as $i => $r ) {
+			if ( ( $r['pg_key'] ?? '' ) === $rec['pg_key'] ) {
+				$records[ $i ]['source_tree'] = $newtree;
+				$records[ $i ]['heading']     = $this->tree_headline( $newtree );
+				break;
+			}
+		}
+		$this->save_ff_sections( $post_id, $records );
+		$this->cohesion_flush( $post_id );
+		$this->bump_usage( 4 );
+
+		$label = $this->role_label( $rec['semantic_role'] ?? 'unknown' );
+		return array(
+			'preview_bust' => time(),
+			'cohesion'     => true,
+			'scoped'       => true,
+			'note'         => 'Updated your ' . ( 'that' === $label ? 'selected' : $label ) . ' section. Say "undo" to revert, or X out of it to work on the whole page.',
+		);
+	}
+
 	/** Which section a "remove the X" message refers to: a record index, or -1. */
 	private function find_target_section( $records, $message ) {
 		$m    = strtolower( (string) $message );
@@ -2084,13 +2158,19 @@ class PressGo_AI_Builder {
 	}
 
 	/** Delete a section the user asked to remove (snapshot first so "undo" restores it). */
-	private function cohesion_delete_section( $post_id, $message ) {
+	private function cohesion_delete_section( $post_id, $message, $selected_key = '' ) {
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
 		if ( count( $records ) <= 1 ) {
 			return array( 'note' => "There's only the hero here — nothing else to remove yet." );
 		}
 		$idx = $this->find_target_section( $records, $message );
+		// No named/positional target, but a section is selected -> delete that one.
+		if ( $idx < 0 && '' !== $selected_key ) {
+			foreach ( $records as $i => $r ) {
+				if ( ( $r['pg_key'] ?? '' ) === $selected_key ) { $idx = $i; break; }
+			}
+		}
 		if ( $idx < 0 ) {
 			// Distinguish "that section doesn't exist here" from "be more specific".
 			$roles = array();
@@ -3490,6 +3570,8 @@ class PressGo_AI_Builder {
 		if ( ! $post_id || '' === trim( $message ) ) {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
+		// Visual editor: a section selected in the preview scopes typed edits to it.
+		$selected_key = isset( $_POST['selected_section'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_section'] ) ) : '';
 
 		// ── Discovery (chip-driven state machine) ──────────────────────────
 		// On a FRESH page, run a short tap-driven interview (goal -> industry ->
@@ -3536,10 +3618,18 @@ class PressGo_AI_Builder {
 			}
 			// Remove/trim -> delete a section (NEVER add). Casual phrasing too:
 			// "take something out", "it's too long", "too many sections", "lose one".
+			// A selected section is the default target ("delete this").
 			if ( ( preg_match( '/\b(remove|delete|get ?rid of|kill|too long|too many|fewer|lose (a|one|the|that)|cut (a|one|the|this))\b/i', $message )
 					|| preg_match( '/\btake\s+(\w+\s+){0,2}out\b/i', $message ) )
 				&& ! preg_match( '/\badd\b/i', $message ) ) {
-				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message ) );
+				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message, $selected_key ) );
+			}
+			// Scoped edit: a section is selected and this is a plain edit/request —
+			// change THAT section in place instead of composing a brand-new one. This
+			// is what stops "here's my menu" from spawning an unrelated section.
+			$sel_rec = ( '' !== $selected_key ) ? $this->ff_record_by_key( $post_id, $selected_key ) : null;
+			if ( is_array( $sel_rec ) ) {
+				wp_send_json_success( $this->scoped_edit_section( $post_id, $sel_rec, $message ) );
 			}
 		}
 
