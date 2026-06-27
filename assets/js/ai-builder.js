@@ -4503,10 +4503,11 @@
 
 	// ===== Voice input (mic button + live waveform) =====
 	// States: idle → recording → transcribing → error → idle
-	// Records audio via MediaRecorder, shows a live canvas waveform driven
-	// by AnalyserNode (real mic input with per-bar randomized spring physics),
-	// POSTs to pressgo_ai_transcribe, fills the textarea. Does NOT auto-send —
-	// the spec says let the user edit before sending.
+	// Records audio via MediaRecorder, shows a live canvas waveform driven by
+	// AnalyserNode — a scrolling amplitude trace (newest sample on the right,
+	// older samples ease left), in the composer accent color. POSTs to
+	// pressgo_ai_transcribe, fills the textarea. Does NOT auto-send — the spec
+	// says let the user edit before sending.
 	(function () {
 		var micBtn = document.querySelector('.pg-mic-btn') || document.getElementById('pg-mic-btn');
 		if (!micBtn) return;
@@ -4528,24 +4529,29 @@
 		var audioCtx      = null;
 		var analyser      = null;
 		var sourceNode    = null;
-		var freqData      = null;
+		var timeData      = null;   // time-domain buffer (for RMS amplitude)
 		var rafId         = null;
 		var recording     = false;
 		var timerInterval = null;
 		var timerStart    = 0;
 
-		// Waveform bar state — per-bar spring physics for organic motion
-		var NUM_BARS = 48;
-		var bars = [];
-		for (var i = 0; i < NUM_BARS; i++) {
-			bars.push({
-				height: 0.1,
-				vel: 0,
-				stiffness: 300 + Math.random() * 80,
-				damping: 18 + Math.random() * 6,
-				target: 0.1
-			});
-		}
+		// Cap a runaway recording so the payload can't blow past PHP limits —
+		// auto-stops and transcribes what we have. Mirrors the server guard.
+		var MAX_SECONDS = 60;
+
+		// Accent color for the trace (matches --pg-accent: #5b4fff).
+		var ACCENT = '91, 79, 255';
+
+		// Scrolling amplitude trace: `levels` holds recent mic amplitudes
+		// (0–1, oldest → newest); `displayed` are the eased heights we draw, so
+		// the motion is fluid rather than steppy. We advance the scroll on a
+		// fixed cadence (not every frame) so it reads at a calm, voice-like pace.
+		var NUM_BARS  = 40;
+		var levels    = [];
+		var displayed = [];
+		for (var i = 0; i < NUM_BARS; i++) { levels.push(0); displayed.push(0); }
+		var lastShift = 0;          // timestamp of the last scroll advance
+		var SHIFT_MS  = 55;         // ~18 new bars/sec → ~2.2s of trace on screen
 
 		function setState(s) {
 			micBtn.setAttribute('data-state', s);
@@ -4578,8 +4584,13 @@
 			timerStart = Date.now();
 			if (voiceTimer) voiceTimer.textContent = '0:00';
 			timerInterval = setInterval(function () {
-				if (!voiceTimer) return;
 				var secs = Math.floor((Date.now() - timerStart) / 1000);
+				// Auto-stop at the cap so the payload can't exceed server limits.
+				if (secs >= MAX_SECONDS) {
+					if (recording) stopRecording();
+					return;
+				}
+				if (!voiceTimer) return;
 				var m = Math.floor(secs / 60);
 				var s = secs % 60;
 				voiceTimer.textContent = m + ':' + (s < 10 ? '0' + s : s);
@@ -4601,6 +4612,23 @@
 			ctx.scale(dpr, dpr);
 		}
 
+		// Rounded-rect path helper (caps clamp to half-height for pill ends).
+		function roundRect(c, x, y, ww, hh, rad) {
+			if (rad > hh / 2) rad = hh / 2;
+			if (rad > ww / 2) rad = ww / 2;
+			c.beginPath();
+			c.moveTo(x + rad, y);
+			c.lineTo(x + ww - rad, y);
+			c.quadraticCurveTo(x + ww, y, x + ww, y + rad);
+			c.lineTo(x + ww, y + hh - rad);
+			c.quadraticCurveTo(x + ww, y + hh, x + ww - rad, y + hh);
+			c.lineTo(x + rad, y + hh);
+			c.quadraticCurveTo(x, y + hh, x, y + hh - rad);
+			c.lineTo(x, y + rad);
+			c.quadraticCurveTo(x, y, x + rad, y);
+			c.closePath();
+		}
+
 		function drawWaveform() {
 			rafId = requestAnimationFrame(drawWaveform);
 			if (!canvas || !ctx) return;
@@ -4610,87 +4638,58 @@
 			var h = rect.height;
 			ctx.clearRect(0, 0, w, h);
 
-			// Get mic volume data
-			var avgVol = 0;
-			if (analyser && freqData) {
-				analyser.getByteFrequencyData(freqData);
+			// Current mic amplitude — RMS of the time-domain signal (0–1).
+			// Time domain (not frequency) reads as a single "loudness" level,
+			// which is what a voice trace should follow.
+			var amp = 0;
+			if (analyser && timeData) {
+				analyser.getByteTimeDomainData(timeData);
 				var sum = 0;
-				for (var k = 0; k < freqData.length; k++) sum += freqData[k];
-				avgVol = sum / freqData.length / 255; // 0–1
-			}
-
-			// Update bar targets from frequency data, with per-bar spring physics
-			var barW = w / NUM_BARS;
-			var gap = 2;
-			var drawW = barW - gap;
-			if (drawW < 1) drawW = 1;
-
-			for (var i = 0; i < NUM_BARS; i++) {
-				var bar = bars[i];
-				if (analyser && freqData) {
-					// Map bar index to frequency bin (skip the lowest bins — mostly noise)
-					var binIdx = Math.floor(2 + (i / NUM_BARS) * (freqData.length * 0.7));
-					var raw = (freqData[binIdx] || 0) / 255;
-					// Add slight randomness to avoid mechanical feel
-					raw = raw * (0.85 + Math.random() * 0.3);
-					bar.target = Math.max(0.05, raw);
-				} else {
-					bar.target = 0.05;
+				for (var k = 0; k < timeData.length; k++) {
+					var s = (timeData[k] - 128) / 128; // −1…1
+					sum += s * s;
 				}
-
-				// Spring physics: F = -kx - cv
-				var force = (bar.target - bar.height) * bar.stiffness;
-				var dampingForce = -bar.vel * bar.damping;
-				bar.vel += (force + dampingForce) * 0.016; // ~60fps
-				bar.height += bar.vel * 0.016;
-
-				// Clamp
-				if (bar.height < 0.03) bar.height = 0.03;
-				if (bar.height > 1) bar.height = 1;
+				var rms = Math.sqrt(sum / timeData.length);
+				// Perceptual lift so quiet speech still moves; clamp to 1.
+				amp = Math.min(1, Math.pow(rms, 0.7) * 2.4);
 			}
 
-			// Draw bars with gradient + glow
-			var maxH = h * 0.9;
+			// Advance the scroll on a fixed cadence: drop the oldest bar and
+			// append the live amplitude on the right. Between shifts, let the
+			// newest bar track the loudest sample so a quick syllable registers.
+			var now = Date.now();
+			if (now - lastShift >= SHIFT_MS) {
+				lastShift = now;
+				levels.shift();
+				levels.push(amp);
+			} else if (amp > levels[NUM_BARS - 1]) {
+				levels[NUM_BARS - 1] = amp;
+			}
+
+			var barW  = w / NUM_BARS;
+			var gap   = Math.max(1, barW * 0.34);
+			var drawW = Math.max(1, barW - gap);
+			var maxH  = h * 0.92;
+			var mid   = h / 2;
+			var rad   = Math.min(drawW / 2, 2);
+
 			for (var j = 0; j < NUM_BARS; j++) {
-				var barH = bars[j].height * maxH;
+				// Ease the drawn height toward the target — fluid, not steppy.
+				displayed[j] += (levels[j] - displayed[j]) * 0.35;
+				var lvl = displayed[j];
+
+				var barH = Math.max(2, lvl * maxH);   // thin idle baseline
 				var x = j * barW + gap / 2;
-				var y = (h - barH) / 2;
+				var y = mid - barH / 2;               // mirror around centerline
 
-				// Gradient: center brighter, edges softer
-				var intensity = bars[j].height;
-				var alpha = 0.4 + intensity * 0.6;
-				ctx.fillStyle = 'rgba(139, 92, 246, ' + alpha + ')';
+				// Newer bars (right) read a touch stronger than the fading tail.
+				var pos = NUM_BARS > 1 ? j / (NUM_BARS - 1) : 1; // 0 oldest … 1 newest
+				var alpha = 0.22 + lvl * 0.62 + pos * 0.16;
+				if (alpha > 1) alpha = 1;
+				ctx.fillStyle = 'rgba(' + ACCENT + ', ' + alpha.toFixed(3) + ')';
 
-				// Rounded bars
-				var r = Math.min(drawW / 2, 2);
-				ctx.beginPath();
-				ctx.moveTo(x + r, y);
-				ctx.lineTo(x + drawW - r, y);
-				ctx.quadraticCurveTo(x + drawW, y, x + drawW, y + r);
-				ctx.lineTo(x + drawW, y + barH - r);
-				ctx.quadraticCurveTo(x + drawW, y + barH, x + drawW - r, y + barH);
-				ctx.lineTo(x + r, y + barH);
-				ctx.quadraticCurveTo(x, y + barH, x, y + barH - r);
-				ctx.lineTo(x, y + r);
-				ctx.quadraticCurveTo(x, y, x + r, y);
-				ctx.closePath();
+				roundRect(ctx, x, y, drawW, barH, rad);
 				ctx.fill();
-			}
-
-			// Edge fade (left/right gradient mask)
-			var fadeW = 24;
-			if (w > fadeW * 2) {
-				var gradL = ctx.createLinearGradient(0, 0, fadeW, 0);
-				gradL.addColorStop(0, 'rgba(30, 27, 46, 1)');
-				gradL.addColorStop(1, 'rgba(30, 27, 46, 0)');
-				ctx.fillStyle = gradL;
-				ctx.fillRect(0, 0, fadeW, h);
-
-				var gradR = ctx.createLinearGradient(w - fadeW, 0, w, 0);
-				gradR.addColorStop(0, 'rgba(30, 27, 46, 0)');
-				gradR.addColorStop(1, 'rgba(30, 27, 46, 1)');
-				ctx.fillStyle = gradR;
-				ctx.fillRect(w - fadeW, 0, fadeW, h);
 			}
 		}
 
@@ -4706,10 +4705,14 @@
 					audioCtx = new AudioContext();
 					sourceNode = audioCtx.createMediaStreamSource(s);
 					analyser = audioCtx.createAnalyser();
-					analyser.fftSize = 256;
+					analyser.fftSize = 1024; // finer time-domain sampling for RMS
 					analyser.smoothingTimeConstant = 0.8;
-					freqData = new Uint8Array(analyser.frequencyBinCount);
+					timeData = new Uint8Array(analyser.fftSize);
 					sourceNode.connect(analyser);
+
+					// Reset the scrolling trace for a clean start.
+					for (var bi = 0; bi < NUM_BARS; bi++) { levels[bi] = 0; displayed[bi] = 0; }
+					lastShift = 0;
 
 					// MediaRecorder for actual recording
 					mediaRecorder = new MediaRecorder(s);
