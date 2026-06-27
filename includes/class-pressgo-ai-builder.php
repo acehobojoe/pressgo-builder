@@ -27,6 +27,8 @@ class PressGo_AI_Builder {
 	const META_FREEFORM_BRIEF = '_pressgo_freeform_brief'; // persistent page brief (business + goal) for Nova discovery
 	const META_DISCOVERY_STATE = '_pressgo_discovery_state'; // per-page chip interview state (transient, cleared on chat reset)
 	const MASTER_PROFILE_OPTION = 'pressgo_master_profile';  // site-level discovery memory (goal/vibe/photos/location) — compounds across pages
+	const META_FF_SECTIONS  = '_pressgo_ff_sections';        // ordered records of every freeform section (source tree + roles) for the cohesion engine
+	const META_COHESION_UNDO = '_pressgo_cohesion_undo';     // one-step snapshot so "undo" restores a reorganize
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -1081,6 +1083,11 @@ class PressGo_AI_Builder {
 			$chips[] = array( 'label' => $s['label'], 'request' => $s['request'], 'key' => $s['key'] );
 			if ( count( $chips ) >= 6 ) { break; }
 		}
+		// Once there are a few sections, lead with the cohesion action — reorganize
+		// the whole page into a smart order with an even dark/light rhythm.
+		if ( count( $built ) >= 3 ) {
+			array_unshift( $chips, array( 'label' => 'Make it flow', 'request' => 'make everything flow better', 'key' => 'cohesion', 'action' => 'cohesion' ) );
+		}
 		if ( empty( $chips ) ) { return null; }
 		$first = ( count( $built ) <= 1 ); // just the hero so far
 		$note  = $first
@@ -1089,6 +1096,419 @@ class PressGo_AI_Builder {
 				: "Here's what usually comes next on a page like this. Tap one and I'll build it on-brand, or tell me your own:" )
 			: "What should we add next? Tap one, or tell me your own:";
 		return array( 'note' => $note, 'chips' => $chips );
+	}
+
+	// ── Cohesion engine: store section trees (C1) + deterministic reorganize (C2) ──
+
+	/** A unique, css-class-safe key per section (also stamped as its render marker). */
+	private function new_pg_key( $post_id ) {
+		return 'ff' . absint( $post_id ) . substr( md5( $post_id . microtime( true ) . wp_rand() ), 0, 6 );
+	}
+
+	private function ff_sections( $post_id ) {
+		$r = get_post_meta( $post_id, self::META_FF_SECTIONS, true );
+		return is_array( $r ) ? $r : array();
+	}
+	private function save_ff_sections( $post_id, $records ) {
+		update_post_meta( $post_id, self::META_FF_SECTIONS, wp_slash( $records ) );
+	}
+
+	/** Map a suggestion section_key to a semantic role. */
+	private function role_from_section_key( $key ) {
+		$map = array(
+			'services' => 'services', 'about' => 'about', 'testimonials' => 'proof', 'reviews' => 'proof',
+			'team' => 'team', 'gallery' => 'gallery', 'faq' => 'faq', 'contact' => 'cta', 'cta' => 'cta',
+			'pricing' => 'pricing', 'benefits' => 'features', 'features' => 'features', 'how' => 'steps', 'steps' => 'steps',
+		);
+		return isset( $map[ $key ] ) ? $map[ $key ] : '';
+	}
+
+	/** Append a record for a freshly-built section (source tree never mutated). */
+	private function store_ff_record( $post_id, $pg_key, $tree, $cfg, $role_hint = '' ) {
+		$records   = $this->ff_sections( $post_id );
+		$bg_role   = $this->bg_role_from_tree( $tree, $cfg );
+		// The user's REQUEST ("add an about section") is a far better role signal than
+		// the composer's creative headline — trust the hint, fall back to the tree.
+		$role = ( '' !== $role_hint && 'unknown' !== $role_hint ) ? $role_hint : $this->infer_section_role( $tree, count( $records ) === 0 );
+		$records[] = array(
+			'pg_key'           => $pg_key,
+			'source_tree'      => $tree,
+			'palette'          => $cfg,
+			'semantic_role'    => $role,
+			'bg_role'          => $bg_role,
+			'rendered_bg_role' => $bg_role,
+			'lock_bg'          => $this->tree_locks_bg( $tree ),
+			'heading'          => $this->tree_headline( $tree ),
+			'origin'           => 'composer',
+		);
+		$this->save_ff_sections( $post_id, $records );
+	}
+
+	/** True when a section's background is an image or gradient (reorder yes, recolor never). */
+	private function tree_locks_bg( $tree ) {
+		$s = isset( $tree['settings'] ) && is_array( $tree['settings'] ) ? $tree['settings'] : array();
+		if ( ! empty( $s['background_image'] ) || ! empty( $s['background_image_query'] ) ) { return true; }
+		$bg = isset( $s['background'] ) ? $s['background'] : '';
+		return is_string( $bg ) && 0 === strpos( $bg, 'gradient:' );
+	}
+
+	/** dark | light | accent from a section's background, against its palette. */
+	private function bg_role_from_tree( $tree, $cfg ) {
+		$s = isset( $tree['settings'] ) && is_array( $tree['settings'] ) ? $tree['settings'] : array();
+		if ( ! empty( $s['background_image'] ) || ! empty( $s['background_image_query'] ) ) { return 'dark'; }
+		$bg = isset( $s['background'] ) ? $s['background'] : '';
+		if ( ! is_string( $bg ) || '' === $bg ) { return 'light'; }
+		if ( 0 === strpos( $bg, 'gradient:' ) ) {
+			$parts = explode( ',', substr( $bg, strlen( 'gradient:' ) ) );
+			$bg    = isset( $parts[0] ) ? trim( $parts[0] ) : '';
+		}
+		$accent = isset( $cfg['colors']['accent'] ) ? strtolower( $cfg['colors']['accent'] ) : '';
+		if ( '' !== $accent && strtolower( $bg ) === $accent ) { return 'accent'; }
+		if ( preg_match( '/^#[0-9a-f]{6}$/i', $bg ) ) { return $this->hex_is_dark( $bg ) ? 'dark' : 'light'; }
+		return 'light';
+	}
+
+	/** Infer a section's semantic role (for ordering) from its SOURCE TREE. */
+	private function infer_section_role( $tree, $is_first ) {
+		return $this->role_from_text( $this->tree_blob( $tree ), $is_first, $this->tree_has_form( $tree ) );
+	}
+
+	/** Heading/eyebrow text concatenated from a freeform source tree (type/children/text). */
+	private function tree_blob( $tree ) {
+		$out = array();
+		$this->tree_collect_headings( $tree, $out );
+		$texts = array();
+		foreach ( $out as $h ) { $texts[] = $h['text']; }
+		return implode( ' ', $texts );
+	}
+	private function tree_collect_headings( $node, &$out ) {
+		if ( ! is_array( $node ) ) { return; }
+		if ( ( $node['type'] ?? '' ) === 'heading' ) {
+			$t = $node['settings']['text'] ?? '';
+			if ( is_string( $t ) && '' !== trim( $t ) ) {
+				$out[] = array( 'text' => trim( wp_strip_all_tags( $t ) ), 'tag' => $node['settings']['tag'] ?? 'h2' );
+			}
+		}
+		foreach ( ( $node['children'] ?? array() ) as $c ) { $this->tree_collect_headings( $c, $out ); }
+	}
+	private function tree_headline( $tree ) {
+		$h = array();
+		$this->tree_collect_headings( $tree, $h );
+		foreach ( array( 'h1', 'h2', 'h3' ) as $tag ) {
+			foreach ( $h as $x ) { if ( ( $x['tag'] ?? '' ) === $tag && '' !== $x['text'] ) { return $x['text']; } }
+		}
+		return isset( $h[0]['text'] ) ? $h[0]['text'] : '';
+	}
+	private function tree_has_form( $node ) {
+		if ( ! is_array( $node ) ) { return false; }
+		if ( ( $node['type'] ?? '' ) === 'form' ) { return true; }
+		foreach ( ( $node['children'] ?? array() ) as $c ) { if ( $this->tree_has_form( $c ) ) { return true; } }
+		return false;
+	}
+
+	/** Shared role classifier (used for both stored trees and backfilled headings). */
+	private function role_from_text( $blob, $is_first, $has_form ) {
+		if ( $is_first ) { return 'hero'; }
+		$b = strtolower( (string) $blob );
+		if ( preg_match( '/\b(faq|frequently asked|questions?)\b/', $b ) )                       { return 'faq'; }
+		if ( preg_match( '/\b(reviews?|testimonial|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
+		if ( preg_match( '/\b(how it works|steps?|get started|simple)\b/', $b ) )               { return 'steps'; }
+		if ( preg_match( '/\b(about|our story|why us|who we are|meet )\b/', $b ) )               { return 'about'; }
+		if ( preg_match( '/\b(team|staff|coaches|trainers|experts)\b/', $b ) )                   { return 'team'; }
+		if ( preg_match( '/\b(gallery|our work|portfolio|projects)\b/', $b ) )                   { return 'gallery'; }
+		if ( preg_match( '/\b(pricing|plans|packages|membership|cost)\b/', $b ) )                { return 'pricing'; }
+		if ( preg_match( '/\b(services?|what we offer|what we do|programs?|features?)\b/', $b ) ) { return 'services'; }
+		if ( preg_match( '/\b(call to action|cta|ready|today|call now|book|claim|get started|join|sign ?up|contact|order|checkout|buy now|order online|enroll|subscribe)\b/', $b ) ) { return 'cta'; }
+		if ( $has_form ) { return 'cta'; }
+		return 'unknown';
+	}
+
+	/** Canonical narrative slot weight per role (lower = earlier on the page). */
+	private function role_weight( $role ) {
+		$w = array(
+			'hero' => 0, 'social_proof' => 10, 'about' => 20, 'services' => 30, 'features' => 32,
+			'unknown' => 35, 'steps' => 40, 'stats' => 45, 'gallery' => 50, 'team' => 55,
+			'pricing' => 60, 'proof' => 65, 'faq' => 80, 'contact' => 85, 'cta' => 90, 'footer' => 100,
+		);
+		return isset( $w[ $role ] ) ? $w[ $role ] : 35;
+	}
+
+	/** Plan = records reordered into the canonical narrative, with a bg rhythm assigned. */
+	private function build_cohesion_plan( $records ) {
+		$indexed = array();
+		foreach ( $records as $i => $r ) { $indexed[] = array( 'i' => $i, 'r' => $r ); }
+		usort( $indexed, function ( $a, $b ) {
+			$wa = $this->role_weight( $a['r']['semantic_role'] );
+			$wb = $this->role_weight( $b['r']['semantic_role'] );
+			return ( $wa === $wb ) ? ( $a['i'] - $b['i'] ) : ( $wa - $wb );
+		} );
+		$ordered = array();
+		foreach ( $indexed as $x ) { $ordered[] = $x['r']; }
+		return $this->assign_bg_rhythm( $ordered );
+	}
+
+	/** Dark/light zebra (no 3-in-a-row), accent rationed to the final CTA as a climax. */
+	private function assign_bg_rhythm( $ordered ) {
+		$n       = count( $ordered );
+		$cta_idx = -1;
+		for ( $i = $n - 1; $i >= 0; $i-- ) {
+			if ( 'cta' === $ordered[ $i ]['semantic_role'] ) { $cta_idx = $i; break; }
+		}
+		$last = 'dark';
+		foreach ( $ordered as $i => $rec ) {
+			if ( 0 === $i ) {
+				$last = ( 'light' === $rec['bg_role'] ) ? 'light' : 'dark';
+				continue;
+			}
+			if ( ! empty( $rec['lock_bg'] ) ) {
+				$last = ( 'light' === $rec['bg_role'] ) ? 'light' : 'dark';
+				continue;
+			}
+			if ( $i === $cta_idx ) { $ordered[ $i ]['bg_role'] = 'accent'; continue; }
+			$ordered[ $i ]['bg_role'] = ( 'dark' === $last ) ? 'light' : 'dark';
+			$last                     = $ordered[ $i ]['bg_role'];
+		}
+		return $ordered;
+	}
+
+	/** [luminance 0-1, saturation 0-1, known] for a color string. */
+	private function color_lum_sat( $v ) {
+		$v = strtolower( trim( (string) $v ) );
+		$r = $g = $b = null;
+		if ( in_array( $v, array( 'white', '#fff', '#ffffff' ), true ) ) { $r = $g = $b = 255; }
+		elseif ( in_array( $v, array( 'black', '#000', '#000000' ), true ) ) { $r = $g = $b = 0; }
+		elseif ( preg_match( '/^#([0-9a-f]{6})$/', $v, $m ) ) { $r = hexdec( substr( $m[1], 0, 2 ) ); $g = hexdec( substr( $m[1], 2, 2 ) ); $b = hexdec( substr( $m[1], 4, 2 ) ); }
+		elseif ( preg_match( '/^#([0-9a-f]{3})$/', $v, $m ) ) { $r = hexdec( $m[1][0] . $m[1][0] ); $g = hexdec( $m[1][1] . $m[1][1] ); $b = hexdec( $m[1][2] . $m[1][2] ); }
+		elseif ( preg_match( '/rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/', $v, $m ) ) { $r = (int) $m[1]; $g = (int) $m[2]; $b = (int) $m[3]; }
+		if ( null === $r ) { return array( 0.0, 0.0, false ); }
+		$max = max( $r, $g, $b ); $min = min( $r, $g, $b );
+		$lum = ( 0.2126 * $r + 0.7152 * $g + 0.0722 * $b ) / 255;
+		$sat = ( 0 === $max ) ? 0.0 : ( $max - $min ) / $max;
+		return array( $lum, $sat, true );
+	}
+
+	/** Should this text color be flipped for legibility on the target bg? (Vivid brand
+	 *  hues are preserved; neutral dark/light contrast colors are flipped.) */
+	private function should_flip_text( $v, $on_dark ) {
+		list( $lum, $sat, $known ) = $this->color_lum_sat( $v );
+		if ( ! $known ) { return false; } // named/unknown -> leave it alone
+		if ( $sat >= 0.45 && $lum > 0.25 && $lum < 0.80 ) { return false; } // vivid accent -> preserve
+		return $on_dark ? ( $lum < 0.55 ) : ( $lum > 0.50 );
+	}
+
+	/** Re-render a section's tree against a target bg role, contrast-safe (no source mutation). */
+	private function apply_role_overlay( $tree, $role, $cfg ) {
+		if ( $this->tree_locks_bg( $tree ) ) { return $tree; }
+		$colors    = isset( $cfg['colors'] ) ? $cfg['colors'] : array();
+		$target_bg = ( 'accent' === $role ) ? ( $colors['accent'] ?? '#e2b714' )
+			: ( ( 'light' === $role ) ? ( $colors['light_bg'] ?? '#F8FAFC' ) : ( $colors['dark_bg'] ?? '#0F172A' ) );
+		$on_dark   = ( 'light' !== $role );
+		if ( ! isset( $tree['settings'] ) || ! is_array( $tree['settings'] ) ) { $tree['settings'] = array(); }
+		$tree['settings']['background'] = $target_bg;
+		$heading_color = $on_dark ? '#ffffff' : ( $colors['text_dark'] ?? '#0F172A' );
+		$text_color    = $on_dark ? 'rgba(255,255,255,0.72)' : ( $colors['text_muted'] ?? '#4B5563' );
+		$accent        = $colors['accent'] ?? '#e2b714';
+		$this->overlay_walk( $tree, $on_dark, $heading_color, $text_color, $accent, $role, $colors );
+		return $tree;
+	}
+
+	/** Recursively recolor a tree for contrast, preserving deliberately-bespoke colors. */
+	private function overlay_walk( &$node, $on_dark, $heading_color, $text_color, $accent, $role, $colors ) {
+		if ( ! is_array( $node ) ) { return; }
+		$type = isset( $node['type'] ) ? $node['type'] : '';
+		if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) { $node['settings'] = array(); }
+		$s       =& $node['settings'];
+		$generic = array( '', '#fff', '#ffffff', 'white', '#000', '#000000', '#0f172a', '#1c1917', '#111827', '#0a0a0a', '#0f1115',
+			'rgba(255,255,255,0.72)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0.7)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.55)',
+			'#64748b', '#4b5563', '#6b7280', '#78716c', '#5b6470' );
+		$is_generic = function ( $v ) use ( $generic, $colors ) {
+			$v = strtolower( trim( (string) $v ) );
+			if ( '' === $v ) { return true; }
+			if ( in_array( $v, $generic, true ) ) { return true; }
+			foreach ( array( 'text_dark', 'text_muted', 'text_light', 'white', 'dark_bg', 'light_bg' ) as $k ) {
+				if ( isset( $colors[ $k ] ) && strtolower( $colors[ $k ] ) === $v ) { return true; }
+			}
+			return false;
+		};
+		if ( 'heading' === $type ) {
+			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $heading_color; }
+		} elseif ( 'text' === $type ) {
+			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $text_color; }
+		} elseif ( 'button' === $type ) {
+			if ( 'accent' === $role ) {
+				$s['bg']    = $on_dark ? '#ffffff' : '#0F172A';
+				$s['color'] = $accent;
+			} else {
+				if ( ! isset( $s['bg'] ) || $is_generic( $s['bg'] ) ) { $s['bg'] = $accent; }
+				$s['color'] = PressGo_Style_Utils::text_on_color( $s['bg'] );
+			}
+			if ( isset( $s['border_color'] ) && $is_generic( $s['border_color'] ) ) { $s['border_color'] = $heading_color; }
+		} elseif ( 'icon' === $type ) {
+			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $accent; }
+		} elseif ( 'divider' === $type ) {
+			$s['color'] = $on_dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+		} elseif ( 'form' === $type ) {
+			$s['on_dark'] = $on_dark;
+		}
+		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
+			foreach ( $node['children'] as &$c ) {
+				$this->overlay_walk( $c, $on_dark, $heading_color, $text_color, $accent, $role, $colors );
+			}
+			unset( $c );
+		}
+	}
+
+	/** The pg-key marker stamped on a rendered Elementor section, or '' if none. */
+	private function element_pg_key( $el ) {
+		$c = isset( $el['settings']['css_classes'] ) ? $el['settings']['css_classes'] : '';
+		if ( is_string( $c ) && preg_match( '/pg-key--([a-z0-9-]+)/i', $c, $m ) ) { return $m[1]; }
+		return '';
+	}
+	private function index_elements_by_marker( $elements ) {
+		$map = array();
+		foreach ( $elements as $el ) {
+			$k = $this->element_pg_key( $el );
+			if ( '' !== $k ) { $map[ $k ] = $el; }
+		}
+		return $map;
+	}
+
+	/** First heading text inside a rendered Elementor element (for backfill). */
+	private function element_headline( $el ) {
+		$found = '';
+		$walk  = function ( $n ) use ( &$walk, &$found ) {
+			if ( '' !== $found ) { return; }
+			if ( 'heading' === ( $n['widgetType'] ?? '' ) && ! empty( $n['settings']['title'] ) ) { $found = $n['settings']['title']; return; }
+			foreach ( ( $n['elements'] ?? array() ) as $c ) { $walk( $c ); }
+		};
+		$walk( $el );
+		return $found;
+	}
+
+	/** Legacy pages (built before C1) get reorder-only frozen records — never recolored. */
+	private function ff_backfill_records( $post_id ) {
+		$elements = $this->read_elements( $post_id );
+		$records  = array();
+		foreach ( $elements as $idx => $el ) {
+			$key  = $this->element_pg_key( $el );
+			$bg   = isset( $el['settings']['background_color'] ) ? $el['settings']['background_color'] : '';
+			$role = ( is_string( $bg ) && preg_match( '/^#[0-9a-f]{6}$/i', $bg ) ) ? ( $this->hex_is_dark( $bg ) ? 'dark' : 'light' ) : 'dark';
+			$head = $this->element_headline( $el );
+			$records[] = array(
+				'pg_key'           => '' !== $key ? $key : 'legacy' . $post_id . '_' . $idx,
+				'source_tree'      => null,
+				'palette'          => null,
+				'semantic_role'    => $this->role_from_text( $head, 0 === $idx, false ),
+				'bg_role'          => $role,
+				'rendered_bg_role' => $role,
+				'lock_bg'          => true,
+				'heading'          => $head,
+				'origin'           => 'backfill',
+				'element'          => $el,
+			);
+		}
+		$this->save_ff_sections( $post_id, $records );
+		return $records;
+	}
+
+	/** The renderer cfg to use for cohesion re-renders (locked brand, else vibe, else default). */
+	private function cohesion_cfg( $post_id ) {
+		if ( $this->brand_is_locked( $post_id ) ) { return $this->cfg_from_foundation(); }
+		$st   = $this->discovery_state( $post_id );
+		$vibe = ( is_array( $st ) && ! empty( $st['answers']['vibe'] ) ) ? $st['answers']['vibe'] : '';
+		$cfg  = ( '' !== $vibe ) ? $this->vibe_to_palette( $vibe ) : null;
+		return $cfg ? $cfg : $this->default_freeform_cfg();
+	}
+
+	private function cohesion_snapshot( $post_id, $records ) {
+		update_post_meta( $post_id, self::META_COHESION_UNDO, wp_slash( array(
+			'elementor_data' => (string) get_post_meta( $post_id, '_elementor_data', true ),
+			'records'        => $records,
+		) ) );
+	}
+
+	private function cohesion_flush( $post_id ) {
+		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
+		if ( class_exists( '\Elementor\Plugin' ) ) { \Elementor\Plugin::$instance->files_manager->clear_cache(); }
+		if ( function_exists( 'rocket_clean_domain' ) ) { rocket_clean_domain(); }
+	}
+
+	/** Reorganize the page: smart order + dark/light/accent rhythm + contrast-safe recolor. */
+	private function cohesion_reorganize( $post_id ) {
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
+		if ( count( $records ) < 3 ) {
+			return array( 'note' => "There's not enough on the page yet to reorganize — build a few more sections first, then ask me to make it flow." );
+		}
+		// Refresh only UNKNOWN roles from the stored trees — never clobber a role we
+		// captured from the user's request at build time.
+		foreach ( $records as $i => $r ) {
+			if ( ! empty( $r['source_tree'] ) && ( 'unknown' === ( $r['semantic_role'] ?? '' ) || '' === ( $r['semantic_role'] ?? '' ) ) ) {
+				$records[ $i ]['semantic_role'] = $this->infer_section_role( $r['source_tree'], 0 === $i );
+			}
+			if ( ! empty( $r['source_tree'] ) && empty( $r['heading'] ) ) {
+				$records[ $i ]['heading'] = $this->tree_headline( $r['source_tree'] );
+			}
+		}
+		$this->cohesion_snapshot( $post_id, $records );
+
+		// The renderer + style utils aren't loaded in this request path.
+		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
+		require_once $gen . 'class-pressgo-style-utils.php';
+		require_once $gen . 'class-pressgo-element-factory.php';
+		require_once $gen . 'class-pressgo-widget-helpers.php';
+		require_once $gen . 'class-pressgo-freeform-renderer.php';
+
+		$plan        = $this->build_cohesion_plan( $records );
+		$elements    = $this->read_elements( $post_id );
+		$by_marker   = $this->index_elements_by_marker( $elements );
+		$default_cfg = $this->cohesion_cfg( $post_id );
+
+		$new = array();
+		foreach ( $plan as $k => $rec ) {
+			$role = $rec['bg_role'];
+			$el   = null;
+			if ( ! empty( $rec['source_tree'] ) ) {
+				$cfg      = ( ! empty( $rec['palette'] ) && is_array( $rec['palette'] ) ) ? $rec['palette'] : $default_cfg;
+				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $cfg );
+				$el       = PressGo_Freeform_Renderer::render( $overlaid, $cfg, $rec['pg_key'] );
+				$plan[ $k ]['rendered_bg_role'] = $role;
+			} elseif ( isset( $rec['element'] ) && is_array( $rec['element'] ) ) {
+				$el = $rec['element'];
+			} elseif ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
+				$el = $by_marker[ $rec['pg_key'] ];
+			}
+			if ( $el ) { $new[] = $el; }
+		}
+
+		if ( count( $new ) < count( $records ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't safely reorganize this page — left it exactly as it was." );
+		}
+
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+		$this->save_ff_sections( $post_id, $plan );
+		$this->cohesion_flush( $post_id );
+
+		return array(
+			'preview_bust' => time(),
+			'cohesion'     => true,
+			'note'         => 'Reorganized your page — a smarter order, an even dark and light rhythm, and your call to action moved to the end where it pops. Say "undo" to put it back.',
+		);
+	}
+
+	/** Revert the last reorganize. */
+	private function cohesion_undo( $post_id ) {
+		$snap = get_post_meta( $post_id, self::META_COHESION_UNDO, true );
+		if ( ! is_array( $snap ) || ! isset( $snap['elementor_data'] ) || '' === $snap['elementor_data'] ) {
+			return array( 'note' => "Nothing to undo — I haven't reorganized this page yet." );
+		}
+		update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
+		$this->save_ff_sections( $post_id, isset( $snap['records'] ) ? $snap['records'] : array() );
+		delete_post_meta( $post_id, self::META_COHESION_UNDO );
+		$this->cohesion_flush( $post_id );
+		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Put it back the way it was.' );
 	}
 
 	/** Guess the industry enum from the first message (drives copy + stock photos). */
@@ -2330,6 +2750,18 @@ class PressGo_AI_Builder {
 			wp_send_json_success( $this->handle_brand_confirm( $post_id, $discovery_value, $message ) );
 		}
 
+		// Cohesion engine: on a populated page, "make it flow / reorganize / fix the
+		// order / balance the colors" reorganizes the whole page instead of adding a
+		// section; "undo / put it back" reverts the last reorganize.
+		if ( ! $page_empty ) {
+			if ( preg_match( '/^\s*(undo|put it back|revert)\b/i', $message ) ) {
+				wp_send_json_success( $this->cohesion_undo( $post_id ) );
+			}
+			if ( preg_match( '/\b(make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this) up|clean (it|this) up|smart order)\b/i', $message ) ) {
+				wp_send_json_success( $this->cohesion_reorganize( $post_id ) );
+			}
+		}
+
 		// Just-in-time conversion drips: when the user asks for a reviews or CTA
 		// section and we don't yet know their proof/offer, ask once (skippable)
 		// before composing it. Follow-up sections only — never the hero.
@@ -2457,7 +2889,10 @@ class PressGo_AI_Builder {
 		$vibe = ( is_array( $dstate ) && ! empty( $dstate['answers']['vibe'] ) ) ? $dstate['answers']['vibe'] : '';
 		if ( null === $cfg && '' !== $vibe ) { $cfg = $this->vibe_to_palette( $vibe ); }
 		if ( null === $cfg ) { $cfg = $this->default_freeform_cfg(); }
-		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
+		// Unique key per section so it carries a locatable marker — the cohesion
+		// engine reorders/recolors by this key without index-fragility.
+		$pg_key  = $this->new_pg_key( $post_id );
+		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, $pg_key );
 		if ( null === $section ) {
 			wp_send_json_error( 'Renderer rejected the composed tree.', 422 );
 		}
@@ -2481,6 +2916,13 @@ class PressGo_AI_Builder {
 		if ( class_exists( '\Elementor\Plugin' ) ) {
 			\Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
+
+		// Store this section's source tree + inferred role so the page is
+		// reconstructable. Role comes from the user's request / suggestion key
+		// (most reliable), falling back to the tree inside store_ff_record.
+		$role_hint = $was_first ? 'hero' : $this->role_from_section_key( $section_key );
+		if ( '' === $role_hint ) { $role_hint = $this->role_from_text( $message, false, $this->tree_has_form( $tree ) ); }
+		$this->store_ff_record( $post_id, $pg_key, $tree, $cfg, $role_hint );
 
 		$this->bump_usage( 4 ); // Nova (freeform) is the heaviest mode
 

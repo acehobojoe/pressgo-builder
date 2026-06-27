@@ -1215,6 +1215,7 @@
 		hero:    ['Reading your brief…', 'Sketching the hero layout…', 'Choosing an on-brand palette…', 'Writing the headline and copy…', 'Finding the right photo…', 'Assembling your hero…'],
 		section: ['Planning the section…', 'Matching your brand…', 'Writing the copy…', 'Finding imagery…', 'Putting it together…'],
 		recolor: ['Rethinking the look…', 'Trying a fresh palette and type…', 'Rewriting to fit…', 'Rebuilding your hero…'],
+		cohesion: ['Stepping back to look at your whole page…', 'Reading the flow, section by section…', 'Finding a smarter order…', 'Balancing the dark and light so it all flows…', 'Putting it back together…'],
 		quick:   ['Thinking…']
 	};
 	function makeThinking(steps) {
@@ -1377,7 +1378,7 @@
 					if (x !== b) x.style.opacity = '0.4';
 				});
 				b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca';
-				postFreeform({ message: c.request, section_key: c.key }, c.label, 'section');
+				postFreeform({ message: c.request, section_key: c.key }, c.label, c.key === 'cohesion' ? 'cohesion' : 'section');
 			});
 			wrap.appendChild(b);
 		});
@@ -1409,6 +1410,8 @@
 		input.value = '';
 		var fields = { message: text };
 		var kind = 'section'; // a typed message outside discovery composes a section
+		if (/\b(make .*(flow|cohesive)|flow better|re-?organi|fix the order|redo the order|balance the colou?rs?|tidy (it|this) up|clean (it|this) up|smart order)\b/i.test(text)) kind = 'cohesion';
+		else if (/^\s*(undo|put it back|revert)\b/i.test(text)) kind = 'quick';
 		// Typed answer during an interview: route it into the awaited stage so it
 		// lands in the same slot a chip tap would (server parses the text).
 		if (currentDiscoveryStage) {
