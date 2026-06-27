@@ -15,6 +15,26 @@
 	var visionInput = document.getElementById('pg-vision');
 	var lastCreditValue = null;
 
+	// ─── Inline composer error toast ───────────────────────────────────
+	var composerError = document.getElementById('pg-composer-error');
+	function showComposerError(msg, retryFn) {
+		if (!composerError) return;
+		composerError.innerHTML = '';
+		composerError.textContent = msg;
+		if (retryFn) {
+			var retry = document.createElement('a');
+			retry.textContent = 'Retry';
+			retry.className = 'pg-composer-error-retry';
+			retry.href = '#';
+			retry.addEventListener('click', function (e) { e.preventDefault(); hideComposerError(); retryFn(); });
+			composerError.appendChild(retry);
+		}
+		composerError.hidden = false;
+	}
+	function hideComposerError() {
+		if (composerError) { composerError.hidden = true; composerError.innerHTML = ''; }
+	}
+
 	// ─── Viewport switcher ─────────────────────────────────────────────
 	var stageInner = document.getElementById('pg-preview-stage-inner');
 	document.querySelectorAll('.pg-vp-btn').forEach(function (btn) {
@@ -56,6 +76,7 @@
 			resized.id = 'img' + (++imgSeq);
 			pendingImages.push(resized);
 			renderStrip();
+			updateSendState();
 		});
 	}
 
@@ -128,17 +149,20 @@
 				id:        'img' + (++imgSeq),
 			});
 			renderStrip();
+			updateSendState();
 		};
 		reader.readAsDataURL(file);
 	}
 	function removePendingImage(id) {
 		pendingImages = pendingImages.filter(function (im) { return im.id !== id; });
 		renderStrip();
+		updateSendState();
 	}
 	function clearPendingImages() {
 		pendingImages = [];
 		if (attachInput) attachInput.value = '';
 		renderStrip();
+		updateSendState();
 	}
 	// Render the thumbnail strip (each thumb has a remove ×) + the count badge.
 	function renderStrip() {
@@ -180,6 +204,24 @@
 		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
 		attachInput.value = ''; // allow re-picking the same file
 	});
+
+	// ── Composer: auto-grow textarea + send-button disabled state ──
+	function autoGrow() {
+		if (!input) return;
+		input.style.height = 'auto';
+		input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+	}
+	function updateSendState() {
+		if (!sendBtn) return;
+		if (sendBtn.classList.contains('is-responding')) return; // stay clickable as Stop
+		var hasText = input.value.trim().length > 0;
+		var hasImages = pendingImages.length > 0;
+		sendBtn.disabled = !hasText && !hasImages;
+	}
+	input.addEventListener('input', autoGrow);
+	input.addEventListener('input', updateSendState);
+	autoGrow();
+	updateSendState();
 
 	// Paste from clipboard inside the textarea (adds each pasted image).
 	input.addEventListener('paste', function (e) {
@@ -436,27 +478,39 @@
 	}
 
 	function setBusy(busy) {
-		sendBtn.disabled = busy;
-		input.disabled = busy;
-		if (busy) startElapsed();
-		else { stopElapsed(); sendBtn.textContent = 'Send'; }
+		if (busy) {
+			startElapsed();
+			sendBtn.classList.add('is-responding');
+			sendBtn.disabled = false; // clickable as Stop
+		} else {
+			stopElapsed();
+			sendBtn.classList.remove('is-responding');
+			updateSendState(); // re-evaluate disabled based on input/images
+		}
 	}
 
-	// Lightweight elapsed-time readout on the Send button so a 20–40s build
-	// doesn't feel hung. "~30s typical" sets the expectation.
+	// Stop button: clicking the send button while responding aborts the
+	// in-flight stream (if one exists) instead of submitting a new message.
+	sendBtn.addEventListener('click', function (e) {
+		if (sendBtn.classList.contains('is-responding')) {
+			e.preventDefault();
+			try { if (window.__pgActiveStream) window.__pgActiveStream.abort(); } catch (err) {}
+			setBusy(false);
+		}
+	});
+
+	// Lightweight elapsed-time readout (kept for potential status UI; the
+	// send button itself now morphs to a stop icon while responding, so we
+	// no longer overwrite its label here).
 	var elapsedTimer = null;
 	function startElapsed() {
 		stopElapsed();
 		var t0 = Date.now();
-		function tick() {
+		elapsedTimer = setInterval(function () {
 			var s = Math.round((Date.now() - t0) / 1000);
-			// Compact: the long "Thinking… 37s · almost there" label squeezed
-			// the textarea into a sliver. Status swaps text, never grows.
-			sendBtn.textContent = s < 1 ? 'Thinking…' : ( s < 30 ? s + 's…' : 'Almost…' );
-		}
-		tick();
-		elapsedTimer = setInterval(tick, 1000);
-		sendBtn.title = 'A full page build usually takes ~30 seconds';
+			sendBtn.title = s < 1 ? 'Generating…' : ( s < 30 ? s + 's elapsed' : 'Almost there' );
+		}, 1000);
+		sendBtn.title = 'Generating…';
 	}
 	function stopElapsed() {
 		if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
@@ -1597,11 +1651,16 @@
 		btn.addEventListener('click', open);
 	})();
 
-	// Enter to send (Shift+Enter for newline)
+	// Enter to send (Shift+Enter for newline) — desktop only. On touch
+	// devices Enter inserts a newline; the send button is the only way to
+	// submit, which avoids the mobile soft-keyboard "go" trap.
+	function isMobileDevice() {
+		return (navigator.maxTouchPoints || 0) > 0 || window.innerWidth < 768;
+	}
 	input.addEventListener('keydown', function (e) {
-		if (e.key === 'Enter' && !e.shiftKey) {
+		if (e.key === 'Enter' && !e.shiftKey && !isMobileDevice()) {
 			e.preventDefault();
-			form.dispatchEvent(new Event('submit', { cancelable: true }));
+			form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 		}
 	});
 
@@ -4299,25 +4358,25 @@
 	refreshCredits();
 
 	// ===== Voice input (mic button + live waveform) =====
-	// 5-state machine: idle → recording → processing → success/error → idle
+	// States: idle → recording → transcribing → error → idle
 	// Records audio via MediaRecorder, shows a live canvas waveform driven
 	// by AnalyserNode (real mic input with per-bar randomized spring physics),
-	// POSTs to pressgo_ai_transcribe, fills the textarea, auto-sends.
+	// POSTs to pressgo_ai_transcribe, fills the textarea. Does NOT auto-send —
+	// the spec says let the user edit before sending.
 	(function () {
-		var micBtn = document.getElementById('pg-mic-btn');
+		var micBtn = document.querySelector('.pg-mic-btn') || document.getElementById('pg-mic-btn');
 		if (!micBtn) return;
 		if (!navigator.mediaDevices || !window.MediaRecorder || !window.AudioContext) {
 			micBtn.style.display = 'none';
 			return;
 		}
 
-		var micWrap    = document.getElementById('pg-mic-wrap');
 		var voiceBar   = document.getElementById('pg-voice-bar');
 		var voiceTimer = document.getElementById('pg-voice-timer');
 		var voiceHint  = document.getElementById('pg-voice-hint');
 		var canvas     = document.getElementById('pg-voice-canvas');
-		var ctx        = canvas.getContext('2d');
-		var formEl     = document.getElementById('pg-chat-form');
+		var ctx        = canvas ? canvas.getContext('2d') : null;
+		var composerEl = document.querySelector('.pg-composer');
 
 		var mediaRecorder = null;
 		var audioChunks   = [];
@@ -4330,8 +4389,6 @@
 		var recording     = false;
 		var timerInterval = null;
 		var timerStart    = 0;
-		var userTyped     = false;
-		var revertTimer   = null;
 
 		// Waveform bar state — per-bar spring physics for organic motion
 		var NUM_BARS = 48;
@@ -4348,27 +4405,29 @@
 
 		function setState(s) {
 			micBtn.setAttribute('data-state', s);
-			if (revertTimer) { clearTimeout(revertTimer); revertTimer = null; }
-			if (s === 'success' || s === 'error') {
-				revertTimer = setTimeout(function () { setState('idle'); }, 1500);
-			}
 		}
 
 		function showVoiceBar(hint) {
 			if (voiceHint) voiceHint.textContent = hint;
+			// Voice bar replaces the textarea area inside the composer.
+			if (input) input.style.display = 'none';
 			if (voiceBar) {
 				voiceBar.hidden = false;
 				requestAnimationFrame(function () { voiceBar.classList.add('is-visible'); });
 			}
-			if (formEl) formEl.classList.add('pg-voice-active');
+			if (composerEl) composerEl.classList.add('pg-voice-active');
 		}
 
 		function hideVoiceBar() {
 			if (voiceBar) {
 				voiceBar.classList.remove('is-visible');
-				setTimeout(function () { voiceBar.hidden = true; }, 250);
+				voiceBar.hidden = true;
 			}
-			if (formEl) formEl.classList.remove('pg-voice-active');
+			if (composerEl) composerEl.classList.remove('pg-voice-active');
+			if (input) {
+				input.style.display = '';
+				input.focus();
+			}
 		}
 
 		function startTimer() {
@@ -4389,7 +4448,7 @@
 
 		// ── Canvas waveform rendering ──
 		function resizeCanvas() {
-			if (!canvas) return;
+			if (!canvas || !ctx) return;
 			var rect = canvas.getBoundingClientRect();
 			var dpr = window.devicePixelRatio || 1;
 			canvas.width = rect.width * dpr;
@@ -4493,11 +4552,11 @@
 
 		// ── Recording lifecycle ──
 		function startRecording() {
+			hideComposerError();
 			navigator.mediaDevices.getUserMedia({ audio: true })
 				.then(function (s) {
 					stream = s;
 					audioChunks = [];
-					userTyped = false;
 
 					// Set up AudioContext + AnalyserNode for live waveform
 					audioCtx = new AudioContext();
@@ -4527,7 +4586,6 @@
 					drawWaveform();
 					startTimer();
 
-					if (input) input.addEventListener('input', onInputWhileRecording);
 					window.addEventListener('resize', resizeCanvas);
 				})
 				.catch(function (err) {
@@ -4535,8 +4593,8 @@
 					if (err && err.name === 'NotAllowedError') {
 						msg = 'Microphone access denied. Click the camera icon in your address bar to allow.';
 					}
-					appendMessage('pg-msg pg-msg-error', msg);
 					setState('error');
+					showComposerError(msg, startRecording);
 				});
 		}
 
@@ -4548,15 +4606,12 @@
 			if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
 			if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
 			if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; analyser = null; }
-			if (input) input.removeEventListener('input', onInputWhileRecording);
 			window.removeEventListener('resize', resizeCanvas);
 
-			setState('processing');
+			setState('transcribing');
 			if (voiceBar) voiceBar.classList.add('is-processing');
 			if (voiceHint) voiceHint.textContent = 'Transcribing…';
 		}
-
-		function onInputWhileRecording() { userTyped = true; }
 
 		function transcribe(blob) {
 			var reader = new FileReader();
@@ -4577,44 +4632,27 @@
 							} else {
 								input.value = text;
 							}
-							input.focus();
-							input.dispatchEvent(new Event('input', { bubbles: true }));
-							setState('success');
-							hideVoiceBar();
 							if (voiceBar) voiceBar.classList.remove('is-processing');
-							if (!userTyped && input.value.trim()) {
-								form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-							}
+							hideVoiceBar();
+							setState('idle');
+							// Refresh textarea height + send state — do NOT auto-send.
+							if (typeof autoGrow === 'function') autoGrow();
+							if (typeof updateSendState === 'function') updateSendState();
 						} else {
-							setState('error');
-							if (voiceBar) voiceBar.classList.remove('is-processing');
-							hideVoiceBar();
-							appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
+							failTranscribe();
 						}
 					})
-					.catch(function () {
-						setState('error');
-						if (voiceBar) voiceBar.classList.remove('is-processing');
-						hideVoiceBar();
-						appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
-					});
+					.catch(failTranscribe);
 			};
-			reader.onerror = function () {
-				setState('error');
-				if (voiceBar) voiceBar.classList.remove('is-processing');
-				hideVoiceBar();
-				appendMessage('pg-msg pg-msg-error', 'Voice transcription failed. Try again or type your message.');
-			};
+			reader.onerror = failTranscribe;
 			reader.readAsDataURL(blob);
 		}
 
-		function appendMessage(cls, text) {
-			if (!log) return;
-			var node = document.createElement('div');
-			node.className = cls;
-			node.textContent = text;
-			log.appendChild(node);
-			log.scrollTop = log.scrollHeight;
+		function failTranscribe() {
+			setState('error');
+			if (voiceBar) voiceBar.classList.remove('is-processing');
+			hideVoiceBar();
+			showComposerError("Couldn't transcribe — try again.", startRecording);
 		}
 
 		micBtn.addEventListener('click', function () {
