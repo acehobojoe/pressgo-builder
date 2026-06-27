@@ -4124,6 +4124,29 @@
 			sendPatch(built);
 		}
 
+		// Nova pages have no recipe pageConfig — persist a reorder by sending the new
+		// pg-key order to the freeform endpoint (which rewrites _elementor_data + the
+		// section records together). Recipe pages keep the config-patch path.
+		function novaReorder(order) {
+			try { setSaveState('saving'); } catch (e) {}
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_freeform');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fd.append('reorder_keys', JSON.stringify(order));
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					try { setSaveState('saved'); } catch (e) {}
+					reloadPreview((j && j.data && j.data.preview_bust) || Date.now());
+				})
+				.catch(function () { try { setSaveState('error'); } catch (e) {} });
+		}
+		function persistReorder(order, label) {
+			if (pgMode === 'freeform') { novaReorder(order); }
+			else { applyDirect({ sections: order }, label); }
+		}
+
 		// ── 1+2. Floating section chip: ‹ layout › + ▲ ▼ move ─────────
 		var secChip = null, secChipUI = null, secChipFlashT = null;
 
@@ -4286,7 +4309,7 @@
 			if (cfg.pageConfig) cfg.pageConfig.sections = order.slice();
 			optimisticMove(selectedSectionKey, order);
 			renderSecChip();
-			applyDirect({ sections: order }, 'Move ' + sectionLabel(selectedSectionKey) + (dir < 0 ? ' up' : ' down'));
+			persistReorder(order, 'Move ' + sectionLabel(selectedSectionKey) + (dir < 0 ? ' up' : ' down'));
 		}
 
 		// Drag state. The grip handle lives in the iframe document (created in
@@ -4394,7 +4417,7 @@
 			if (cfg.pageConfig) cfg.pageConfig.sections = order.slice();
 			optimisticMove(st.key, order);
 			renderSecChip();
-			applyDirect({ sections: order }, 'Reorder: move ' + sectionLabel(st.key));
+			persistReorder(order, 'Reorder: move ' + sectionLabel(st.key));
 			showToast('Moved ' + sectionLabel(st.key));
 		}
 

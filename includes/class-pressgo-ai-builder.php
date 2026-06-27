@@ -2040,6 +2040,47 @@ class PressGo_AI_Builder {
 		return '';
 	}
 
+	/** Reorder the page's sections to a given list of pg-keys (visual drag/move).
+	 *  Reorders both _elementor_data and the records, never drops a section,
+	 *  snapshot-protected ("undo"). */
+	private function cohesion_reorder_keys( $post_id, $keys ) {
+		$keys = array_values( array_filter( array_map( 'sanitize_text_field', $keys ) ) );
+		if ( count( $keys ) < 2 ) { return array( 'note' => 'Nothing to reorder.' ); }
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
+		if ( count( $records ) < 2 ) { return array( 'note' => 'Nothing to reorder yet.' ); }
+
+		$elements = $this->read_elements( $post_id );
+		$el_by    = $this->index_elements_by_marker( $elements );
+		$rec_by   = array();
+		foreach ( $records as $r ) { $rec_by[ $r['pg_key'] ] = $r; }
+
+		$this->cohesion_snapshot( $post_id, $records );
+
+		$new_records = array();
+		$new_elements = array();
+		$seen = array();
+		$place = function ( $k ) use ( &$rec_by, &$el_by, &$new_records, &$new_elements, &$seen ) {
+			if ( isset( $seen[ $k ] ) || ! isset( $rec_by[ $k ] ) ) { return; }
+			$seen[ $k ]     = true;
+			$new_records[]  = $rec_by[ $k ];
+			if ( isset( $el_by[ $k ] ) ) { $new_elements[] = $el_by[ $k ]; }
+			elseif ( isset( $rec_by[ $k ]['element'] ) && is_array( $rec_by[ $k ]['element'] ) ) { $new_elements[] = $rec_by[ $k ]['element']; }
+		};
+		foreach ( $keys as $k ) { $place( $k ); }              // requested order
+		foreach ( $records as $r ) { $place( $r['pg_key'] ); } // anything not mentioned, original order
+		foreach ( $elements as $el ) { if ( '' === $this->element_pg_key( $el ) ) { $new_elements[] = $el; } } // hand-authored
+
+		if ( count( $new_elements ) < count( $elements ) || count( $new_records ) < count( $records ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't reorder safely — left the page exactly as it was." );
+		}
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new_elements ) ) ) );
+		$this->save_ff_sections( $post_id, $new_records );
+		$this->cohesion_flush( $post_id );
+		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Reordered. Say "undo" to put it back.' );
+	}
+
 	/** The stored record for a section by its pg-key marker, or null. */
 	private function ff_record_by_key( $post_id, $key ) {
 		if ( '' === $key ) { return null; }
@@ -3566,6 +3607,12 @@ class PressGo_AI_Builder {
 		// "Network error during Pro mode compose". Mirrors ajax_chat().
 		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet,WordPress.PHP.NoSilencedErrors
 		$post_id = absint( $_POST['post_id'] ?? 0 );
+		// Visual editor drag/move reorder: a new top-level section order (pg-keys).
+		// Structural op — no message needed, handled before the build path.
+		if ( $post_id && isset( $_POST['reorder_keys'] ) ) {
+			$keys = json_decode( wp_unslash( (string) $_POST['reorder_keys'] ), true );
+			wp_send_json_success( $this->cohesion_reorder_keys( $post_id, is_array( $keys ) ? $keys : array() ) );
+		}
 		$message = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
 		if ( ! $post_id || '' === trim( $message ) ) {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
