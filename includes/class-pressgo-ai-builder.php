@@ -493,6 +493,65 @@ class PressGo_AI_Builder {
 		wp_send_json_success();
 	}
 
+	/**
+	 * Resolve image queries in a freeform tree into real Pexels photo URLs.
+	 * The composer requests imagery with {"type":"image","settings":{"query":"..."}}
+	 * or a container background via settings.background_image_query — this fills the
+	 * real URL so Nova pages actually have photos. No-ops without a Pexels key or if
+	 * an explicit src/background_image is already set.
+	 */
+	private function resolve_freeform_images( $tree ) {
+		if ( '' === (string) get_option( 'pressgo_pexels_key', '' ) ) { return $tree; }
+		$this->ff_walk_images( $tree );
+		return $tree;
+	}
+
+	private function ff_walk_images( &$node ) {
+		if ( ! is_array( $node ) ) { return; }
+		if ( isset( $node['settings'] ) && is_array( $node['settings'] ) ) {
+			$s = &$node['settings'];
+			// image widget: query -> src
+			if ( ( $node['type'] ?? '' ) === 'image' && empty( $s['src'] ) && ! empty( $s['query'] ) ) {
+				$url = self::pexels_image_url( (string) $s['query'], 'landscape' );
+				if ( '' !== $url ) { $s['src'] = $url; }
+			}
+			// container background image: background_image_query -> background_image
+			if ( empty( $s['background_image'] ) && ! empty( $s['background_image_query'] ) ) {
+				$url = self::pexels_image_url( (string) $s['background_image_query'], 'landscape' );
+				if ( '' !== $url ) { $s['background_image'] = $url; }
+			}
+			unset( $s );
+		}
+		foreach ( array( 'children', 'elements' ) as $k ) {
+			if ( isset( $node[ $k ] ) && is_array( $node[ $k ] ) ) {
+				foreach ( $node[ $k ] as &$child ) { $this->ff_walk_images( $child ); }
+				unset( $child );
+			}
+		}
+	}
+
+	/** Search Pexels for a query; return a real photo URL (cached 12h). '' on miss. */
+	private static function pexels_image_url( $query, $orientation = 'landscape' ) {
+		$query = trim( wp_strip_all_tags( $query ) );
+		if ( '' === $query ) { return ''; }
+		$key = (string) get_option( 'pressgo_pexels_key', '' );
+		if ( '' === $key ) { return ''; }
+		$cache_key = 'pg_px_' . md5( strtolower( $query ) . '|' . $orientation );
+		$cached    = get_transient( $cache_key );
+		if ( is_string( $cached ) ) { return $cached; }
+		$resp = wp_remote_get(
+			'https://api.pexels.com/v1/search?per_page=1&orientation=' . rawurlencode( $orientation ) . '&query=' . rawurlencode( $query ),
+			array( 'timeout' => 12, 'headers' => array( 'Authorization' => $key ) )
+		);
+		$url = '';
+		if ( ! is_wp_error( $resp ) && 200 === (int) wp_remote_retrieve_response_code( $resp ) ) {
+			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+			if ( ! empty( $data['photos'][0]['src']['large'] ) ) { $url = (string) $data['photos'][0]['src']['large']; }
+		}
+		set_transient( $cache_key, $url, 12 * HOUR_IN_SECONDS );
+		return $url;
+	}
+
 	/** Is a fresh-page Nova request too vague to build well without a quick brief? */
 	private static function ff_is_vague( $message ) {
 		$m = strtolower( trim( (string) $message ) );
@@ -1429,6 +1488,10 @@ class PressGo_AI_Builder {
 		}
 		$tree       = $composed['tree'];
 		$used_model = $composed['model'];
+
+		// Resolve any image queries the composer asked for into REAL Pexels photo
+		// URLs (so Nova pages get actual imagery instead of being text-only).
+		$tree = $this->resolve_freeform_images( $tree );
 
 		// Render through the freeform renderer.
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
