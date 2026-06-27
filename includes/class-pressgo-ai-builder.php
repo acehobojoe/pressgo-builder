@@ -3559,7 +3559,7 @@ class PressGo_AI_Builder {
 		// costs more units the heavier its mode (basic 1, Iris/vision 3, Nova/
 		// freeform 4), so the meter reflects real token burn. Filterable.
 		return apply_filters( 'pressgo_usage_caps', array(
-			'free' => 12, 'starter' => 60, 'pro' => 160, 'dev' => 400,
+			'free' => 24, 'starter' => 60, 'pro' => 160, 'dev' => 400,
 		) );
 	}
 
