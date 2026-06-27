@@ -25,6 +25,7 @@ class PressGo_AI_Builder {
 	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
 	const META_FREEFORM   = '_pressgo_freeform';  // marks a freeform "build anything" page (native tree, no recipe config)
 	const META_FREEFORM_BRIEF = '_pressgo_freeform_brief'; // persistent page brief (business + goal) for Nova discovery
+	const META_DISCOVERY_STATE = '_pressgo_discovery_state'; // per-page chip interview state (transient, cleared on chat reset)
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -249,7 +250,9 @@ class PressGo_AI_Builder {
 		// Copy every meta except per-post housekeeping. get_post_meta returns
 		// UNSLASHED values; update_post_meta expects slashed — wp_slash both
 		// strings and arrays (same rule as the render dispatcher).
-		$skip = array( '_edit_lock', '_edit_last', '_wp_old_slug' );
+		// Don't carry a half-finished interview or committed brief onto the copy —
+		// a duplicated page starts its own discovery. (Site-level brand persists.)
+		$skip = array( '_edit_lock', '_edit_last', '_wp_old_slug', self::META_FREEFORM_BRIEF, self::META_DISCOVERY_STATE );
 		foreach ( get_post_meta( $post_id ) as $mk => $vals ) {
 			if ( in_array( $mk, $skip, true ) ) { continue; }
 			foreach ( $vals as $raw ) {
@@ -489,7 +492,8 @@ class PressGo_AI_Builder {
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
 		delete_post_meta( $post_id, self::META_AI_CHAT );
-		delete_post_meta( $post_id, self::META_FREEFORM_BRIEF ); // reset Nova discovery on a fresh chat
+		delete_post_meta( $post_id, self::META_FREEFORM_BRIEF );    // reset Nova discovery on a fresh chat
+		delete_post_meta( $post_id, self::META_DISCOVERY_STATE );  // and its in-progress interview state
 		wp_send_json_success();
 	}
 
@@ -580,6 +584,267 @@ class PressGo_AI_Builder {
 			'/\b(sign ?up|signups?|book|booking|call|calls|buy|buying|purchase|order|contact|quote|subscribe|donate|appointment|schedule|register|registration|reservation|reserve|checkout|enroll|apply|application|download|demo|free trial|trial|opt ?in|lead|leads|get in touch|join now)\b/i',
 			(string) $message
 		);
+	}
+
+	// ── Nova discovery state machine ────────────────────────────────────────
+	// A short tap-driven interview that captures the one business, goal and look
+	// before building. Stages run goal -> industry -> vibe -> photos; whatever can
+	// be inferred from the first message is pre-filled so the user only taps what
+	// we genuinely cannot guess.
+
+	/** Read the per-page interview state, or null if none yet. */
+	private function discovery_state( $post_id ) {
+		$s = get_post_meta( $post_id, self::META_DISCOVERY_STATE, true );
+		return is_array( $s ) ? $s : null;
+	}
+
+	/** Persist the interview state (wp_slash so string values round-trip clean). */
+	private function save_discovery_state( $post_id, $state ) {
+		update_post_meta( $post_id, self::META_DISCOVERY_STATE, wp_slash( $state ) );
+	}
+
+	/** Seed a fresh interview from the user's first message, inferring what we can. */
+	private function init_discovery_state( $message ) {
+		$answers = array();
+		// Goal is the one thing we cannot infer from a business name — but if the
+		// user already named it ("...to get signups"), pre-fill and skip the ask.
+		$g = $this->goal_from_text( $message );
+		if ( '' !== $g && self::ff_has_goal( $message ) ) {
+			$answers['goal']       = $g;
+			$answers['goal_label'] = $this->goal_cta_phrase( $g );
+		}
+		// Honor an outright-stated vibe or photo preference; otherwise we ask.
+		$v = $this->vibe_from_text( $message, true );
+		if ( '' !== $v ) { $answers['vibe'] = $v; }
+		if ( preg_match( '/\bstock\s+photos?\b/i', (string) $message ) ) {
+			$answers['photos'] = 'stock';
+		} elseif ( preg_match( '/\b(my (own )?photos?|my media|i have photos|use my images?)\b/i', (string) $message ) ) {
+			$answers['photos'] = 'media_library';
+		}
+		return array(
+			'branch'         => 'lander',
+			'answers'        => $answers,
+			'business'       => trim( (string) $message ),
+			'industry_guess' => $this->infer_industry_from_message( $message ),
+			'location'       => $this->infer_location_from_message( $message ),
+			'audience'       => $this->infer_audience_from_message( $message ),
+			'hero_built'     => false,
+		);
+	}
+
+	/** Record an answer (parsing typed free-text into the stage enum when value is ''). */
+	private function run_discovery_step( $post_id, $state, $stage, $value, $message ) {
+		if ( ! isset( $state['answers'] ) || ! is_array( $state['answers'] ) ) { $state['answers'] = array(); }
+		if ( '' === $value ) { // free-text fallback: the user typed instead of tapping a chip
+			switch ( $stage ) {
+				case 'goal':     $value = $this->goal_from_text( $message ); if ( '' === $value ) { $value = 'browse'; } break;
+				case 'industry': $g = $this->infer_industry_from_message( $message ); $value = '' !== $g ? $g : 'other'; break;
+				case 'vibe':     $value = $this->vibe_from_text( $message ); break;
+				case 'photos':   $value = ( false !== stripos( $message, 'stock' ) ) ? 'stock' : ( ( false !== stripos( $message, 'upload' ) || false !== stripos( $message, 'drop' ) ) ? 'upload' : 'media_library' ); break;
+			}
+		}
+		$value = sanitize_text_field( $value );
+		$state['answers'][ $stage ] = $value;
+		if ( 'goal' === $stage ) { $state['answers']['goal_label'] = $this->goal_cta_phrase( $value ); }
+		$this->save_discovery_state( $post_id, $state );
+		return $state;
+	}
+
+	/** The next unanswered required stage, or '' when the interview is complete. */
+	private function next_discovery_stage( $state ) {
+		$answers = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
+		foreach ( array( 'goal', 'industry', 'vibe', 'photos' ) as $stage ) {
+			if ( empty( $answers[ $stage ] ) ) { return $stage; }
+		}
+		return '';
+	}
+
+	/** The chip envelope JS renders for a given stage. */
+	private function discovery_envelope( $stage, $state ) {
+		$base = array(
+			'needs_discovery' => true,
+			'mode'            => 'discovery',
+			'stage'           => $stage,
+			'allow_freetext'  => true,
+			'freetext_hint'   => '…or just type it',
+		);
+		switch ( $stage ) {
+			case 'goal':
+				return array_merge( $base, array(
+					'question' => "Love it. One quick thing and I'll start designing: what should this page get people to do?",
+					'chips'    => array(
+						array( 'label' => 'Fill out a form', 'value' => 'form' ),
+						array( 'label' => 'Call you', 'value' => 'call' ),
+						array( 'label' => 'Book a session', 'value' => 'book' ),
+						array( 'label' => 'Buy / sign up', 'value' => 'buy' ),
+						array( 'label' => 'Just browse (homepage)', 'value' => 'browse' ),
+					),
+				) );
+			case 'industry':
+				$guess = isset( $state['industry_guess'] ) ? $state['industry_guess'] : '';
+				$chips = array(
+					array( 'label' => 'Fitness / gym', 'value' => 'fitness' ),
+					array( 'label' => 'Food / restaurant', 'value' => 'food' ),
+					array( 'label' => 'Home services', 'value' => 'home_services' ),
+					array( 'label' => 'Health / medical', 'value' => 'health' ),
+					array( 'label' => 'Professional services', 'value' => 'professional' ),
+					array( 'label' => 'Shop / retail', 'value' => 'retail' ),
+					array( 'label' => 'Something else', 'value' => 'other' ),
+				);
+				if ( '' !== $guess ) {
+					foreach ( $chips as $i => $c ) { if ( $c['value'] === $guess ) { $chips[ $i ]['selected'] = true; } }
+				}
+				$q = '' !== $guess
+					? "Got it. I'm guessing this is " . $this->industry_label( $guess ) . " — right?"
+					: "What kind of business is this?";
+				return array_merge( $base, array( 'question' => $q, 'chips' => $chips ) );
+			case 'vibe':
+				return array_merge( $base, array(
+					'question' => "Pick a vibe and I'll set your colors and fonts.",
+					'chips'    => array(
+						array( 'label' => 'Bold & energetic', 'value' => 'bold' ),
+						array( 'label' => 'Clean & premium', 'value' => 'premium' ),
+						array( 'label' => 'Warm & friendly', 'value' => 'warm' ),
+						array( 'label' => 'Calm & minimal', 'value' => 'calm' ),
+					),
+				) );
+			case 'photos':
+				return array_merge( $base, array(
+					'question'       => "Last thing, then I'll build your hero — what should I use for photos?",
+					'allow_freetext' => false,
+					'chips'          => array(
+						array( 'label' => 'Use my media library', 'value' => 'media_library' ),
+						array( 'label' => "I'll drop one in now", 'value' => 'upload' ),
+						array( 'label' => 'Use great stock photos', 'value' => 'stock' ),
+					),
+				) );
+		}
+		return array_merge( $base, array( 'question' => 'Quick question:', 'chips' => array() ) );
+	}
+
+	/** Build the persistent page brief from the completed interview. */
+	private function compose_brief_from_state( $state ) {
+		$a     = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
+		$parts = array();
+		if ( ! empty( $state['business'] ) ) { $parts[] = trim( $state['business'] ); }
+		if ( ! empty( $a['goal_label'] ) )   { $parts[] = 'Primary goal: get visitors to ' . $a['goal_label'] . '.'; }
+		if ( ! empty( $a['industry'] ) && 'other' !== $a['industry'] ) { $parts[] = 'Industry: ' . $this->industry_label( $a['industry'] ) . '.'; }
+		if ( ! empty( $state['location'] ) ) { $parts[] = 'Location: ' . $state['location'] . '.'; }
+		if ( ! empty( $state['audience'] ) ) { $parts[] = 'Audience: ' . $state['audience'] . '.'; }
+		if ( ! empty( $a['vibe'] ) )         { $parts[] = 'Vibe: ' . $a['vibe'] . '.'; }
+		if ( ! empty( $a['photos'] ) )       { $parts[] = 'Photos: ' . str_replace( '_', ' ', $a['photos'] ) . '.'; }
+		return implode( "\n", $parts );
+	}
+
+	/** Map a goal enum to the CTA phrase used in the brief. */
+	private function goal_cta_phrase( $goal ) {
+		$map = array(
+			'form'   => 'fill out a form',
+			'call'   => 'call the business',
+			'book'   => 'book an appointment',
+			'buy'    => 'buy or sign up',
+			'browse' => 'explore the business (this is a general homepage)',
+		);
+		return isset( $map[ $goal ] ) ? $map[ $goal ] : 'take action';
+	}
+
+	/** Friendly label for an industry enum. */
+	private function industry_label( $industry ) {
+		$map = array(
+			'fitness'       => 'fitness / a gym',
+			'food'          => 'food / a restaurant',
+			'home_services' => 'home services',
+			'health'        => 'health / medical',
+			'professional'  => 'professional services',
+			'retail'        => 'a shop / retail',
+			'other'         => 'a business',
+		);
+		return isset( $map[ $industry ] ) ? $map[ $industry ] : 'a business';
+	}
+
+	/** Guess the industry enum from the first message (drives copy + stock photos). */
+	private function infer_industry_from_message( $message ) {
+		$m   = strtolower( (string) $message );
+		$map = array(
+			'fitness'       => array( 'gym', 'fitness', 'crossfit', 'yoga', 'pilates', 'personal train', 'workout', 'martial art', 'bootcamp' ),
+			'food'          => array( 'restaurant', 'cafe', 'coffee', 'bakery', 'catering', 'food truck', 'diner', 'pizzeria', 'brewery', 'taco', 'bistro' ),
+			'home_services' => array( 'roof', 'plumb', 'hvac', 'landscap', 'lawn', 'electrician', 'pest', 'remodel', 'contractor', 'painter', 'handyman', 'cleaning', 'fencing', 'concrete' ),
+			'health'        => array( 'dental', 'dentist', 'medical', 'clinic', 'chiro', 'therapy', 'therapist', 'wellness', ' spa', 'salon', 'medspa', 'doctor', 'health', 'physio', 'aesthetic' ),
+			'professional'  => array( 'law', 'attorney', 'lawyer', 'account', 'consult', 'agency', 'real estate', 'realtor', 'insurance', 'financial', 'coach', 'marketing', 'architect' ),
+			'retail'        => array( 'shop', 'store', 'boutique', 'ecommerce', 'e-commerce', 'retail', 'apparel', 'jewelry', 'clothing' ),
+		);
+		foreach ( $map as $industry => $kws ) {
+			foreach ( $kws as $kw ) {
+				if ( false !== strpos( $m, $kw ) ) { return $industry; }
+			}
+		}
+		return '';
+	}
+
+	/** Pull a city/place out of "...in Tampa" (capitalized), seeds local copy + stock. */
+	private function infer_location_from_message( $message ) {
+		if ( preg_match( '/\bin ([A-Z][a-zA-Z.\-]+(?: [A-Z][a-zA-Z.\-]+){0,2})\b/', (string) $message, $mm ) ) {
+			$loc = trim( $mm[1] );
+			// Drop obvious non-places that follow "in".
+			if ( ! preg_match( '/^(January|February|March|April|May|June|July|August|September|October|November|December|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i', $loc ) ) {
+				return $loc;
+			}
+		}
+		return '';
+	}
+
+	/** Pull an audience out of "...for busy parents" (not "for my/a/the ..."). */
+	private function infer_audience_from_message( $message ) {
+		if ( preg_match( '/\bfor (?!my\b|a\b|an\b|the\b|our\b|your\b)([a-z][a-zA-Z ]{2,40}?)(?:[.,]| who| that| to | so | and |$)/', (string) $message, $mm ) ) {
+			return trim( $mm[1] );
+		}
+		return '';
+	}
+
+	/** Map a goal description to its enum (used for the free-text fallback + pre-fill). */
+	private function goal_from_text( $message ) {
+		$m = strtolower( (string) $message );
+		if ( preg_match( '/\b(call|phone|ring)\b/', $m ) )                                                    { return 'call'; }
+		if ( preg_match( '/\b(book|booking|appointment|schedule|reserve|reservation)\b/', $m ) )              { return 'book'; }
+		if ( preg_match( '/\b(buy|buying|purchase|order|checkout|shop|store|ecommerce|e-commerce)\b/', $m ) ) { return 'buy'; }
+		if ( preg_match( '/\b(form|quote|contact|sign ?ups?|signups?|subscribe|leads?|get in touch|enroll|register|registration|apply|application|demo|free trial|trial|download|opt ?in)\b/', $m ) ) { return 'form'; }
+		return '';
+	}
+
+	/** Map vibe words to an enum. Strict mode returns '' unless a clear word appears. */
+	private function vibe_from_text( $message, $strict = false ) {
+		$m = strtolower( (string) $message );
+		if ( preg_match( '/\b(bold|energetic|vibrant|punchy|dynamic|loud|powerful)\b/', $m ) )                 { return 'bold'; }
+		if ( preg_match( '/\b(premium|luxury|luxurious|elegant|high.?end|sophisticated|upscale|sleek|refined)\b/', $m ) ) { return 'premium'; }
+		if ( preg_match( '/\b(warm|friendly|cozy|welcoming|inviting|approachable|homey)\b/', $m ) )            { return 'warm'; }
+		if ( preg_match( '/\b(calm|minimal|clean|simple|serene|zen|airy|understated)\b/', $m ) )              { return 'calm'; }
+		return $strict ? '' : 'premium';
+	}
+
+	/** A renderer cfg (colors + fonts + layout) for a chosen vibe, or null if unknown. */
+	private function vibe_to_palette( $vibe ) {
+		$palettes = array(
+			'bold' => array(
+				'colors' => array( 'primary' => '#E2B714', 'primary_dark' => '#B8910A', 'accent' => '#E2B714', 'dark_bg' => '#0F1115', 'light_bg' => '#F7F7F5', 'white' => '#FFFFFF', 'text_dark' => '#0F1115', 'text_muted' => '#5B6470', 'text_light' => 'rgba(255,255,255,0.78)', 'gold' => '#E2B714' ),
+				'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
+			),
+			'premium' => array(
+				'colors' => array( 'primary' => '#1E293B', 'primary_dark' => '#0F172A', 'accent' => '#C4A35A', 'dark_bg' => '#111827', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF', 'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.72)', 'gold' => '#C4A35A' ),
+				'fonts'  => array( 'heading' => 'Playfair Display', 'body' => 'Inter' ),
+			),
+			'warm' => array(
+				'colors' => array( 'primary' => '#C2410C', 'primary_dark' => '#9A3412', 'accent' => '#EA580C', 'dark_bg' => '#1C1917', 'light_bg' => '#FFF7ED', 'white' => '#FFFFFF', 'text_dark' => '#1C1917', 'text_muted' => '#78716C', 'text_light' => 'rgba(255,255,255,0.80)', 'gold' => '#F59E0B' ),
+				'fonts'  => array( 'heading' => 'Poppins', 'body' => 'Inter' ),
+			),
+			'calm' => array(
+				'colors' => array( 'primary' => '#0D9488', 'primary_dark' => '#0F766E', 'accent' => '#14B8A6', 'dark_bg' => '#0F1B1A', 'light_bg' => '#F0FDFA', 'white' => '#FFFFFF', 'text_dark' => '#134E4A', 'text_muted' => '#5F7470', 'text_light' => 'rgba(255,255,255,0.80)', 'gold' => '#2DD4BF' ),
+				'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
+			),
+		);
+		if ( ! isset( $palettes[ $vibe ] ) ) { return null; }
+		$cfg           = $palettes[ $vibe ];
+		$cfg['layout'] = array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 );
+		return $cfg;
 	}
 
 	/**
@@ -1452,66 +1717,44 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
 
-		// ── Discovery (chip-driven) ────────────────────────────────────────
-		// On a FRESH page with a VAGUE first request, run a short tap-driven
-		// interview before building blind, so every section shares one business,
-		// goal, and vibe (the post-3143 "three businesses" failure). Phase 1: the
-		// single GOAL question, captured into the page brief (the existing
-		// META_FREEFORM_BRIEF string — no new storage yet). The JS renders the
-		// chips and posts the answer back as discovery_stage + discovery_value.
+		// ── Discovery (chip-driven state machine) ──────────────────────────
+		// On a FRESH page, run a short tap-driven interview (goal -> industry ->
+		// vibe -> photos) before building, so every section shares one business,
+		// goal, and look (the post-3143 "three businesses" failure). Industry,
+		// location and audience are INFERRED from the first message (never asked);
+		// the vibe choice drives the palette. Interview state lives in
+		// META_DISCOVERY_STATE (per page); a committed META_FREEFORM_BRIEF means
+		// discovery is done. JS renders the chips and posts each answer back as
+		// discovery_stage + discovery_value (value '' = a typed free-text answer).
 		$discovery_stage = isset( $_POST['discovery_stage'] ) ? sanitize_key( wp_unslash( $_POST['discovery_stage'] ) ) : '';
 		$discovery_value = isset( $_POST['discovery_value'] ) ? sanitize_text_field( wp_unslash( $_POST['discovery_value'] ) ) : '';
 		$existing   = get_post_meta( $post_id, '_elementor_data', true );
 		$page_empty = ! ( is_string( $existing ) && false !== strpos( $existing, '"type"' ) );
 		$brief      = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
 
-		// Ask the goal question on a fresh page whenever the goal is not already
-		// stated (the one thing we cannot infer). One tap, even if the business is
-		// named — "I own a gym" gives us the business but not the call to action.
-		if ( $page_empty && '' === $brief && '' === $discovery_stage && ! self::ff_has_goal( $message ) ) {
-			// Stash the user's own words as the business context; await the goal tap.
-			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, 'await_goal:' . $message );
-			wp_send_json_success( array(
-				'needs_discovery' => true,
-				'mode'            => 'discovery',
-				'stage'           => 'goal',
-				'question'        => "Love it. One quick thing and I'll start designing: what should this page get people to do?",
-				'chips'           => array(
-					array( 'label' => 'Fill out a form', 'value' => 'form' ),
-					array( 'label' => 'Call you', 'value' => 'call' ),
-					array( 'label' => 'Book a session', 'value' => 'book' ),
-					array( 'label' => 'Buy / sign up', 'value' => 'buy' ),
-					array( 'label' => 'Just browse (homepage)', 'value' => 'browse' ),
-				),
-				'allow_freetext'  => true,
-				'freetext_hint'   => "…or just type it",
-			) );
-		}
-
-		// The goal answer arrives (a chip tap, or free text routed to the goal stage).
-		if ( 'goal' === $discovery_stage ) {
-			$stash    = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
-			$business = ( 0 === strpos( $stash, 'await_goal:' ) ) ? trim( substr( $stash, strlen( 'await_goal:' ) ) ) : trim( $stash );
-			$goal_map = array(
-				'form'   => 'fill out a form',
-				'call'   => 'call the business',
-				'book'   => 'book an appointment',
-				'buy'    => 'buy or sign up',
-				'browse' => 'browse (this is a general homepage)',
-			);
-			$goal_phrase = isset( $goal_map[ $discovery_value ] ) ? $goal_map[ $discovery_value ] : ( '' !== $discovery_value ? $discovery_value : $message );
-			$brief = ( '' !== $business ? $business : $message ) . "\nPrimary goal: get visitors to " . $goal_phrase . '.';
+		if ( $page_empty && '' === $brief ) {
+			$state = $this->discovery_state( $post_id );
+			// First contact: seed state from the user's own words (infer what we can).
+			if ( ! is_array( $state ) ) {
+				$state = $this->init_discovery_state( $message );
+				$this->save_discovery_state( $post_id, $state );
+			}
+			// An answer just came in (a chip tap, or typed text routed to a stage).
+			if ( '' !== $discovery_stage ) {
+				$state = $this->run_discovery_step( $post_id, $state, $discovery_stage, $discovery_value, $message );
+			}
+			// Still owe a question? Ask the next one and stop (build nothing yet).
+			$next = $this->next_discovery_stage( $state );
+			if ( '' !== $next ) {
+				wp_send_json_success( $this->discovery_envelope( $next, $state ) );
+			}
+			// Every essential is known — commit the brief and build the hero from
+			// the business description (not the last chip label the POST carried).
+			$brief = $this->compose_brief_from_state( $state );
 			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $brief );
-			// Build from the business description, not the chip label the POST carried.
-			if ( '' !== $business ) { $message = $business; }
-		}
-
-		// Safety net: if we reach the build with a half-finished stash (e.g. the
-		// user typed instead of tapping and the stage was lost), unwrap it so the
-		// "await_goal:" marker never leaks into the composed brief.
-		if ( 0 === strpos( $brief, 'await_goal:' ) ) {
-			$brief = trim( substr( $brief, strlen( 'await_goal:' ) ) );
-			if ( '' !== $brief && '' === trim( $message ) ) { $message = $brief; }
+			$state['hero_built'] = true;
+			$this->save_discovery_state( $post_id, $state );
+			if ( ! empty( $state['business'] ) ) { $message = $state['business']; }
 		}
 
 		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
@@ -1555,15 +1798,24 @@ class PressGo_AI_Builder {
 		require_once $gen . 'class-pressgo-element-factory.php';
 		require_once $gen . 'class-pressgo-widget-helpers.php';
 		require_once $gen . 'class-pressgo-freeform-renderer.php';
-		$cfg = array(
-			'colors' => array(
-				'primary' => '#2563EB', 'primary_dark' => '#1E40AF', 'accent' => '#e2b714',
-				'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF',
-				'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.75)', 'gold' => '#F59E0B',
-			),
-			'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
-			'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
-		);
+		// Palette: the chosen vibe drives colors + fonts (Phase 3 will lock these
+		// into the site brand foundation). Falls back to the original default so
+		// in-flight pages with no vibe render exactly as before.
+		$cfg   = null;
+		$dstate = $this->discovery_state( $post_id );
+		$vibe   = ( is_array( $dstate ) && ! empty( $dstate['answers']['vibe'] ) ) ? $dstate['answers']['vibe'] : '';
+		if ( '' !== $vibe ) { $cfg = $this->vibe_to_palette( $vibe ); }
+		if ( null === $cfg ) {
+			$cfg = array(
+				'colors' => array(
+					'primary' => '#2563EB', 'primary_dark' => '#1E40AF', 'accent' => '#e2b714',
+					'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'white' => '#FFFFFF',
+					'text_dark' => '#0F172A', 'text_muted' => '#64748B', 'text_light' => 'rgba(255,255,255,0.75)', 'gold' => '#F59E0B',
+				),
+				'fonts'  => array( 'heading' => 'Manrope', 'body' => 'Inter' ),
+				'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
+			);
+		}
 		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
 		if ( null === $section ) {
 			wp_send_json_error( 'Renderer rejected the composed tree.', 422 );
