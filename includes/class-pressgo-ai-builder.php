@@ -93,6 +93,8 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_duplicate',    array( $this, 'ajax_duplicate' ) );
 		add_action( 'wp_ajax_pressgo_ai_review_seen',  array( $this, 'ajax_review_seen' ) );
 		add_action( 'wp_ajax_pressgo_ai_brand_optout', array( $this, 'ajax_brand_optout' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_reapply', array( $this, 'ajax_brand_reapply' ) );
+		add_action( 'wp_ajax_pressgo_ai_brand_upload', array( $this, 'ajax_brand_upload' ) );
 		add_action( 'wp_ajax_pressgo_ai_apply_patch',  array( $this, 'ajax_apply_patch' ) );
 		add_action( 'wp_ajax_pressgo_ai_get_config',   array( $this, 'ajax_get_config' ) );
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
@@ -177,7 +179,7 @@ class PressGo_AI_Builder {
 		if ( ! is_array( $raw ) ) {
 			wp_send_json_error( 'bad brand payload', 400 );
 		}
-		$args = array_intersect_key( $raw, array_flip( array( 'brand_name', 'industry', 'logo_url', 'voice', 'colors', 'fonts' ) ) );
+		$args = array_intersect_key( $raw, array_flip( array( 'brand_name', 'industry', 'logo_url', 'favicon_url', 'voice', 'colors', 'fonts' ) ) );
 		$f    = PressGo_MCP_Tools::merge_brand_foundation( $args );
 		unset( $f['updated'] );
 		wp_send_json_success( array( 'brand' => $f ) );
@@ -278,6 +280,143 @@ class PressGo_AI_Builder {
 			delete_post_meta( $post_id, '_pressgo_brand_optout' );
 		}
 		wp_send_json_success();
+	}
+
+	/**
+	 * Re-apply the saved brand foundation to the current page. Re-renders every
+	 * freeform section with the latest brand cfg (colors/fonts/layout) so manual
+	 * edits in the brand panel immediately update the page. Non-freeform pages
+	 * (legacy config builds) are skipped. Snapshots first so a failure restores
+	 * the original content — never deletes sections.
+	 */
+	public function ajax_brand_reapply() {
+		$this->check_auth();
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
+
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) {
+			$records = $this->ff_backfill_records( $post_id );
+		}
+		if ( empty( $records ) ) {
+			wp_send_json_error( 'no sections to re-render' );
+		}
+
+		// Load the renderer dependencies.
+		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
+		require_once $gen . 'class-pressgo-style-utils.php';
+		require_once $gen . 'class-pressgo-element-factory.php';
+		require_once $gen . 'class-pressgo-widget-helpers.php';
+		require_once $gen . 'class-pressgo-freeform-renderer.php';
+
+		$cfg      = $this->cfg_from_foundation();
+		$elements = $this->read_elements( $post_id );
+		$by_marker = $this->index_elements_by_marker( $elements );
+
+		// Snapshot the current data so we can restore on failure.
+		$backup = (string) get_post_meta( $post_id, '_elementor_data', true );
+
+		$new = array();
+		$rendered = 0;
+		$failed = 0;
+		foreach ( $records as $idx => $rec ) {
+			$el = null;
+			if ( ! empty( $rec['source_tree'] ) ) {
+				// The source tree bakes the colors the composer chose — re-rendering it
+				// verbatim with a new cfg changes almost nothing (cfg colors are only
+				// fallbacks for blocks that omit a color). To actually repaint the page
+				// to the new brand we overlay the section's background ROLE: this flips
+				// the section bg, contrast-driven heading/body text, and accent buttons/
+				// icons to the new palette, while preserving deliberately-bespoke colors.
+				// The source tree itself is passed by value and never mutated.
+				$role     = ! empty( $rec['rendered_bg_role'] ) ? $rec['rendered_bg_role'] : ( ! empty( $rec['bg_role'] ) ? $rec['bg_role'] : 'light' );
+				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $cfg, true );
+				$el       = PressGo_Freeform_Renderer::render( $overlaid, $cfg, $rec['pg_key'] );
+				if ( null === $el ) {
+					$failed++;
+					// Keep the existing element instead of dropping it.
+					if ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
+						$el = $by_marker[ $rec['pg_key'] ];
+					}
+				} else {
+					$rendered++;
+					// Remember the brand we rendered with so a later "make it flow"
+					// reorganize starts from the new palette, not the stale one.
+					$records[ $idx ]['palette']          = $cfg;
+					$records[ $idx ]['rendered_bg_role'] = $role;
+				}
+			} elseif ( isset( $rec['element'] ) && is_array( $rec['element'] ) ) {
+				$el = $rec['element'];
+			} elseif ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
+				$el = $by_marker[ $rec['pg_key'] ];
+			}
+			if ( $el ) { $new[] = $el; }
+		}
+
+		if ( empty( $new ) ) {
+			// Nothing rendered at all — don't touch the page.
+			wp_send_json_error( 're-render produced no sections' );
+		}
+
+		// Write the new elements.
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+		$this->save_ff_sections( $post_id, $records );
+		$this->cohesion_flush( $post_id );
+
+		wp_send_json_success( array(
+			'preview_bust' => time(),
+			'sections'     => count( $new ),
+			'rendered'     => $rendered,
+			'kept'         => count( $new ) - $rendered,
+		) );
+	}
+
+	/**
+	 * Upload a logo or favicon for the brand foundation. Handles file upload
+	 * via wp_handle_upload, stores the attachment ID + URL in the foundation.
+	 * Accepts: field=logo_url or field=favicon_url, file in $_FILES['file'].
+	 */
+	public function ajax_brand_upload() {
+		$this->check_auth();
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) {
+			wp_send_json_error( 'brand store unavailable', 500 );
+		}
+		$field = isset( $_POST['field'] ) ? sanitize_key( $_POST['field'] ) : '';
+		if ( ! in_array( $field, array( 'logo_url', 'favicon_url' ), true ) ) {
+			wp_send_json_error( 'invalid field', 400 );
+		}
+		if ( empty( $_FILES['file'] ) ) {
+			wp_send_json_error( 'no file', 400 );
+		}
+		$file = $_FILES['file'];
+		$ext  = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+		$allowed = array( 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico' );
+		if ( ! in_array( $ext, $allowed, true ) ) {
+			wp_send_json_error( 'unsupported file type', 400 );
+		}
+		if ( $file['size'] > 2 * MB_IN_BYTES ) {
+			wp_send_json_error( 'file too large (max 2MB)', 400 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		$attachment_id = media_handle_sideload( $file, 0, 'Brand ' . $field );
+		if ( is_wp_error( $attachment_id ) ) {
+			wp_send_json_error( $attachment_id->get_error_message(), 500 );
+		}
+		$url = wp_get_attachment_url( $attachment_id );
+
+		PressGo_MCP_Tools::merge_brand_foundation( array(
+			$field      => $url,
+			$field . '_id' => $attachment_id,
+		) );
+
+		wp_send_json_success( array(
+			'url' => $url,
+			'id'  => $attachment_id,
+		) );
 	}
 
 	/** Review ask was actually DISPLAYED — only then burn a shown-credit. */
@@ -1296,24 +1435,56 @@ class PressGo_AI_Builder {
 		return $on_dark ? ( $lum < 0.55 ) : ( $lum > 0.50 );
 	}
 
-	/** Re-render a section's tree against a target bg role, contrast-safe (no source mutation). */
-	private function apply_role_overlay( $tree, $role, $cfg ) {
-		if ( $this->tree_locks_bg( $tree ) ) { return $tree; }
+	/**
+	 * Re-render a section's tree against a target bg role, contrast-safe (no source
+	 * mutation).
+	 *
+	 * $force=false (the "make it flow" reorganize path): bespoke colors are
+	 * preserved and image/gradient bands are left untouched — reorder only nudges
+	 * contrast where it's broken.
+	 *
+	 * $force=true (the Site Brand panel): a Huemint-style GLOBAL repaint. Every
+	 * band's surface and every heading/body/button/icon is pushed onto the new
+	 * palette regardless of what the composer baked in, and gradient bands are
+	 * rebuilt on brand colors (photo bands keep the photo). The brand panel is a
+	 * whole-view control; granular per-element color lives in the Elementor editor.
+	 */
+	private function apply_role_overlay( $tree, $role, $cfg, $force = false ) {
+		$locked = $this->tree_locks_bg( $tree );
+		if ( $locked && ! $force ) { return $tree; }
 		$colors    = isset( $cfg['colors'] ) ? $cfg['colors'] : array();
 		$target_bg = ( 'accent' === $role ) ? ( $colors['accent'] ?? '#e2b714' )
 			: ( ( 'light' === $role ) ? ( $colors['light_bg'] ?? '#F8FAFC' ) : ( $colors['dark_bg'] ?? '#0F172A' ) );
 		$on_dark   = ( 'light' !== $role );
 		if ( ! isset( $tree['settings'] ) || ! is_array( $tree['settings'] ) ) { $tree['settings'] = array(); }
-		$tree['settings']['background'] = $target_bg;
+		if ( ! $locked ) {
+			$tree['settings']['background'] = $target_bg;
+		} elseif ( $force ) {
+			// Forced repaint of a locked band. A photo can't be recolored — keep the
+			// image and just repaint the content over it. A gradient gets rebuilt on
+			// brand surfaces (same angle) so the band matches the new palette.
+			$bg = isset( $tree['settings']['background'] ) ? $tree['settings']['background'] : '';
+			if ( is_string( $bg ) && 0 === strpos( $bg, 'gradient:' ) ) {
+				$parts = explode( ',', substr( $bg, strlen( 'gradient:' ) ) );
+				$angle = ( isset( $parts[2] ) && is_numeric( trim( $parts[2] ) ) ) ? (int) trim( $parts[2] ) : 135;
+				$stop_b = 'accent' === $role ? ( $colors['primary_dark'] ?? $target_bg )
+					: ( $on_dark ? ( $colors['primary_dark'] ?? $target_bg ) : ( $colors['white'] ?? $target_bg ) );
+				$tree['settings']['background'] = 'gradient:' . $target_bg . ',' . $stop_b . ',' . $angle;
+			}
+		}
 		$heading_color = $on_dark ? '#ffffff' : ( $colors['text_dark'] ?? '#0F172A' );
 		$text_color    = $on_dark ? 'rgba(255,255,255,0.72)' : ( $colors['text_muted'] ?? '#4B5563' );
 		$accent        = $colors['accent'] ?? '#e2b714';
-		$this->overlay_walk( $tree, $on_dark, $heading_color, $text_color, $accent, $role, $colors );
+		$this->overlay_walk( $tree, $on_dark, $heading_color, $text_color, $accent, $role, $colors, $force );
 		return $tree;
 	}
 
-	/** Recursively recolor a tree for contrast, preserving deliberately-bespoke colors. */
-	private function overlay_walk( &$node, $on_dark, $heading_color, $text_color, $accent, $role, $colors ) {
+	/**
+	 * Recursively recolor a tree for contrast. $force=false preserves deliberately-
+	 * bespoke colors (reorganize). $force=true repaints every leaf onto the brand
+	 * palette regardless of what was baked in (Site Brand panel — whole-view recolor).
+	 */
+	private function overlay_walk( &$node, $on_dark, $heading_color, $text_color, $accent, $role, $colors, $force = false ) {
 		if ( ! is_array( $node ) ) { return; }
 		$type = isset( $node['type'] ) ? $node['type'] : '';
 		if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) { $node['settings'] = array(); }
@@ -1331,28 +1502,36 @@ class PressGo_AI_Builder {
 			return false;
 		};
 		if ( 'heading' === $type ) {
-			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $heading_color; }
+			if ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $heading_color; }
 		} elseif ( 'text' === $type ) {
-			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $text_color; }
+			if ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $text_color; }
 		} elseif ( 'button' === $type ) {
 			if ( 'accent' === $role ) {
 				$s['bg']    = $on_dark ? '#ffffff' : '#0F172A';
 				$s['color'] = $accent;
 			} else {
-				if ( ! isset( $s['bg'] ) || $is_generic( $s['bg'] ) ) { $s['bg'] = $accent; }
+				if ( $force || ! isset( $s['bg'] ) || $is_generic( $s['bg'] ) ) { $s['bg'] = $accent; }
 				$s['color'] = PressGo_Style_Utils::text_on_color( $s['bg'] );
 			}
-			if ( isset( $s['border_color'] ) && $is_generic( $s['border_color'] ) ) { $s['border_color'] = $heading_color; }
+			if ( isset( $s['border_color'] ) && ( $force || $is_generic( $s['border_color'] ) ) ) { $s['border_color'] = $s['bg'] ?? $heading_color; }
 		} elseif ( 'icon' === $type ) {
-			if ( ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $accent; }
+			if ( $force || ! isset( $s['color'] ) || $this->should_flip_text( $s['color'], $on_dark ) ) { $s['color'] = $accent; }
 		} elseif ( 'divider' === $type ) {
 			$s['color'] = $on_dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
 		} elseif ( 'form' === $type ) {
 			$s['on_dark'] = $on_dark;
+		} elseif ( $force && in_array( $type, array( 'row', 'col' ), true ) ) {
+			// Nested card surfaces: repaint a solid bespoke card onto a brand surface
+			// (white card on light bands, raised dark card on dark bands). Leave
+			// gradient/image card backgrounds and transparent cards alone.
+			if ( isset( $s['background'] ) && is_string( $s['background'] ) && '' !== $s['background']
+				&& 'transparent' !== $s['background'] && 0 !== strpos( $s['background'], 'gradient:' ) ) {
+				$s['background'] = $on_dark ? ( $colors['primary_dark'] ?? '#1E293B' ) : ( $colors['white'] ?? '#FFFFFF' );
+			}
 		}
 		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
 			foreach ( $node['children'] as &$c ) {
-				$this->overlay_walk( $c, $on_dark, $heading_color, $text_color, $accent, $role, $colors );
+				$this->overlay_walk( $c, $on_dark, $heading_color, $text_color, $accent, $role, $colors, $force );
 			}
 			unset( $c );
 		}
@@ -2505,6 +2684,7 @@ class PressGo_AI_Builder {
 				$wp_edit_label = 'Edit in Elementor';
 		}
 		$list_url    = admin_url( 'admin.php?page=' . self::MENU_SLUG );
+		wp_enqueue_media();
 		?><!DOCTYPE html>
 		<html <?php language_attributes(); ?>>
 		<head>
@@ -2799,11 +2979,12 @@ class PressGo_AI_Builder {
 					'url'    => get_permalink( $post_id ),
 					'title'  => get_the_title( $post_id ),
 				) ); ?>,
-				brand: <?php echo wp_json_encode( array(
-					'exists'  => (bool) $brand_state['brand'],
-					'enabled' => $brand_state['enabled'],
-					'name'    => isset( $brand_state['brand']['brand_name'] ) ? $brand_state['brand']['brand_name'] : '',
-				) ); ?>,
+			brand: <?php echo wp_json_encode( array(
+				'exists'  => (bool) $brand_state['brand'],
+				'enabled' => $brand_state['enabled'],
+				'name'    => isset( $brand_state['brand']['brand_name'] ) ? $brand_state['brand']['brand_name'] : '',
+			) ); ?>,
+			fontList: <?php echo wp_json_encode( class_exists( 'PressGo_Config_Validator' ) ? PressGo_Config_Validator::google_fonts() : array() ); ?>,
 			};
 			</script>
 			<?php

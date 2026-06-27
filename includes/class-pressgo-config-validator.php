@@ -286,6 +286,32 @@ class PressGo_Config_Validator {
 	}
 
 	/**
+	 * Curated list of Google Fonts available in the brand panel dropdowns.
+	 * Grouped by category so the <select> can use <optgroup> labels.
+	 *
+	 * @return array Keys are category labels, values are arrays of font names.
+	 */
+	public static function google_fonts() {
+		return array(
+			'Sans-serif' => array(
+				'Inter', 'Manrope', 'Poppins', 'Montserrat', 'Open Sans', 'Work Sans',
+				'Roboto', 'Mulish', 'Karla', 'Nunito Sans', 'Outfit', 'Sora',
+				'Archivo', 'Bricolage Grotesque', 'Space Grotesk', 'DM Sans',
+				'Onest', 'Plus Jakarta Sans', 'Figtree', 'Hanken Grotesk',
+			),
+			'Serif' => array(
+				'Playfair Display', 'Cormorant Garamond', 'Libre Baskerville',
+				'Lora', 'Fraunces', 'DM Serif Display', 'Source Serif Pro',
+				'EB Garamond', 'Merriweather', 'Crimson Pro', 'Spectral',
+			),
+			'Display' => array(
+				'Syne', 'Bricolage Grotesque', 'Archivo Black', 'Anton',
+				'Bebas Neue', 'Oswald', 'Righteous', 'Unbounded',
+			),
+		);
+	}
+
+	/**
 	 * Curated font pairings, each tagged with vibe/industry keywords. Heading
 	 * and body are always distinct families so a page never reads as the
 	 * generic Inter/Inter template. Picked by industry keyword match, then by a

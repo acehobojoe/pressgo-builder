@@ -1646,38 +1646,30 @@
 		return true;
 	}
 
-	// ===== Continuous branding toggle =====
-	// Renders only once a brand foundation exists (auto-learned from the first
-	// build, or set via MCP). ON = new pages reuse the site's palette/fonts/
-	// identity; OFF = each page gets a fresh brand.
+	// ===== Site Brand panel =====
+	// Full design-system controller: identity, colors, fonts, logo/favicon.
+	// Saves re-render the current page so changes are immediately visible.
 	(function () {
 		var b = cfg.brand || {};
-		// Compact topbar chip (next to History/Clear chat) instead of a second
-		// footer toggle — the footer stays A(eyes)-only and uncluttered.
 		var actions = document.querySelector('.pg-builder-actions');
 		if (!actions) return;
+
+		// -- Chip in the topbar --
 		var chip = document.createElement('button');
 		chip.type = 'button';
-		chip.className = 'pg-builder-ghost';
-		chip.title = 'Site brand: new pages reuse this site\'s saved colors, fonts, and identity' + (b.name ? ' (' + b.name + ')' : '') + '. Click to toggle; off gives a page its own fresh look.';
+		chip.className = 'pg-builder-ghost pg-brand-chip';
 		var on = !!b.enabled;
-		// Self-explanatory label: the chip names the brand it's applying
-		// ("Brand: John's Gym"), so nobody needs the tooltip to know what it does.
 		var shortName = (b.name || '').length > 16 ? b.name.slice(0, 15) + '\u2026' : (b.name || '');
 		function paint() {
 			var label = on ? ('Brand: ' + (shortName ? escapeHtml(shortName) : 'on')) : 'Brand: off';
-			chip.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:' + (on ? '#22C55E' : '#9CA3AF') + ';"></span>' + label;
+			chip.innerHTML = '<span class="pg-brand-dot' + (on ? ' is-on' : '') + '"></span>' + label;
 			chip.style.opacity = on ? '1' : '0.65';
 		}
 		paint();
-		// No brand yet: keep the chip in the DOM but hidden — lock-in reveals it.
 		if (!b.exists) chip.style.display = 'none';
 		actions.insertBefore(chip, actions.firstChild);
 
-		// ===== Brand control panel =====
-		// The chip opens a real control menu: view/edit the stored foundation
-		// (name, industry, voice, colors, fonts), toggle continuous branding,
-		// or clear it so the next first build relearns from scratch.
+		// -- Panel state --
 		var brandPanel = null;
 		function closeBrandPanel() {
 			if (brandPanel) { brandPanel.remove(); brandPanel = null; document.removeEventListener('click', onBrandDocClick, true); }
@@ -1685,15 +1677,24 @@
 		function onBrandDocClick(e) {
 			if (brandPanel && !brandPanel.contains(e.target) && e.target !== chip && !chip.contains(e.target)) closeBrandPanel();
 		}
-		function fieldRow(label, input) {
-			var row = document.createElement('label');
-			row.className = 'pg-brand-row';
-			var span = document.createElement('span');
-			span.textContent = label;
-			row.appendChild(span);
-			row.appendChild(input);
-			return row;
+
+		// -- Helpers --
+		function el(tag, cls, text) {
+			var e = document.createElement(tag);
+			if (cls) e.className = cls;
+			if (text != null) e.textContent = text;
+			return e;
 		}
+		function isHex(v) { return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')); }
+		function isColorLike(v) { return isHex(v) || /^rgba?\(/i.test(String(v || '')); }
+
+		// Ordered color groups for the swatch grid.
+		var COLOR_GROUPS = [
+			{ label: 'Brand', keys: ['primary', 'primary_dark', 'accent', 'gold'] },
+			{ label: 'Backgrounds', keys: ['dark_bg', 'light_bg', 'white'] },
+			{ label: 'Text', keys: ['text_dark', 'text_muted', 'text_light'] },
+		];
+
 		function textInput(value, placeholder) {
 			var i = document.createElement('input');
 			i.type = 'text';
@@ -1701,7 +1702,124 @@
 			if (placeholder) i.placeholder = placeholder;
 			return i;
 		}
-		function isHex(v) { return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')); }
+		function selectInput(selected, groups) {
+			var sel = document.createElement('select');
+			sel.className = 'pg-brand-select';
+			var blank = document.createElement('option');
+			blank.value = '';
+			blank.textContent = 'Choose a font\u2026';
+			sel.appendChild(blank);
+			Object.keys(groups).forEach(function (cat) {
+				var og = document.createElement('optgroup');
+				og.label = cat;
+				groups[cat].forEach(function (name) {
+					var opt = document.createElement('option');
+					opt.value = name;
+					opt.textContent = name;
+					opt.style.fontFamily = "'" + name + "', sans-serif";
+					if (name === selected) opt.selected = true;
+					og.appendChild(opt);
+				});
+				sel.appendChild(og);
+			});
+			if (!selected) { sel.selectedIndex = 0; }
+			return sel;
+		}
+
+		// A color swatch with hex readout + label.
+		function colorSwatch(key, hex) {
+			var wrap = document.createElement('div');
+			wrap.className = 'pg-brand-swatch2';
+			var ci = document.createElement('input');
+			ci.type = 'color';
+			ci.dataset.key = key;
+			var safeHex = isHex(hex)
+				? (hex.length === 4
+					? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3]
+					: hex.slice(0, 7))
+				: '#000000';
+			ci.value = safeHex;
+			var preview = document.createElement('span');
+			preview.className = 'pg-brand-swatch2-color';
+			preview.style.background = hex || safeHex;
+			var label = document.createElement('span');
+			label.className = 'pg-brand-swatch2-label';
+			label.textContent = key.replace(/_/g, ' ');
+			var hexVal = document.createElement('span');
+			hexVal.className = 'pg-brand-swatch2-hex';
+			hexVal.textContent = isHex(hex) ? hex.toUpperCase() : String(hex || '').slice(0, 20);
+			ci.addEventListener('input', function () {
+				preview.style.background = ci.value;
+				hexVal.textContent = ci.value.toUpperCase();
+			});
+			wrap.appendChild(ci);
+			wrap.appendChild(preview);
+			wrap.appendChild(label);
+			wrap.appendChild(hexVal);
+			return wrap;
+		}
+
+		// Logo / favicon selector using the WordPress media library.
+		function uploadRow(field, label, currentUrl) {
+			var row = document.createElement('div');
+			row.className = 'pg-brand-upload';
+			var preview = document.createElement('div');
+			preview.className = 'pg-brand-upload-preview';
+			if (currentUrl) {
+				preview.style.backgroundImage = 'url("' + currentUrl + '")';
+			} else {
+				preview.classList.add('is-empty');
+			}
+			var info = document.createElement('div');
+			info.className = 'pg-brand-upload-info';
+			var lbl = el('span', 'pg-brand-upload-label', label);
+			var urlSpan = el('span', 'pg-brand-upload-url', currentUrl ? currentUrl.split('/').pop() : 'No file selected');
+			info.appendChild(lbl);
+			info.appendChild(urlSpan);
+			var btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'pg-brand-upload-btn';
+			btn.textContent = currentUrl ? 'Replace' : 'Choose';
+			btn.addEventListener('click', function () {
+				if (typeof wp === 'undefined' || !wp.media) {
+					alert('Media library not available. Make sure you are logged in as admin.');
+					return;
+				}
+				var frame = wp.media({
+					title: 'Select ' + label,
+					button: { text: 'Use as ' + label },
+					library: { type: 'image' },
+					multiple: false,
+				});
+				frame.on('select', function () {
+					var attachment = frame.state().get('selection').first().toJSON();
+					var imgUrl = attachment.url;
+					preview.classList.remove('is-empty');
+					preview.style.backgroundImage = 'url("' + imgUrl + '")';
+					urlSpan.textContent = attachment.filename || imgUrl.split('/').pop();
+					btn.textContent = 'Replace';
+					// Save to the brand foundation immediately.
+					var payload = {};
+					payload[field] = imgUrl;
+					var fd = new FormData();
+					fd.append('action', 'pressgo_ai_brand_save');
+					fd.append('nonce', cfg.nonce);
+					fd.append('brand', JSON.stringify(payload));
+					fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+						.then(function (r) { return r.json(); })
+						.then(function (j) {
+							if (j && j.success) {
+								append(el('pg-msg-system', label + ' updated.'));
+							}
+						});
+				});
+				frame.open();
+			});
+			row.appendChild(preview);
+			row.appendChild(info);
+			row.appendChild(btn);
+			return row;
+		}
 
 		function openBrandPanel(state, justSaved) {
 			closeBrandPanel();
@@ -1709,10 +1827,10 @@
 			brandPanel = document.createElement('div');
 			brandPanel.className = 'pg-brand-panel';
 
+			// -- Header --
 			var head = document.createElement('div');
 			head.className = 'pg-brand-head';
-			var title = document.createElement('strong');
-			title.textContent = 'Site brand';
+			var title = el('strong', null, 'Site brand');
 			head.appendChild(title);
 			var toggleWrap = document.createElement('label');
 			toggleWrap.className = 'pg-brand-toggle';
@@ -1724,69 +1842,101 @@
 			head.appendChild(toggleWrap);
 			brandPanel.appendChild(head);
 
-			// Just locked in: make it read as a confirmation, not a pending form —
-			// the brand is already saved; this panel is just showing what got locked.
+			// -- Saved banner --
 			if (justSaved) {
-				var saved = document.createElement('div');
-				saved.style.cssText = 'margin:2px 0 10px;padding:8px 11px;border-radius:8px;background:#ecfdf5;color:#047857;font-size:12px;font-weight:600;line-height:1.35;';
-				saved.textContent = '✓ Saved. This brand now applies to every new page automatically — nothing else to do. Tweak anything below if you like.';
+				var saved = el('div', 'pg-brand-saved', '\u2713 Saved. This brand now applies to every new page automatically. Tweak anything below if you like.');
 				brandPanel.appendChild(saved);
 			}
 
+			// -- Section: Identity --
+			var idSection = el('div', 'pg-brand-section');
+			idSection.appendChild(el('div', 'pg-brand-section-title', 'Identity'));
 			var nameI = textInput(b.brand_name, 'Business name');
-			var indI  = textInput(b.industry, 'Industry');
-			brandPanel.appendChild(fieldRow('Name', nameI));
-			brandPanel.appendChild(fieldRow('Industry', indI));
-
+			idSection.appendChild((function () {
+				var r = document.createElement('label'); r.className = 'pg-brand-row';
+				r.appendChild(el('span', null, 'Name')); r.appendChild(nameI); return r;
+			})());
+			var indI = textInput(b.industry, 'Industry');
+			idSection.appendChild((function () {
+				var r = document.createElement('label'); r.className = 'pg-brand-row';
+				r.appendChild(el('span', null, 'Industry')); r.appendChild(indI); return r;
+			})());
 			var voiceI = document.createElement('textarea');
 			voiceI.rows = 2;
 			voiceI.placeholder = 'Voice (e.g. warm and plainspoken)';
 			voiceI.value = b.voice || '';
-			brandPanel.appendChild(fieldRow('Voice', voiceI));
+			idSection.appendChild((function () {
+				var r = document.createElement('label'); r.className = 'pg-brand-row';
+				r.appendChild(el('span', null, 'Voice')); r.appendChild(voiceI); return r;
+			})());
+			brandPanel.appendChild(idSection);
 
-			// Colors: every stored hex key gets a native color input.
-			var colorInputs = {};
+			// -- Section: Logo & Favicon --
+			var logoSection = el('div', 'pg-brand-section');
+			logoSection.appendChild(el('div', 'pg-brand-section-title', 'Logo & Favicon'));
+			logoSection.appendChild(uploadRow('logo_url', 'Logo', b.logo_url || ''));
+			logoSection.appendChild(uploadRow('favicon_url', 'Favicon', b.favicon_url || ''));
+			brandPanel.appendChild(logoSection);
+
+			// -- Section: Colors --
 			var colors = b.colors || {};
-			var colorKeys = Object.keys(colors).filter(function (k) { return isHex(colors[k]); });
-			['primary', 'accent', 'background', 'text'].forEach(function (k) {
-				if (colorKeys.indexOf(k) === -1 && isHex(colors[k])) colorKeys.push(k);
-			});
-			if (colorKeys.length) {
-				var sw = document.createElement('div');
-				sw.className = 'pg-brand-colors';
-				colorKeys.forEach(function (k) {
-					var wrap = document.createElement('label');
-					wrap.className = 'pg-brand-swatch';
-					var ci = document.createElement('input');
-					ci.type = 'color';
-					ci.value = colors[k].length === 4
-						? '#' + colors[k][1] + colors[k][1] + colors[k][2] + colors[k][2] + colors[k][3] + colors[k][3]
-						: colors[k].slice(0, 7);
-					colorInputs[k] = ci;
-					wrap.appendChild(ci);
-					wrap.appendChild(document.createTextNode(k.replace(/_/g, ' ')));
-					sw.appendChild(wrap);
+			var colorInputs = {};
+			var colorSection = el('div', 'pg-brand-section');
+			colorSection.appendChild(el('div', 'pg-brand-section-title', 'Colors'));
+			var usedKeys = {};
+			COLOR_GROUPS.forEach(function (grp) {
+				var groupKeys = grp.keys.filter(function (k) {
+					return colors[k] && !usedKeys[k] && (isHex(colors[k]) || isColorLike(colors[k]));
 				});
-				brandPanel.appendChild(sw);
-			}
+				// Also include any unknown hex keys not in our groups.
+				if (grp.label === 'Brand') {
+					Object.keys(colors).forEach(function (k) {
+						if (!usedKeys[k] && isColorLike(colors[k]) && COLOR_GROUPS.every(function (g) { return g.keys.indexOf(k) === -1; })) {
+							groupKeys.push(k);
+						}
+					});
+				}
+				if (!groupKeys.length) return;
+				if (grp.label !== 'Brand') colorSection.appendChild(el('div', 'pg-brand-color-group-label', grp.label));
+				var grid = document.createElement('div');
+				grid.className = 'pg-brand-colors';
+				groupKeys.forEach(function (k) {
+					usedKeys[k] = true;
+					var sw = colorSwatch(k, colors[k]);
+					colorInputs[k] = sw.querySelector('input[type="color"]');
+					grid.appendChild(sw);
+				});
+				colorSection.appendChild(grid);
+			});
+			brandPanel.appendChild(colorSection);
 
+			// -- Section: Typography --
 			var fonts = b.fonts || {};
-			var headF = textInput(fonts.heading, 'Heading font (Google Fonts name)');
-			var bodyF = textInput(fonts.body, 'Body font');
-			brandPanel.appendChild(fieldRow('Headings', headF));
-			brandPanel.appendChild(fieldRow('Body', bodyF));
+			var fontGroups = cfg.fontList || {};
+			var fontSection = el('div', 'pg-brand-section');
+			fontSection.appendChild(el('div', 'pg-brand-section-title', 'Typography'));
+			var headF = selectInput(fonts.heading, fontGroups);
+			var bodyF = selectInput(fonts.body, fontGroups);
+			fontSection.appendChild((function () {
+				var r = document.createElement('label'); r.className = 'pg-brand-row';
+				r.appendChild(el('span', null, 'Headings')); r.appendChild(headF); return r;
+			})());
+			fontSection.appendChild((function () {
+				var r = document.createElement('label'); r.className = 'pg-brand-row';
+				r.appendChild(el('span', null, 'Body')); r.appendChild(bodyF); return r;
+			})());
+			brandPanel.appendChild(fontSection);
 
-			// Per-PAGE opt-out: one off-brand page without flipping the
-			// site-wide toggle (and forgetting to flip it back).
+			// -- Section: Page Options --
+			var pageSection = el('div', 'pg-brand-section');
 			var optWrap = document.createElement('label');
 			optWrap.className = 'pg-brand-toggle';
-			optWrap.style.marginTop = '2px';
 			var optCb = document.createElement('input');
 			optCb.type = 'checkbox';
 			optCb.checked = !!state.page_optout;
 			optWrap.appendChild(optCb);
 			optWrap.appendChild(document.createTextNode(' skip the brand on THIS page only'));
-			brandPanel.appendChild(optWrap);
+			pageSection.appendChild(optWrap);
 			optCb.addEventListener('change', function () {
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_brand_optout');
@@ -1795,22 +1945,25 @@
 				fd.append('optout', optCb.checked ? '1' : '');
 				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
 			});
+			brandPanel.appendChild(pageSection);
 
+			// -- Footer: Save + Danger Zone --
 			var foot = document.createElement('div');
 			foot.className = 'pg-brand-foot';
 			var saveBtn = document.createElement('button');
 			saveBtn.type = 'button';
 			saveBtn.className = 'pg-modal-btn is-primary';
-			saveBtn.textContent = 'Save';
-			var clearBtn2 = document.createElement('button');
-			clearBtn2.type = 'button';
-			clearBtn2.className = 'pg-modal-btn is-danger';
-			clearBtn2.textContent = 'Clear & relearn';
-			clearBtn2.title = 'Forget this brand. The next first build on a fresh page learns a new one.';
-			foot.appendChild(clearBtn2);
+			saveBtn.textContent = 'Save & apply';
+			var clearBtn = document.createElement('button');
+			clearBtn.type = 'button';
+			clearBtn.className = 'pg-modal-btn is-danger';
+			clearBtn.textContent = 'Clear & relearn';
+			clearBtn.title = 'Forget this brand. The next first build on a fresh page learns a new one.';
+			foot.appendChild(clearBtn);
 			foot.appendChild(saveBtn);
 			brandPanel.appendChild(foot);
 
+			// -- Toggle handler --
 			toggle.addEventListener('change', function () {
 				on = toggle.checked;
 				paint();
@@ -1821,9 +1974,10 @@
 				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
 			});
 
+			// -- Save handler --
 			saveBtn.addEventListener('click', function () {
 				saveBtn.disabled = true;
-				saveBtn.textContent = 'Saving…';
+				saveBtn.textContent = 'Saving\u2026';
 				var payload = {
 					brand_name: nameI.value.trim(),
 					industry: indI.value.trim(),
@@ -1839,21 +1993,47 @@
 				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 					.then(function (r) { return r.json(); })
 					.then(function (j) {
-						if (j && j.success) {
-							var nm = (j.data.brand && j.data.brand.brand_name) || '';
-							shortName = nm.length > 16 ? nm.slice(0, 15) + '…' : nm;
-							paint();
-							closeBrandPanel();
-							append(el('pg-msg-system', 'Brand saved. New pages will follow it.'));
-						} else {
+						if (!j || !j.success) {
 							saveBtn.disabled = false;
-							saveBtn.textContent = 'Save';
+							saveBtn.textContent = 'Save & apply';
+							return;
 						}
+						var nm = (j.data.brand && j.data.brand.brand_name) || '';
+						shortName = nm.length > 16 ? nm.slice(0, 15) + '\u2026' : nm;
+						paint();
+						saveBtn.textContent = 'Applying\u2026';
+						append(el('pg-msg-system', 'Brand saved. Re-rendering page\u2026'));
+						// Re-apply the updated brand to the current page.
+						var rfd = new FormData();
+						rfd.append('action', 'pressgo_ai_brand_reapply');
+						rfd.append('nonce', cfg.nonce);
+						rfd.append('post_id', cfg.postId);
+						fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: rfd })
+							.then(function (r) { return r.json(); })
+							.then(function (rj) {
+								saveBtn.disabled = false;
+								saveBtn.textContent = 'Save & apply';
+								if (rj && rj.success) {
+									reloadPreview(rj.data.preview_bust || Date.now());
+									closeBrandPanel();
+									append(el('pg-msg-system', 'Done. ' + (rj.data.sections || 0) + ' sections updated with the new brand.'));
+								} else {
+									closeBrandPanel();
+									append(el('pg-msg-system', 'Brand saved. New pages will follow it.'));
+								}
+							})
+							.catch(function () {
+								saveBtn.disabled = false;
+								saveBtn.textContent = 'Save & apply';
+								closeBrandPanel();
+								append(el('pg-msg-system', 'Brand saved. New pages will follow it.'));
+							});
 					})
-					.catch(function () { saveBtn.disabled = false; saveBtn.textContent = 'Save'; });
+					.catch(function () { saveBtn.disabled = false; saveBtn.textContent = 'Save & apply'; });
 			});
 
-			clearBtn2.addEventListener('click', function () {
+			// -- Clear handler --
+			clearBtn.addEventListener('click', function () {
 				if (!window.confirm('Forget this brand? Existing pages keep their look; the next first build learns a fresh brand.')) return;
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_brand_clear');
@@ -1870,6 +2050,7 @@
 			setTimeout(function () { document.addEventListener('click', onBrandDocClick, true); }, 0);
 		}
 
+		// -- Chip click: open panel --
 		chip.addEventListener('click', function () {
 			if (brandPanel) { closeBrandPanel(); return; }
 			var fd = new FormData();
@@ -1882,8 +2063,7 @@
 				.catch(function () {});
 		});
 
-		// Exposed to the chat: on brand lock-in, re-fetch, reveal + repaint the chip,
-		// and open the panel so the user watches their colors/fonts populate it.
+		// -- Exposed to chat: on brand lock-in, reveal + open panel --
 		refreshBrandPanel = function () {
 			var fd = new FormData();
 			fd.append('action', 'pressgo_ai_brand_get');
@@ -1897,12 +2077,12 @@
 					if (st.brand) {
 						on = st.enabled !== false;
 						var nm = st.brand.brand_name || st.brand.name || '';
-						shortName = nm.length > 16 ? nm.slice(0, 15) + '…' : nm;
+						shortName = nm.length > 16 ? nm.slice(0, 15) + '\u2026' : nm;
 						chip.style.display = '';
 						paint();
 					}
 					closeBrandPanel();
-					openBrandPanel(st, true); // confirmation state — already saved
+					openBrandPanel(st, true);
 				})
 				.catch(function () {});
 		};

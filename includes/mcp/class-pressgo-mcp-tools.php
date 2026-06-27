@@ -2779,6 +2779,9 @@ class PressGo_MCP_Tools {
 		if ( isset( $args['brand_name'] ) && is_string( $args['brand_name'] ) ) { $f['brand_name'] = sanitize_text_field( $args['brand_name'] ); }
 		if ( isset( $args['industry'] ) && is_string( $args['industry'] ) )     { $f['industry']   = sanitize_text_field( $args['industry'] ); }
 		if ( isset( $args['logo_url'] ) && is_string( $args['logo_url'] ) )     { $f['logo_url']   = esc_url_raw( $args['logo_url'] ); }
+		if ( isset( $args['favicon_url'] ) && is_string( $args['favicon_url'] ) ) { $f['favicon_url'] = esc_url_raw( $args['favicon_url'] ); }
+		if ( isset( $args['logo_url_id'] ) )     { $f['logo_url_id']     = absint( $args['logo_url_id'] ); }
+		if ( isset( $args['favicon_url_id'] ) )  { $f['favicon_url_id']  = absint( $args['favicon_url_id'] ); }
 		if ( isset( $args['voice'] ) && is_string( $args['voice'] ) )           { $f['voice']      = sanitize_textarea_field( $args['voice'] ); }
 		foreach ( array( 'colors', 'fonts', 'layout' ) as $k ) {
 			if ( isset( $args[ $k ] ) && is_array( $args[ $k ] ) ) {
