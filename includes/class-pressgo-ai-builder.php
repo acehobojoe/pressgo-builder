@@ -93,6 +93,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
+		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 	}
 
 	/**
@@ -352,6 +353,113 @@ class PressGo_AI_Builder {
 		}
 		$collect( get_posts( $args ) );
 		wp_send_json_success( array( 'images' => $out ) );
+	}
+
+	/**
+	 * Transcribe a base64-encoded audio blob via OpenRouter's Voxtral model.
+	 * Powers the voice-input button in the chat builder.
+	 */
+	public function ajax_transcribe() {
+		$this->check_auth();
+
+		$audio = isset( $_POST['audio'] ) ? (string) wp_unslash( $_POST['audio'] ) : '';
+		$mime  = isset( $_POST['mime'] ) ? sanitize_text_field( wp_unslash( $_POST['mime'] ) ) : '';
+		if ( '' === $audio || '' === $mime ) {
+			wp_send_json_error( 'missing audio or mime', 400 );
+		}
+
+		// Strip the data URL prefix (data:audio/webm;base64,XXXX) if present.
+		$b64 = $audio;
+		$comma = strpos( $audio, ',' );
+		if ( false !== $comma && 0 === strpos( $audio, 'data:' ) ) {
+			$b64 = substr( $audio, $comma + 1 );
+		}
+		$b64 = preg_replace( '/\s+/', '', $b64 );
+		if ( '' === $b64 ) {
+			wp_send_json_error( 'empty audio payload', 400 );
+		}
+
+		$api_key = get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $api_key ) {
+			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
+		}
+
+		// Gemini 2.5 Flash Lite transcribes accurately and accepts WebM
+		// (the browser's MediaRecorder format) natively — no server-side
+		// conversion needed. Same cost as Voxtral ($0.10/M tokens).
+		$format = $mime;
+		// Normalize mime to a format OpenRouter recognizes.
+		if ( 0 === strpos( $format, 'audio/' ) ) {
+			$format = substr( $format, 6 ); // strip "audio/" → "webm", "wav", "mp3", etc.
+		}
+
+		$body = wp_json_encode( array(
+			'model'    => 'google/gemini-2.5-flash-lite',
+			'messages' => array(
+				array(
+					'role'    => 'user',
+					'content' => array(
+						array(
+							'type' => 'text',
+							'text' => 'Transcribe this audio recording. Output ONLY the transcribed text, no preamble, no quotes, no commentary.',
+						),
+						array(
+							'type'        => 'input_audio',
+							'input_audio' => array(
+								'data'   => $b64,
+								'format' => $format,
+							),
+						),
+					),
+				),
+			),
+		) );
+
+		$response = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 120,
+			'headers' => array(
+				'Content-Type'  => 'application/json',
+				'Authorization' => 'Bearer ' . $api_key,
+			),
+			'body'    => $body,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( 'Transcription failed: ' . $response->get_error_message(), 502 );
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status ) {
+			$err_body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$detail   = isset( $err_body['error']['message'] ) ? $err_body['error']['message'] : 'HTTP ' . $status;
+			wp_send_json_error( 'Transcription failed: ' . $detail, 502 );
+		}
+
+		$json   = json_decode( wp_remote_retrieve_body( $response ), true );
+		$text   = '';
+		if ( isset( $json['choices'][0]['message']['content'] ) ) {
+			$content = $json['choices'][0]['message']['content'];
+			if ( is_string( $content ) ) {
+				$text = $content;
+			} elseif ( is_array( $content ) ) {
+				$parts = array();
+				foreach ( $content as $block ) {
+					if ( is_array( $block ) && isset( $block['text'] ) && is_string( $block['text'] ) ) {
+						$parts[] = $block['text'];
+					} elseif ( is_string( $block ) ) {
+						$parts[] = $block;
+					}
+				}
+				$text = implode( '', $parts );
+			}
+		}
+
+		$text = trim( $text );
+		if ( '' === $text ) {
+			wp_send_json_error( 'Transcription failed: empty response', 502 );
+		}
+
+		wp_send_json_success( array( 'text' => $text ) );
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
@@ -1186,19 +1294,52 @@ class PressGo_AI_Builder {
 				<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
-					<div class="pg-attach-strip" id="pg-attach-strip" hidden></div>
 					<form class="pg-chat-input" id="pg-chat-form">
-						<button type="button" class="pg-attach-btn" id="pg-attach-btn" title="Attach images (or drag/drop / paste — you can add several)" aria-label="Attach images">
-							<svg class="pg-attach-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-							<span class="pg-attach-count" id="pg-attach-count" hidden>0</span>
-						</button>
-						<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
-						<textarea
-							id="pg-chat-text"
-							rows="1"
-							placeholder="Describe your page, or drop a screenshot…"
-							required></textarea>
-						<button type="submit" id="pg-chat-send">Send</button>
+						<div class="pg-composer" id="pg-composer">
+							<div class="pg-attach-row" id="pg-attach-strip" hidden></div>
+							<textarea
+								id="pg-chat-text"
+								rows="1"
+								placeholder="Describe your page, or tweak the example…"
+								required></textarea>
+							<div class="pg-voice-bar" id="pg-voice-bar" hidden>
+								<span class="pg-voice-timer" id="pg-voice-timer">0:00</span>
+								<canvas class="pg-voice-canvas" id="pg-voice-canvas"></canvas>
+								<span class="pg-voice-hint" id="pg-voice-hint">Listening…</span>
+							</div>
+							<div class="pg-action-bar">
+								<div class="pg-action-left">
+									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images" aria-label="Attach images">
+										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+									</button>
+									<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
+									<button type="button" class="pg-icon-btn pg-mic-btn" id="pg-mic-btn" data-state="idle" title="Record voice message" aria-label="Record voice message">
+										<svg class="pg-mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<rect x="9" y="2" width="6" height="11" rx="3"/>
+											<path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+											<line x1="12" y1="18" x2="12" y2="22"/>
+											<line x1="8" y1="22" x2="16" y2="22"/>
+										</svg>
+										<svg class="pg-mic-stop-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display:none">
+											<rect x="6" y="6" width="12" height="12" rx="2"/>
+										</svg>
+									</button>
+								</div>
+								<div class="pg-action-right">
+									<button type="submit" class="pg-send-btn" id="pg-chat-send" disabled>
+										<svg class="pg-send-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<line x1="22" y1="2" x2="11" y2="13"/>
+											<polygon points="22 2 15 22 11 13 2 9 22 2"/>
+										</svg>
+										<svg class="pg-stop-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="display:none">
+											<rect x="6" y="6" width="12" height="12" rx="2"/>
+										</svg>
+										<span class="pg-send-label">Send</span>
+									</button>
+								</div>
+							</div>
+							<div class="pg-composer-error" id="pg-composer-error" hidden></div>
+						</div>
 					</form>
 					<div class="pg-drop-overlay" id="pg-drop-overlay">
 						<div class="pg-drop-message">

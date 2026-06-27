@@ -16,6 +16,26 @@
 	// Build mode (Ada=basic recipe, Iris=recipe+A(eyes) review, Nova=freeform).
 	var pgMode = 'basic';
 
+	// ─── Inline composer error toast ───────────────────────────────────
+	var composerError = document.getElementById('pg-composer-error');
+	function showComposerError(msg, retryFn) {
+		if (!composerError) return;
+		composerError.innerHTML = '';
+		composerError.textContent = msg;
+		if (retryFn) {
+			var retry = document.createElement('a');
+			retry.textContent = 'Retry';
+			retry.className = 'pg-composer-error-retry';
+			retry.href = '#';
+			retry.addEventListener('click', function (e) { e.preventDefault(); hideComposerError(); retryFn(); });
+			composerError.appendChild(retry);
+		}
+		composerError.hidden = false;
+	}
+	function hideComposerError() {
+		if (composerError) { composerError.hidden = true; composerError.innerHTML = ''; }
+	}
+
 	// ─── Viewport switcher ─────────────────────────────────────────────
 	var stageInner = document.getElementById('pg-preview-stage-inner');
 	document.querySelectorAll('.pg-vp-btn').forEach(function (btn) {
@@ -57,6 +77,7 @@
 			resized.id = 'img' + (++imgSeq);
 			pendingImages.push(resized);
 			renderStrip();
+			updateSendState();
 		});
 	}
 
@@ -129,17 +150,20 @@
 				id:        'img' + (++imgSeq),
 			});
 			renderStrip();
+			updateSendState();
 		};
 		reader.readAsDataURL(file);
 	}
 	function removePendingImage(id) {
 		pendingImages = pendingImages.filter(function (im) { return im.id !== id; });
 		renderStrip();
+		updateSendState();
 	}
 	function clearPendingImages() {
 		pendingImages = [];
 		if (attachInput) attachInput.value = '';
 		renderStrip();
+		updateSendState();
 	}
 	// Render the thumbnail strip (each thumb has a remove ×) + the count badge.
 	function renderStrip() {
@@ -181,6 +205,24 @@
 		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
 		attachInput.value = ''; // allow re-picking the same file
 	});
+
+	// ── Composer: auto-grow textarea + send-button disabled state ──
+	function autoGrow() {
+		if (!input) return;
+		input.style.height = 'auto';
+		input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+	}
+	function updateSendState() {
+		if (!sendBtn) return;
+		if (sendBtn.classList.contains('is-responding')) return; // stay clickable as Stop
+		var hasText = input.value.trim().length > 0;
+		var hasImages = pendingImages.length > 0;
+		sendBtn.disabled = !hasText && !hasImages;
+	}
+	input.addEventListener('input', autoGrow);
+	input.addEventListener('input', updateSendState);
+	autoGrow();
+	updateSendState();
 
 	// Paste from clipboard inside the textarea (adds each pasted image).
 	input.addEventListener('paste', function (e) {
@@ -523,27 +565,39 @@
 	}
 
 	function setBusy(busy) {
-		sendBtn.disabled = busy;
-		input.disabled = busy;
-		if (busy) startElapsed();
-		else { stopElapsed(); sendBtn.textContent = 'Send'; }
+		if (busy) {
+			startElapsed();
+			sendBtn.classList.add('is-responding');
+			sendBtn.disabled = false; // clickable as Stop
+		} else {
+			stopElapsed();
+			sendBtn.classList.remove('is-responding');
+			updateSendState(); // re-evaluate disabled based on input/images
+		}
 	}
 
-	// Lightweight elapsed-time readout on the Send button so a 20–40s build
-	// doesn't feel hung. "~30s typical" sets the expectation.
+	// Stop button: clicking the send button while responding aborts the
+	// in-flight stream (if one exists) instead of submitting a new message.
+	sendBtn.addEventListener('click', function (e) {
+		if (sendBtn.classList.contains('is-responding')) {
+			e.preventDefault();
+			try { if (window.__pgActiveStream) window.__pgActiveStream.abort(); } catch (err) {}
+			setBusy(false);
+		}
+	});
+
+	// Lightweight elapsed-time readout (kept for potential status UI; the
+	// send button itself now morphs to a stop icon while responding, so we
+	// no longer overwrite its label here).
 	var elapsedTimer = null;
 	function startElapsed() {
 		stopElapsed();
 		var t0 = Date.now();
-		function tick() {
+		elapsedTimer = setInterval(function () {
 			var s = Math.round((Date.now() - t0) / 1000);
-			// Compact: the long "Thinking… 37s · almost there" label squeezed
-			// the textarea into a sliver. Status swaps text, never grows.
-			sendBtn.textContent = s < 1 ? 'Thinking…' : ( s < 30 ? s + 's…' : 'Almost…' );
-		}
-		tick();
-		elapsedTimer = setInterval(tick, 1000);
-		sendBtn.title = 'A full page build usually takes ~30 seconds';
+			sendBtn.title = s < 1 ? 'Generating…' : ( s < 30 ? s + 's elapsed' : 'Almost there' );
+		}, 1000);
+		sendBtn.title = 'Generating…';
 	}
 	function stopElapsed() {
 		if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
@@ -1741,11 +1795,16 @@
 		btn.addEventListener('click', open);
 	})();
 
-	// Enter to send (Shift+Enter for newline)
+	// Enter to send (Shift+Enter for newline) — desktop only. On touch
+	// devices Enter inserts a newline; the send button is the only way to
+	// submit, which avoids the mobile soft-keyboard "go" trap.
+	function isMobileDevice() {
+		return (navigator.maxTouchPoints || 0) > 0 || window.innerWidth < 768;
+	}
 	input.addEventListener('keydown', function (e) {
-		if (e.key === 'Enter' && !e.shiftKey) {
+		if (e.key === 'Enter' && !e.shiftKey && !isMobileDevice()) {
 			e.preventDefault();
-			form.dispatchEvent(new Event('submit', { cancelable: true }));
+			form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 		}
 	});
 
@@ -4441,4 +4500,326 @@
 
 	loadHistory();
 	refreshCredits();
+
+	// ===== Voice input (mic button + live waveform) =====
+	// States: idle → recording → transcribing → error → idle
+	// Records audio via MediaRecorder, shows a live canvas waveform driven
+	// by AnalyserNode (real mic input with per-bar randomized spring physics),
+	// POSTs to pressgo_ai_transcribe, fills the textarea. Does NOT auto-send —
+	// the spec says let the user edit before sending.
+	(function () {
+		var micBtn = document.querySelector('.pg-mic-btn') || document.getElementById('pg-mic-btn');
+		if (!micBtn) return;
+		if (!navigator.mediaDevices || !window.MediaRecorder || !window.AudioContext) {
+			micBtn.style.display = 'none';
+			return;
+		}
+
+		var voiceBar   = document.getElementById('pg-voice-bar');
+		var voiceTimer = document.getElementById('pg-voice-timer');
+		var voiceHint  = document.getElementById('pg-voice-hint');
+		var canvas     = document.getElementById('pg-voice-canvas');
+		var ctx        = canvas ? canvas.getContext('2d') : null;
+		var composerEl = document.querySelector('.pg-composer');
+
+		var mediaRecorder = null;
+		var audioChunks   = [];
+		var stream        = null;
+		var audioCtx      = null;
+		var analyser      = null;
+		var sourceNode    = null;
+		var freqData      = null;
+		var rafId         = null;
+		var recording     = false;
+		var timerInterval = null;
+		var timerStart    = 0;
+
+		// Waveform bar state — per-bar spring physics for organic motion
+		var NUM_BARS = 48;
+		var bars = [];
+		for (var i = 0; i < NUM_BARS; i++) {
+			bars.push({
+				height: 0.1,
+				vel: 0,
+				stiffness: 300 + Math.random() * 80,
+				damping: 18 + Math.random() * 6,
+				target: 0.1
+			});
+		}
+
+		function setState(s) {
+			micBtn.setAttribute('data-state', s);
+		}
+
+		function showVoiceBar(hint) {
+			if (voiceHint) voiceHint.textContent = hint;
+			// Voice bar replaces the textarea area inside the composer.
+			if (input) input.style.display = 'none';
+			if (voiceBar) {
+				voiceBar.hidden = false;
+				requestAnimationFrame(function () { voiceBar.classList.add('is-visible'); });
+			}
+			if (composerEl) composerEl.classList.add('pg-voice-active');
+		}
+
+		function hideVoiceBar() {
+			if (voiceBar) {
+				voiceBar.classList.remove('is-visible');
+				voiceBar.hidden = true;
+			}
+			if (composerEl) composerEl.classList.remove('pg-voice-active');
+			if (input) {
+				input.style.display = '';
+				input.focus();
+			}
+		}
+
+		function startTimer() {
+			timerStart = Date.now();
+			if (voiceTimer) voiceTimer.textContent = '0:00';
+			timerInterval = setInterval(function () {
+				if (!voiceTimer) return;
+				var secs = Math.floor((Date.now() - timerStart) / 1000);
+				var m = Math.floor(secs / 60);
+				var s = secs % 60;
+				voiceTimer.textContent = m + ':' + (s < 10 ? '0' + s : s);
+			}, 250);
+		}
+
+		function stopTimer() {
+			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+		}
+
+		// ── Canvas waveform rendering ──
+		function resizeCanvas() {
+			if (!canvas || !ctx) return;
+			var rect = canvas.getBoundingClientRect();
+			var dpr = window.devicePixelRatio || 1;
+			canvas.width = rect.width * dpr;
+			canvas.height = rect.height * dpr;
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.scale(dpr, dpr);
+		}
+
+		function drawWaveform() {
+			rafId = requestAnimationFrame(drawWaveform);
+			if (!canvas || !ctx) return;
+
+			var rect = canvas.getBoundingClientRect();
+			var w = rect.width;
+			var h = rect.height;
+			ctx.clearRect(0, 0, w, h);
+
+			// Get mic volume data
+			var avgVol = 0;
+			if (analyser && freqData) {
+				analyser.getByteFrequencyData(freqData);
+				var sum = 0;
+				for (var k = 0; k < freqData.length; k++) sum += freqData[k];
+				avgVol = sum / freqData.length / 255; // 0–1
+			}
+
+			// Update bar targets from frequency data, with per-bar spring physics
+			var barW = w / NUM_BARS;
+			var gap = 2;
+			var drawW = barW - gap;
+			if (drawW < 1) drawW = 1;
+
+			for (var i = 0; i < NUM_BARS; i++) {
+				var bar = bars[i];
+				if (analyser && freqData) {
+					// Map bar index to frequency bin (skip the lowest bins — mostly noise)
+					var binIdx = Math.floor(2 + (i / NUM_BARS) * (freqData.length * 0.7));
+					var raw = (freqData[binIdx] || 0) / 255;
+					// Add slight randomness to avoid mechanical feel
+					raw = raw * (0.85 + Math.random() * 0.3);
+					bar.target = Math.max(0.05, raw);
+				} else {
+					bar.target = 0.05;
+				}
+
+				// Spring physics: F = -kx - cv
+				var force = (bar.target - bar.height) * bar.stiffness;
+				var dampingForce = -bar.vel * bar.damping;
+				bar.vel += (force + dampingForce) * 0.016; // ~60fps
+				bar.height += bar.vel * 0.016;
+
+				// Clamp
+				if (bar.height < 0.03) bar.height = 0.03;
+				if (bar.height > 1) bar.height = 1;
+			}
+
+			// Draw bars with gradient + glow
+			var maxH = h * 0.9;
+			for (var j = 0; j < NUM_BARS; j++) {
+				var barH = bars[j].height * maxH;
+				var x = j * barW + gap / 2;
+				var y = (h - barH) / 2;
+
+				// Gradient: center brighter, edges softer
+				var intensity = bars[j].height;
+				var alpha = 0.4 + intensity * 0.6;
+				ctx.fillStyle = 'rgba(139, 92, 246, ' + alpha + ')';
+
+				// Rounded bars
+				var r = Math.min(drawW / 2, 2);
+				ctx.beginPath();
+				ctx.moveTo(x + r, y);
+				ctx.lineTo(x + drawW - r, y);
+				ctx.quadraticCurveTo(x + drawW, y, x + drawW, y + r);
+				ctx.lineTo(x + drawW, y + barH - r);
+				ctx.quadraticCurveTo(x + drawW, y + barH, x + drawW - r, y + barH);
+				ctx.lineTo(x + r, y + barH);
+				ctx.quadraticCurveTo(x, y + barH, x, y + barH - r);
+				ctx.lineTo(x, y + r);
+				ctx.quadraticCurveTo(x, y, x + r, y);
+				ctx.closePath();
+				ctx.fill();
+			}
+
+			// Edge fade (left/right gradient mask)
+			var fadeW = 24;
+			if (w > fadeW * 2) {
+				var gradL = ctx.createLinearGradient(0, 0, fadeW, 0);
+				gradL.addColorStop(0, 'rgba(30, 27, 46, 1)');
+				gradL.addColorStop(1, 'rgba(30, 27, 46, 0)');
+				ctx.fillStyle = gradL;
+				ctx.fillRect(0, 0, fadeW, h);
+
+				var gradR = ctx.createLinearGradient(w - fadeW, 0, w, 0);
+				gradR.addColorStop(0, 'rgba(30, 27, 46, 0)');
+				gradR.addColorStop(1, 'rgba(30, 27, 46, 1)');
+				ctx.fillStyle = gradR;
+				ctx.fillRect(w - fadeW, 0, fadeW, h);
+			}
+		}
+
+		// ── Recording lifecycle ──
+		function startRecording() {
+			hideComposerError();
+			navigator.mediaDevices.getUserMedia({ audio: true })
+				.then(function (s) {
+					stream = s;
+					audioChunks = [];
+
+					// Set up AudioContext + AnalyserNode for live waveform
+					audioCtx = new AudioContext();
+					sourceNode = audioCtx.createMediaStreamSource(s);
+					analyser = audioCtx.createAnalyser();
+					analyser.fftSize = 256;
+					analyser.smoothingTimeConstant = 0.8;
+					freqData = new Uint8Array(analyser.frequencyBinCount);
+					sourceNode.connect(analyser);
+
+					// MediaRecorder for actual recording
+					mediaRecorder = new MediaRecorder(s);
+					mediaRecorder.ondataavailable = function (e) {
+						if (e.data && e.data.size) audioChunks.push(e.data);
+					};
+					mediaRecorder.onstop = function () {
+						var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+						audioChunks = [];
+						transcribe(blob);
+					};
+					mediaRecorder.start();
+					recording = true;
+
+					setState('recording');
+					showVoiceBar('Listening…');
+					resizeCanvas();
+					drawWaveform();
+					startTimer();
+
+					window.addEventListener('resize', resizeCanvas);
+				})
+				.catch(function (err) {
+					var msg = 'Microphone access denied. Check your browser permissions.';
+					if (err && err.name === 'NotAllowedError') {
+						msg = 'Microphone access denied. Click the camera icon in your address bar to allow.';
+					}
+					setState('error');
+					showComposerError(msg, startRecording);
+				});
+		}
+
+		function stopRecording() {
+			recording = false;
+			if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+			stopTimer();
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+			if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+			if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
+			if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; analyser = null; }
+			window.removeEventListener('resize', resizeCanvas);
+
+			setState('transcribing');
+			if (voiceBar) voiceBar.classList.add('is-processing');
+			if (voiceHint) voiceHint.textContent = 'Transcribing…';
+		}
+
+		function transcribe(blob) {
+			var reader = new FileReader();
+			reader.onload = function () {
+				var dataUrl = reader.result;
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_transcribe');
+				fd.append('nonce', cfg.nonce);
+				fd.append('audio', dataUrl);
+				fd.append('mime', blob.type || 'audio/webm');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (data) {
+						if (data && data.success && data.data && data.data.text) {
+							var text = data.data.text;
+							if (input.value.trim()) {
+								input.value = input.value.replace(/\s+$/, '') + ' ' + text;
+							} else {
+								input.value = text;
+							}
+							if (voiceBar) voiceBar.classList.remove('is-processing');
+							hideVoiceBar();
+							setState('idle');
+							// Refresh textarea height + send state — do NOT auto-send.
+							if (typeof autoGrow === 'function') autoGrow();
+							if (typeof updateSendState === 'function') updateSendState();
+						} else {
+							failTranscribe();
+						}
+					})
+					.catch(failTranscribe);
+			};
+			reader.onerror = failTranscribe;
+			reader.readAsDataURL(blob);
+		}
+
+		function failTranscribe() {
+			setState('error');
+			if (voiceBar) voiceBar.classList.remove('is-processing');
+			hideVoiceBar();
+			showComposerError("Couldn't transcribe — try again.", startRecording);
+		}
+
+		micBtn.addEventListener('click', function () {
+			if (recording) stopRecording();
+			else startRecording();
+		});
+
+		// Spacebar on the mic button toggles recording (accessibility)
+		micBtn.addEventListener('keydown', function (e) {
+			if (e.key === ' ' || e.key === 'Spacebar') {
+				e.preventDefault();
+				if (recording) stopRecording();
+				else startRecording();
+			}
+		});
+
+		window.addEventListener('beforeunload', function () {
+			if (recording) {
+				if (rafId) cancelAnimationFrame(rafId);
+				if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+				if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+				if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
+			}
+		});
+	})();
 })();
