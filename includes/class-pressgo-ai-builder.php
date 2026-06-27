@@ -1460,12 +1460,36 @@ class PressGo_AI_Builder {
 		require_once $gen . 'class-pressgo-widget-helpers.php';
 		require_once $gen . 'class-pressgo-freeform-renderer.php';
 
-		$plan        = $this->build_cohesion_plan( $records );
+		$plan = $this->build_cohesion_plan( $records );
+		$new  = $this->cohesion_apply_plan( $post_id, $plan );
+		if ( count( $new ) < count( $records ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't safely reorganize this page — left it exactly as it was." );
+		}
+		$this->cohesion_write_elements( $post_id, $new, $plan );
+
+		// Vision critic (C3): screenshot the reorganized page and let a vision model
+		// catch any contrast/rhythm miss the deterministic pass made. Non-blocking —
+		// any failure leaves the already-good deterministic page in place.
+		$vnote = '';
+		try {
+			$vnote = (string) $this->cohesion_vision_fixes( $post_id, $plan );
+		} catch ( \Throwable $e ) {
+			$vnote = '';
+		}
+
+		$note = 'Reorganized your page — a smarter order, an even dark and light rhythm, and your call to action moved to the end where it pops.';
+		if ( '' !== $vnote ) { $note .= ' ' . $vnote; }
+		$note .= ' Say "undo" to put it back.';
+		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => $note );
+	}
+
+	/** Render a plan to an _elementor_data element list (recolor + reorder). */
+	private function cohesion_apply_plan( $post_id, &$plan ) {
 		$elements    = $this->read_elements( $post_id );
 		$by_marker   = $this->index_elements_by_marker( $elements );
 		$default_cfg = $this->cohesion_cfg( $post_id );
-
-		$new = array();
+		$new         = array();
 		foreach ( $plan as $k => $rec ) {
 			$role = $rec['bg_role'];
 			$el   = null;
@@ -1481,21 +1505,124 @@ class PressGo_AI_Builder {
 			}
 			if ( $el ) { $new[] = $el; }
 		}
+		return $new;
+	}
 
-		if ( count( $new ) < count( $records ) ) {
-			delete_post_meta( $post_id, self::META_COHESION_UNDO );
-			return array( 'note' => "I couldn't safely reorganize this page — left it exactly as it was." );
-		}
-
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+	private function cohesion_write_elements( $post_id, $elements, $plan ) {
+		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
 		$this->save_ff_sections( $post_id, $plan );
 		$this->cohesion_flush( $post_id );
+	}
 
-		return array(
-			'preview_bust' => time(),
-			'cohesion'     => true,
-			'note'         => 'Reorganized your page — a smarter order, an even dark and light rhythm, and your call to action moved to the end where it pops. Say "undo" to put it back.',
+	/** The vision critic's instruction set. */
+	private function cohesion_critic_rubric() {
+		return "You are a sharp web design critic. You are shown a full-page screenshot of a landing page (top to bottom) that was just auto-reorganized, plus a numbered list of its sections. Judge ONLY these:\n"
+			. "1. Is any TEXT illegible against its section background (e.g. dark text on a dark band, light text on a light band)?\n"
+			. "2. Do two ADJACENT sections share the same background shade (dark next to dark, or light next to light), breaking the rhythm?\n"
+			. "3. Does the final call-to-action visibly STAND OUT from the rest?\n"
+			. "Return STRICT JSON only:\n"
+			. '{"approve": true, "issues": [{"n": 3, "problem": "unreadable_text|adjacent_same_shade|cta_not_distinct", "set_bg_role": "dark|light|accent"}], "notes": ""}'
+			. "\nRules: `n` is the 1-based section number from the TOP. `set_bg_role` is the background the section SHOULD have to fix it. Only report problems you can clearly SEE. If the page looks good, return approve:true with an empty issues array. Max 4 issues. `notes` is one short human sentence (or empty).";
+	}
+
+	/** A full-page screenshot of the page as a data URL, or '' on failure. */
+	private function cohesion_screenshot( $post_id ) {
+		$preview = $this->signed_preview_url( $post_id );
+		$resp    = wp_remote_get(
+			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview ) . '&viewport=desktop&full_page=1',
+			array( 'timeout' => 30, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
 		);
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
+		$png = wp_remote_retrieve_body( $resp );
+		return $png ? 'data:image/png;base64,' . base64_encode( $png ) : '';
+	}
+
+	/** GLM vision critique (z-ai/glm-4.6v) -> parsed array, or null. */
+	private function glm_vision_critique( $key, $data_url, $plan_text ) {
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 120,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'body'    => wp_json_encode( array(
+				'model'           => 'z-ai/glm-4.6v',
+				'max_tokens'      => 1500,
+				'response_format' => array( 'type' => 'json_object' ),
+				'messages'        => array(
+					array( 'role' => 'system', 'content' => $this->cohesion_critic_rubric() ),
+					array( 'role' => 'user', 'content' => array(
+						array( 'type' => 'text', 'text' => "Reorganized page sections (top to bottom):\n" . $plan_text ),
+						array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+					) ),
+				),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$j    = json_decode( $data['choices'][0]['message']['content'] ?? '', true );
+		return is_array( $j ) ? $j : null;
+	}
+
+	/** Claude Sonnet vision critique fallback -> parsed array, or null. */
+	private function claude_vision_critique( $key, $data_url, $plan_text ) {
+		if ( ! preg_match( '#^data:(image/\w+);base64,(.+)$#', $data_url, $m ) ) { return null; }
+		$resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+			'timeout' => 90,
+			'headers' => array( 'content-type' => 'application/json', 'x-api-key' => $key, 'anthropic-version' => '2023-06-01' ),
+			'body'    => wp_json_encode( array(
+				'model'      => 'claude-sonnet-4-5-20250929',
+				'max_tokens' => 1500,
+				'system'     => $this->cohesion_critic_rubric(),
+				'messages'   => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => "Reorganized page sections (top to bottom):\n" . $plan_text ),
+					array( 'type' => 'image', 'source' => array( 'type' => 'base64', 'media_type' => $m[1], 'data' => $m[2] ) ),
+				) ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$text = '';
+		foreach ( ( $data['content'] ?? array() ) as $blk ) { if ( ( $blk['type'] ?? '' ) === 'text' ) { $text .= $blk['text']; } }
+		if ( preg_match( '/\{[\s\S]*\}/', $text, $mm ) ) { return json_decode( $mm[0], true ); }
+		return null;
+	}
+
+	/** Screenshot the reorganized page, ask a vision model to audit it, apply the
+	 *  bounded background fixes it flags. Returns a short user-facing note, or ''. */
+	private function cohesion_vision_fixes( $post_id, $plan ) {
+		$data_url = $this->cohesion_screenshot( $post_id );
+		if ( '' === $data_url ) { return ''; }
+		$lines = array();
+		foreach ( $plan as $i => $rec ) {
+			$lines[] = ( $i + 1 ) . '. role=' . $rec['semantic_role'] . ' bg=' . $rec['bg_role'] . ' "' . mb_substr( (string) $rec['heading'], 0, 50 ) . '"';
+		}
+		$plan_text = implode( "\n", $lines );
+
+		$or   = (string) get_option( 'pressgo_openrouter_key', '' );
+		$crit = '' !== $or ? $this->glm_vision_critique( $or, $data_url, $plan_text ) : null;
+		if ( ! is_array( $crit ) ) {
+			$cl = (string) get_option( 'pressgo_freeform_key', '' );
+			if ( '' !== $cl ) { $crit = $this->claude_vision_critique( $cl, $data_url, $plan_text ); }
+		}
+		if ( ! is_array( $crit ) || empty( $crit['issues'] ) || ! is_array( $crit['issues'] ) ) { return ''; }
+
+		$changed = 0;
+		foreach ( $crit['issues'] as $iss ) {
+			$n    = isset( $iss['n'] ) ? ( (int) $iss['n'] ) - 1 : -1;
+			$role = isset( $iss['set_bg_role'] ) ? $iss['set_bg_role'] : '';
+			if ( $n < 0 || $n >= count( $plan ) ) { continue; }
+			if ( ! in_array( $role, array( 'dark', 'light', 'accent' ), true ) ) { continue; }
+			if ( empty( $plan[ $n ]['source_tree'] ) || ! empty( $plan[ $n ]['lock_bg'] ) ) { continue; } // can't recolor
+			if ( ( $plan[ $n ]['bg_role'] ?? '' ) === $role ) { continue; }
+			$plan[ $n ]['bg_role'] = $role;
+			$changed++;
+		}
+		if ( 0 === $changed ) { return ''; }
+
+		$new = $this->cohesion_apply_plan( $post_id, $plan );
+		if ( count( $new ) >= count( $plan ) ) {
+			$this->cohesion_write_elements( $post_id, $new, $plan );
+			return 'I double-checked it visually and tuned a couple of sections so everything stays readable.';
+		}
+		return '';
 	}
 
 	/** Revert the last reorganize. */
