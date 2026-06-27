@@ -904,6 +904,52 @@ class PressGo_AI_Builder {
 		return isset( $map[ $value ] ) ? $map[ $value ] : '';
 	}
 
+	/** Candidate next sections for a page goal (homepage vs paid landing page). */
+	private function section_suggestions( $goal ) {
+		if ( 'browse' === $goal ) {
+			return array(
+				array( 'key' => 'services',     'label' => 'Services',    'request' => 'Add a section showing the main services or what we offer, as clean cards.' ),
+				array( 'key' => 'about',        'label' => 'About us',     'request' => 'Add an about section: our story and what makes us different.' ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',      'request' => 'Add a testimonials section with customer reviews.' ),
+				array( 'key' => 'team',         'label' => 'Team',         'request' => 'Add a team section introducing our people.' ),
+				array( 'key' => 'gallery',      'label' => 'Gallery',      'request' => 'Add a gallery section showing examples of our work.' ),
+				array( 'key' => 'faq',          'label' => 'FAQ',          'request' => 'Add a frequently asked questions section.' ),
+				array( 'key' => 'contact',      'label' => 'Contact',      'request' => 'Add a contact section with a form and our details.' ),
+				array( 'key' => 'cta',          'label' => 'Final CTA',    'request' => 'Add a final call to action section.' ),
+			);
+		}
+		return array(
+			array( 'key' => 'benefits',     'label' => 'Benefits',     'request' => 'Add a benefits section: the top reasons to choose us.' ),
+			array( 'key' => 'how',          'label' => 'How it works', 'request' => 'Add a how it works section with three simple steps.' ),
+			array( 'key' => 'testimonials', 'label' => 'Reviews',      'request' => 'Add a social proof section with customer reviews.' ),
+			array( 'key' => 'features',     'label' => 'Features',     'request' => 'Add a features section highlighting what sets us apart.' ),
+			array( 'key' => 'pricing',      'label' => 'Pricing',      'request' => 'Add a pricing or offer section.' ),
+			array( 'key' => 'faq',          'label' => 'FAQ',          'request' => 'Add a frequently asked questions section.' ),
+			array( 'key' => 'cta',          'label' => 'Final CTA',    'request' => 'Add a final call to action section.' ),
+		);
+	}
+
+	/** Next-section suggestion chips (excludes what's already built), or null. */
+	private function suggest_payload( $state ) {
+		if ( ! is_array( $state ) ) { return null; }
+		$goal  = ! empty( $state['answers']['goal'] ) ? $state['answers']['goal'] : 'browse';
+		$built = isset( $state['built_keys'] ) && is_array( $state['built_keys'] ) ? $state['built_keys'] : array();
+		$chips = array();
+		foreach ( $this->section_suggestions( $goal ) as $s ) {
+			if ( in_array( $s['key'], $built, true ) ) { continue; }
+			$chips[] = array( 'label' => $s['label'], 'request' => $s['request'], 'key' => $s['key'] );
+			if ( count( $chips ) >= 6 ) { break; }
+		}
+		if ( empty( $chips ) ) { return null; }
+		$first = ( count( $built ) <= 1 ); // just the hero so far
+		$note  = $first
+			? ( 'browse' === $goal
+				? "Looks like a homepage. Most add a few of these next — tap one and I'll build it on-brand, or just tell me your own:"
+				: "Here's what usually comes next on a page like this. Tap one and I'll build it on-brand, or tell me your own:" )
+			: "What should we add next? Tap one, or tell me your own:";
+		return array( 'note' => $note, 'chips' => $chips );
+	}
+
 	/** Guess the industry enum from the first message (drives copy + stock photos). */
 	private function infer_industry_from_message( $message ) {
 		$m   = strtolower( (string) $message );
@@ -1139,10 +1185,11 @@ class PressGo_AI_Builder {
 			) );
 			if ( is_array( $f ) ) { unset( $f['updated'] ); }
 			return array(
-				'note'         => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent. Want me to keep building? Tell me the next section.',
+				'note'         => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent.',
 				'brand_synced' => true,
 				'brand'        => $f,
 				'preview_bust' => time(),
+				'suggest'      => $this->suggest_payload( $state ),
 			);
 		}
 
@@ -2091,6 +2138,7 @@ class PressGo_AI_Builder {
 		// discovery_stage + discovery_value (value '' = a typed free-text answer).
 		$discovery_stage = isset( $_POST['discovery_stage'] ) ? sanitize_key( wp_unslash( $_POST['discovery_stage'] ) ) : '';
 		$discovery_value = isset( $_POST['discovery_value'] ) ? sanitize_text_field( wp_unslash( $_POST['discovery_value'] ) ) : '';
+		$section_key     = isset( $_POST['section_key'] ) ? sanitize_key( wp_unslash( $_POST['section_key'] ) ) : ''; // which suggested section the user tapped
 		// Page empty? Decode the data and check for any element. (The old check
 		// looked for "type", but rendered Elementor data uses "elType" — so it read
 		// every built page as empty, which silently disabled the follow-up drips.)
@@ -2120,12 +2168,14 @@ class PressGo_AI_Builder {
 				if ( 'social_proof' === $intent && empty( $jit['answers']['proof'] ) && empty( $jit['proof_asked'] ) ) {
 					$jit['proof_asked']     = true;
 					$jit['pending_request'] = $message;
+					$jit['pending_key']     = $section_key;
 					$this->save_discovery_state( $post_id, $jit );
 					wp_send_json_success( $this->discovery_envelope( 'proof', $jit ) );
 				}
 				if ( 'cta' === $intent && empty( $jit['answers']['offer'] ) && empty( $jit['offer_asked'] ) ) {
 					$jit['offer_asked']     = true;
 					$jit['pending_request'] = $message;
+					$jit['pending_key']     = $section_key;
 					$this->save_discovery_state( $post_id, $jit );
 					wp_send_json_success( $this->discovery_envelope( 'offer', $jit ) );
 				}
@@ -2141,7 +2191,8 @@ class PressGo_AI_Builder {
 				if ( ! isset( $dr['answers'] ) || ! is_array( $dr['answers'] ) ) { $dr['answers'] = array(); }
 				$dr['answers'][ $discovery_stage ] = $val;
 				if ( ! empty( $dr['pending_request'] ) ) { $message = $dr['pending_request']; }
-				unset( $dr['pending_request'] );
+				if ( ! empty( $dr['pending_key'] ) ) { $section_key = $dr['pending_key']; }
+				unset( $dr['pending_request'], $dr['pending_key'] );
 				$this->save_discovery_state( $post_id, $dr );
 				$phrase = $this->proof_offer_phrase( $discovery_stage, $val );
 				if ( '' !== $phrase ) {
@@ -2268,8 +2319,23 @@ class PressGo_AI_Builder {
 			$palette                = $this->extract_hero_palette( $tree, $cfg );
 			$dstate['hero_palette'] = $palette;
 			$dstate['hero_index']   = count( $elements ) - 1;
+			$dstate['built_keys']   = array( 'hero' ); // the hero is on the page now
 			$this->save_discovery_state( $post_id, $dstate );
 			wp_send_json_success( $this->brand_confirm_envelope( $palette, count( $elements ) ) );
+		}
+
+		// Record what we just built and suggest the next sections, so the wizard
+		// keeps leading the user section by section instead of going quiet.
+		$suggest = null;
+		$dstate3 = $this->discovery_state( $post_id );
+		if ( is_array( $dstate3 ) ) {
+			if ( ! isset( $dstate3['built_keys'] ) || ! is_array( $dstate3['built_keys'] ) ) { $dstate3['built_keys'] = array(); }
+			$built_key = $was_first ? 'hero' : $section_key;
+			if ( '' !== $built_key && ! in_array( $built_key, $dstate3['built_keys'], true ) ) {
+				$dstate3['built_keys'][] = $built_key;
+				$this->save_discovery_state( $post_id, $dstate3 );
+			}
+			$suggest = $this->suggest_payload( $dstate3 );
 		}
 
 		$model_tag = 'glm-5.2' === $used_model ? 'GLM-5.2' : 'Claude';
@@ -2277,7 +2343,8 @@ class PressGo_AI_Builder {
 			'preview_bust' => time(),
 			'sections'     => count( $elements ),
 			'model'        => $used_model,
-			'note'         => 'Composed a freeform section with ' . $model_tag . ' (' . count( $elements ) . ' on the page). Add another, or refine by describing the next section.',
+			'note'         => 'Done — added that section (' . count( $elements ) . ' on the page now).',
+			'suggest'      => $suggest,
 			'usage'        => $this->usage_state(),
 		) );
 	}

@@ -1214,6 +1214,7 @@
 			if (data.brand_synced) refreshBrandPanel(data.brand); // watch the panel fill in
 			reloadPreview(data.preview_bust || Date.now());
 			if (data.usage) renderUsage(data.usage); else refreshUsage();
+			if (data.suggest) renderSuggestions(data.suggest); // keep the wizard leading
 		} else if (d && d.data) {
 			append(el('pg-msg-error', typeof d.data === 'string' ? d.data : (d.data.message || 'Pro mode compose failed.')));
 		} else {
@@ -1268,6 +1269,35 @@
 		currentDiscoveryStage = data.stage || null;
 		if (input && data.freetext_hint) input.placeholder = data.freetext_hint;
 		setBusy(false); // keep the box live so the free-text fallback works
+		setTimeout(function () { if (input) input.focus(); }, 50);
+	}
+
+	// After a build, the server suggests the next sections for this page type.
+	// Tapping one fires a normal build request (which may hit a drip), then the
+	// response suggests the rest — the wizard keeps leading section by section.
+	function renderSuggestions(s) {
+		if (!s || !s.chips || !s.chips.length) return;
+		append(el('pg-msg pg-msg-ai', s.note || 'What should we add next?'));
+		var wrap = document.createElement('div');
+		wrap.className = 'pg-suggest-chips';
+		wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px;';
+		s.chips.forEach(function (c) {
+			var b = document.createElement('button');
+			b.type = 'button';
+			b.textContent = '+ ' + c.label;
+			b.className = 'pg-suggest-chip';
+			b.style.cssText = 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
+			b.addEventListener('click', function () {
+				Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (x) {
+					x.disabled = true; x.style.cursor = 'default';
+					if (x !== b) x.style.opacity = '0.4';
+				});
+				b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca';
+				postFreeform({ message: c.request, section_key: c.key }, c.label, 'Building your ' + c.label.toLowerCase() + ' section…');
+			});
+			wrap.appendChild(b);
+		});
+		append(wrap);
 		setTimeout(function () { if (input) input.focus(); }, 50);
 	}
 
