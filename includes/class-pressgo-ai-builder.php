@@ -356,8 +356,19 @@ class PressGo_AI_Builder {
 	}
 
 	/**
-	 * Transcribe a base64-encoded audio blob via OpenRouter's Voxtral model.
-	 * Powers the voice-input button in the chat builder.
+	 * Voice-input transcription model. Audio→text is its own capability: the
+	 * freeform brain (GLM-5.2) takes no audio, so transcription routes through
+	 * a dedicated, audio-capable model over the same OpenRouter key — kept
+	 * filterable so it lives in the model config, not buried in the handler.
+	 */
+	public static function transcribe_model() {
+		return (string) apply_filters( 'pressgo_transcribe_model', 'google/gemini-2.5-flash-lite' );
+	}
+
+	/**
+	 * Transcribe a base64 audio blob via OpenRouter. Thin handler — mirrors
+	 * ajax_freeform → compose_freeform_tree: validate, hand off to the provider
+	 * helper, map the result. Powers the voice-input button in the chat builder.
 	 */
 	public function ajax_transcribe() {
 		$this->check_auth();
@@ -369,7 +380,7 @@ class PressGo_AI_Builder {
 		}
 
 		// Strip the data URL prefix (data:audio/webm;base64,XXXX) if present.
-		$b64 = $audio;
+		$b64   = $audio;
 		$comma = strpos( $audio, ',' );
 		if ( false !== $comma && 0 === strpos( $audio, 'data:' ) ) {
 			$b64 = substr( $audio, $comma + 1 );
@@ -379,87 +390,109 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'empty audio payload', 400 );
 		}
 
+		// Payload guard — a runaway recording shouldn't blow past PHP's
+		// post_max_size and fail with a generic error. Base64 inflates ~4/3,
+		// so cap on the decoded size (~8MB ≈ a few minutes of Opus). Filterable.
+		$max_bytes = (int) apply_filters( 'pressgo_transcribe_max_bytes', 8 * 1024 * 1024 );
+		if ( ( strlen( $b64 ) * 3 ) / 4 > $max_bytes ) {
+			wp_send_json_error( 'Recording is too long. Keep it under a minute or so.', 413 );
+		}
+
 		$api_key = get_option( 'pressgo_openrouter_key', '' );
 		if ( '' === $api_key ) {
 			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
 		}
 
-		// Gemini 2.5 Flash Lite transcribes accurately and accepts WebM
-		// (the browser's MediaRecorder format) natively — no server-side
-		// conversion needed. Same cost as Voxtral ($0.10/M tokens).
+		// Normalize the MediaRecorder mime to a bare OpenRouter format:
+		// "audio/webm;codecs=opus" → "webm". The codecs suffix made the API reject it.
 		$format = $mime;
-		// Normalize mime to a format OpenRouter recognizes.
 		if ( 0 === strpos( $format, 'audio/' ) ) {
-			$format = substr( $format, 6 ); // strip "audio/" → "webm", "wav", "mp3", etc.
+			$format = substr( $format, 6 );
+		}
+		$semi = strpos( $format, ';' );
+		if ( false !== $semi ) {
+			$format = substr( $format, 0, $semi );
+		}
+		$format = trim( $format );
+
+		$result = self::transcribe_via_openrouter( $api_key, $b64, $format );
+		if ( is_wp_error( $result ) ) {
+			$status = (int) ( $result->get_error_data()['status'] ?? 502 );
+			wp_send_json_error( $result->get_error_message(), $status );
 		}
 
-		$body = wp_json_encode( array(
-			'model'    => 'google/gemini-2.5-flash-lite',
-			'messages' => array(
-				array(
-					'role'    => 'user',
-					'content' => array(
-						array(
-							'type' => 'text',
-							'text' => 'Transcribe this audio recording. Output ONLY the transcribed text, no preamble, no quotes, no commentary.',
-						),
-						array(
-							'type'        => 'input_audio',
-							'input_audio' => array(
-								'data'   => $b64,
-								'format' => $format,
+		wp_send_json_success( array( 'text' => $result, 'model' => self::transcribe_model() ) );
+	}
+
+	/**
+	 * Provider call for transcription — same shape as glm_compose(): one
+	 * OpenRouter request, returns the transcribed string or a WP_Error that
+	 * carries a user-facing message + HTTP status for the handler to relay.
+	 */
+	private static function transcribe_via_openrouter( $key, $b64, $format ) {
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 120,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'body'    => wp_json_encode( array(
+				'model'    => self::transcribe_model(),
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							array(
+								'type' => 'text',
+								'text' => 'Transcribe this audio recording. Output ONLY the transcribed text, no preamble, no quotes, no commentary.',
+							),
+							array(
+								'type'        => 'input_audio',
+								'input_audio' => array( 'data' => $b64, 'format' => $format ),
 							),
 						),
 					),
 				),
-			),
+			) ),
 		) );
 
-		$response = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
-			'timeout' => 120,
-			'headers' => array(
-				'Content-Type'  => 'application/json',
-				'Authorization' => 'Bearer ' . $api_key,
-			),
-			'body'    => $body,
-		) );
-
-		if ( is_wp_error( $response ) ) {
-			wp_send_json_error( 'Transcription failed: ' . $response->get_error_message(), 502 );
+		if ( is_wp_error( $resp ) ) {
+			return new WP_Error( 'transcribe_http', 'Transcription failed: ' . $resp->get_error_message(), array( 'status' => 502 ) );
 		}
 
-		$status = (int) wp_remote_retrieve_response_code( $response );
+		$status = (int) wp_remote_retrieve_response_code( $resp );
+		$raw    = wp_remote_retrieve_body( $resp );
 		if ( 200 !== $status ) {
-			$err_body = json_decode( wp_remote_retrieve_body( $response ), true );
-			$detail   = isset( $err_body['error']['message'] ) ? $err_body['error']['message'] : 'HTTP ' . $status;
-			wp_send_json_error( 'Transcription failed: ' . $detail, 502 );
+			$err    = json_decode( $raw, true );
+			$detail = $err['error']['message'] ?? ( 'HTTP ' . $status );
+			return new WP_Error( 'transcribe_api', 'Transcription failed: ' . $detail, array( 'status' => 502 ) );
 		}
 
-		$json   = json_decode( wp_remote_retrieve_body( $response ), true );
-		$text   = '';
-		if ( isset( $json['choices'][0]['message']['content'] ) ) {
-			$content = $json['choices'][0]['message']['content'];
-			if ( is_string( $content ) ) {
-				$text = $content;
-			} elseif ( is_array( $content ) ) {
-				$parts = array();
-				foreach ( $content as $block ) {
-					if ( is_array( $block ) && isset( $block['text'] ) && is_string( $block['text'] ) ) {
-						$parts[] = $block['text'];
-					} elseif ( is_string( $block ) ) {
-						$parts[] = $block;
-					}
-				}
-				$text = implode( '', $parts );
-			}
-		}
-
-		$text = trim( $text );
+		$json = json_decode( $raw, true );
+		$text = trim( self::openrouter_message_text( $json['choices'][0]['message']['content'] ?? '' ) );
 		if ( '' === $text ) {
-			wp_send_json_error( 'Transcription failed: empty response', 502 );
+			return new WP_Error( 'transcribe_empty', 'Transcription failed: empty response', array( 'status' => 502 ) );
 		}
+		return $text;
+	}
 
-		wp_send_json_success( array( 'text' => $text ) );
+	/**
+	 * Flatten an OpenRouter chat message `content` (string, or array of
+	 * {type,text} / string blocks) into plain text.
+	 */
+	private static function openrouter_message_text( $content ) {
+		if ( is_string( $content ) ) {
+			return $content;
+		}
+		if ( is_array( $content ) ) {
+			$parts = array();
+			foreach ( $content as $block ) {
+				if ( is_array( $block ) && isset( $block['text'] ) && is_string( $block['text'] ) ) {
+					$parts[] = $block['text'];
+				} elseif ( is_string( $block ) ) {
+					$parts[] = $block;
+				}
+			}
+			return implode( '', $parts );
+		}
+		return '';
 	}
 
 	/** Per-page render target (multi-builder). Applies on the NEXT build. */
