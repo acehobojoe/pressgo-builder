@@ -2021,6 +2021,25 @@ class PressGo_AI_Builder {
 		return isset( $map[ $role ] ) ? $map[ $role ] : 'that';
 	}
 
+	/** If the user asked for an interactive widget Nova can't truly build, return an
+	 *  honest one-line disclosure (so we never report a static fake as "Done"). */
+	private function unsupported_widget_disclosure( $message ) {
+		$m = strtolower( (string) $message );
+		if ( preg_match( '/\b(video|youtube|vimeo|play button|embed.*video|video.*embed)\b/', $m ) ) {
+			return "One thing: I can't embed a real playable video yet — drop a YouTube/Vimeo embed into this section in Elementor to make it play.";
+		}
+		if ( preg_match( '/\b(google ?map|live map|interactive map|embed.*map|map embed)\b/', $m ) ) {
+			return "One thing: I can't embed a live map yet — this is an address + directions block; add a real Google Map in Elementor if you need it interactive.";
+		}
+		if ( preg_match( '/\b(calendar|booking|book online|appointment scheduler|schedule online|calendly|reservation system|reserve online)\b/', $m ) ) {
+			return "One thing: I can't embed a live booking calendar yet — this is a Book Now button; point it at your Calendly or booking link.";
+		}
+		if ( preg_match( '/\b(cart|checkout|add to cart|shopping cart|payment form|process payments?)\b/', $m ) ) {
+			return "One thing: I can't build a real cart or checkout yet — these are marketing sections, not a store; connect WooCommerce for actual purchases.";
+		}
+		return '';
+	}
+
 	/** Which section a "remove the X" message refers to: a record index, or -1. */
 	private function find_target_section( $records, $message ) {
 		$m    = strtolower( (string) $message );
@@ -2084,7 +2103,18 @@ class PressGo_AI_Builder {
 			if ( '' !== $want && empty( $roles[ $want ] ) ) {
 				return array( 'note' => 'There isn\'t a ' . $this->role_label( $want ) . ' section on this page to remove.' );
 			}
-			return array( 'note' => 'I wasn\'t sure which section to remove. Try "remove the testimonials section" or "remove the last section".' );
+			// Ambiguous ("take something out" / "it's too long") — list what's here
+			// (only clearly-named sections; skip the hero and unlabeled ones).
+			$names = array();
+			foreach ( $records as $r ) {
+				$role = $r['semantic_role'] ?? '';
+				if ( 'hero' === $role || 'unknown' === $role || '' === $role ) { continue; }
+				$label = $this->role_label( $role );
+				if ( 'that' !== $label ) { $names[] = $label; }
+			}
+			$names = array_values( array_unique( $names ) );
+			$list  = $names ? ' You\'ve got ' . implode( ', ', $names ) . '.' : '';
+			return array( 'note' => 'Which section should I remove?' . $list . ' (or say "the last one").' );
 		}
 		if ( 'hero' === ( $records[ $idx ]['semantic_role'] ?? '' ) ) {
 			return array( 'note' => "I'll keep the hero — tell me another section to remove." );
@@ -3496,16 +3526,20 @@ class PressGo_AI_Builder {
 		// order / balance the colors" reorganizes the whole page instead of adding a
 		// section; "undo / put it back" reverts the last reorganize.
 		if ( ! $page_empty ) {
-			if ( preg_match( '/^\s*(undo|put it back|revert)\b/i', $message ) ) {
+			if ( preg_match( '/^\s*(undo|put it back|revert|go back)\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_undo( $post_id ) );
 			}
-			// Delete: "remove / delete / get rid of the [X] section" removes a section
-			// instead of composing a new one (Nova used to only ever append).
-			if ( preg_match( '/\b(remove|delete|get rid of|take out|kill)\b/i', $message ) && ! preg_match( '/\badd\b/i', $message ) ) {
-				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message ) );
-			}
-			if ( preg_match( '/\b(make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this) up|clean (it|this) up|smart order)\b/i', $message ) ) {
+			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
+			// "clean it up" / "tidy it" reorganize rather than remove.
+			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this) up|smart order|less cluttered|improve the (layout|design|look|flow))\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_reorganize( $post_id ) );
+			}
+			// Remove/trim -> delete a section (NEVER add). Casual phrasing too:
+			// "take something out", "it's too long", "too many sections", "lose one".
+			if ( ( preg_match( '/\b(remove|delete|get ?rid of|kill|too long|too many|fewer|lose (a|one|the|that)|cut (a|one|the|this))\b/i', $message )
+					|| preg_match( '/\btake\s+(\w+\s+){0,2}out\b/i', $message ) )
+				&& ! preg_match( '/\badd\b/i', $message ) ) {
+				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message ) );
 			}
 		}
 
@@ -3714,12 +3748,27 @@ class PressGo_AI_Builder {
 		// If we reorganized, the section count is unchanged but the data was rewritten.
 		$sections_now = count( $this->read_elements( $post_id ) );
 
-		$model_tag = 'glm-5.2' === $used_model ? 'GLM-5.2' : 'Claude';
+		// Honest confirmation: name what was actually built (not a canned "added that
+		// section"), plus an honest disclosure if they asked for a widget we can't truly do.
+		if ( $was_first ) {
+			$built_phrase = 'Built your hero';
+		} elseif ( '' !== $role_hint && 'unknown' !== $role_hint && 'hero' !== $role_hint ) {
+			$built_phrase = 'Added your ' . $this->role_label( $role_hint ) . ' section';
+		} else {
+			$built_phrase = 'Added that section';
+		}
+		$headline = $this->tree_headline( $tree );
+		if ( '' !== $headline && ! $was_first ) { $built_phrase .= ' — "' . $headline . '"'; }
+		$note = $built_phrase . ' (' . $sections_now . ' on the page now).';
+		$disclosure = $this->unsupported_widget_disclosure( $message );
+		if ( '' !== $disclosure ) { $note .= ' ' . $disclosure; }
+		$note .= $auto_note;
+
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => $sections_now,
 			'model'        => $used_model,
-			'note'         => 'Done — added that section (' . $sections_now . ' on the page now).' . $auto_note,
+			'note'         => $note,
 			'suggest'      => $suggest,
 			'usage'        => $this->usage_state(),
 		) );
