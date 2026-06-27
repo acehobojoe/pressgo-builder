@@ -1300,8 +1300,7 @@ class PressGo_AI_Builder {
 	private function apply_role_overlay( $tree, $role, $cfg ) {
 		if ( $this->tree_locks_bg( $tree ) ) { return $tree; }
 		$colors    = isset( $cfg['colors'] ) ? $cfg['colors'] : array();
-		$target_bg = ( 'accent' === $role ) ? ( $colors['accent'] ?? '#e2b714' )
-			: ( ( 'light' === $role ) ? ( $colors['light_bg'] ?? '#F8FAFC' ) : ( $colors['dark_bg'] ?? '#0F172A' ) );
+		$target_bg = $this->safe_bg( $role, $colors );
 		$on_dark   = ( 'light' !== $role );
 		if ( ! isset( $tree['settings'] ) || ! is_array( $tree['settings'] ) ) { $tree['settings'] = array(); }
 		$tree['settings']['background'] = $target_bg;
@@ -1310,6 +1309,26 @@ class PressGo_AI_Builder {
 		$accent        = $colors['accent'] ?? '#e2b714';
 		$this->overlay_walk( $tree, $on_dark, $heading_color, $text_color, $accent, $role, $colors );
 		return $tree;
+	}
+
+	/** A background color for a role that is ACTUALLY dark/light/vivid — never trust a
+	 *  mislabeled palette token (e.g. a "dark_bg" that's actually orange). */
+	private function safe_bg( $role, $colors ) {
+		if ( 'accent' === $role ) {
+			$a = isset( $colors['accent'] ) ? $colors['accent'] : '#e2b714';
+			list( $lum, $sat, $known ) = $this->color_lum_sat( $a );
+			// A real accent is reasonably saturated; if not, fall back to a warm gold.
+			return ( $known && $sat >= 0.30 ) ? $a : '#E2B714';
+		}
+		if ( 'light' === $role ) {
+			$l = isset( $colors['light_bg'] ) ? $colors['light_bg'] : '#F8FAFC';
+			list( $lum, $sat, $known ) = $this->color_lum_sat( $l );
+			return ( $known && $lum > 0.82 ) ? $l : '#F7F7F5';
+		}
+		// dark
+		$d = isset( $colors['dark_bg'] ) ? $colors['dark_bg'] : '#0F172A';
+		list( $lum, $sat, $known ) = $this->color_lum_sat( $d );
+		return ( $known && $lum < 0.28 ) ? $d : '#111418';
 	}
 
 	/** Recursively recolor a tree for contrast, preserving deliberately-bespoke colors. */
@@ -1494,10 +1513,13 @@ class PressGo_AI_Builder {
 			$role = $rec['bg_role'];
 			$el   = null;
 			if ( ! empty( $rec['source_tree'] ) ) {
-				$cfg      = ( ! empty( $rec['palette'] ) && is_array( $rec['palette'] ) ) ? $rec['palette'] : $default_cfg;
-				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $cfg );
+				$cfg = ( ! empty( $rec['palette'] ) && is_array( $rec['palette'] ) ) ? $rec['palette'] : $default_cfg;
+				// Never recolor the hero (or a section it pinned) — it was brand-confirmed
+				// and re-tinting it is what produced the all-orange block.
+				$is_hero = ( 0 === $k ) || ( 'hero' === ( $rec['semantic_role'] ?? '' ) );
+				$overlaid = $is_hero ? $rec['source_tree'] : $this->apply_role_overlay( $rec['source_tree'], $role, $cfg );
 				$el       = PressGo_Freeform_Renderer::render( $overlaid, $cfg, $rec['pg_key'] );
-				$plan[ $k ]['rendered_bg_role'] = $role;
+				$plan[ $k ]['rendered_bg_role'] = $is_hero ? ( $rec['rendered_bg_role'] ?? $role ) : $role;
 			} elseif ( isset( $rec['element'] ) && is_array( $rec['element'] ) ) {
 				$el = $rec['element'];
 			} elseif ( isset( $by_marker[ $rec['pg_key'] ] ) ) {
