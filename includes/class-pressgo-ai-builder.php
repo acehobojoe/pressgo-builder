@@ -381,8 +381,17 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
 		}
 
+		// Gemini 2.5 Flash Lite transcribes accurately and accepts WebM
+		// (the browser's MediaRecorder format) natively — no server-side
+		// conversion needed. Same cost as Voxtral ($0.10/M tokens).
+		$format = $mime;
+		// Normalize mime to a format OpenRouter recognizes.
+		if ( 0 === strpos( $format, 'audio/' ) ) {
+			$format = substr( $format, 6 ); // strip "audio/" → "webm", "wav", "mp3", etc.
+		}
+
 		$body = wp_json_encode( array(
-			'model'    => 'mistralai/voxtral-small-24b-2507',
+			'model'    => 'google/gemini-2.5-flash-lite',
 			'messages' => array(
 				array(
 					'role'    => 'user',
@@ -395,7 +404,7 @@ class PressGo_AI_Builder {
 							'type'        => 'input_audio',
 							'input_audio' => array(
 								'data'   => $b64,
-								'format' => $mime,
+								'format' => $format,
 							),
 						),
 					),
