@@ -568,6 +568,21 @@ class PressGo_AI_Builder {
 	}
 
 	/**
+	 * Does the message already state a conversion goal (the ONE thing we cannot
+	 * infer and always want before building)? Used to decide whether to ask the
+	 * goal chip on a fresh page — we ask whenever a goal is NOT evident, even if
+	 * the business is named ("I own a gym" has a business but no goal). Word
+	 * boundaries keep short verbs like "call" from matching inside other words
+	 * ("locally").
+	 */
+	private static function ff_has_goal( $message ) {
+		return (bool) preg_match(
+			'/\b(sign ?up|signups?|book|booking|call|calls|buy|buying|purchase|order|contact|quote|subscribe|donate|appointment|schedule|register|registration|reservation|reserve|checkout|enroll|apply|application|download|demo|free trial|trial|opt ?in|lead|leads|get in touch|join now)\b/i',
+			(string) $message
+		);
+	}
+
+	/**
 	 * Serve a cached thumbnail of the given post, generating it on first
 	 * request via screenshot.pressgo.app.
 	 *
@@ -1437,25 +1452,66 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
 
-		// ── Discovery gate ─────────────────────────────────────────────────
-		// On a FRESH page (no sections) with a VAGUE first request, ask 1-2 sharp
-		// questions before building blind — so every section shares one business,
-		// goal, and vibe (the post-3143 "three businesses" failure). Mirrors the
-		// recipe chat's "ask 1-2 follow-ups then build". Ask at most once.
+		// ── Discovery (chip-driven) ────────────────────────────────────────
+		// On a FRESH page with a VAGUE first request, run a short tap-driven
+		// interview before building blind, so every section shares one business,
+		// goal, and vibe (the post-3143 "three businesses" failure). Phase 1: the
+		// single GOAL question, captured into the page brief (the existing
+		// META_FREEFORM_BRIEF string — no new storage yet). The JS renders the
+		// chips and posts the answer back as discovery_stage + discovery_value.
+		$discovery_stage = isset( $_POST['discovery_stage'] ) ? sanitize_key( wp_unslash( $_POST['discovery_stage'] ) ) : '';
+		$discovery_value = isset( $_POST['discovery_value'] ) ? sanitize_text_field( wp_unslash( $_POST['discovery_value'] ) ) : '';
 		$existing   = get_post_meta( $post_id, '_elementor_data', true );
 		$page_empty = ! ( is_string( $existing ) && false !== strpos( $existing, '"type"' ) );
 		$brief      = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
-		if ( $page_empty && '' === $brief && self::ff_is_vague( $message ) ) {
-			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, 'pending' );
+
+		// Ask the goal question on a fresh page whenever the goal is not already
+		// stated (the one thing we cannot infer). One tap, even if the business is
+		// named — "I own a gym" gives us the business but not the call to action.
+		if ( $page_empty && '' === $brief && '' === $discovery_stage && ! self::ff_has_goal( $message ) ) {
+			// Stash the user's own words as the business context; await the goal tap.
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, 'await_goal:' . $message );
 			wp_send_json_success( array(
 				'needs_discovery' => true,
-				'note'            => "Before I build, two quick things so the page actually fits:\n\n1. What's the business or page about, and who is it for?\n2. What's the ONE thing you want a visitor to do — sign up, call, buy, or book?\n\n(A word on the vibe helps too: premium, playful, no-nonsense…)",
+				'mode'            => 'discovery',
+				'stage'           => 'goal',
+				'question'        => "Love it. One quick thing and I'll start designing: what should this page get people to do?",
+				'chips'           => array(
+					array( 'label' => 'Fill out a form', 'value' => 'form' ),
+					array( 'label' => 'Call you', 'value' => 'call' ),
+					array( 'label' => 'Book a session', 'value' => 'book' ),
+					array( 'label' => 'Buy / sign up', 'value' => 'buy' ),
+					array( 'label' => 'Just browse (homepage)', 'value' => 'browse' ),
+				),
+				'allow_freetext'  => true,
+				'freetext_hint'   => "…or just type it",
 			) );
 		}
-		// If we just asked, this message is the answer — capture it as the brief.
-		if ( 'pending' === $brief ) {
-			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $message );
-			$brief = $message;
+
+		// The goal answer arrives (a chip tap, or free text routed to the goal stage).
+		if ( 'goal' === $discovery_stage ) {
+			$stash    = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+			$business = ( 0 === strpos( $stash, 'await_goal:' ) ) ? trim( substr( $stash, strlen( 'await_goal:' ) ) ) : trim( $stash );
+			$goal_map = array(
+				'form'   => 'fill out a form',
+				'call'   => 'call the business',
+				'book'   => 'book an appointment',
+				'buy'    => 'buy or sign up',
+				'browse' => 'browse (this is a general homepage)',
+			);
+			$goal_phrase = isset( $goal_map[ $discovery_value ] ) ? $goal_map[ $discovery_value ] : ( '' !== $discovery_value ? $discovery_value : $message );
+			$brief = ( '' !== $business ? $business : $message ) . "\nPrimary goal: get visitors to " . $goal_phrase . '.';
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $brief );
+			// Build from the business description, not the chip label the POST carried.
+			if ( '' !== $business ) { $message = $business; }
+		}
+
+		// Safety net: if we reach the build with a half-finished stash (e.g. the
+		// user typed instead of tapping and the stage was lost), unwrap it so the
+		// "await_goal:" marker never leaks into the composed brief.
+		if ( 0 === strpos( $brief, 'await_goal:' ) ) {
+			$brief = trim( substr( $brief, strlen( 'await_goal:' ) ) );
+			if ( '' !== $brief && '' === trim( $message ) ) { $message = $brief; }
 		}
 
 		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {

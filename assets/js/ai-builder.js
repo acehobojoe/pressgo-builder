@@ -1141,14 +1141,23 @@
 	// Pro mode (beta): compose a freeform "build anything" section instead of
 	// routing through the recipe chat. Non-streaming — appends one custom
 	// section to the page per message.
-	function sendFreeform(text) {
-		chatStarted = true;
-		var userBubble = el('pg-msg pg-msg-user');
-		var txt = document.createElement('div');
-		txt.textContent = text;
-		userBubble.appendChild(txt);
-		append(userBubble);
-		input.value = '';
+	// Nova discovery state: when the server is mid-interview, the stage we owe an
+	// answer to. While set, a typed message is routed into the same answer slot as
+	// a chip tap (the free-text fallback). Cleared once a section actually builds.
+	var currentDiscoveryStage = null;
+	var defaultPlaceholder = input ? input.placeholder : '';
+
+	// One shared POST + response path for Nova, used by both a typed message and a
+	// discovery chip tap. `fields` are extra POST fields; `userText`, if given, is
+	// echoed as the user's chat bubble first.
+	function postFreeform(fields, userText) {
+		if (userText != null) {
+			var userBubble = el('pg-msg pg-msg-user');
+			var txt = document.createElement('div');
+			txt.textContent = userText;
+			userBubble.appendChild(txt);
+			append(userBubble);
+		}
 		var typing = typingNode();
 		append(typing);
 		setBusy(true);
@@ -1157,7 +1166,9 @@
 		fd.append('action', 'pressgo_ai_freeform');
 		fd.append('nonce', cfg.nonce);
 		fd.append('post_id', cfg.postId);
-		fd.append('message', text);
+		Object.keys(fields).forEach(function (k) {
+			if (fields[k] != null) fd.append(k, fields[k]);
+		});
 
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 			.then(function (r) {
@@ -1171,27 +1182,83 @@
 			})
 			.then(function (res) {
 				if (typing) typing.remove();
-				var d = res.json;
-				if (d && d.success) {
-					var data = d.data || {};
-					append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
-					if (data.needs_discovery) { setBusy(false); return; } // asked 1-2 questions; wait for the answer, build nothing yet
-					reloadPreview(data.preview_bust || Date.now());
-					if (data.usage) renderUsage(data.usage); else refreshUsage();
-				} else if (d && d.data) {
-					append(el('pg-msg-error', typeof d.data === 'string' ? d.data : (d.data.message || 'Pro mode compose failed.')));
-				} else {
-					// Non-JSON body — show a trimmed snippet so the real cause is visible.
-					var snip = (res.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
-					append(el('pg-msg-error', 'Pro mode compose failed' + (snip ? ': ' + snip : ' — try again.')));
-				}
-				setBusy(false);
+				handleFreeformResult(res);
 			})
 			.catch(function () {
 				if (typing) typing.remove();
 				append(el('pg-msg-error', 'Network error during Pro mode compose — try again.'));
 				setBusy(false);
 			});
+	}
+
+	function handleFreeformResult(res) {
+		var d = res.json;
+		if (d && d.success) {
+			var data = d.data || {};
+			// Mid-interview: render the question + chips and wait, build nothing yet.
+			if (data.needs_discovery) { renderDiscovery(data); return; }
+			append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
+			currentDiscoveryStage = null; // a section built — discovery is done
+			if (input) input.placeholder = defaultPlaceholder;
+			reloadPreview(data.preview_bust || Date.now());
+			if (data.usage) renderUsage(data.usage); else refreshUsage();
+		} else if (d && d.data) {
+			append(el('pg-msg-error', typeof d.data === 'string' ? d.data : (d.data.message || 'Pro mode compose failed.')));
+		} else {
+			// Non-JSON body — show a trimmed snippet so the real cause is visible.
+			var snip = (res.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+			append(el('pg-msg-error', 'Pro mode compose failed' + (snip ? ': ' + snip : ' — try again.')));
+		}
+		setBusy(false);
+	}
+
+	// Render a discovery step: the question as an AI bubble, then a row of tappable
+	// chips. Tapping sends the value back; the user can still type a free answer.
+	function renderDiscovery(data) {
+		append(el('pg-msg pg-msg-ai', data.question || 'Quick question:'));
+		var wrap = document.createElement('div');
+		wrap.className = 'pg-discovery-chips';
+		wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px;';
+		(data.chips || []).forEach(function (chip) {
+			var b = document.createElement('button');
+			b.type = 'button';
+			b.textContent = chip.label;
+			b.className = 'pg-discovery-chip' + (chip.selected ? ' pg-chip-selected' : '');
+			b.style.cssText = 'border:1px solid #d9d6ff;background:' + (chip.selected ? '#e7e3ff' : '#f3f1ff') +
+				';color:#5b4fff;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:' +
+				(chip.selected ? '600' : '500') + ';';
+			b.addEventListener('click', function () { onDiscoveryChip(wrap, chip); });
+			wrap.appendChild(b);
+		});
+		append(wrap);
+		currentDiscoveryStage = data.stage || null;
+		if (input && data.freetext_hint) input.placeholder = data.freetext_hint;
+		setBusy(false); // keep the box live so the free-text fallback works
+		setTimeout(function () { if (input) input.focus(); }, 50);
+	}
+
+	function onDiscoveryChip(wrap, chip) {
+		// Lock the row and show the choice (the answer also echoes as a user bubble).
+		Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (btn) {
+			btn.disabled = true;
+			btn.style.cursor = 'default';
+			if (btn.textContent === chip.label) {
+				btn.style.background = '#5b4fff'; btn.style.color = '#fff'; btn.style.borderColor = '#5b4fff';
+			} else {
+				btn.style.opacity = '0.4';
+			}
+		});
+		postFreeform({ message: chip.label, discovery_stage: currentDiscoveryStage, discovery_value: chip.value }, chip.label);
+	}
+
+	function sendFreeform(text) {
+		chatStarted = true;
+		input.value = '';
+		var fields = { message: text };
+		// Typed answer during an interview: route it into the awaited stage so it
+		// lands in the same slot a chip tap would (server parses the text).
+		if (currentDiscoveryStage) { fields.discovery_stage = currentDiscoveryStage; fields.discovery_value = ''; }
+		postFreeform(fields, text);
 	}
 
 	form.addEventListener('submit', function (e) {
