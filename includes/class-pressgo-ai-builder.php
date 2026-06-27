@@ -3627,8 +3627,10 @@ class PressGo_AI_Builder {
 			// Scoped edit: a section is selected and this is a plain edit/request —
 			// change THAT section in place instead of composing a brand-new one. This
 			// is what stops "here's my menu" from spawning an unrelated section.
+			// Exception: an explicit "add a ... section" still builds a NEW section.
 			$sel_rec = ( '' !== $selected_key ) ? $this->ff_record_by_key( $post_id, $selected_key ) : null;
-			if ( is_array( $sel_rec ) ) {
+			$wants_new_section = (bool) preg_match( '/\b(add|create|insert|build|new)\b.{0,40}\bsection\b/i', $message );
+			if ( is_array( $sel_rec ) && ! $wants_new_section ) {
 				wp_send_json_success( $this->scoped_edit_section( $post_id, $sel_rec, $message ) );
 			}
 		}
