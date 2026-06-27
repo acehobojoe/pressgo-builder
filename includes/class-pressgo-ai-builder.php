@@ -1520,9 +1520,10 @@ class PressGo_AI_Builder {
 			. "1. Is any TEXT illegible against its section background (e.g. dark text on a dark band, light text on a light band)?\n"
 			. "2. Do two ADJACENT sections share the same background shade (dark next to dark, or light next to light), breaking the rhythm?\n"
 			. "3. Does the final call-to-action visibly STAND OUT from the rest?\n"
+			. "4. REDUNDANCY: do two or more sections do the SAME job (e.g. two testimonial/review sections, two 'about' sections, two final CTAs, two pricing blocks)? If so, choose the single STRONGEST one to keep and list the weaker duplicate(s) to remove.\n"
 			. "Return STRICT JSON only:\n"
-			. '{"approve": true, "issues": [{"n": 3, "problem": "unreadable_text|adjacent_same_shade|cta_not_distinct", "set_bg_role": "dark|light|accent"}], "notes": ""}'
-			. "\nRules: `n` is the 1-based section number from the TOP. `set_bg_role` is the background the section SHOULD have to fix it. Only report problems you can clearly SEE. If the page looks good, return approve:true with an empty issues array. Max 4 issues. `notes` is one short human sentence (or empty).";
+			. '{"approve": true, "issues": [{"n": 3, "problem": "unreadable_text|adjacent_same_shade|cta_not_distinct", "set_bg_role": "dark|light|accent"}], "redundant": [{"keep": 4, "remove": [6]}], "notes": ""}'
+			. "\nRules: `n`/`keep`/`remove` are 1-based section numbers from the TOP. `set_bg_role` is the background the section SHOULD have to fix it. Only report problems you can clearly SEE. Only flag redundancy when sections CLEARLY duplicate purpose — when unsure, leave them. NEVER remove section 1 (the hero). Max 4 issues and max 2 removals. If the page looks good, return approve:true with empty arrays. `notes` is one short human sentence (or empty).";
 	}
 
 	/** A full-page screenshot of the page as a data URL, or '' on failure. */
@@ -1604,25 +1605,49 @@ class PressGo_AI_Builder {
 		}
 		if ( ! is_array( $crit ) || empty( $crit['issues'] ) || ! is_array( $crit['issues'] ) ) { return ''; }
 
+		// 1) Background fixes (contrast / rhythm).
 		$changed = 0;
-		foreach ( $crit['issues'] as $iss ) {
+		$issues  = ( isset( $crit['issues'] ) && is_array( $crit['issues'] ) ) ? $crit['issues'] : array();
+		foreach ( $issues as $iss ) {
 			$n    = isset( $iss['n'] ) ? ( (int) $iss['n'] ) - 1 : -1;
 			$role = isset( $iss['set_bg_role'] ) ? $iss['set_bg_role'] : '';
 			if ( $n < 0 || $n >= count( $plan ) ) { continue; }
 			if ( ! in_array( $role, array( 'dark', 'light', 'accent' ), true ) ) { continue; }
-			if ( empty( $plan[ $n ]['source_tree'] ) || ! empty( $plan[ $n ]['lock_bg'] ) ) { continue; } // can't recolor
+			if ( empty( $plan[ $n ]['source_tree'] ) || ! empty( $plan[ $n ]['lock_bg'] ) ) { continue; }
 			if ( ( $plan[ $n ]['bg_role'] ?? '' ) === $role ) { continue; }
 			$plan[ $n ]['bg_role'] = $role;
 			$changed++;
 		}
-		if ( 0 === $changed ) { return ''; }
+
+		// 2) Consolidate redundant sections (remove the weaker duplicate(s)).
+		$remove = array();
+		$groups = ( isset( $crit['redundant'] ) && is_array( $crit['redundant'] ) ) ? $crit['redundant'] : array();
+		foreach ( $groups as $grp ) {
+			$rm = isset( $grp['remove'] ) ? (array) $grp['remove'] : array();
+			foreach ( $rm as $rn ) {
+				$ri = ( (int) $rn ) - 1;
+				if ( $ri > 0 && $ri < count( $plan ) ) { $remove[ $ri ] = true; } // never the hero (index 0)
+			}
+		}
+		$remove = array_keys( $remove );
+		rsort( $remove ); // splice high indices first so lower ones stay valid
+		$removed = 0;
+		foreach ( $remove as $ri ) {
+			if ( count( $plan ) <= 3 || $removed >= 2 ) { break; } // keep at least 3 sections
+			array_splice( $plan, $ri, 1 );
+			$removed++;
+		}
+
+		if ( 0 === $changed && 0 === $removed ) { return ''; }
 
 		$new = $this->cohesion_apply_plan( $post_id, $plan );
-		if ( count( $new ) >= count( $plan ) ) {
-			$this->cohesion_write_elements( $post_id, $new, $plan );
-			return 'I double-checked it visually and tuned a couple of sections so everything stays readable.';
-		}
-		return '';
+		if ( count( $new ) < count( $plan ) ) { return ''; } // safety: a render failed
+		$this->cohesion_write_elements( $post_id, $new, $plan );
+
+		$parts = array();
+		if ( $removed > 0 ) { $parts[] = ( 1 === $removed ) ? 'merged a duplicate section' : 'merged ' . $removed . ' duplicate sections'; }
+		if ( $changed > 0 ) { $parts[] = 'tuned a couple of sections for contrast'; }
+		return 'I looked it over visually and ' . implode( ' and ', $parts ) . '.';
 	}
 
 	/** Revert the last reorganize. */
