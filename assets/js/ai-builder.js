@@ -1208,7 +1208,38 @@
 	// One shared POST + response path for Nova, used by both a typed message and a
 	// discovery chip tap. `fields` are extra POST fields; `userText`, if given, is
 	// echoed as the user's chat bubble first.
-	function postFreeform(fields, userText, statusText) {
+	// Contextual "thinking chain" shown beside the typing dots while GLM (a
+	// reasoning model) composes — so a ~15s build reads as working through steps,
+	// not a frozen bubble. Captions are progress, not the literal model tokens.
+	var THINK = {
+		hero:    ['Reading your brief…', 'Sketching the hero layout…', 'Choosing an on-brand palette…', 'Writing the headline and copy…', 'Finding the right photo…', 'Assembling your hero…'],
+		section: ['Planning the section…', 'Matching your brand…', 'Writing the copy…', 'Finding imagery…', 'Putting it together…'],
+		recolor: ['Rethinking the look…', 'Trying a fresh palette and type…', 'Rewriting to fit…', 'Rebuilding your hero…'],
+		quick:   ['Thinking…']
+	};
+	function makeThinking(steps) {
+		var node = document.createElement('div');
+		node.className = 'pg-thinking';
+		node.style.cssText = 'display:flex;align-items:center;gap:10px;margin:4px 0;';
+		node.appendChild(typingNode());
+		var timer = null;
+		if (steps && steps.length) {
+			var cap = document.createElement('span');
+			cap.className = 'pg-thinking-cap';
+			cap.style.cssText = 'font-size:13px;color:#6b7280;font-style:italic;';
+			cap.textContent = steps[0];
+			node.appendChild(cap);
+			var i = 0;
+			timer = setInterval(function () {
+				i++;
+				if (i >= steps.length) { clearInterval(timer); timer = null; return; }
+				cap.textContent = steps[i];
+			}, 2200);
+		}
+		return { node: node, stop: function () { if (timer) { clearInterval(timer); timer = null; } } };
+	}
+
+	function postFreeform(fields, userText, thinkKind) {
 		if (userText != null) {
 			var userBubble = el('pg-msg pg-msg-user');
 			var txt = document.createElement('div');
@@ -1216,10 +1247,8 @@
 			userBubble.appendChild(txt);
 			append(userBubble);
 		}
-		// For the slow paths (a full hero (re)build) say so, so it never reads as frozen.
-		if (statusText) append(el('pg-msg pg-msg-ai', statusText));
-		var typing = typingNode();
-		append(typing);
+		var think = makeThinking(THINK[thinkKind] || THINK.quick);
+		append(think.node);
 		setBusy(true);
 
 		var fd = new FormData();
@@ -1241,11 +1270,11 @@
 				});
 			})
 			.then(function (res) {
-				if (typing) typing.remove();
+				think.stop(); think.node.remove();
 				handleFreeformResult(res);
 			})
 			.catch(function () {
-				if (typing) typing.remove();
+				think.stop(); think.node.remove();
 				append(el('pg-msg-error', 'Network error during Pro mode compose — try again.'));
 				setBusy(false);
 			});
@@ -1348,7 +1377,7 @@
 					if (x !== b) x.style.opacity = '0.4';
 				});
 				b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca';
-				postFreeform({ message: c.request, section_key: c.key }, c.label, 'Building your ' + c.label.toLowerCase() + ' section…');
+				postFreeform({ message: c.request, section_key: c.key }, c.label, 'section');
 			});
 			wrap.appendChild(b);
 		});
@@ -1368,25 +1397,27 @@
 			}
 		});
 		var stage = currentDiscoveryStage;
-		var status = null;
-		if (stage === 'photos') status = 'Designing your hero now — give me a few seconds…';
-		else if (stage === 'brand_confirm' && (chip.value === 'recolor' || chip.value === 'refont')) status = 'On it — redrawing your hero. This takes a few seconds…';
-		postFreeform({ message: chip.label, discovery_stage: stage, discovery_value: chip.value }, chip.label, status);
+		var kind = 'quick';
+		if (stage === 'photos') kind = 'hero';
+		else if (stage === 'brand_confirm' && (chip.value === 'recolor' || chip.value === 'refont')) kind = 'recolor';
+		else if (stage === 'proof' || stage === 'offer') kind = 'section';
+		postFreeform({ message: chip.label, discovery_stage: stage, discovery_value: chip.value }, chip.label, kind);
 	}
 
 	function sendFreeform(text) {
 		chatStarted = true;
 		input.value = '';
 		var fields = { message: text };
-		var status = null;
+		var kind = 'section'; // a typed message outside discovery composes a section
 		// Typed answer during an interview: route it into the awaited stage so it
 		// lands in the same slot a chip tap would (server parses the text).
 		if (currentDiscoveryStage) {
 			fields.discovery_stage = currentDiscoveryStage;
 			fields.discovery_value = '';
-			if (currentDiscoveryStage === 'brand_confirm') status = 'On it — redrawing your hero. This takes a few seconds…';
+			kind = (currentDiscoveryStage === 'brand_confirm') ? 'recolor'
+				: (currentDiscoveryStage === 'photos') ? 'hero' : 'quick';
 		}
-		postFreeform(fields, text, status);
+		postFreeform(fields, text, kind);
 	}
 
 	form.addEventListener('submit', function (e) {
