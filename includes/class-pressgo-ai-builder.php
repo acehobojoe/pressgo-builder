@@ -1375,6 +1375,11 @@ class PressGo_AI_Builder {
 		// brain — render-validated at parity with Claude, ~4x cheaper; Claude is the
 		// automatic fallback on any failure or invalid output.
 		$framed = 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message;
+		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
+		// already on the page, so the new section continues the same business,
+		// palette, and goal instead of re-inventing them statelessly.
+		$page_state = $this->freeform_page_state( $post_id );
+		if ( '' !== $page_state ) { $framed = $page_state . $framed; }
 		$composed = $this->compose_freeform_tree( $system, $framed );
 		if ( empty( $composed['tree'] ) ) {
 			wp_send_json_error( $composed['error'] ?? 'The composer did not return a valid section. Try rewording.', 422 );
@@ -1498,6 +1503,155 @@ class PressGo_AI_Builder {
 			foreach ( $data['content'] as $blk ) { if ( ( $blk['type'] ?? '' ) === 'text' ) { $text .= $blk['text']; } }
 		}
 		return self::extract_section_json( $text );
+	}
+
+	/**
+	 * Page-level reasoning for Nova: derive a compact "PAGE STATE" block from the
+	 * sections already on the page, so each new freeform compose CONTINUES the same
+	 * business, palette, and conversion goal instead of re-inventing them
+	 * statelessly (the post-3143 incoherence: 3 businesses, 3 forms, 3 darks).
+	 * Returns '' for an empty page (the first section anchors it; nothing to
+	 * continue yet).
+	 */
+	public function freeform_page_state( $post_id ) {
+		$raw = get_post_meta( $post_id, '_elementor_data', true );
+		$els = null;
+		if ( is_string( $raw ) && '' !== $raw ) {
+			$els = json_decode( $raw, true );
+			if ( ! is_array( $els ) ) { $els = json_decode( wp_unslash( $raw ), true ); }
+		}
+		if ( ! is_array( $els ) || empty( $els ) ) { return ''; }
+		$sections = $this->summarize_freeform_sections( $els );
+		if ( empty( $sections ) ) { return ''; }
+
+		// Establish palette + identity from what's already on the page.
+		$bg_counts = array(); $accent = ''; $present = array(); $has_form = false;
+		foreach ( $sections as $s ) {
+			if ( '' !== $s['bg'] )     { $bg_counts[ $s['bg'] ] = ( $bg_counts[ $s['bg'] ] ?? 0 ) + 1; }
+			if ( '' === $accent && '' !== $s['accent'] ) { $accent = $s['accent']; }
+			$present[ $s['type'] ] = true;
+			if ( $s['has_form'] ) { $has_form = true; }
+		}
+		arsort( $bg_counts );
+		$bgs        = array_keys( $bg_counts );
+		$primary_bg = $bgs[0] ?? '';
+		$alt_bg     = '';
+		foreach ( $bgs as $b ) { if ( $b !== $primary_bg ) { $alt_bg = $b; break; } }
+		$last        = end( $sections );
+		$last_bg     = $last['bg'] ?? $primary_bg;
+		$next_bg     = ( '' !== $alt_bg ) ? ( ( $last_bg === $primary_bg ) ? $alt_bg : $primary_bg ) : '';
+		$hero_headline = $sections[0]['headline'] ?? '';
+
+		// Next logical section: canonical flow minus what's already present.
+		$present_norm = $present;
+		if ( isset( $present_norm['stats'] ) ) { $present_norm['social_proof'] = true; }
+		$flow = array( 'hero', 'social_proof', 'features', 'steps', 'testimonials', 'pricing', 'faq', 'cta', 'footer' );
+		$next = '';
+		foreach ( $flow as $f ) { if ( empty( $present_norm[ $f ] ) ) { $next = $f; break; } }
+
+		$L   = array();
+		$L[] = '=== PAGE STATE (read first) — this page already exists; compose ONE new section that CONTINUES the same business, palette, and goal. Do NOT start a different business or restyle. ===';
+		if ( '' !== $hero_headline ) { $L[] = 'WHAT THIS PAGE IS (from the hero): "' . $hero_headline . '" — match this exact business and voice.'; }
+		$palparts = array();
+		if ( '' !== $primary_bg ) { $palparts[] = 'background ' . $primary_bg; }
+		if ( '' !== $alt_bg )     { $palparts[] = 'alternate background ' . $alt_bg; }
+		if ( '' !== $accent )     { $palparts[] = 'accent ' . $accent; }
+		if ( $palparts )          { $L[] = 'LOCKED PALETTE — use ONLY these colors: ' . implode( ', ', $palparts ) . '. Introduce NO other dark, light, or accent color.'; }
+		if ( '' !== $next_bg && '' !== $last_bg ) { $L[] = 'The last section background was ' . $last_bg . ', so use ' . $next_bg . ' for this one (alternate the rhythm — never two same-bg sections adjacent).'; }
+		if ( $has_form ) { $L[] = 'A lead-capture form ALREADY EXISTS on this page. Do NOT add another form, newsletter signup, or contact section unless the user explicitly asks for one this turn — route any CTA to the existing goal.'; }
+		$L[] = 'SECTIONS ALREADY ON THE PAGE (in order, your new one is appended after):';
+		foreach ( $sections as $i => $s ) {
+			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ( $s['has_form'] ? ' — has a form' : '' );
+		}
+		if ( '' !== $next ) { $L[] = 'NEXT LOGICAL SECTION for this page: ' . $next . '. Do NOT repeat a section type already present.'; }
+		$L[] = '=== END PAGE STATE — now compose ONE section continuing this exact business, palette, and goal. ===';
+		return implode( "\n", $L ) . "\n\n";
+	}
+
+	/** Walk a freeform _elementor_data tree into a per-top-level-section summary. */
+	private function summarize_freeform_sections( $els ) {
+		$out = array();
+		if ( ! is_array( $els ) ) { return $out; }
+		$i = 0;
+		foreach ( $els as $node ) {
+			if ( ! is_array( $node ) ) { continue; }
+			$s        = isset( $node['settings'] ) && is_array( $node['settings'] ) ? $node['settings'] : array();
+			$bg       = ( isset( $s['background_color'] ) && is_string( $s['background_color'] ) ) ? $s['background_color'] : '';
+			$headline = self::ff_headline( $node );
+			$accent   = self::ff_first( $node, 'button', 'background_color' );
+			$has_form = self::ff_has_form( $node );
+			$out[]    = array(
+				'headline' => '' !== $headline ? mb_substr( $headline, 0, 70 ) : '',
+				'bg'       => $bg,
+				'accent'   => $accent,
+				'has_form' => $has_form,
+				// The first section of a page is always the hero.
+				'type'     => ( 0 === $i ) ? 'hero' : self::ff_infer_type( strtolower( $headline ), $has_form ),
+			);
+			$i++;
+		}
+		return $out;
+	}
+
+	/** Best section headline: prefer the first h1, then h2, then any heading (skips small eyebrows). */
+	private static function ff_headline( $node ) {
+		$found = array();
+		self::ff_collect_headings( $node, $found );
+		foreach ( array( 'h1', 'h2', 'h3' ) as $tag ) {
+			foreach ( $found as $h ) { if ( $h['size'] === $tag && '' !== $h['text'] ) { return $h['text']; } }
+		}
+		return $found[0]['text'] ?? '';
+	}
+
+	private static function ff_collect_headings( $node, &$out ) {
+		if ( ( $node['widgetType'] ?? '' ) === 'heading' ) {
+			$t = $node['settings']['title'] ?? '';
+			if ( is_string( $t ) && '' !== trim( $t ) ) {
+				$out[] = array( 'text' => trim( wp_strip_all_tags( $t ) ), 'size' => $node['settings']['header_size'] ?? 'h2' );
+			}
+		}
+		foreach ( ( $node['elements'] ?? array() ) as $c ) {
+			if ( is_array( $c ) ) { self::ff_collect_headings( $c, $out ); }
+		}
+	}
+
+	/** First descendant widget of $widget type's $setting value (depth-first). */
+	private static function ff_first( $node, $widget, $setting ) {
+		if ( ( $node['widgetType'] ?? '' ) === $widget ) {
+			$v = $node['settings'][ $setting ] ?? '';
+			if ( is_string( $v ) && '' !== trim( $v ) ) { return $v; }
+		}
+		foreach ( ( $node['elements'] ?? array() ) as $c ) {
+			if ( is_array( $c ) ) { $v = self::ff_first( $c, $widget, $setting ); if ( '' !== $v ) { return $v; } }
+		}
+		return '';
+	}
+
+	private static function ff_has_form( $node ) {
+		if ( ( $node['widgetType'] ?? '' ) === 'form' ) { return true; }
+		foreach ( ( $node['elements'] ?? array() ) as $c ) {
+			if ( is_array( $c ) && self::ff_has_form( $c ) ) { return true; }
+		}
+		return false;
+	}
+
+	private static function ff_infer_type( $h, $has_form ) {
+		$map = array(
+			'pricing'      => array( 'pricing', 'plan', '/mo', 'per month', '/month', 'price' ),
+			'faq'          => array( 'faq', 'question', 'frequently' ),
+			'testimonials' => array( 'testimonial', 'review', 'what our', 'clients say', 'customers say', 'loved by' ),
+			'features'     => array( 'feature', 'everything you', 'what you get', 'how we help', 'why ' ),
+			'steps'        => array( 'how it works', 'step ', 'get started in' ),
+			'stats'        => array( 'by the numbers', 'trusted by', 'results', 'in numbers' ),
+			'newsletter'   => array( 'newsletter', 'stay in the loop', 'subscribe', 'updates', 'inbox' ),
+			'contact'      => array( 'contact', 'get in touch', 'talk about your', 'reach out', 'book a', 'book your' ),
+			'cta'          => array( 'ready to', 'get started', 'start building', 'start your', 'join ' ),
+			'about'        => array( 'about', 'our story', 'who we are', 'mission' ),
+		);
+		foreach ( $map as $type => $kw ) {
+			foreach ( $kw as $k ) { if ( false !== strpos( $h, $k ) ) { return $type; } }
+		}
+		return $has_form ? 'contact' : 'section';
 	}
 
 	/* ─── Daily usage view (Claude-Code-style bar) ──────────────────────
