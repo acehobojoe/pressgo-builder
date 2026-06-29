@@ -1314,6 +1314,13 @@
 				runWholePagePlan(data.whole_page_plan);
 				return;
 			}
+			// Conversational reply (not a build): show the text + refresh suggestions.
+			if (data.chat_mode) {
+				append(el('pg-msg pg-msg-ai', data.note || ''));
+				if (data.suggest && !wholeRunning) renderSuggestions(data.suggest);
+				setBusy(false);
+				return;
+			}
 			append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
 			currentDiscoveryStage = null; // a section built — discovery is done
 			if (input) input.placeholder = defaultPlaceholder;

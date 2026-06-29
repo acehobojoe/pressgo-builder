@@ -3996,6 +3996,23 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Pro mode is not configured on this site (no compose key).', 500 );
 		}
 
+		// ── Conversational mode ──────────────────────────────────────────
+		// Not every message is a build command. Questions, brainstorming, and
+		// feedback ("what sections should I include?", "I'm not sure about the
+		// layout", "can we use a different vibe?") should get a thoughtful text
+		// reply, not a blind JSON compose attempt. Route those to GLM-5.2 in
+		// chat mode (not json_object) with full page context, so the user can
+		// discuss before committing to a build.
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && $this->is_conversational( $message, $selected_key ) ) {
+			$reply = $this->freeform_chat( $post_id, $message, $brief );
+			wp_send_json_success( array(
+				'note'         => $reply['text'],
+				'preview_bust' => time(),
+				'chat_mode'    => true,
+				'suggest'      => $reply['suggest'] ?? null,
+			) );
+		}
+
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
 		if ( '' === $system ) {
@@ -4180,7 +4197,153 @@ class PressGo_AI_Builder {
 	}
 
 	/**
-	 * Compose a freeform section tree. Primary brain = GLM-5.2 via OpenRouter
+	 * Detect conversational messages that should get a text reply, not a blind
+	 * JSON compose. Questions, brainstorming, feedback, and "what if" messages
+	 * route here. Build/edit/structural commands (already handled above) never
+	 * reach this check. A selected section means the user is editing, not chatting.
+	 */
+	private function is_conversational( $message, $selected_key ) {
+		if ( '' !== $selected_key ) { return false; }
+		$m = strtolower( trim( $message ) );
+
+		// Explicit questions.
+		if ( preg_match( '/^(what|how|why|should|can|could|would|do you|is it|are there|what if|what about|how about)\b/i', $m ) ) { return true; }
+		// Ends with a question mark.
+		if ( '?' === substr( trim( $message ), -1 ) ) { return true; }
+		// Brainstorming / uncertainty markers.
+		if ( preg_match( '/\b(not sure|thinking about|considering|wondering|idea|ideas|suggest|recommend|advice|opinion|thoughts?|feel like|seems (off|wrong|weird|basic)|too (plain|simple|basic|empty|much)|missing something|what else|what next|which (sections?|order|layout|colors?|fonts?|vibe))\b/i', $m ) ) { return true; }
+		// "I like it but..." / "I want something more..." — feedback that needs discussion.
+		if ( preg_match( '/\b(i like|i love|looks good|nice|great).{0,30}\b(but|however|except|though|wish|want|need)\b/i', $m ) ) { return true; }
+		// Short messages with no build verb are probably conversational.
+		$has_build_verb = (bool) preg_match( '/\b(add|build|create|make|insert|put|give me|design|compose|generate)\b/i', $m );
+		if ( ! $has_build_verb && mb_strlen( $m ) < 80 ) { return true; }
+
+		return false;
+	}
+
+	/**
+	 * Conversational reply for the freeform builder. Calls GLM-5.2 in chat mode
+	 * (not json_object) with the page's current state + brief, so the user can
+	 * discuss layout, sections, colors, and copy before committing to a build.
+	 * Returns ['text'=>string, 'suggest'=>array|null].
+	 */
+	private function freeform_chat( $post_id, $message, $brief ) {
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		$page_state = $this->freeform_page_state( $post_id );
+
+		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful, opinionated reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason. If they ask about colors/layout/fonts, give a real recommendation based on what's on the page. Do NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n";
+		if ( '' !== $brief && 'pending' !== $brief ) {
+			$system .= "PAGE BRIEF:\n" . $brief . "\n\n";
+		}
+		if ( '' !== $page_state ) {
+			$system .= $page_state;
+		}
+
+		$text = '';
+		if ( '' !== $or_key ) {
+			$text = self::glm_chat( $or_key, $system, $message, $this->freeform_keepalive() );
+		}
+		if ( '' === $text ) {
+			$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
+			if ( '' !== $cl_key ) {
+				$text = self::claude_chat( $cl_key, $system, $message );
+			}
+		}
+		if ( '' === $text ) {
+			$text = "I'm having trouble thinking right now. Try telling me what to build and I'll get right on it.";
+		}
+
+		// After the reply, refresh the section suggestions so the user can act.
+		$suggest = null;
+		$dstate = $this->discovery_state( $post_id );
+		if ( is_array( $dstate ) ) { $suggest = $this->suggest_payload( $dstate ); }
+
+		return array( 'text' => $text, 'suggest' => $suggest );
+	}
+
+	/**
+	 * GLM-5.2 chat (not compose) via OpenRouter streaming. Returns plain text.
+	 * Uses the same keepalive mechanism as glm_compose to prevent Cloudflare 524.
+	 */
+	private static function glm_chat( $key, $system, $user, $keepalive = null ) {
+		$body = wp_json_encode( array(
+			'model'      => 'z-ai/glm-5.2',
+			'max_tokens' => 1000,
+			'stream'     => true,
+			'messages'   => array(
+				array( 'role' => 'system', 'content' => $system ),
+				array( 'role' => 'user',   'content' => $user ),
+			),
+		) );
+
+		if ( ! $keepalive ) {
+			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+				'timeout' => 120,
+				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+				'body'    => $body,
+			) );
+			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
+			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+			return trim( self::openrouter_message_text( $data['choices'][0]['message']['content'] ?? '' ) );
+		}
+
+		$accumulated = '';
+		$ch = curl_init( 'https://openrouter.ai/api/v1/chat/completions' );
+		curl_setopt_array( $ch, array(
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => $body,
+			CURLOPT_HTTPHEADER     => array( 'Content-Type: application/json', 'Authorization: Bearer ' . $key ),
+			CURLOPT_RETURNTRANSFER => false,
+			CURLOPT_HEADER         => false,
+			CURLOPT_TIMEOUT        => 120,
+			CURLOPT_CONNECTTIMEOUT => 10,
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $chunk ) use ( &$accumulated, $keepalive ) {
+				$accumulated .= $chunk;
+				$keepalive();
+				return strlen( $chunk );
+			},
+		) );
+		$ok  = curl_exec( $ch );
+		$err = curl_error( $ch );
+		curl_close( $ch );
+		if ( ! $ok || $err ) { return ''; }
+
+		$content = '';
+		$lines = preg_split( "/\r?\n/", $accumulated );
+		foreach ( $lines as $line ) {
+			if ( 0 !== strpos( $line, 'data: ' ) ) { continue; }
+			$json = trim( substr( $line, 6 ) );
+			if ( '[DONE]' === $json ) { break; }
+			$evt = json_decode( $json, true );
+			if ( ! is_array( $evt ) ) { continue; }
+			$delta = $evt['choices'][0]['delta']['content'] ?? '';
+			if ( is_string( $delta ) && '' !== $delta ) { $content .= $delta; }
+		}
+		return trim( $content );
+	}
+
+	/** Claude chat (not compose) — plain text reply, no JSON forcing. */
+	private static function claude_chat( $key, $system, $user ) {
+		$resp = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+			'timeout' => 90,
+			'headers' => array( 'content-type' => 'application/json', 'x-api-key' => $key, 'anthropic-version' => '2023-06-01' ),
+			'body'    => wp_json_encode( array(
+				'model'      => 'claude-sonnet-4-5-20250929',
+				'max_tokens' => 1000,
+				'system'     => $system,
+				'messages'   => array( array( 'role' => 'user', 'content' => $user ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$text = '';
+		if ( isset( $data['content'] ) && is_array( $data['content'] ) ) {
+			foreach ( $data['content'] as $blk ) { if ( ( $blk['type'] ?? '' ) === 'text' ) { $text .= $blk['text']; } }
+		}
+		return trim( $text );
+	}
+
+	/**
 	 * (response_format json_object — render-validated at parity with Claude, ~4x
 	 * cheaper). Falls back to Claude on any failure or invalid output. Returns
 	 * ['tree'=>array,'model'=>string] or ['error'=>string].
