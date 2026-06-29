@@ -1246,7 +1246,7 @@
 		return { node: node, stop: function () { if (timer) { clearInterval(timer); timer = null; } } };
 	}
 
-	function postFreeform(fields, userText, thinkKind) {
+	function postFreeform(fields, userText, thinkKind, done) {
 		if (userText != null) {
 			var userBubble = el('pg-msg pg-msg-user');
 			var txt = document.createElement('div');
@@ -1279,11 +1279,13 @@
 			.then(function (res) {
 				think.stop(); think.node.remove();
 				handleFreeformResult(res);
+				if (done) done(res && res.json && res.json.data);
 			})
 			.catch(function () {
 				think.stop(); think.node.remove();
 				append(el('pg-msg-error', 'Network error during Pro mode compose — try again.'));
 				setBusy(false);
+				if (done) done(null);
 			});
 	}
 
@@ -1296,7 +1298,20 @@
 			// first, then render its swatches + chips.
 			if (data.needs_discovery) {
 				if (data.preview_bust) reloadPreview(data.preview_bust);
+				// The brand-lock step rides brand_synced + a note alongside its chips —
+				// fill the panel and confirm the lock before asking the build-mode fork.
+				if (data.brand_synced) refreshBrandPanel(data.brand);
+				if (data.note) append(el('pg-msg pg-msg-ai', data.note));
 				renderDiscovery(data);
+				return;
+			}
+			// "Build the whole page": the server returns an ordered plan; build each
+			// section one at a time so the user watches it fill in and can stop.
+			if (data.whole_page_plan && data.whole_page_plan.length) {
+				append(el('pg-msg pg-msg-ai', data.note || 'Building your whole page…'));
+				currentDiscoveryStage = null;
+				if (input) input.placeholder = defaultPlaceholder;
+				runWholePagePlan(data.whole_page_plan);
 				return;
 			}
 			append(el('pg-msg pg-msg-ai', data.note || 'Composed a freeform section.'));
@@ -1305,7 +1320,7 @@
 			if (data.brand_synced) refreshBrandPanel(data.brand); // watch the panel fill in
 			reloadPreview(data.preview_bust || Date.now());
 			if (data.usage) renderUsage(data.usage); else refreshUsage();
-			if (data.suggest) renderSuggestions(data.suggest); // keep the wizard leading
+			if (data.suggest && !wholeRunning) renderSuggestions(data.suggest); // keep the wizard leading
 		} else if (d && d.data) {
 			append(el('pg-msg-error', typeof d.data === 'string' ? d.data : (d.data.message || 'Pro mode compose failed.')));
 		} else {
@@ -1361,6 +1376,46 @@
 		if (input && data.freetext_hint) input.placeholder = data.freetext_hint;
 		setBusy(false); // keep the box live so the free-text fallback works
 		setTimeout(function () { if (input) input.focus(); }, 50);
+	}
+
+	// "Build the whole page" — drive the server's ordered plan one section at a
+	// time. Each step is a normal build (so the preview fills in live and usage
+	// ticks), but suggestions are suppressed mid-run and re-shown once at the end.
+	// A Stop button halts after the current section; "stop" typed also works.
+	var wholeRunning = false;
+	var wholeStop = false;
+	function runWholePagePlan(plan) {
+		wholeRunning = true;
+		wholeStop = false;
+		var lastData = null;
+		// Stop affordance.
+		var bar = el('pg-msg pg-msg-ai');
+		var stopBtn = document.createElement('button');
+		stopBtn.type = 'button';
+		stopBtn.textContent = '■ Stop building';
+		stopBtn.style.cssText = 'border:1px solid #e5b3b3;background:#fff5f5;color:#b54141;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600;';
+		stopBtn.addEventListener('click', function () { wholeStop = true; stopBtn.disabled = true; stopBtn.style.opacity = '0.5'; stopBtn.textContent = 'Stopping after this one…'; });
+		bar.appendChild(stopBtn);
+		append(bar);
+
+		var i = 0;
+		function finish() {
+			wholeRunning = false;
+			bar.remove();
+			refreshUsage();
+			if (wholeStop) append(el('pg-msg pg-msg-ai', 'Stopped there. Tap what to add next, or tell me your own.'));
+			else append(el('pg-msg pg-msg-ai', "That's your page. Want me to ✨ make it flow, or tweak anything?"));
+			if (lastData && lastData.suggest) renderSuggestions(lastData.suggest);
+		}
+		function step() {
+			if (wholeStop || i >= plan.length) { finish(); return; }
+			var s = plan[i++];
+			postFreeform({ message: s.request, section_key: s.key || '', whole_page: '1' }, null, 'section', function (data) {
+				if (data) lastData = data;
+				setTimeout(step, 200);
+			});
+		}
+		step();
 	}
 
 	// After a build, the server suggests the next sections for this page type.

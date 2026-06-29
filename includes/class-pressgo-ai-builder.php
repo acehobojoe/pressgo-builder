@@ -1315,12 +1315,38 @@ class PressGo_AI_Builder {
 		}
 		if ( empty( $chips ) ) { return null; }
 		$first = ( count( $built ) <= 1 ); // just the hero so far
+		// (whole_page_plan lives just below — kept here so the two stay in sync.)
 		$note  = $first
 			? ( 'browse' === $goal
 				? "Looks like a homepage. Most add a few of these next — tap one and I'll build it on-brand, or just tell me your own:"
 				: "Here's what usually comes next on a page like this. Tap one and I'll build it on-brand, or tell me your own:" )
 			: "What should we add next? Tap one, or tell me your own:";
 		return array( 'note' => $note, 'chips' => $chips );
+	}
+
+	/**
+	 * The ordered "build the whole page" plan: a curated core set for the goal,
+	 * always ending on a dedicated call-to-action (the form/booking lives there,
+	 * which keeps it out of the hero). Skips anything already built.
+	 */
+	private function whole_page_plan( $state ) {
+		$goal  = ! empty( $state['answers']['goal'] ) ? $state['answers']['goal'] : 'browse';
+		$built = isset( $state['built_keys'] ) && is_array( $state['built_keys'] ) ? $state['built_keys'] : array();
+		$core  = ( 'browse' === $goal )
+			? array( 'services', 'about', 'testimonials', 'cta' )
+			: array( 'benefits', 'how', 'testimonials', 'cta' );
+		$by_key = array();
+		foreach ( $this->section_suggestions( $goal ) as $s ) { $by_key[ $s['key'] ] = $s; }
+		$plan = array();
+		foreach ( $core as $key ) {
+			if ( in_array( $key, $built, true ) || empty( $by_key[ $key ] ) ) { continue; }
+			$plan[] = array(
+				'request' => $by_key[ $key ]['request'],
+				'label'   => $by_key[ $key ]['label'],
+				'key'     => $key,
+			);
+		}
+		return $plan;
 	}
 
 	// ── Cohesion engine: store section trees (C1) + deterministic reorganize (C2) ──
@@ -2726,12 +2752,24 @@ class PressGo_AI_Builder {
 				'discovery_complete' => true,
 			) );
 			if ( is_array( $f ) ) { unset( $f['updated'] ); }
+			// One fork before we keep going: build the whole page now, or steer it
+			// section by section. (The client renders these chips; the panel + preview
+			// still refresh because brand_synced rides along.)
 			return array(
-				'note'         => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent.',
-				'brand_synced' => true,
-				'brand'        => $f,
-				'preview_bust' => time(),
-				'suggest'      => $this->suggest_payload( $state ),
+				'note'            => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent.',
+				'brand_synced'    => true,
+				'brand'           => $f,
+				'preview_bust'    => time(),
+				'needs_discovery' => true,
+				'mode'            => 'build_mode',
+				'stage'           => 'build_mode',
+				'question'        => 'Want me to build out the whole page now, or go section by section so you can steer each one?',
+				'chips'           => array(
+					array( 'label' => 'Build the whole page', 'value' => 'whole' ),
+					array( 'label' => 'Section by section', 'value' => 'sections' ),
+				),
+				'allow_freetext'  => true,
+				'freetext_hint'   => '…or just tell me what to add',
 			);
 		}
 
@@ -3778,6 +3816,27 @@ class PressGo_AI_Builder {
 			wp_send_json_success( $this->handle_brand_confirm( $post_id, $discovery_value, $message ) );
 		}
 
+		// Build mode: right after the brand locks, the user picks whole-page vs
+		// section-by-section. "whole" hands the client an ordered plan it builds one
+		// section at a time (visible + stoppable); "sections" resumes the wizard.
+		if ( 'build_mode' === $discovery_stage ) {
+			$bm = $this->discovery_state( $post_id );
+			if ( ! is_array( $bm ) ) { $bm = array(); }
+			if ( 'whole' === $discovery_value ) {
+				wp_send_json_success( array(
+					'whole_page_plan' => $this->whole_page_plan( $bm ),
+					'note'            => "On it — I'll build out the rest of your page, one section at a time. Watch them land below; hit Stop or say \"stop\" anytime.",
+				) );
+			}
+			wp_send_json_success( array(
+				'note'    => "Good call — we'll go one section at a time. Tap what to add next.",
+				'suggest' => $this->suggest_payload( $bm ),
+			) );
+		}
+		// Plan steps drive normal builds but must not stop to ask drip questions —
+		// that would interrupt the "watch it build" flow with a chip prompt.
+		$whole_page = ! empty( $_POST['whole_page'] );
+
 		// Cohesion engine: on a populated page, "make it flow / reorganize / fix the
 		// order / balance the colors" reorganizes the whole page instead of adding a
 		// section; "undo / put it back" reverts the last reorganize.
@@ -3818,7 +3877,7 @@ class PressGo_AI_Builder {
 		// Just-in-time conversion drips: when the user asks for a reviews or CTA
 		// section and we don't yet know their proof/offer, ask once (skippable)
 		// before composing it. Follow-up sections only — never the hero.
-		if ( ! $page_empty && '' === $discovery_stage ) {
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page ) {
 			$jit = $this->discovery_state( $post_id );
 			if ( is_array( $jit ) ) {
 				$intent = $this->ff_section_intent( $message );
@@ -3908,6 +3967,13 @@ class PressGo_AI_Builder {
 		// consistent with the one business + goal the user gave up front.
 		if ( '' !== $brief && 'pending' !== $brief ) {
 			$framed = "PAGE BRIEF (the business + goal for this whole page — keep EVERY section consistent with this; do not introduce a different business):\n" . $brief . "\n\n" . $framed;
+		}
+		// The hero should sell, not collect. Lead it with a headline + one CTA
+		// BUTTON pointing at the page's main action; the form lives in its own
+		// dedicated section. (A form crammed into the hero reads as illogical —
+		// e.g. a gym whose hero IS a contact form.)
+		if ( $was_first ) {
+			$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
 		}
 		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
 		// already on the page, so the new section continues the same business,
