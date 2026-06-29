@@ -4319,10 +4319,12 @@ class PressGo_AI_Builder {
 		) );
 
 		if ( ! $keepalive ) {
+			$blk = json_decode( $body, true );
+			unset( $blk['stream'] ); // blocking request must not stream (SSE body won't json_decode)
 			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
 				'timeout' => 120,
 				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
-				'body'    => $body,
+				'body'    => wp_json_encode( $blk ),
 			) );
 			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
@@ -4435,12 +4437,16 @@ class PressGo_AI_Builder {
 			),
 		) );
 
-		// Non-keepalive path: simple blocking request (CLI / harness).
+		// Non-keepalive path: simple blocking request (CLI / harness). Must NOT
+		// request a stream — wp_remote_post returns the raw SSE body, which the
+		// json_decode below can't parse (it would always fail -> Claude fallback).
 		if ( ! $keepalive ) {
+			$blk = json_decode( $body, true );
+			unset( $blk['stream'] );
 			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
 				'timeout' => 240,
 				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
-				'body'    => $body,
+				'body'    => wp_json_encode( $blk ),
 			) );
 			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
