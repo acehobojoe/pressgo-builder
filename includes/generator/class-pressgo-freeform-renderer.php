@@ -683,11 +683,11 @@ class PressGo_Freeform_Renderer {
 	private static function strip_dashes( $text ) {
 		if ( ! is_string( $text ) || '' === $text ) { return $text; }
 		// HTML entities first (wp_kses_post on text blocks can leave these).
-		$text = str_replace( array( '&#8212;', '&#x2014;', '&mdash;', '&#8211;', '&#x2013;', '&ndash;' ), array( '—', '—', '—', '–', '–', '–' ), $text );
+		$text = str_replace( array( '&#8212;', '&#x2014;', '&mdash;', '&#8211;', '&#x2013;', '&ndash;' ), array( "\xe2\x80\x94", "\xe2\x80\x94", "\xe2\x80\x94", "\xe2\x80\x93", "\xe2\x80\x93", "\xe2\x80\x93" ), $text );
 		// Spaced em/en dash -> comma (the natural prose replacement).
-		$text = str_replace( array( ' — ', ' – ', "\xe2\x80\x94 ", " \xe2\x80\x94", "\xe2\x80\x93 ", " \xe2\x80\x93" ), ', ', $text );
+		$text = str_replace( array( " \xe2\x80\x94 ", " \xe2\x80\x93 " ), ', ', $text );
 		// Any remaining bare em/en dash -> hyphen.
-		$text = str_replace( array( '—', '–', "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
+		$text = str_replace( array( "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
 		return $text;
 	}
 
