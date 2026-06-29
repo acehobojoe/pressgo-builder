@@ -2284,7 +2284,7 @@ class PressGo_AI_Builder {
 			. wp_json_encode( $tree )
 			. "\n\nApply ONLY this change and keep everything else (layout, structure, other copy, images, colors) identical:\n" . $message
 			. "\n\nOutput the FULL updated section as one JSON block tree (root {\"type\":\"section\"}). No prose, no code fences.";
-		$composed = $this->compose_freeform_tree( $system, $framed );
+		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive() );
 		if ( empty( $composed['tree'] ) ) {
 			return array( 'note' => "I couldn't make that change cleanly — try rewording it." );
 		}
@@ -2858,7 +2858,7 @@ class PressGo_AI_Builder {
 		$biz         = ! empty( $state['business'] ) ? $state['business'] : $brief;
 		$framed      = "PAGE BRIEF (keep EVERY detail consistent with this):\n" . $brief . "\n\nREVISION: " . $nudge .
 			"\n\nCompose ONE landing-page HERO section as a JSON block tree (root {\"type\":\"section\"}). Output the JSON object only: no prose, no code fences. Request: " . $biz;
-		$composed = $this->compose_freeform_tree( $system, $framed );
+		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive() );
 		if ( empty( $composed['tree'] ) ) {
 			return array( 'note' => "I couldn't generate a different version just now — your current hero is still in place. Lock it in, or tell me a specific change.", 'preview_bust' => time() );
 		}
@@ -3786,6 +3786,20 @@ class PressGo_AI_Builder {
 	 * chat-edit clobber guard protects it. Not the production wiring — the key
 	 * lives in a wp option for testing, and the call is synchronous (no SSE).
 	 */
+	/**
+	 * Keepalive callback for compose_freeform_tree: flushes whitespace to the
+	 * browser during slow GLM reasoning turns so Cloudflare doesn't 524. The
+	 * browser's fetch() buffers it; whitespace before the JSON body is valid
+	 * and ignored by JSON.parse. Must be called after output buffering is off
+	 * (ajax_freeform does that at the top).
+	 */
+	private function freeform_keepalive() {
+		return function () {
+			echo ' ';
+			@flush();
+		};
+	}
+
 	public function ajax_freeform() {
 		$this->check_auth();
 		// Keep stray PHP warnings (e.g. Elementor's font-awesome data manager on an
@@ -3793,6 +3807,13 @@ class PressGo_AI_Builder {
 		// prepend the response, response.json() throws, and the UI shows a generic
 		// "Network error during Pro mode compose". Mirrors ajax_chat().
 		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet,WordPress.PHP.NoSilencedErrors
+		// GLM-5.2 with reasoning can take 60-120s; Cloudflare 524s at 100s of
+		// silence. Allow enough PHP time and disable output buffering so keepalive
+		// whitespace (emitted during the compose call) reaches the browser through
+		// nginx + Cloudflare before the proxy timeout fires.
+		@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.IniSet
+		@ini_set( 'zlib.output_compression', '0' );
+		while ( ob_get_level() > 0 ) { @ob_end_clean(); }
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		// Visual editor drag/move reorder: a new top-level section order (pg-keys).
 		// Structural op — no message needed, handled before the build path.
@@ -4006,7 +4027,7 @@ class PressGo_AI_Builder {
 		// page not opted out) — not generated blind then repainted.
 		$brand_block = $this->brand_prompt_block( $post_id );
 		if ( '' !== $brand_block ) { $framed = $brand_block . $framed; }
-		$composed = $this->compose_freeform_tree( $system, $framed );
+		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive() );
 		if ( empty( $composed['tree'] ) ) {
 			wp_send_json_error( $composed['error'] ?? 'The composer did not return a valid section. Try rewording.', 422 );
 		}
@@ -4163,11 +4184,16 @@ class PressGo_AI_Builder {
 	 * (response_format json_object — render-validated at parity with Claude, ~4x
 	 * cheaper). Falls back to Claude on any failure or invalid output. Returns
 	 * ['tree'=>array,'model'=>string] or ['error'=>string].
+	 *
+	 * @param callable|null $keepalive fn() called periodically during the GLM
+	 *                                 stream so the caller can flush keepalive
+	 *                                 bytes to the browser (prevents Cloudflare
+	 *                                 524 on slow reasoning turns).
 	 */
-	public function compose_freeform_tree( $system, $framed ) {
+	public function compose_freeform_tree( $system, $framed, $keepalive = null ) {
 		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
 		if ( '' !== $or_key ) {
-			$tree = self::glm_compose( $or_key, $system, $framed );
+			$tree = self::glm_compose( $or_key, $system, $framed, $keepalive );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
@@ -4186,23 +4212,78 @@ class PressGo_AI_Builder {
 		return $tree;
 	}
 
-	private static function glm_compose( $key, $system, $framed ) {
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
-			'timeout' => 240, // GLM reasons; big sections can take 60-100s
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
-			'body'    => wp_json_encode( array(
-				'model'           => 'z-ai/glm-5.2',
-				'max_tokens'      => 12000,
-				'response_format' => array( 'type' => 'json_object' ), // forces valid JSON, tames runaway reasoning
-				'messages'        => array(
-					array( 'role' => 'system', 'content' => $system ),
-					array( 'role' => 'user',   'content' => $framed ),
-				),
-			) ),
+	/**
+	 * GLM-5.2 compose via OpenRouter. Uses cURL with streaming so a $keepalive
+	 * callback can flush whitespace to the browser during slow reasoning turns
+	 * (prevents Cloudflare 524 at 100s of silence). Without $keepalive, falls
+	 * back to a simple wp_remote_post (CLI / harness paths).
+	 */
+	private static function glm_compose( $key, $system, $framed, $keepalive = null ) {
+		$body = wp_json_encode( array(
+			'model'           => 'z-ai/glm-5.2',
+			'max_tokens'      => 12000,
+			'response_format' => array( 'type' => 'json_object' ),
+			'stream'          => true,
+			'messages'        => array(
+				array( 'role' => 'system', 'content' => $system ),
+				array( 'role' => 'user',   'content' => $framed ),
+			),
 		) );
-		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
-		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
-		return self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
+
+		// Non-keepalive path: simple blocking request (CLI / harness).
+		if ( ! $keepalive ) {
+			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+				'timeout' => 240,
+				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+				'body'    => $body,
+			) );
+			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+			return self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
+		}
+
+		// Keepalive path: cURL streaming, assemble SSE chunks into the full JSON.
+		$accumulated = '';
+		$ch = curl_init( 'https://openrouter.ai/api/v1/chat/completions' );
+		curl_setopt_array( $ch, array(
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => $body,
+			CURLOPT_HTTPHEADER     => array(
+				'Content-Type: application/json',
+				'Authorization: Bearer ' . $key,
+			),
+			CURLOPT_RETURNTRANSFER => false,
+			CURLOPT_HEADER         => false,
+			CURLOPT_TIMEOUT        => 240,
+			CURLOPT_CONNECTTIMEOUT => 10,
+			CURLOPT_WRITEFUNCTION  => function ( $ch, $chunk ) use ( &$accumulated, $keepalive ) {
+				$accumulated .= $chunk;
+				// Each SSE chunk is a keepalive signal — flush whitespace to the
+				// browser so Cloudflare sees traffic and doesn't 524.
+				$keepalive();
+				return strlen( $chunk );
+			},
+		) );
+		$ok  = curl_exec( $ch );
+		$err = curl_error( $ch );
+		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+
+		if ( ! $ok || $err || 200 !== (int) $status ) { return null; }
+
+		// Parse the SSE stream: extract content deltas from data: lines.
+		$content = '';
+		$lines = preg_split( "/\r?\n/", $accumulated );
+		foreach ( $lines as $line ) {
+			if ( 0 !== strpos( $line, 'data: ' ) ) { continue; }
+			$json = trim( substr( $line, 6 ) );
+			if ( '[DONE]' === $json ) { break; }
+			$evt = json_decode( $json, true );
+			if ( ! is_array( $evt ) ) { continue; }
+			$delta = $evt['choices'][0]['delta']['content'] ?? '';
+			if ( is_string( $delta ) && '' !== $delta ) { $content .= $delta; }
+		}
+		return self::extract_section_json( $content );
 	}
 
 	private static function claude_compose( $key, $system, $framed ) {
