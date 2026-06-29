@@ -1324,6 +1324,23 @@ class PressGo_AI_Builder {
 		return array( 'note' => $note, 'chips' => $chips );
 	}
 
+	/** The whole-page vs section-by-section fork shown right after the hero. */
+	private function build_mode_envelope() {
+		return array(
+			'needs_discovery' => true,
+			'mode'            => 'build_mode',
+			'stage'           => 'build_mode',
+			'question'        => 'Want me to build out the whole page now, or go section by section so you can steer each one?',
+			'chips'           => array(
+				array( 'label' => 'Build the whole page', 'value' => 'whole' ),
+				array( 'label' => 'Section by section', 'value' => 'sections' ),
+			),
+			'allow_freetext'  => true,
+			'freetext_hint'   => '…or just tell me what to add',
+			'preview_bust'    => time(),
+		);
+	}
+
 	/**
 	 * The ordered "build the whole page" plan: a curated core set for the goal,
 	 * always ending on a dedicated call-to-action (the form/booking lives there,
@@ -2755,22 +2772,11 @@ class PressGo_AI_Builder {
 			// One fork before we keep going: build the whole page now, or steer it
 			// section by section. (The client renders these chips; the panel + preview
 			// still refresh because brand_synced rides along.)
-			return array(
-				'note'            => 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent.',
-				'brand_synced'    => true,
-				'brand'           => $f,
-				'preview_bust'    => time(),
-				'needs_discovery' => true,
-				'mode'            => 'build_mode',
-				'stage'           => 'build_mode',
-				'question'        => 'Want me to build out the whole page now, or go section by section so you can steer each one?',
-				'chips'           => array(
-					array( 'label' => 'Build the whole page', 'value' => 'whole' ),
-					array( 'label' => 'Section by section', 'value' => 'sections' ),
-				),
-				'allow_freetext'  => true,
-				'freetext_hint'   => '…or just tell me what to add',
-			);
+			$env                 = $this->build_mode_envelope();
+			$env['note']         = 'Locked in. That palette and ' . $palette['fonts']['heading'] . ' are your site brand now, so every page stays consistent.';
+			$env['brand_synced'] = true;
+			$env['brand']        = $f;
+			return $env;
 		}
 
 		// recolor / refont / typed tweak -> rebuild just the hero and re-confirm.
@@ -4059,6 +4065,20 @@ class PressGo_AI_Builder {
 			$dstate['built_keys']   = array( 'hero' ); // the hero is on the page now
 			$this->save_discovery_state( $post_id, $dstate );
 			wp_send_json_success( $this->brand_confirm_envelope( $palette, count( $elements ) ) );
+		}
+
+		// Brand already locked (a prior page set the site brand) so we skipped the
+		// lock step — but this is still the first section, so offer the same fork:
+		// build the whole page, or go section by section. (Without this, an
+		// already-branded page jumped straight to suggestions with no "build it all".)
+		if ( $was_first && is_array( $dstate ) && $this->brand_is_locked( $post_id ) ) {
+			$d2 = $this->discovery_state( $post_id );
+			if ( ! is_array( $d2 ) ) { $d2 = $dstate; }
+			$d2['built_keys'] = array( 'hero' );
+			$this->save_discovery_state( $post_id, $d2 );
+			$env         = $this->build_mode_envelope();
+			$env['note'] = 'Built your hero (' . count( $elements ) . ' on the page now).';
+			wp_send_json_success( $env );
 		}
 
 		// Record what we just built and suggest the next sections, so the wizard
