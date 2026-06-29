@@ -974,10 +974,16 @@ class PressGo_AI_Builder {
 			$answers['goal']       = $g;
 			$answers['goal_label'] = $this->goal_cta_phrase( $g );
 		}
+		// Build the SAME business as the rest of the site (from the master profile),
+		// not the page-2 message — that's the page's purpose, kept separately.
+		$business = ! empty( $master['business'] ) ? $master['business'] : trim( (string) $message );
 		return array(
 			'branch'          => 'reuse',
 			'answers'         => $answers,
-			'business'        => trim( (string) $message ),
+			'business'        => $business,
+			'page_intent'     => trim( (string) $message ),
+			'voice'           => ! empty( $master['voice'] ) ? $master['voice'] : '',
+			'site_headline'   => ! empty( $master['site_headline'] ) ? $master['site_headline'] : '',
 			'industry_guess'  => ! empty( $master['industry'] ) ? $master['industry'] : '',
 			'location'        => ! empty( $master['location'] ) ? $master['location'] : $this->infer_location_from_message( $message ),
 			'audience'        => ! empty( $master['audience'] ) ? $master['audience'] : '',
@@ -1194,6 +1200,11 @@ class PressGo_AI_Builder {
 		$a     = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
 		$parts = array();
 		if ( ! empty( $state['business'] ) ) { $parts[] = trim( $state['business'] ); }
+		// Page 2+: this is a NEW page for the SAME business — keep its identity + voice
+		// consistent and don't reinvent the company.
+		if ( ! empty( $state['page_intent'] ) ) { $parts[] = 'This specific page is: ' . trim( $state['page_intent'] ) . ' (for the SAME business — keep the company, name, and positioning consistent with the rest of the site).'; }
+		if ( ! empty( $state['site_headline'] ) ) { $parts[] = 'The site\'s positioning/tagline is "' . $state['site_headline'] . '" — stay consistent with it.'; }
+		if ( ! empty( $state['voice'] ) ) { $parts[] = 'Brand voice: ' . $state['voice'] . '.'; }
 		if ( ! empty( $a['goal_label'] ) )   { $parts[] = 'Primary goal: get visitors to ' . $a['goal_label'] . '.'; }
 		if ( ! empty( $a['industry'] ) && 'other' !== $a['industry'] ) { $parts[] = 'Industry: ' . $this->industry_label( $a['industry'] ) . '.'; }
 		if ( ! empty( $state['location'] ) ) { $parts[] = 'Location: ' . $state['location'] . '.'; }
@@ -2697,6 +2708,10 @@ class PressGo_AI_Builder {
 			// Master profile: the site-level discovery memory every later page reuses
 			// so it collapses to "same brand? -> what's this page for? -> build".
 			$a = isset( $state['answers'] ) && is_array( $state['answers'] ) ? $state['answers'] : array();
+			// Capture the BUSINESS IDENTITY too (not just the visual brand) so page 2
+			// builds the same company with the same voice instead of reinventing it.
+			$ff = $this->ff_sections( $post_id );
+			$site_headline = ( ! empty( $ff[0]['source_tree'] ) ) ? $this->tree_headline( $ff[0]['source_tree'] ) : '';
 			$this->merge_master_profile( array(
 				'industry'           => isset( $a['industry'] ) ? $a['industry'] : '',
 				'vibe'               => isset( $a['vibe'] ) ? $a['vibe'] : '',
@@ -2704,6 +2719,9 @@ class PressGo_AI_Builder {
 				'default_goal'       => isset( $a['goal'] ) ? $a['goal'] : '',
 				'location'           => isset( $state['location'] ) ? $state['location'] : '',
 				'audience'           => isset( $state['audience'] ) ? $state['audience'] : '',
+				'business'           => isset( $state['business'] ) ? $state['business'] : '',
+				'voice'              => $this->vibe_voice( isset( $a['vibe'] ) ? $a['vibe'] : '' ),
+				'site_headline'      => $site_headline,
 				'palette_locked'     => true,
 				'discovery_complete' => true,
 			) );
