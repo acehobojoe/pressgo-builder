@@ -3815,6 +3815,11 @@ class PressGo_AI_Builder {
 		// nginx + Cloudflare before the proxy timeout fires.
 		@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.IniSet
 		@ini_set( 'zlib.output_compression', '0' );
+		// nginx buffers FastCGI output by default, which holds the keepalive
+		// whitespace until the response ends -> Cloudflare sees 100s of silence and
+		// 524s on a long GLM turn. This header makes nginx stream the bytes through
+		// immediately (honored per-response even when fastcgi_buffering is on).
+		if ( ! headers_sent() ) { header( 'X-Accel-Buffering: no' ); }
 		while ( ob_get_level() > 0 ) { @ob_end_clean(); }
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		// Visual editor drag/move reorder: a new top-level section order (pg-keys).

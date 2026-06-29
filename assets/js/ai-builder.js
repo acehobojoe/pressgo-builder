@@ -1221,8 +1221,21 @@
 		section: ['Planning the section…', 'Matching your brand…', 'Choosing the right layout…', 'Writing the copy…', 'Finding imagery…', 'Putting it together…', 'Polishing the details…', 'Almost there…'],
 		recolor: ['Rethinking the look…', 'Trying a fresh palette and type…', 'Rewriting to fit…', 'Rebuilding your hero…', 'Polishing the details…', 'Almost there…'],
 		cohesion: ['Stepping back to look at your whole page…', 'Reading the flow, section by section…', 'Finding a smarter order…', 'Balancing the dark and light so it all flows…', 'Recoloring each section to stay readable…', 'Putting it back together…', 'Checking it all reads well…', 'Almost there…'],
+		edit:    ['Finding that section…', 'Reworking it in place…', 'Keeping the rest untouched…', 'Applying your change…', 'Polishing the details…', 'Almost there…'],
+		chat:    ['Thinking…', 'Looking at your page…', 'Weighing it up…', 'Gathering my thoughts…'],
 		quick:   ['Thinking…']
 	};
+	// Pick a thinking-caption set that matches what the user actually asked, so the
+	// status reads true to the request (an edit/chat shouldn't say "building").
+	function freeformThinkKind(text) {
+		var t = (text || '').toLowerCase();
+		if (/\b(make .*(flow|cohesive)|flow better|re-?organi|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this) up|smart order)\b/.test(t)) return 'cohesion';
+		if (/^\s*(undo|put it back|revert|no\b|nope|nah|not that|stop|wait|hold on|never ?mind|forget)/.test(t)) return 'quick';
+		if (/\?\s*$/.test(text) || /^(what|how|why|should|could|would|which|is it|are there|do you|any\b)/.test(t)) return 'chat';
+		if (/\b(not sure|thoughts?|suggest|recommend|ideas?|feels? (off|basic|flat|empty)|too (plain|basic)|make it pop|more (energy|modern|premium)|cleaner|something more)\b/.test(t)) return 'chat';
+		if (!/\badd\b/.test(t) && /\b(make|change|update|recolou?r|rewrite|reword|swap|rename|move|replace|edit|tweak|adjust|fix|shorten|lengthen|bigger|smaller|darker|lighter|bolder|brighter|cleaner|shorter|longer|should be)\b/.test(t)) return 'edit';
+		return 'section';
+	}
 	function makeThinking(steps) {
 		var node = document.createElement('div');
 		node.className = 'pg-thinking';
@@ -1491,9 +1504,7 @@
 		chatStarted = true;
 		input.value = '';
 		var fields = { message: text };
-		var kind = 'section'; // a typed message outside discovery composes a section
-		if (/\b(make .*(flow|cohesive)|flow better|re-?organi|fix the order|redo the order|balance the colou?rs?|tidy (it|this) up|clean (it|this) up|smart order)\b/i.test(text)) kind = 'cohesion';
-		else if (/^\s*(undo|put it back|revert)\b/i.test(text)) kind = 'quick';
+		var kind = freeformThinkKind(text); // status caption matches the request intent
 		// Typed answer during an interview: route it into the awaited stage so it
 		// lands in the same slot a chip tap would (server parses the text).
 		if (currentDiscoveryStage) {
