@@ -326,7 +326,7 @@ class PressGo_Freeform_Renderer {
 	// ───────────────────────────────────────────────────────────────────
 
 	private static function render_heading( $s, $cfg ) {
-		$text = isset( $s['text'] ) ? $s['text'] : '';
+		$text = isset( $s['text'] ) ? self::strip_dashes( $s['text'] ) : '';
 		$tag  = isset( $s['tag'] ) ? $s['tag'] : 'h2';
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
 		$color = isset( $s['color'] ) ? $s['color'] : null;
@@ -365,7 +365,7 @@ class PressGo_Freeform_Renderer {
 	}
 
 	private static function render_text( $s, $cfg ) {
-		$html  = isset( $s['html'] ) ? $s['html'] : ( isset( $s['text'] ) ? $s['text'] : '' );
+		$html  = isset( $s['html'] ) ? self::strip_dashes( $s['html'] ) : ( isset( $s['text'] ) ? self::strip_dashes( $s['text'] ) : '' );
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
 		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
@@ -404,12 +404,17 @@ class PressGo_Freeform_Renderer {
 
 	private static function render_image( $s, $cfg ) {
 		$src    = isset( $s['src'] ) ? $s['src'] : '';
-		$alt    = isset( $s['alt'] ) ? $s['alt'] : '';
-		$radius = isset( $s['radius'] ) && is_numeric( $s['radius'] ) ? (int) $s['radius'] : 0;
+		$alt    = isset( $s['alt'] ) ? self::strip_dashes( $s['alt'] ) : '';
+		$radius = isset( $s['radius'] ) && is_numeric( $s['radius'] ) ? (int) $s['radius'] : 12;
 		$shadow = ! empty( $s['shadow'] );
 		$align  = isset( $s['align'] ) ? $s['align'] : 'center';
 		$width  = isset( $s['width'] ) && is_numeric( $s['width'] ) ? (int) $s['width'] : null;
-		return PressGo_Widget_Helpers::image_w( $src, $alt, $width, $radius, $shadow, $align );
+		$w      = PressGo_Widget_Helpers::image_w( $src, $alt, $width, $radius, $shadow, $align );
+		// Tag images with a cover class so the page-level CSS gives them a
+		// consistent aspect ratio (prevents staggered card grids).
+		$cls = isset( $w['settings']['_css_classes'] ) ? $w['settings']['_css_classes'] : '';
+		$w['settings']['_css_classes'] = '' !== $cls ? $cls . ' pg-img-cover' : 'pg-img-cover';
+		return $w;
 	}
 
 	private static function render_spacer( $s ) {
@@ -669,13 +674,30 @@ class PressGo_Freeform_Renderer {
 	// ───────────────────────────────────────────────────────────────────
 
 	/**
+	 * Renderer-side em/en-dash safety net. The prompt forbids them (rule 6) but
+	 * LLMs still emit them. Replace " — " / " – " with ", " (comma) and bare
+	 * em/en dashes with "-" (hyphen). Also handles the HTML entities. This runs
+	 * on every heading and text string before it reaches the widget helper, so
+	 * no dash ever ships to the page regardless of what the composer returns.
+	 */
+	private static function strip_dashes( $text ) {
+		if ( ! is_string( $text ) || '' === $text ) { return $text; }
+		// HTML entities first (wp_kses_post on text blocks can leave these).
+		$text = str_replace( array( '&#8212;', '&#x2014;', '&mdash;', '&#8211;', '&#x2013;', '&ndash;' ), array( '—', '—', '—', '–', '–', '–' ), $text );
+		// Spaced em/en dash -> comma (the natural prose replacement).
+		$text = str_replace( array( ' — ', ' – ', "\xe2\x80\x94 ", " \xe2\x80\x94", "\xe2\x80\x93 ", " \xe2\x80\x93" ), ', ', $text );
+		// Any remaining bare em/en dash -> hyphen.
+		$text = str_replace( array( '—', '–', "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
+		return $text;
+	}
+
+	/**
 	 * Map common Font Awesome 6 glyph names to their FA5 equivalents. Elementor
 	 * bundles FA5, so FA6-only names (fa-xmark, fa-shield-halved, ...) render to
 	 * NOTHING and trip PHP warnings in Elementor's icon data manager. Unmapped
 	 * names pass through (the display_errors guard catches their warnings).
 	 */
-	private static function normalize_icon( $icon ) {
-		if ( ! is_string( $icon ) || '' === $icon ) { return $icon; }
+	private static function normalize_icon( $icon ) {		if ( ! is_string( $icon ) || '' === $icon ) { return $icon; }
 		static $map = array(
 			'fa-xmark'                  => 'fa-times',
 			'fa-circle-xmark'           => 'fa-times-circle',

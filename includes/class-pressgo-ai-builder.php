@@ -103,6 +103,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
+		add_action( 'wp_head',                         array( $this, 'freeform_page_css' ), 20 );
 	}
 
 	/**
@@ -131,6 +132,21 @@ class PressGo_AI_Builder {
 		$url = 'https://fonts.googleapis.com/css2?' . str_replace( '%20', '+', implode( '&', $parts ) ) . '&display=swap';
 		echo "\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n";
 		echo '<link rel="stylesheet" href="' . esc_url( $url ) . '" />' . "\n";
+	}
+
+	/**
+	 * Inject page-level CSS for freeform pages: consistent image aspect ratios
+	 * (prevents staggered card grids when Pexels photos have varying dimensions)
+	 * and equal-height card columns. Scoped to PressGo freeform pages only.
+	 */
+	public function freeform_page_css() {
+		if ( ! is_singular() ) { return; }
+		$post_id = get_queried_object_id();
+		if ( ! $post_id || ! get_post_meta( $post_id, self::META_FF_SECTIONS, true ) ) { return; }
+		echo "\n<style>\n"
+			. ".pg-img-cover img { aspect-ratio: 3/2; object-fit: cover; width: 100%; height: auto; }\n"
+			. ".pg-sec--freeform .e-child.e-con { align-self: stretch; }\n"
+			. "</style>\n";
 	}
 
 	/**
@@ -4265,8 +4281,18 @@ class PressGo_AI_Builder {
 		if ( $has_form ) { $L[] = 'A lead-capture form ALREADY EXISTS on this page. Do NOT add another form, newsletter signup, or contact section unless the user explicitly asks for one this turn — route any CTA to the existing goal.'; }
 		$L[] = 'SECTIONS ALREADY ON THE PAGE (in order, your new one is appended after):';
 		foreach ( $sections as $i => $s ) {
-			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ( $s['has_form'] ? ' — has a form' : '' );
+			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ' — layout: ' . ( $s['layout'] ?? 'centered' ) . ( $s['has_form'] ? ' — has a form' : '' );
 		}
+		$last_layout = $sections[ count( $sections ) - 1 ]['layout'] ?? '';
+		if ( '' !== $last_layout ) {
+			$L[] = 'The last section used the "' . $last_layout . '" layout family. Your new section MUST use a DIFFERENT family (split, grid, stat-band, or quote — not ' . $last_layout . ').';
+		}
+		$has_split = false; $has_stat = false;
+		foreach ( $sections as $s ) {
+			if ( 'split' === ( $s['layout'] ?? '' ) ) { $has_split = true; }
+			if ( 'grid' === ( $s['layout'] ?? '' ) ) { $has_stat = true; } // grids count as stat-eligible for variety
+		}
+		if ( ! $has_split && count( $sections ) >= 2 ) { $L[] = 'REQUIREMENT: this page still needs an asymmetric image+text split — use one for this section.'; }
 		if ( '' !== $next ) { $L[] = 'NEXT LOGICAL SECTION for this page: ' . $next . '. Do NOT repeat a section type already present.'; }
 		$L[] = '=== END PAGE STATE — now compose ONE section continuing this exact business, palette, and goal. ===';
 		return implode( "\n", $L ) . "\n\n";
@@ -4291,10 +4317,51 @@ class PressGo_AI_Builder {
 				'has_form' => $has_form,
 				// The first section of a page is always the hero.
 				'type'     => ( 0 === $i ) ? 'hero' : self::ff_infer_type( strtolower( $headline ), $has_form ),
+				'layout'   => self::ff_infer_layout( $node ),
 			);
 			$i++;
 		}
 		return $out;
+	}
+
+	/** Infer the layout family of a top-level section from its Elementor structure. */
+	private static function ff_infer_layout( $node ) {
+		$rows = array();
+		self::ff_collect_rows( $node, $rows );
+		$max_cols = 0;
+		$has_asym = false;
+		foreach ( $rows as $r ) {
+			$cols = isset( $r['elements'] ) && is_array( $r['elements'] ) ? count( $r['elements'] ) : 0;
+			if ( $cols > $max_cols ) { $max_cols = $cols; }
+			if ( $cols >= 2 ) {
+				$widths = array();
+				foreach ( ( $r['elements'] ?? array() ) as $c ) {
+					$w = isset( $c['settings']['width']['size'] ) ? (float) $c['settings']['width']['size'] : 0;
+					if ( $w > 0 ) { $widths[] = $w; }
+				}
+				if ( count( $widths ) >= 2 ) {
+					sort( $widths );
+					if ( abs( $widths[0] - $widths[ count( $widths ) - 1 ] ) > 10 ) { $has_asym = true; }
+				}
+			}
+		}
+		if ( $has_asym ) { return 'split'; }
+		if ( $max_cols >= 3 ) { return 'grid'; }
+		if ( 2 === $max_cols ) { return 'split'; }
+		return 'centered';
+	}
+
+	private static function ff_collect_rows( $node, &$out ) {
+		if ( ! is_array( $node ) ) { return; }
+		if ( isset( $node['elType'] ) && 'container' === $node['elType'] ) {
+			$s = isset( $node['settings'] ) && is_array( $node['settings'] ) ? $node['settings'] : array();
+			if ( isset( $s['flex_direction'] ) && 'row' === $s['flex_direction'] ) {
+				$out[] = $node;
+			}
+		}
+		foreach ( ( $node['elements'] ?? array() ) as $c ) {
+			if ( is_array( $c ) ) { self::ff_collect_rows( $c, $out ); }
+		}
 	}
 
 	/** Best section headline: prefer the first h1, then h2, then any heading (skips small eyebrows). */
