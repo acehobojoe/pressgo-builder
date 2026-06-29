@@ -4236,6 +4236,14 @@ class PressGo_AI_Builder {
 		if ( '' !== $selected_key ) { return false; }
 		$m = strtolower( trim( $message ) );
 
+		// A direct build command: imperative verb at the start, or "can you add X"
+		// phrased as a polite request. "Add a testimonials section", "Make the hero
+		// darker", "Can you add pricing?" — all are build commands. But NOT "What
+		// should I add?" or "How about adding pricing?" — those are questions.
+		$is_imperative_build = (bool) preg_match( '/^(add|build|create|make|insert|put|give me|design|compose|generate)\b/i', $m );
+		$is_polite_build = (bool) preg_match( '/^can you (add|build|create|make|insert|put|design|generate)\b.{0,30}\b(section|gallery|form|hero|pricing|faq|testimonial|feature|cta|map|grid|band|card)\b/i', $m );
+		if ( $is_imperative_build || $is_polite_build ) { return false; }
+
 		// Explicit questions.
 		if ( preg_match( '/^(what|how|why|should|can|could|would|do you|is it|are there|what if|what about|how about)\b/i', $m ) ) { return true; }
 		// Ends with a question mark.
@@ -4244,9 +4252,8 @@ class PressGo_AI_Builder {
 		if ( preg_match( '/\b(not sure|thinking about|considering|wondering|idea|ideas|suggest|recommend|advice|opinion|thoughts?|feel like|seems (off|wrong|weird|basic)|too (plain|simple|basic|empty|much)|missing something|what else|what next|which (sections?|order|layout|colors?|fonts?|vibe))\b/i', $m ) ) { return true; }
 		// "I like it but..." / "I want something more..." — feedback that needs discussion.
 		if ( preg_match( '/\b(i like|i love|looks good|nice|great).{0,30}\b(but|however|except|though|wish|want|need)\b/i', $m ) ) { return true; }
-		// Short messages with no build verb are probably conversational.
-		$has_build_verb = (bool) preg_match( '/\b(add|build|create|make|insert|put|give me|design|compose|generate)\b/i', $m );
-		if ( ! $has_build_verb && mb_strlen( $m ) < 80 ) { return true; }
+		// Short messages with no build verb at the start are probably conversational.
+		if ( mb_strlen( $m ) < 80 ) { return true; }
 
 		return false;
 	}
@@ -4282,6 +4289,11 @@ class PressGo_AI_Builder {
 		if ( '' === $text ) {
 			$text = "I'm having trouble thinking right now. Try telling me what to build and I'll get right on it.";
 		}
+		// Strip em/en dashes from chat replies too (the prompt says zero, but
+		// GLM still emits them). Same logic as the renderer's strip_dashes.
+		$text = str_replace( array( '&#8212;', '&#x2014;', '&mdash;', '&#8211;', '&#x2013;', '&ndash;' ), array( "\xe2\x80\x94", "\xe2\x80\x94", "\xe2\x80\x94", "\xe2\x80\x93", "\xe2\x80\x93", "\xe2\x80\x93" ), $text );
+		$text = str_replace( array( " \xe2\x80\x94 ", " \xe2\x80\x93 " ), ', ', $text );
+		$text = str_replace( array( "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
 
 		// Don't auto-append the generic chip list after a chat reply. The reply
 		// itself either made a specific recommendation (which the generic chips
