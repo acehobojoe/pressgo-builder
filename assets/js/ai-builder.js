@@ -1438,14 +1438,23 @@
 			var b = document.createElement('button');
 			b.type = 'button';
 			var isFlow = (c.key === 'cohesion');
-			b.textContent = isFlow ? '✨ ' + c.label : '+ ' + c.label;
+			var isNoop = (c.op === 'continue' || c.request === '__noop');
+			// Clarify chips are choices (a question), not "+ add a section" actions —
+			// no "+" prefix. The no-op "let me type" chip is a neutral escape.
+			var prefix = isNoop ? '✍️ ' : (isFlow ? '✨ ' : (s.clarify ? '' : '+ '));
+			b.textContent = prefix + c.label;
 			b.className = 'pg-suggest-chip' + (isFlow ? ' pg-suggest-flow' : '');
 			// The cohesion action is a different kind of thing than "add a section",
 			// so it gets a filled, accented pill that visibly stands apart.
 			b.style.cssText = isFlow
 				? 'border:none;background:linear-gradient(135deg,#5b4fff,#8b5cf6);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:700;box-shadow:0 2px 10px rgba(91,79,255,0.4);margin-right:2px;'
-				: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
+				: isNoop
+					? 'border:1px dashed #cbd5e1;background:#fff;color:#64748b;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;'
+					: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
 			b.addEventListener('click', function () {
+				// No-op "let me type something else": just clear the chips and hand the
+				// floor back to the input — never forces a build.
+				if (isNoop) { wrap.remove(); if (input) input.focus(); return; }
 				Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (x) {
 					x.disabled = true; x.style.cursor = 'default';
 					if (x !== b) x.style.opacity = '0.4';

@@ -3889,6 +3889,33 @@ class PressGo_AI_Builder {
 			if ( preg_match( '/^\s*(undo|put it back|revert|go back)\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_undo( $post_id ) );
 			}
+			// Decline / redirect: wave off the last idea and reopen the floor instead
+			// of forcing a build. Runs before any build/delete verb can grab it, and
+			// clears the pending recommendation so a stale "do it" can't re-fire.
+			if ( '' === $discovery_stage && ! $whole_page && $this->is_decline( $message ) ) {
+				delete_post_meta( $post_id, self::META_LAST_CHAT );
+				wp_send_json_success( array(
+					'chat_mode' => true,
+					'note'      => "Got it, scrapping that. What do you want to do instead? Tell me, or tap one.",
+					'suggest'   => $this->suggest_payload( $this->discovery_state( $post_id ) ),
+				) );
+			}
+			// Multi-intent "remove X and add Y": run the delete now, then let the add
+			// clause fall through to the build path (single request, no data lost).
+			if ( '' === $discovery_stage && ! $whole_page && preg_match( '/\b(and|then|also|plus)\b/i', $message )
+				&& preg_match( '/\b(remove|delete|get ?rid of|drop|lose|cut)\b/i', $message )
+				&& preg_match( '/\b(add|build|create|insert|need|want|put)\b/i', $message ) ) {
+				$clauses = array_values( array_filter( array_map( 'trim', preg_split( '/\b(?:and then|then|also|, and|and|but|plus)\b/i', $message ) ) ) );
+				$del = ''; $add = '';
+				foreach ( $clauses as $c ) {
+					if ( '' === $del && preg_match( '/\b(remove|delete|get ?rid of|drop|lose|cut)\b/i', $c ) ) { $del = $c; }
+					elseif ( '' === $add && preg_match( '/\b(add|build|create|insert|need|want|put)\b/i', $c ) ) { $add = $c; }
+				}
+				if ( '' !== $del && '' !== $add ) {
+					$this->cohesion_delete_section( $post_id, $del, $selected_key ); // delete now, don't return
+					$message = $add; // the rest of the cascade builds the add clause
+				}
+			}
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
 			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this) up|smart order|less cluttered|improve the (layout|design|look|flow))\b/i', $message ) ) {
@@ -4008,22 +4035,44 @@ class PressGo_AI_Builder {
 		//
 		// Affirmation after a recommendation ("do it", "can you do that?", "yes",
 		// "go ahead") should BUILD what was just discussed, not chat again.
+		// Edit-in-place from TEXT (no UI selection): "make the hero darker", "change
+		// the button to Book Now", "the headline should be bigger" resolve to an
+		// existing section and edit it, instead of composing a duplicate. Only fires
+		// on a real change verb against a section that exists (a build request for a
+		// not-yet-built section falls through to compose).
+		$wants_new_section_msg = (bool) preg_match( '/\b(add|create|insert|build|new|another)\b.{0,40}\bsection\b/i', $message );
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && ! $wants_new_section_msg && $this->is_edit_intent( $message ) ) {
+			$edit_target = $this->resolve_edit_target( $post_id, $message, $selected_key );
+			if ( is_array( $edit_target ) ) {
+				wp_send_json_success( $this->scoped_edit_section( $post_id, $edit_target, $message ) );
+			}
+		}
+
 		$last_chat = (string) get_post_meta( $post_id, self::META_LAST_CHAT, true );
 		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && '' !== $last_chat && $this->is_affirmation( $message ) ) {
 			// Clear the chat context so the next "yes" doesn't re-trigger.
 			delete_post_meta( $post_id, self::META_LAST_CHAT );
 			// Build from the recommendation: the last chat reply IS the build request.
 			$message = $last_chat;
-		} elseif ( ! $page_empty && '' === $discovery_stage && ! $whole_page && $this->is_conversational( $message, $selected_key ) ) {
-			$reply = $this->freeform_chat( $post_id, $message, $brief );
-			// Store the reply so a follow-up "do it" can build it.
-			update_post_meta( $post_id, self::META_LAST_CHAT, wp_slash( $reply['text'] ) );
-			wp_send_json_success( array(
-				'note'         => $reply['text'],
-				'preview_bust' => time(),
-				'chat_mode'    => true,
-				'suggest'      => $reply['suggest'] ?? null,
-			) );
+		} elseif ( ! $page_empty && '' === $discovery_stage && ! $whole_page ) {
+			// Three-state intent. The default is CLARIFY (a question + chips), NOT a
+			// blind compose — that's the core "stop force-building" fix. Only
+			// build_high falls through to compose a new section below.
+			$cls = $this->classify_message( $message, $selected_key );
+			if ( 'chat' === $cls ) {
+				$reply = $this->freeform_chat( $post_id, $message, $brief );
+				update_post_meta( $post_id, self::META_LAST_CHAT, wp_slash( $reply['text'] ) );
+				wp_send_json_success( array(
+					'note'         => $reply['text'],
+					'preview_bust' => time(),
+					'chat_mode'    => true,
+					'suggest'      => $reply['suggest'] ?? null,
+				) );
+			}
+			if ( 'clarify' === $cls ) {
+				wp_send_json_success( $this->clarify_envelope( $post_id, $message ) );
+			}
+			// 'build_high' falls through to compose a new section.
 		}
 
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
@@ -4256,6 +4305,123 @@ class PressGo_AI_Builder {
 		if ( mb_strlen( $m ) < 80 ) { return true; }
 
 		return false;
+	}
+
+	/**
+	 * Decline / redirect: "no", "not that", "stop", "never mind", "forget that",
+	 * "actually let's...". Power users need to wave off the last idea and reopen
+	 * the floor instead of having a build forced on them. Runs early so a leading
+	 * "no" isn't grabbed by a downstream build verb.
+	 */
+	private function is_decline( $message ) {
+		return (bool) preg_match( '/^\s*(no\b|nope|nah|not that|not really|stop|wait|hold on|cancel|never ?mind|forget (it|that|the|about)|scrap (it|that)|actually,?\s+(let\'?s|can we|i|maybe)|instead\b)/i', (string) $message );
+	}
+
+	/**
+	 * An explicit EDIT command (change verb) on an existing section, as opposed to
+	 * a build, a question, or vague feedback. Used with resolve_edit_target() so
+	 * "make the hero darker" edits the hero in place instead of appending a
+	 * duplicate dark section. Questions are never edits.
+	 */
+	private function is_edit_intent( $message ) {
+		$m = strtolower( trim( (string) $message ) );
+		if ( '?' === substr( $m, -1 ) ) { return false; }
+		if ( preg_match( '/^(what|how|why|should|could|would|do you|is it|are there|which|does|can i)\b/', $m ) ) { return false; }
+		return (bool) preg_match( '/\b(make|change|update|recolou?r|rewrite|reword|swap|rename|move|replace|edit|tweak|adjust|fix|shorten|lengthen|bigger|smaller|larger|darker|lighter|bolder|brighter|punchier|cleaner|shorter|longer|tighten|differently|should be)\b/i', $m );
+	}
+
+	/**
+	 * Resolve which EXISTING section an edit refers to from the message text (no UI
+	 * selection needed): "make the hero darker" -> the hero record, "change the
+	 * button" -> the CTA record. Returns a record (with source_tree) or null. Only
+	 * matches sections that actually exist on the page, so a build request that
+	 * names a not-yet-built section ("I need a gallery") falls through to compose.
+	 */
+	private function resolve_edit_target( $post_id, $message, $selected_key = '' ) {
+		if ( '' !== $selected_key ) { return $this->ff_record_by_key( $post_id, $selected_key ); }
+		$m    = strtolower( (string) $message );
+		$recs = $this->ff_sections( $post_id );
+		if ( empty( $recs ) ) { return null; }
+		$map = array(
+			'hero|headline|title|banner'                 => 'hero',
+			'button|cta|call to action'                  => 'cta',
+			'pricing|plans?|price'                       => 'pricing',
+			'faq|questions?'                             => 'faq',
+			'gallery|photos|images'                      => 'gallery',
+			'reviews?|testimonials?|social proof'        => 'proof',
+			'team|staff|about us|about'                  => 'about',
+			'services?|features?|benefits?'              => 'features',
+			'steps|how it works|process'                 => 'steps',
+		);
+		foreach ( $map as $pat => $role ) {
+			if ( preg_match( '/\b(' . $pat . ')\b/i', $m ) ) {
+				foreach ( $recs as $r ) {
+					if ( ( $r['semantic_role'] ?? '' ) === $role && ! empty( $r['source_tree'] ) ) { return $r; }
+				}
+			}
+		}
+		// "that section / this one / it" with no noun -> the most-recently built.
+		if ( preg_match( '/\b(that|this|it)\b.{0,20}\b(section|one)\b/i', $m ) ) {
+			$last = end( $recs );
+			return ! empty( $last['source_tree'] ) ? $last : null;
+		}
+		return null;
+	}
+
+	/**
+	 * Vague feedback ("make it pop", "cleaner", "more energy") with no concrete
+	 * section noun. These must never compose a brand-new section (the old
+	 * verb-at-start heuristic built junk for "make it pop"); route to CLARIFY.
+	 */
+	private function is_vague_feedback( $message ) {
+		$m = strtolower( trim( (string) $message ) );
+		if ( preg_match( '/\b(section|hero|button|pricing|faq|gallery|reviews?|testimonials?|cta|map|features?|services?|footer|header|form|team|menu)\b/', $m ) ) { return false; }
+		return (bool) preg_match( '/\b(pop|punchier|crisper|sleeker|fresher|bolder|nicer|snappier|more (energy|modern|professional|premium|life|punch|pop)|less (boring|plain|generic)|too (plain|basic|boring|generic)|feels? (off|basic|flat|empty|plain|generic)|something more|something better)\b/i', $m );
+	}
+
+	/**
+	 * Three-state intent for a populated page (after edit/decline/affirmation have
+	 * had their shot): 'build_high' (build verb + concrete section noun -> compose),
+	 * 'chat' (question/brainstorm/meta -> text reply), or 'clarify' (vague feedback,
+	 * a build verb with no noun, or anything uncertain). CLARIFY is the new safe
+	 * default in place of the old "compose a brand-new section" fallthrough.
+	 */
+	private function classify_message( $message, $selected_key ) {
+		$m    = strtolower( trim( (string) $message ) );
+		$core = preg_replace( '/^(just|please|ok|okay|so|now|can you|could you|i\'?d like to|i wanna|i want to|hey|alright|yeah)\s+/i', '', $m );
+		if ( $this->is_vague_feedback( $m ) ) { return 'clarify'; }
+		$build_verb = '(add|build|create|make|insert|put|give me|gimme|design|generate|compose|throw in|drop in|i need|i want|let\'?s add|set up|whip up|need|want)';
+		$noun       = '(section|hero|gallery|pricing|faq|form|testimonials?|reviews?|cta|map|features?|services?|band|grid|team|blank|contact|about|footer|header|menu|steps|benefits?|stats?|quote)';
+		if ( preg_match( '/\b' . $build_verb . '\b.{0,40}\b' . $noun . '\b/i', $core ) ) { return 'build_high'; }
+		// A real question ("what should I add next?", "which layout works?") is CHAT
+		// even though it contains a build verb — checked before verb-without-noun.
+		$is_question = ( '?' === substr( trim( $m ), -1 ) ) || preg_match( '/^(what|how|why|should|could|would|do you|is it|are there|which|does|when|where|who|any)\b/', $m );
+		if ( $is_question ) { return 'chat'; }
+		if ( preg_match( '/\b' . $build_verb . '\b/i', $core ) ) { return 'clarify'; } // verb but no concrete noun
+		if ( $this->is_conversational( $message, $selected_key ) ) { return 'chat'; }
+		return 'clarify';
+	}
+
+	/**
+	 * The CLARIFY response: a one-line question plus tappable chips. Each chip's
+	 * `request` is a HIGH-confidence phrase, so a tap re-enters ajax_freeform and
+	 * lands deterministically on BUILD/EDIT. A "let me type something else" no-op
+	 * chip lets the user wave it off and write their own (the user's exact ask).
+	 */
+	private function clarify_envelope( $post_id, $message ) {
+		$chips = array();
+		$sug   = $this->suggest_payload( $this->discovery_state( $post_id ) );
+		if ( is_array( $sug ) && ! empty( $sug['chips'] ) ) {
+			foreach ( array_slice( $sug['chips'], 0, 3 ) as $c ) { $chips[] = $c; }
+		}
+		$chips[] = array( 'label' => 'Let me type something else', 'request' => '__noop', 'key' => 'noop', 'op' => 'continue' );
+		return array(
+			'chat_mode'    => true,
+			'clarify'      => true,
+			'note'         => "Want me to build something, tweak what's already there, or are we just talking it through? Tap one, or tell me more.",
+			'preview_bust' => time(),
+			'suggest'      => array( 'note' => null, 'clarify' => true, 'chips' => $chips ),
+		);
 	}
 
 	/**
