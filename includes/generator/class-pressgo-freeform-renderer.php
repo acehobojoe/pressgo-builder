@@ -273,6 +273,16 @@ class PressGo_Freeform_Renderer {
 		$s        = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
 		$children = self::render_children( $block, $cfg );
 
+		// Star ratings: the composer emits a run of `icon` blocks (e.g. 5x fas
+		// fa-star) inside a col, which stacks them VERTICALLY into a useless column.
+		// When every child is an icon, lay them out inline horizontally instead — and
+		// keep them horizontal on mobile (a rating should never wrap to a column).
+		$kids = isset( $block['children'] ) && is_array( $block['children'] ) ? $block['children'] : array();
+		$all_icons = count( $kids ) >= 2;
+		foreach ( $kids as $k ) {
+			if ( ! is_array( $k ) || ( isset( $k['type'] ) ? $k['type'] : '' ) !== 'icon' ) { $all_icons = false; break; }
+		}
+
 		$settings = array(
 			'container_type'   => 'flex',
 			'content_width'    => 'full',
@@ -280,6 +290,14 @@ class PressGo_Freeform_Renderer {
 			'flex_align_items' => self::map_content_align( isset( $s['content_align'] ) ? $s['content_align'] : 'left' ),
 			'flex_gap'         => array( 'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true ),
 		);
+
+		if ( $all_icons ) {
+			$settings['flex_direction']        = 'row';
+			$settings['flex_direction_mobile'] = 'row';
+			$settings['flex_wrap']             = 'nowrap';
+			$settings['flex_align_items']      = 'center';
+			$settings['flex_gap']              = array( 'unit' => 'px', 'column' => '6', 'row' => '6', 'isLinked' => true );
+		}
 
 		if ( isset( $s['gap'] ) && is_numeric( $s['gap'] ) ) {
 			$g = (int) $s['gap'];
@@ -313,14 +331,32 @@ class PressGo_Freeform_Renderer {
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
 		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : null;
-		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : '700';
+		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : null;
 		$ls    = isset( $s['letter_spacing'] ) && is_numeric( $s['letter_spacing'] ) ? (float) $s['letter_spacing'] : null;
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : null;
 		$tr    = isset( $s['transform'] ) ? $s['transform'] : null;
 		$size_mobile = isset( $s['size_mobile'] ) && is_numeric( $s['size_mobile'] ) ? (int) $s['size_mobile'] : null;
-		// Auto mobile size for big type if not given.
-		if ( null === $size_mobile && null !== $size && $size >= 28 ) {
-			$size_mobile = max( 22, (int) round( $size * 0.6 ) );
+		// Real typographic hierarchy by default. Without this, a composer that omits
+		// `size`/`weight` collapses every heading to the theme's single default — the
+		// "fonts aren't variable / flat" complaint. Defaults only fill what's unset.
+		$tagl = strtolower( (string) $tag );
+		$tag_size = array( 'h1' => 56, 'h2' => 40, 'h3' => 30, 'h4' => 24, 'h5' => 20, 'h6' => 13 );
+		if ( null === $size && isset( $tag_size[ $tagl ] ) ) { $size = $tag_size[ $tagl ]; }
+		if ( 'h6' === $tagl ) {
+			// h6 reads as an eyebrow/kicker: small, tracked-out, uppercase.
+			if ( null === $weight ) { $weight = '600'; }
+			if ( null === $tr )     { $tr = 'uppercase'; }
+			if ( null === $ls )     { $ls = 2; }
+		}
+		if ( null === $weight ) { $weight = ( null !== $size && $size >= 46 ) ? '800' : '700'; }
+		// Tight tracking + line-height on display sizes; airier on small headings.
+		if ( null === $ls && null !== $size && $size >= 40 ) { $ls = -1; }
+		if ( null === $lh && null !== $size ) {
+			$lh = ( $size >= 40 ) ? 1.12 : ( ( $size >= 24 ) ? 1.22 : 1.4 );
+		}
+		// Scale anything sizable down on mobile so display heads don't overflow.
+		if ( null === $size_mobile && null !== $size && $size >= 24 ) {
+			$size_mobile = max( 20, (int) round( $size * 0.62 ) );
 		}
 
 		$w = PressGo_Widget_Helpers::heading_w( $cfg, $text, $tag, $align, $color, $size, $weight, $ls, $lh, $tr, $size_mobile );
@@ -334,12 +370,13 @@ class PressGo_Freeform_Renderer {
 		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : 1.7;
+		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : '400'; // honor bold/light body copy
 		// Inline links should take the widget's text color, not the theme's link
 		// color (often a clashing magenta on dark footers). Inject it on each <a>.
 		if ( $color && false !== strpos( $html, '<a' ) ) {
 			$html = preg_replace( '/<a(\s)/i', '<a style="color:' . esc_attr( $color ) . '"$1', $html );
 		}
-		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh );
+		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh, null, $weight );
 		// text_w doesn't expose transform/letter-spacing; plumb them directly so
 		// freeform labels honor uppercase + tracking the way the heading widget does.
 		if ( isset( $s['transform'] ) && in_array( $s['transform'], array( 'uppercase', 'lowercase', 'capitalize', 'none' ), true ) ) {

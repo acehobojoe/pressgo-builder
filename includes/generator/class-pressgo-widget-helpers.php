@@ -104,7 +104,7 @@ class PressGo_Widget_Helpers {
 	 * Text editor widget.
 	 */
 	public static function text_w( $cfg, $html, $align = 'left', $color = null, $size = 16,
-								   $size_mobile = null, $line_height = 1.7, $align_mobile = null ) {
+								   $size_mobile = null, $line_height = 1.7, $align_mobile = null, $weight = '400' ) {
 		$fonts = $cfg['fonts'];
 		// Non-scalar input would stringify to the literal word "Array".
 		if ( ! is_scalar( $html ) ) {
@@ -120,7 +120,7 @@ class PressGo_Widget_Helpers {
 			'typography_typography'     => 'custom',
 			'typography_font_family'   => $fonts['body'],
 			'typography_font_size'     => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
-			'typography_font_weight'   => '400',
+			'typography_font_weight'   => (string) $weight,
 			'typography_line_height'   => array( 'unit' => 'em', 'size' => $line_height, 'sizes' => array() ),
 		);
 
