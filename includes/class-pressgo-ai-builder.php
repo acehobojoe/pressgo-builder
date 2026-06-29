@@ -25,6 +25,7 @@ class PressGo_AI_Builder {
 	const META_AI_CONFIG  = '_pressgo_ai_config'; // last applied page config (for clean edits)
 	const META_FREEFORM   = '_pressgo_freeform';  // marks a freeform "build anything" page (native tree, no recipe config)
 	const META_FREEFORM_BRIEF = '_pressgo_freeform_brief'; // persistent page brief (business + goal) for Nova discovery
+	const META_LAST_CHAT = '_pressgo_last_chat'; // last conversational reply (so "do it" / "can you do that?" can build it)
 	const META_DISCOVERY_STATE = '_pressgo_discovery_state'; // per-page chip interview state (transient, cleared on chat reset)
 	const MASTER_PROFILE_OPTION = 'pressgo_master_profile';  // site-level discovery memory (goal/vibe/photos/location) — compounds across pages
 	const META_FF_SECTIONS  = '_pressgo_ff_sections';        // ordered records of every freeform section (source tree + roles) for the cohesion engine
@@ -852,6 +853,7 @@ class PressGo_AI_Builder {
 		delete_post_meta( $post_id, self::META_AI_CHAT );
 		delete_post_meta( $post_id, self::META_FREEFORM_BRIEF );    // reset Nova discovery on a fresh chat
 		delete_post_meta( $post_id, self::META_DISCOVERY_STATE );  // and its in-progress interview state
+		delete_post_meta( $post_id, self::META_LAST_CHAT );         // clear chat context so "do it" doesn't fire stale
 		delete_post_meta( $post_id, '_pressgo_cohesion_autosig' ); // let auto-tidy run fresh
 		wp_send_json_success();
 	}
@@ -4003,8 +4005,19 @@ class PressGo_AI_Builder {
 		// reply, not a blind JSON compose attempt. Route those to GLM-5.2 in
 		// chat mode (not json_object) with full page context, so the user can
 		// discuss before committing to a build.
-		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && $this->is_conversational( $message, $selected_key ) ) {
+		//
+		// Affirmation after a recommendation ("do it", "can you do that?", "yes",
+		// "go ahead") should BUILD what was just discussed, not chat again.
+		$last_chat = (string) get_post_meta( $post_id, self::META_LAST_CHAT, true );
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && '' !== $last_chat && $this->is_affirmation( $message ) ) {
+			// Clear the chat context so the next "yes" doesn't re-trigger.
+			delete_post_meta( $post_id, self::META_LAST_CHAT );
+			// Build from the recommendation: the last chat reply IS the build request.
+			$message = $last_chat;
+		} elseif ( ! $page_empty && '' === $discovery_stage && ! $whole_page && $this->is_conversational( $message, $selected_key ) ) {
 			$reply = $this->freeform_chat( $post_id, $message, $brief );
+			// Store the reply so a follow-up "do it" can build it.
+			update_post_meta( $post_id, self::META_LAST_CHAT, wp_slash( $reply['text'] ) );
 			wp_send_json_success( array(
 				'note'         => $reply['text'],
 				'preview_bust' => time(),
@@ -4048,6 +4061,9 @@ class PressGo_AI_Builder {
 		if ( empty( $composed['tree'] ) ) {
 			wp_send_json_error( $composed['error'] ?? 'The composer did not return a valid section. Try rewording.', 422 );
 		}
+		// A build happened — clear the chat context so a stale "do it" can't
+		// re-trigger the same recommendation on the next turn.
+		delete_post_meta( $post_id, self::META_LAST_CHAT );
 		$tree       = $composed['tree'];
 		$used_model = $composed['model'];
 
@@ -4197,6 +4213,20 @@ class PressGo_AI_Builder {
 	}
 
 	/**
+	 * Detect affirmation messages that should trigger a build from the last
+	 * chat recommendation. "do it", "can you do that?", "yes", "go ahead",
+	 * "sounds good", "let's do it" — short, positive, no specific content.
+	 */
+	private function is_affirmation( $message ) {
+		$m = strtolower( trim( $message ) );
+		// Short positive confirmations.
+		if ( preg_match( '/^(do it|can you do that|can you do it|do that|go ahead|go for it|sounds good|let\'?s do it|let\'?s go|yes|yep|sure|ok|okay|perfect|love it|do that please|please do|make it so)\b/i', $m ) ) { return true; }
+		// "can you [add/build/create] [that/it/this]?" — a build request referencing the recommendation.
+		if ( preg_match( '/^can you (add|build|create|make|do|put)\b.{0,20}\b(that|it|this|one)\b/i', $m ) ) { return true; }
+		return false;
+	}
+
+	/**
 	 * Detect conversational messages that should get a text reply, not a blind
 	 * JSON compose. Questions, brainstorming, feedback, and "what if" messages
 	 * route here. Build/edit/structural commands (already handled above) never
@@ -4253,12 +4283,12 @@ class PressGo_AI_Builder {
 			$text = "I'm having trouble thinking right now. Try telling me what to build and I'll get right on it.";
 		}
 
-		// After the reply, refresh the section suggestions so the user can act.
-		$suggest = null;
-		$dstate = $this->discovery_state( $post_id );
-		if ( is_array( $dstate ) ) { $suggest = $this->suggest_payload( $dstate ); }
-
-		return array( 'text' => $text, 'suggest' => $suggest );
+		// Don't auto-append the generic chip list after a chat reply. The reply
+		// itself either made a specific recommendation (which the generic chips
+		// would undercut) or answered a question (where chips are noise). If the
+		// user wants to build, they'll say so — and "do it" / "can you do that?"
+		// after a recommendation triggers the build path directly.
+		return array( 'text' => $text, 'suggest' => null );
 	}
 
 	/**
