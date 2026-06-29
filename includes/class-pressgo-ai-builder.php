@@ -2105,6 +2105,100 @@ class PressGo_AI_Builder {
 		return null;
 	}
 
+	/** Does the message ask to change the page's colors or fonts (vs build/edit)? */
+	private function is_brand_change_intent( $message ) {
+		$m = strtolower( (string) $message );
+		if ( preg_match( '/\badd\b.{0,30}\bsection\b/', $m ) ) { return false; } // an explicit add wins
+		if ( preg_match( '/#[0-9a-f]{6}\b/i', $message ) ) { return true; }
+		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|white|cream)';
+		if ( preg_match( '/\b(make|use|change|switch|try|go|set).{0,24}\b' . $colorword . '\b/', $m ) ) { return true; }
+		if ( preg_match( '/\b' . $colorword . '\b.{0,16}\b(accent|theme|palette|colou?rs?|brand|vibe|look)\b/', $m ) ) { return true; }
+		if ( preg_match( '/\b(different|new|change|update|adjust).{0,12}\b(colou?rs?|palette|fonts?)\b/', $m ) ) { return true; }
+		if ( preg_match( '/\b(darker|lighter|brighter|more muted|more vibrant|warmer|cooler)\b/', $m ) && preg_match( '/\b(colou?r|palette|accent|theme|it|page|everything)\b/', $m ) ) { return true; }
+		if ( preg_match( '/\b(serif|sans-?serif|handwritten|script)\b/', $m ) || preg_match( '/\b(use|change|switch|try|different|new).{0,16}\bfonts?\b/', $m ) ) { return true; }
+		if ( preg_match( '/\b(playfair|lora|merriweather|poppins|montserrat|manrope|oswald|raleway|roboto|inter)\b/', $m ) ) { return true; }
+		return false;
+	}
+
+	/** Map a color/font request to concrete brand tokens, or null if nothing parsed. */
+	private function brand_change_from_message( $message ) {
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		$m       = strtolower( (string) $message );
+		$colors  = array();
+		$fonts   = array();
+		$summary = array();
+
+		$set_accent = function ( $hex ) use ( &$colors ) {
+			$colors['accent']       = $hex;
+			$colors['primary']      = $hex;
+			$colors['primary_dark'] = PressGo_Style_Utils::shade( $hex, -0.15 );
+			$colors['gold']         = $hex;
+		};
+		if ( preg_match( '/#([0-9a-f]{6})\b/i', $message, $hm ) ) {
+			$set_accent( '#' . $hm[1] );
+			$summary[] = 'a ' . '#' . strtoupper( $hm[1] ) . ' accent';
+		} else {
+			$named = array(
+				'navy' => '#1E3A8A', 'blue' => '#2563EB', 'sky' => '#0EA5E9', 'teal' => '#0D9488', 'green' => '#16A34A',
+				'emerald' => '#059669', 'red' => '#DC2626', 'crimson' => '#B91C1C', 'maroon' => '#7F1D1D', 'orange' => '#EA580C',
+				'amber' => '#F59E0B', 'gold' => '#E2B714', 'yellow' => '#EAB308', 'purple' => '#7C3AED', 'violet' => '#7C3AED',
+				'pink' => '#DB2777', 'rose' => '#E11D48', 'magenta' => '#C026D3', 'black' => '#0F1115', 'charcoal' => '#1F2937', 'slate' => '#475569',
+			);
+			foreach ( $named as $name => $hex ) {
+				if ( preg_match( '/\b' . $name . '\b/', $m ) ) { $set_accent( $hex ); $summary[] = $name . ' as your accent'; break; }
+			}
+			if ( empty( $colors ) ) { // a transform on the current accent
+				$f   = $this->cfg_from_foundation();
+				$cur = isset( $f['colors']['accent'] ) ? $f['colors']['accent'] : '#E2B714';
+				if ( preg_match( '/\bdarker\b/', $m ) )                        { $set_accent( PressGo_Style_Utils::shade( $cur, -0.12 ) ); $summary[] = 'a darker accent'; }
+				elseif ( preg_match( '/\b(lighter|brighter)\b/', $m ) )        { $set_accent( PressGo_Style_Utils::shade( $cur, 0.12 ) ); $summary[] = 'a lighter accent'; }
+			}
+		}
+
+		$set_font = '';
+		$named_f  = array( 'playfair' => 'Playfair Display', 'lora' => 'Lora', 'merriweather' => 'Merriweather', 'poppins' => 'Poppins', 'montserrat' => 'Montserrat', 'manrope' => 'Manrope', 'oswald' => 'Oswald', 'raleway' => 'Raleway', 'roboto' => 'Roboto', 'inter' => 'Inter' );
+		foreach ( $named_f as $k => $v ) { if ( preg_match( '/\b' . $k . '\b/', $m ) ) { $set_font = $v; break; } }
+		if ( '' === $set_font ) {
+			if ( preg_match( '/\bserif\b/', $m ) && ! preg_match( '/\bsans/', $m ) ) { $set_font = 'Playfair Display'; }
+			elseif ( preg_match( '/\b(sans-?serif|modern|clean|minimal)\b/', $m ) && preg_match( '/\bfont\b/', $m ) ) { $set_font = 'Manrope'; }
+			elseif ( preg_match( '/\b(elegant|classic|sophisticated|fancy)\b/', $m ) && preg_match( '/\bfont\b/', $m ) ) { $set_font = 'Playfair Display'; }
+			elseif ( preg_match( '/\b(bold|strong|condensed|impact)\b/', $m ) && preg_match( '/\bfont\b/', $m ) ) { $set_font = 'Oswald'; }
+		}
+		if ( '' !== $set_font ) { $fonts['heading'] = $set_font; $summary[] = $set_font . ' headings'; }
+
+		if ( empty( $colors ) && empty( $fonts ) ) { return null; }
+		$out = array( 'summary' => implode( ' and ', $summary ) );
+		if ( $colors ) { $out['colors'] = $colors; }
+		if ( $fonts ) { $out['fonts'] = $fonts; }
+		return $out;
+	}
+
+	/** Apply a deterministic color/font change to the site brand and repaint the page. */
+	private function handle_brand_change( $post_id, $message ) {
+		$change = $this->brand_change_from_message( $message );
+		if ( null === $change ) {
+			return array( 'note' => "Tell me a color (a name or a #hex) or a font and I'll repaint the whole page — e.g. \"make the accent navy\" or \"use a serif font\"." );
+		}
+		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) {
+			return array( 'note' => 'The brand store is unavailable right now.' );
+		}
+		$args = array();
+		if ( ! empty( $change['colors'] ) ) { $args['colors'] = $change['colors']; }
+		if ( ! empty( $change['fonts'] ) ) { $args['fonts'] = $change['fonts']; }
+		PressGo_MCP_Tools::merge_brand_foundation( $args );
+		update_option( 'pressgo_use_site_brand', '1', false );
+
+		$res = $this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
+		if ( false === $res ) {
+			return array( 'preview_bust' => time(), 'note' => 'Set ' . $change['summary'] . ' as your brand — new pages will use it.' );
+		}
+		return array(
+			'preview_bust' => time(),
+			'cohesion'     => true,
+			'note'         => 'Done — ' . $change['summary'] . ', and repainted the page to match. Say "undo" to revert.',
+		);
+	}
+
 	/** Edit a SELECTED section in place: re-compose just that section's tree with the
 	 *  user's change, re-render it under the same marker, and swap it into the page —
 	 *  so "change the headline" / "here's my menu" edits the section you're on, not a
@@ -3685,6 +3779,12 @@ class PressGo_AI_Builder {
 					|| preg_match( '/\btake\s+(\w+\s+){0,2}out\b/i', $message ) )
 				&& ! preg_match( '/\badd\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_delete_section( $post_id, $message, $selected_key ) );
+			}
+			// Brand color/font change for the WHOLE page (no section selected): set the
+			// brand deterministically and repaint, instead of a random re-roll or an add.
+			// With a section selected, "make it blue" is a scoped edit (handled below).
+			if ( '' === $selected_key && $this->is_brand_change_intent( $message ) ) {
+				wp_send_json_success( $this->handle_brand_change( $post_id, $message ) );
 			}
 			// Scoped edit: a section is selected and this is a plain edit/request —
 			// change THAT section in place instead of composing a brand-new one. This
