@@ -266,17 +266,18 @@ class PressGo_Style_Utils {
 		$mob    = (string) max( 16, $pad - 8 );
 
 		if ( self::$dark_theme ) {
-			// Frosted card on a dark page: translucent white surface + hairline
-			// border, no drop shadow (shadows read as dirt on dark).
+			// Frosted card on a dark page: translucent white surface + visible
+			// hairline border. The old 0.05/0.10 opacity was nearly invisible
+			// on dark backgrounds (vision QA: "cards blend into the page").
 			return array(
 				'background_background' => 'classic',
-				'background_color'      => 'rgba(255,255,255,0.05)',
+				'background_color'      => 'rgba(255,255,255,0.08)',
 				'border_border'         => 'solid',
 				'border_width'          => array(
 					'unit' => 'px', 'top' => '1', 'right' => '1',
 					'bottom' => '1', 'left' => '1', 'isLinked' => true,
 				),
-				'border_color'          => 'rgba(255,255,255,0.10)',
+				'border_color'          => 'rgba(255,255,255,0.16)',
 				'border_radius'         => array(
 					'unit' => 'px', 'top' => $r, 'right' => $r,
 					'bottom' => $r, 'left' => $r, 'isLinked' => true,

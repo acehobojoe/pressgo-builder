@@ -373,15 +373,23 @@ class PressGo_Section_Builder {
 			if ( ! isset( $i['quote'] ) || ! is_string( $i['quote'] ) || '' === trim( $i['quote'] ) ) {
 				continue;
 			}
-			$i['quote'] = trim( $i['quote'] );
-			$i['name']  = isset( $i['name'] ) && is_scalar( $i['name'] ) ? trim( (string) $i['name'] ) : '';
-			$i['role']  = isset( $i['role'] ) && is_scalar( $i['role'] ) ? trim( (string) $i['role'] ) : '';
-			// Honest stars (guard.testimonial-honest-stars): a per-review rating
-			// (1-5, fractional ok) renders as supplied; absent → null and the
-			// builders keep the legacy 5-star treatment (zero visual regression).
-			$i['rating'] = isset( $i['rating'] ) && is_numeric( $i['rating'] )
-				? max( 1.0, min( 5.0, (float) $i['rating'] ) ) : null;
-			$out[] = $i;
+		$i['quote'] = trim( $i['quote'] );
+		$i['name']  = isset( $i['name'] ) && is_scalar( $i['name'] ) ? trim( (string) $i['name'] ) : '';
+		$i['role']  = isset( $i['role'] ) && is_scalar( $i['role'] ) ? trim( (string) $i['role'] ) : '';
+		// Strip bracketed placeholders the model sometimes leaves in names
+		// ("[Name] & [Name]", "[Client Name]"). Replace with a neutral label.
+		if ( '' !== $i['name'] && preg_match( '/\[[A-Za-z]/', $i['name'] ) ) {
+			$i['name'] = '';
+		}
+		if ( '' !== $i['role'] && preg_match( '/\[[A-Za-z]/', $i['role'] ) ) {
+			$i['role'] = '';
+		}
+		// Honest stars (guard.testimonial-honest-stars): a per-review rating
+		// (1-5, fractional ok) renders as supplied; absent -> null and the
+		// builders keep the legacy 5-star treatment (zero visual regression).
+		$i['rating'] = isset( $i['rating'] ) && is_numeric( $i['rating'] )
+			? max( 1.0, min( 5.0, (float) $i['rating'] ) ) : null;
+		$out[] = $i;
 		}
 		return $out;
 	}
@@ -1312,13 +1320,13 @@ class PressGo_Section_Builder {
 				} else {
 					// Vertical gradient scrim, darker through the middle/bottom
 					// where the headline + CTAs sit. Heavier than the old flat
-					// 0.78 slab (top 0.72 → center 0.86) so text stays legible
-					// over busy or bright photos while the image still reads at
-					// the top edge.
+					// slab (top 0.78 -> center 0.88) so text stays legible over
+					// busy or bright photos while the image still reads at the
+					// top edge.
 					$extra['background_overlay_background']    = 'gradient';
-					$extra['background_overlay_color']         = 'rgba(0,0,0,0.72)';
+					$extra['background_overlay_color']         = 'rgba(0,0,0,0.78)';
 					$extra['background_overlay_color_stop']    = array( 'unit' => '%', 'size' => 0, 'sizes' => array() );
-					$extra['background_overlay_color_b']       = 'rgba(0,0,0,0.86)';
+					$extra['background_overlay_color_b']       = 'rgba(0,0,0,0.88)';
 					$extra['background_overlay_color_b_stop']  = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
 					$extra['background_overlay_gradient_type'] = 'linear';
 					$extra['background_overlay_gradient_angle'] = array( 'unit' => 'deg', 'size' => 180, 'sizes' => array() );

@@ -579,8 +579,8 @@ class PressGo_Widget_Helpers {
 	/**
 	 * Star Rating widget — proper Elementor star rating.
 	 */
-	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left' ) {
-		return PressGo_Element_Factory::widget( 'star-rating', array(
+	public static function star_rating_w( $rating = 5, $size = 16, $color = '#F59E0B', $align = 'left', $size_mobile = null ) {
+		$s = array(
 			'rating'     => $rating,
 			// Unicode stars, not the old FontAwesome glyphs — cleaner look and no
 			// FontAwesome dependency just to draw five stars.
@@ -589,7 +589,13 @@ class PressGo_Widget_Helpers {
 			'icon_space' => array( 'unit' => 'px', 'size' => 2, 'sizes' => array() ),
 			'stars_color' => $color,
 			'align'      => $align,
-		) );
+		);
+		if ( null !== $size_mobile ) {
+			$s['icon_size_mobile'] = array( 'unit' => 'px', 'size' => $size_mobile, 'sizes' => array() );
+		} elseif ( $size >= 16 ) {
+			$s['icon_size_mobile'] = array( 'unit' => 'px', 'size' => max( 12, (int) round( $size * 0.75 ) ), 'sizes' => array() );
+		}
+		return PressGo_Element_Factory::widget( 'star-rating', $s );
 	}
 
 	/**

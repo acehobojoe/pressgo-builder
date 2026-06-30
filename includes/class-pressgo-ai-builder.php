@@ -147,6 +147,16 @@ class PressGo_AI_Builder {
 		echo "\n<style>\n"
 			. ".pg-img-cover img { aspect-ratio: 3/2; object-fit: cover; width: 100%; height: auto; }\n"
 			. ".pg-sec--freeform .e-child.e-con { align-self: stretch; }\n"
+			. "@media (max-width: 767px) {\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(15'] .e-child .elementor-widget-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(17'] .e-child .elementor-widget-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(11'] .e-child .elementor-widget-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(28'] .e-child .elementor-widget-text-editor { font-size: 15px !important; }\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(15'] .e-child .elementor-widget-text-editor .elementor-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(17'] .e-child .elementor-widget-text-editor .elementor-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(11'] .e-child .elementor-widget-text-editor .elementor-text-editor,\n"
+			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(28'] .e-child .elementor-widget-text-editor .elementor-text-editor { color: rgba(255,255,255,0.82) !important; }\n"
+			. "}\n"
 			. "</style>\n";
 	}
 

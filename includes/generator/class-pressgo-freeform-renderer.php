@@ -35,6 +35,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PressGo_Freeform_Renderer {
 
 	/**
+	 * Whether the section currently being rendered has a dark background.
+	 * Set by render_section(), read by render_col() to inject visible
+	 * card borders on dark sections (the composer often gives cards a
+	 * near-black bg like #16191e that blends into a #0F1115 section).
+	 *
+	 * @var bool
+	 */
+	private static $section_is_dark = false;
+
+	/**
 	 * Render a freeform blocks tree to an Elementor section element (one
 	 * top-level container, ready to drop into the _elementor_data array).
 	 *
@@ -137,7 +147,23 @@ class PressGo_Freeform_Renderer {
 				$out[] = $el;
 			}
 		}
+		// Trim leading/trailing spacers left behind when content widgets were
+		// stripped (e.g. "..." placeholders removed, leaving orphaned spacers
+		// that create dead vertical space at section edges).
+		while ( ! empty( $out ) && self::is_spacer( $out[0] ) ) {
+			array_shift( $out );
+		}
+		while ( ! empty( $out ) && self::is_spacer( $out[ count( $out ) - 1 ] ) ) {
+			array_pop( $out );
+		}
 		return $out;
+	}
+
+	/**
+	 * Check if a rendered element is a spacer widget.
+	 */
+	private static function is_spacer( $el ) {
+		return isset( $el['widgetType'] ) && 'spacer' === $el['widgetType'];
 	}
 
 	// ───────────────────────────────────────────────────────────────────
@@ -149,6 +175,13 @@ class PressGo_Freeform_Renderer {
 	 */
 	private static function render_section( $block, $cfg ) {
 		$s        = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
+
+		// Detect dark section: check the section background color luminance.
+		// The composer often gives cards a near-black bg (e.g. #16191e) that
+		// is nearly invisible on a #0F1115 section. When the section is dark,
+		// render_col() will inject a visible hairline border on card cols.
+		self::$section_is_dark = self::is_dark_color( isset( $s['background'] ) ? $s['background'] : '' );
+
 		$children = self::render_children( $block, $cfg );
 
 		$max_width = isset( $s['max_width'] ) && is_numeric( $s['max_width'] ) ? (int) $s['max_width'] : 1200;
@@ -312,6 +345,22 @@ class PressGo_Freeform_Renderer {
 		self::apply_margin( $settings, $s );
 		self::apply_radius_shadow( $settings, $s );
 
+		// Dark-section card visibility: when the section is dark and this col
+		// has its own background (i.e. it's a card), inject a visible hairline
+		// border so the card doesn't blend into the section. The composer often
+		// gives cards a near-black bg (#16191e) on a #0F1115 section — without
+		// a border, the card is invisible in screenshots/vision QA.
+		if ( self::$section_is_dark && isset( $settings['background_background'] ) && 'classic' === $settings['background_background'] ) {
+			if ( ! isset( $settings['border_border'] ) ) {
+				$settings['border_border'] = 'solid';
+				$settings['border_width']  = array(
+					'unit' => 'px', 'top' => '1', 'right' => '1',
+					'bottom' => '1', 'left' => '1', 'isLinked' => true,
+				);
+				$settings['border_color']  = 'rgba(255,255,255,0.16)';
+			}
+		}
+
 		return array(
 			'id'       => PressGo_Element_Factory::eid(),
 			'elType'   => 'container',
@@ -327,6 +376,7 @@ class PressGo_Freeform_Renderer {
 
 	private static function render_heading( $s, $cfg ) {
 		$text = isset( $s['text'] ) ? self::strip_dashes( $s['text'] ) : '';
+		if ( '' === trim( $text ) ) { return null; } // skip empty (e.g. stripped "..." placeholders)
 		$tag  = isset( $s['tag'] ) ? $s['tag'] : 'h2';
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
 		$color = isset( $s['color'] ) ? $s['color'] : null;
@@ -336,10 +386,16 @@ class PressGo_Freeform_Renderer {
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : null;
 		$tr    = isset( $s['transform'] ) ? $s['transform'] : null;
 		$size_mobile = isset( $s['size_mobile'] ) && is_numeric( $s['size_mobile'] ) ? (int) $s['size_mobile'] : null;
-		// Real typographic hierarchy by default. Without this, a composer that omits
-		// `size`/`weight` collapses every heading to the theme's single default — the
-		// "fonts aren't variable / flat" complaint. Defaults only fill what's unset.
+		// Sanitize tag: the composer sometimes emits invalid values like ': '.
 		$tagl = strtolower( (string) $tag );
+		$valid_tags = array( 'h1','h2','h3','h4','h5','h6' );
+		if ( ! in_array( $tagl, $valid_tags, true ) ) {
+			$tagl = 'h2';
+		}
+		$tag = $tagl;
+		// Real typographic hierarchy by default. Without this, a composer that omits
+		// `size`/`weight` collapses every heading to the theme's single default —
+		// the "fonts aren't variable / flat" complaint. Defaults only fill what's unset.
 		$tag_size = array( 'h1' => 56, 'h2' => 40, 'h3' => 30, 'h4' => 24, 'h5' => 20, 'h6' => 13 );
 		if ( null === $size && isset( $tag_size[ $tagl ] ) ) { $size = $tag_size[ $tagl ]; }
 		if ( 'h6' === $tagl ) {
@@ -366,6 +422,7 @@ class PressGo_Freeform_Renderer {
 
 	private static function render_text( $s, $cfg ) {
 		$html  = isset( $s['html'] ) ? self::strip_dashes( $s['html'] ) : ( isset( $s['text'] ) ? self::strip_dashes( $s['text'] ) : '' );
+		if ( '' === trim( wp_strip_all_tags( $html ) ) ) { return null; } // skip empty (stripped placeholders)
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
 		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
@@ -674,6 +731,44 @@ class PressGo_Freeform_Renderer {
 	// ───────────────────────────────────────────────────────────────────
 
 	/**
+	 * Check whether a hex or rgba color is dark (luminance < 0.3).
+	 * Used to detect dark sections so card cols get visible borders.
+	 *
+	 * @param string $color Hex (#RRGGBB) or rgba(r,g,b,a) string.
+	 * @return bool True if the color is dark.
+	 */
+	private static function is_dark_color( $color ) {
+		$color = trim( (string) $color );
+		if ( '' === $color ) { return false; }
+
+		$r = 0; $g = 0; $b = 0;
+
+		// Hex: #RGB or #RRGGBB.
+		if ( '#' === $color[0] ) {
+			$hex = substr( $color, 1 );
+			if ( 3 === strlen( $hex ) ) {
+				$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+			}
+			if ( 6 !== strlen( $hex ) ) { return false; }
+			$r = hexdec( substr( $hex, 0, 2 ) );
+			$g = hexdec( substr( $hex, 2, 2 ) );
+			$b = hexdec( substr( $hex, 4, 2 ) );
+		} elseif ( 0 === strpos( $color, 'rgb' ) ) {
+			// rgba(r,g,b,a) or rgb(r,g,b).
+			if ( ! preg_match( '/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/', $color, $m ) ) { return false; }
+			$r = (int) $m[1];
+			$g = (int) $m[2];
+			$b = (int) $m[3];
+		} else {
+			return false;
+		}
+
+		// Relative luminance (sRGB, simplified).
+		$lum = ( 0.299 * $r + 0.587 * $g + 0.114 * $b ) / 255;
+		return $lum < 0.3;
+	}
+
+	/**
 	 * Renderer-side em/en-dash safety net. The prompt forbids them (rule 6) but
 	 * LLMs still emit them. Replace " — " / " – " with ", " (comma) and bare
 	 * em/en dashes with "-" (hyphen). Also handles the HTML entities. This runs
@@ -688,6 +783,12 @@ class PressGo_Freeform_Renderer {
 		$text = str_replace( array( " \xe2\x80\x94 ", " \xe2\x80\x93 " ), ', ', $text );
 		// Any remaining bare em/en dash -> hyphen.
 		$text = str_replace( array( "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
+		// Strip bracketed placeholders ("[Name]", "[Client Name]") that the
+		// composer sometimes leaves in generated copy.
+		$text = preg_replace( '/\[[A-Za-z][^\]]*\]/', '', $text );
+		// Strip bare "..." placeholders the composer sometimes emits instead of
+		// real copy (leaves orphaned dots that read as broken UI in screenshots).
+		$text = preg_replace( '/^\s*\.{2,}\s*$/', '', $text );
 		return $text;
 	}
 

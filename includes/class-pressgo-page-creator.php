@@ -129,6 +129,19 @@ class PressGo_Page_Creator {
     white-space: nowrap;
 }
 
+/* On mobile, long CTA labels (like Book Your Free Intro Session) must wrap
+   rather than truncate or overflow the viewport. Only phone-number
+   buttons keep nowrap (pg-btn-nowrap above). */
+@media (max-width: 767px) {
+    .elementor-button .elementor-button-text {
+        white-space: normal;
+        line-height: 1.3;
+    }
+    .pg-btn-nowrap .elementor-button-text {
+        white-space: nowrap;
+    }
+}
+
 /* Card container hover — smooth shadow transition */
 .e-child.e-con {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
