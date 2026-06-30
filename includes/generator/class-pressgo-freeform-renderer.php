@@ -150,6 +150,15 @@ class PressGo_Freeform_Renderer {
 				$out[] = $el;
 			}
 		}
+		// Drop EMPTY containers (a card row/col whose only content was stripped
+		// placeholder text) — they render as blank bands / dead vertical space. This
+		// is the husk that made "Three steps" promise content and show nothing.
+		$out = array_values( array_filter( $out, function ( $el ) {
+			if ( is_array( $el ) && isset( $el['elType'] ) && 'container' === $el['elType'] ) {
+				return ! empty( $el['elements'] );
+			}
+			return true;
+		} ) );
 		// Trim leading/trailing spacers left behind when content widgets were
 		// stripped (e.g. "..." placeholders removed, leaving orphaned spacers
 		// that create dead vertical space at section edges).
@@ -186,6 +195,27 @@ class PressGo_Freeform_Renderer {
 		self::$section_is_dark = self::is_dark_color( isset( $s['background'] ) ? $s['background'] : '' );
 
 		$children = self::render_children( $block, $cfg );
+
+		// Husk guard: if the source section had content containers (rows/cols meant
+		// to hold cards/steps/etc.) but they ALL pruned away to nothing, and only
+		// headings/text remain, it's an empty promise (e.g. "Three steps" with no
+		// steps) — drop the whole section. Safe: a legit text/CTA section never had a
+		// container, or still has a button/image, so it keeps real content here.
+		$had_container = false;
+		foreach ( ( isset( $block['children'] ) && is_array( $block['children'] ) ? $block['children'] : array() ) as $cb ) {
+			$t = is_array( $cb ) ? ( isset( $cb['type'] ) ? $cb['type'] : '' ) : '';
+			if ( 'row' === $t || 'col' === $t ) { $had_container = true; break; }
+		}
+		if ( $had_container ) {
+			$has_content = false;
+			foreach ( $children as $el ) {
+				$et = isset( $el['elType'] ) ? $el['elType'] : '';
+				$wt = isset( $el['widgetType'] ) ? $el['widgetType'] : '';
+				if ( 'container' === $et ) { $has_content = true; break; }
+				if ( ! in_array( $wt, array( 'heading', 'text-editor', 'spacer', 'divider' ), true ) ) { $has_content = true; break; }
+			}
+			if ( ! $has_content ) { return null; }
+		}
 
 		$max_width = isset( $s['max_width'] ) && is_numeric( $s['max_width'] ) ? (int) $s['max_width'] : 1200;
 		$align     = isset( $s['content_align'] ) ? $s['content_align'] : 'center';
@@ -244,6 +274,11 @@ class PressGo_Freeform_Renderer {
 		foreach ( $child_blocks as $cb ) {
 			$el = self::render_block( $cb, $cfg );
 			if ( null === $el ) {
+				continue;
+			}
+			// Skip a column whose content all stripped away (empty container) — an
+			// empty card col otherwise leaves a blank gap in the row.
+			if ( isset( $el['elType'] ) && 'container' === $el['elType'] && empty( $el['elements'] ) ) {
 				continue;
 			}
 			$cw = isset( $cb['settings']['width'] ) && is_numeric( $cb['settings']['width'] ) ? (float) $cb['settings']['width'] : null;
