@@ -1797,9 +1797,11 @@ class PressGo_AI_Builder {
 		return $records;
 	}
 
-	/** The renderer cfg to use for cohesion re-renders (locked brand, else vibe, else default). */
+	/** The renderer cfg to use for cohesion re-renders (active brand, else vibe, else default). */
 	private function cohesion_cfg( $post_id ) {
-		if ( $this->brand_is_locked( $post_id ) ) { return $this->cfg_from_foundation(); }
+		// Use brand_active_for (not brand_is_locked) so a fresh unlocked page with its
+		// own vibe reflows in that vibe, not a leftover foundation from another business.
+		if ( $this->brand_active_for( $post_id ) ) { return $this->cfg_from_foundation(); }
 		$st   = $this->discovery_state( $post_id );
 		$vibe = ( is_array( $st ) && ! empty( $st['answers']['vibe'] ) ) ? $st['answers']['vibe'] : '';
 		$cfg  = ( '' !== $vibe ) ? $this->vibe_to_palette( $vibe ) : null;
@@ -2582,7 +2584,20 @@ class PressGo_AI_Builder {
 		if ( get_post_meta( $post_id, '_pressgo_brand_optout', true ) ) { return false; }
 		if ( ! class_exists( 'PressGo_MCP_Tools' ) ) { return false; }
 		$f = PressGo_MCP_Tools::brand_foundation();
-		return ! empty( $f['colors'] ) && is_array( $f['colors'] );
+		if ( empty( $f['colors'] ) || ! is_array( $f['colors'] ) ) { return false; }
+		// A FRESH interview that picked its own vibe and hasn't locked a brand yet is
+		// establishing THIS page's look. Don't let a leftover site foundation from a
+		// different business (e.g. a teal skincare brand bleeding onto a new ice cream
+		// shop) override the chosen vibe. Once this page locks its brand, or on the
+		// "same brand" reuse path, the foundation applies again.
+		$st = $this->discovery_state( $post_id );
+		if ( is_array( $st )
+			&& empty( $st['brand_locked'] )
+			&& 'reuse' !== ( isset( $st['branch'] ) ? $st['branch'] : '' )
+			&& ! empty( $st['answers']['vibe'] ) ) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
