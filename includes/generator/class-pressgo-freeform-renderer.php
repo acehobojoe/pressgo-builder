@@ -127,6 +127,9 @@ class PressGo_Freeform_Renderer {
 				return self::render_spacer( $s );
 			case 'icon':
 				return self::render_icon( $s, $cfg );
+			case 'star-rating':
+			case 'rating':
+				return self::render_star_rating( $s, $cfg );
 			case 'divider':
 				return self::render_divider( $s, $cfg );
 			case 'form':
@@ -218,6 +221,23 @@ class PressGo_Freeform_Renderer {
 		$s            = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
 		$child_blocks = isset( $block['children'] ) && is_array( $block['children'] ) ? $block['children'] : array();
 
+		// Rating row: a star rating the composer laid out as N single-icon columns
+		// (col[star] col[star] ...). A normal row stacks its columns 1-up on mobile,
+		// which turns the 5 stars into a vertical column. Detect an all-icon/star
+		// column set and keep it horizontal on mobile instead.
+		$is_rating_row = count( $child_blocks ) >= 2;
+		foreach ( $child_blocks as $cb ) {
+			if ( ! is_array( $cb ) || ( isset( $cb['type'] ) ? $cb['type'] : '' ) !== 'col' ) { $is_rating_row = false; break; }
+			$cc = array_values( array_filter( isset( $cb['children'] ) && is_array( $cb['children'] ) ? $cb['children'] : array(), function ( $k ) {
+				return is_array( $k ) && ( isset( $k['type'] ) ? $k['type'] : '' ) !== 'spacer';
+			} ) );
+			if ( empty( $cc ) ) { $is_rating_row = false; break; }
+			foreach ( $cc as $k ) {
+				$t = isset( $k['type'] ) ? $k['type'] : '';
+				if ( 'icon' !== $t && 'star-rating' !== $t ) { $is_rating_row = false; break 2; }
+			}
+		}
+
 		// Render children first; remember each child's requested width % (col blocks).
 		$rendered = array();
 		$widths   = array();
@@ -247,7 +267,7 @@ class PressGo_Freeform_Renderer {
 		}
 
 		$n   = count( $rendered );
-		$gap = isset( $s['gap'] ) && is_numeric( $s['gap'] ) ? (int) $s['gap'] : 24;
+		$gap = isset( $s['gap'] ) && is_numeric( $s['gap'] ) ? (int) $s['gap'] : ( $is_rating_row ? 4 : 24 );
 		// NOTE: a reliable "stay N-up on mobile" needs Elementor grid columns,
 		// whose value format this Elementor build (4.0.9) ignored — it fell back
 		// to a default 3-col grid that regressed desktop. So columns cleanly stack
@@ -260,7 +280,11 @@ class PressGo_Freeform_Renderer {
 				$col['settings']['width'] = array( 'unit' => '%', 'size' => $w, 'sizes' => array() );
 			}
 			if ( ! isset( $col['settings']['width_mobile'] ) ) {
-				$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+				// A rating row's "columns" are single stars — keep them auto-width so
+				// they sit side by side, not full-width (which would stack them).
+				$col['settings']['width_mobile'] = $is_rating_row
+					? array( 'unit' => '%', 'size' => $w, 'sizes' => array() )
+					: array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
 			}
 		}
 		unset( $col );
@@ -269,7 +293,7 @@ class PressGo_Freeform_Renderer {
 			'container_type'        => 'flex',
 			'content_width'         => 'full',
 			'flex_direction'        => 'row',
-			'flex_direction_mobile' => 'column',
+			'flex_direction_mobile' => $is_rating_row ? 'row' : 'column',
 			'flex_wrap'             => 'nowrap',
 			'flex_align_items'      => self::map_vertical_align( isset( $s['vertical_align'] ) ? $s['vertical_align'] : 'top' ),
 			'flex_gap'              => array(
@@ -308,12 +332,18 @@ class PressGo_Freeform_Renderer {
 
 		// Star ratings: the composer emits a run of `icon` blocks (e.g. 5x fas
 		// fa-star) inside a col, which stacks them VERTICALLY into a useless column.
-		// When every child is an icon, lay them out inline horizontally instead — and
+		// When the row of children is all icons/stars, lay them out inline instead — and
 		// keep them horizontal on mobile (a rating should never wrap to a column).
+		// Tolerate spacers between/around the icons and the dedicated star-rating block,
+		// so a mixed "icon icon spacer icon" run is still detected as a rating row.
 		$kids = isset( $block['children'] ) && is_array( $block['children'] ) ? $block['children'] : array();
-		$all_icons = count( $kids ) >= 2;
-		foreach ( $kids as $k ) {
-			if ( ! is_array( $k ) || ( isset( $k['type'] ) ? $k['type'] : '' ) !== 'icon' ) { $all_icons = false; break; }
+		$content_kids = array_values( array_filter( $kids, function ( $k ) {
+			return is_array( $k ) && ( isset( $k['type'] ) ? $k['type'] : '' ) !== 'spacer';
+		} ) );
+		$all_icons = count( $content_kids ) >= 2;
+		foreach ( $content_kids as $k ) {
+			$t = isset( $k['type'] ) ? $k['type'] : '';
+			if ( 'icon' !== $t && 'star-rating' !== $t ) { $all_icons = false; break; }
 		}
 
 		$settings = array(
@@ -488,6 +518,24 @@ class PressGo_Freeform_Renderer {
 			$w['settings']['align'] = $s['align'];
 		}
 		return $w;
+	}
+
+	/**
+	 * First-class star rating: a single native Elementor star-rating widget that is
+	 * ALWAYS a horizontal row, with mobile down-scaling. The composer should emit
+	 * this (`{type:"star-rating", settings:{count:5}}`) instead of hand-assembling a
+	 * run of icon widgets — that hand-assembly is what stacked vertically / collapsed
+	 * to a single star across templates.
+	 */
+	private static function render_star_rating( $s, $cfg ) {
+		$count = isset( $s['count'] ) && is_numeric( $s['count'] ) ? (float) $s['count']
+			: ( isset( $s['rating'] ) && is_numeric( $s['rating'] ) ? (float) $s['rating'] : 5 );
+		$count = max( 0.5, min( 5, $count ) );
+		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 18;
+		$color = isset( $s['color'] ) ? $s['color']
+			: ( isset( $cfg['colors']['accent'] ) ? $cfg['colors']['accent'] : '#F59E0B' );
+		$align = isset( $s['align'] ) ? $s['align'] : 'left';
+		return PressGo_Widget_Helpers::star_rating_w( $count, $size, $color, $align, max( 12, (int) round( $size * 0.85 ) ) );
 	}
 
 	private static function render_divider( $s, $cfg ) {
