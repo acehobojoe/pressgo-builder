@@ -3921,6 +3921,12 @@ class PressGo_AI_Builder {
 					$message = $add; // the rest of the cascade builds the add clause
 				}
 			}
+			// Text-driven reorder: "move the form to the bottom" / "put pricing first".
+			// Runs before the edit branch (which would otherwise treat "move" as an
+			// in-place edit) and before reflow.
+			if ( '' === $discovery_stage && ! $whole_page && $this->is_text_reorder( $message ) ) {
+				wp_send_json_success( $this->handle_text_reorder( $post_id, $message ) );
+			}
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
 			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this) up|smart order|less cluttered|improve the (layout|design|look|flow))\b/i', $message ) ) {
@@ -4349,7 +4355,7 @@ class PressGo_AI_Builder {
 		if ( empty( $recs ) ) { return null; }
 		$map = array(
 			'hero|headline|title|banner'                 => 'hero',
-			'button|cta|call to action'                  => 'cta',
+			'button|cta|call to action|form|contact|sign ?up'  => 'cta',
 			'pricing|plans?|price'                       => 'pricing',
 			'faq|questions?'                             => 'faq',
 			'gallery|photos|images'                      => 'gallery',
@@ -4371,6 +4377,39 @@ class PressGo_AI_Builder {
 			return ! empty( $last['source_tree'] ) ? $last : null;
 		}
 		return null;
+	}
+
+	/** "move the form to the bottom", "put pricing first" -> a text-driven reorder. */
+	private function is_text_reorder( $message ) {
+		return (bool) preg_match( '/\b(move|put|send|push|drop|reorder|reposition)\b.{0,40}\b(bottom|top|end|start|beginning|first|last|up|down|above|below)\b/i', (string) $message );
+	}
+
+	/** Resolve the target section from text and move it to the top or bottom. */
+	private function handle_text_reorder( $post_id, $message ) {
+		$records = $this->ff_sections( $post_id );
+		if ( count( $records ) < 2 ) { return array( 'note' => "There's nothing to reorder yet." ); }
+		$target = $this->resolve_edit_target( $post_id, $message );
+		if ( ! is_array( $target ) || empty( $target['pg_key'] ) ) {
+			return array( 'note' => 'Which section should I move? Name it, like "move the pricing to the bottom".' );
+		}
+		$tk    = $target['pg_key'];
+		$to_top = (bool) preg_match( '/\b(top|start|beginning|first|up|above)\b/i', $message );
+		$keys  = array();
+		foreach ( $records as $r ) { if ( ( $r['pg_key'] ?? '' ) !== $tk ) { $keys[] = $r['pg_key']; } }
+		if ( $to_top ) {
+			// Keep the hero anchored first; drop the target right after it.
+			if ( ! empty( $keys ) && ( $records[0]['semantic_role'] ?? '' ) === 'hero' && $keys[0] === $records[0]['pg_key'] ) {
+				array_splice( $keys, 1, 0, $tk );
+			} else {
+				array_unshift( $keys, $tk );
+			}
+		} else {
+			$keys[] = $tk; // to the bottom
+		}
+		$res = $this->cohesion_reorder_keys( $post_id, $keys );
+		$where = $to_top ? 'up near the top' : 'down to the bottom';
+		$res['note'] = 'Moved your ' . $this->role_label( $target['semantic_role'] ?? 'that' ) . ' section ' . $where . '. Say "undo" to put it back.';
+		return $res;
 	}
 
 	/**
@@ -4439,7 +4478,8 @@ class PressGo_AI_Builder {
 		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
 		$page_state = $this->freeform_page_state( $post_id );
 
-		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful, opinionated reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason. If they ask about colors/layout/fonts, give a real recommendation based on what's on the page. Do NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n";
+		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful, opinionated reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason. If they ask about colors/layout/fonts, give a real recommendation based on what's on the page. Do NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n"
+			. "IMPORTANT: when you recommend something, or when you ask the user to choose, END your reply with 1 to 3 tappable suggestions so they don't have to type. Put each on its own line, formatted EXACTLY like this:\n[[SUGGEST: Short button label || the exact instruction for me to carry out]]\nThe instruction after || must be a concrete command I can act on right now (e.g. \"add a stats section\", \"make the hero bolder\", \"move the form to the bottom\"). Example: if you suggest a stats band, end with [[SUGGEST: Add a stats band || add a stats section]]. If the user must pick between options, give one SUGGEST per option. Omit the SUGGEST lines only for a pure factual answer with no obvious next step. Never mention the SUGGEST syntax in your prose.\n\n";
 		if ( '' !== $brief && 'pending' !== $brief ) {
 			$system .= "PAGE BRIEF:\n" . $brief . "\n\n";
 		}
@@ -4466,12 +4506,23 @@ class PressGo_AI_Builder {
 		$text = str_replace( array( " \xe2\x80\x94 ", " \xe2\x80\x93 " ), ', ', $text );
 		$text = str_replace( array( "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
 
-		// Don't auto-append the generic chip list after a chat reply. The reply
-		// itself either made a specific recommendation (which the generic chips
-		// would undercut) or answered a question (where chips are noise). If the
-		// user wants to build, they'll say so — and "do it" / "can you do that?"
-		// after a recommendation triggers the build path directly.
-		return array( 'text' => $text, 'suggest' => null );
+		// Pull out the model's tappable suggestions ([[SUGGEST: label || request]]),
+		// strip them from the visible prose, and surface them as one-tap action chips
+		// so the user can confirm/act ("yeah, do this") instead of having to type.
+		// Each chip's request is a concrete command, so a tap routes deterministically
+		// to BUILD/EDIT through the normal cascade.
+		$chips = array();
+		if ( preg_match_all( '/\[\[\s*SUGGEST:\s*(.+?)\s*\|\|\s*(.+?)\s*\]\]/is', $text, $mm, PREG_SET_ORDER ) ) {
+			foreach ( $mm as $one ) {
+				$label = trim( preg_replace( '/\s+/', ' ', $one[1] ) );
+				$req   = trim( preg_replace( '/\s+/', ' ', $one[2] ) );
+				if ( '' !== $label && '' !== $req ) { $chips[] = array( 'label' => $label, 'request' => $req, 'key' => '' ); }
+				if ( count( $chips ) >= 3 ) { break; }
+			}
+			$text = trim( preg_replace( '/\[\[\s*SUGGEST:.*?\]\]/is', '', $text ) );
+		}
+		$suggest = ! empty( $chips ) ? array( 'note' => null, 'suggested' => true, 'chips' => $chips ) : null;
+		return array( 'text' => $text, 'suggest' => $suggest );
 	}
 
 	/**

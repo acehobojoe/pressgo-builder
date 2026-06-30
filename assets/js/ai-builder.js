@@ -1327,9 +1327,10 @@
 				runWholePagePlan(data.whole_page_plan);
 				return;
 			}
-			// Conversational reply (not a build): show the text + refresh suggestions.
+			// Conversational reply (not a build): a softer "talking to you" bubble,
+			// visually distinct from the terse build/system notes, then its chips.
 			if (data.chat_mode) {
-				append(el('pg-msg pg-msg-ai', data.note || ''));
+				append(el('pg-msg pg-msg-ai pg-msg-convo', data.note || ''));
 				if (data.suggest && !wholeRunning) renderSuggestions(data.suggest);
 				setBusy(false);
 				return;
@@ -1452,18 +1453,21 @@
 			b.type = 'button';
 			var isFlow = (c.key === 'cohesion');
 			var isNoop = (c.op === 'continue' || c.request === '__noop');
-			// Clarify chips are choices (a question), not "+ add a section" actions —
-			// no "+" prefix. The no-op "let me type" chip is a neutral escape.
-			var prefix = isNoop ? '✍️ ' : (isFlow ? '✨ ' : (s.clarify ? '' : '+ '));
+			var noPlus = (s.clarify || s.suggested); // choices/answers, not "+ add"
+			// Clarify/suggested chips are choices (a question or a suggested answer),
+			// not "+ add a section" actions. The no-op "let me type" chip is neutral.
+			var prefix = isNoop ? '✍️ ' : (isFlow ? '✨ ' : (noPlus ? '' : '+ '));
 			b.textContent = prefix + c.label;
 			b.className = 'pg-suggest-chip' + (isFlow ? ' pg-suggest-flow' : '');
-			// The cohesion action is a different kind of thing than "add a section",
-			// so it gets a filled, accented pill that visibly stands apart.
+			// Flow = accent gradient; no-op = dashed ghost; a chat SUGGESTED answer =
+			// accent-outlined "reply" pill (tap to confirm/act); default = soft add chip.
 			b.style.cssText = isFlow
 				? 'border:none;background:linear-gradient(135deg,#5b4fff,#8b5cf6);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:700;box-shadow:0 2px 10px rgba(91,79,255,0.4);margin-right:2px;'
 				: isNoop
 					? 'border:1px dashed #cbd5e1;background:#fff;color:#64748b;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;'
-					: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
+					: s.suggested
+						? 'border:1.5px solid #5b4fff;background:#fff;color:#5b4fff;border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:600;'
+						: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
 			b.addEventListener('click', function () {
 				// No-op "let me type something else": just clear the chips and hand the
 				// floor back to the input — never forces a build.
