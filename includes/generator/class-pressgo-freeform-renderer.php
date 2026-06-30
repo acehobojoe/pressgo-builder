@@ -105,6 +105,10 @@ class PressGo_Freeform_Renderer {
 		if ( ! is_array( $block ) || empty( $block['type'] ) ) {
 			return null;
 		}
+		// P4: accept a flat block (`{type:"heading", text, tag, size}`) by hoisting
+		// any non-reserved root keys into `settings`. ~15% less JSON per block and
+		// easier for the composer to write. Nested `settings` still wins on conflict.
+		$block = self::normalize_block( $block );
 		$type = $block['type'];
 		$s    = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
 
@@ -134,9 +138,155 @@ class PressGo_Freeform_Renderer {
 				return self::render_divider( $s, $cfg );
 			case 'form':
 				return self::render_form( $s, $cfg );
+			// P1: component blocks — pre-tuned multi-part units. The composer emits a
+			// semantic block; we build the correct sub-tree so spacing/stars/layout are
+			// baked in and can't be assembled wrong.
+			case 'icon_box':
+				return self::render_block( self::comp_icon_box( $s ), $cfg );
+			case 'feature_card':
+				return self::render_block( self::comp_feature_card( $s ), $cfg );
+			case 'testimonial_card':
+				return self::render_block( self::comp_testimonial_card( $s ), $cfg );
+			case 'stat':
+				return self::render_block( self::comp_stat( $s ), $cfg );
+			case 'quote':
+				return self::render_block( self::comp_quote( $s ), $cfg );
+			// P2: repeat — expand a template N times into a row of cards.
+			case 'repeat':
+				return self::render_block( self::comp_repeat( $block ), $cfg );
 			default:
 				return null;
 		}
+	}
+
+	/** P4: hoist flat root-level keys into `settings` (so `{type, text, tag}` works). */
+	private static function normalize_block( $block ) {
+		$reserved = array( 'type' => 1, 'settings' => 1, 'children' => 1 );
+		$hoist = array();
+		foreach ( $block as $k => $v ) {
+			if ( ! isset( $reserved[ $k ] ) ) { $hoist[ $k ] = $v; }
+		}
+		if ( ! empty( $hoist ) ) {
+			$nested = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
+			$block['settings'] = array_merge( $hoist, $nested ); // nested settings win on conflict
+			foreach ( $hoist as $k => $v ) { unset( $block[ $k ] ); }
+		}
+		return $block;
+	}
+
+	// ── P1 component blocks: each returns a freeform sub-tree (rendered by the
+	// caller through render_block, so widget rendering + layout are reused). ──
+
+	private static function comp_icon_box( $s ) {
+		$align = isset( $s['align'] ) ? $s['align'] : 'left';
+		$kids  = array();
+		if ( ! empty( $s['icon'] ) ) {
+			$kids[] = array( 'type' => 'icon', 'icon' => $s['icon'], 'size' => isset( $s['icon_size'] ) ? $s['icon_size'] : 34, 'color' => isset( $s['accent'] ) ? $s['accent'] : null, 'align' => $align );
+			$kids[] = array( 'type' => 'spacer', 'height' => 14 );
+		}
+		if ( ! empty( $s['title'] ) ) {
+			$kids[] = array( 'type' => 'heading', 'text' => $s['title'], 'tag' => 'h4', 'size' => 21, 'align' => $align );
+		}
+		if ( ! empty( $s['desc'] ) ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 8 );
+			$kids[] = array( 'type' => 'text', 'html' => $s['desc'], 'size' => 15, 'line_height' => 1.6, 'align' => $align );
+		}
+		return array( 'type' => 'col', 'content_align' => $align, 'children' => $kids );
+	}
+
+	private static function comp_feature_card( $s ) {
+		$align = isset( $s['align'] ) ? $s['align'] : 'left';
+		$kids  = array();
+		if ( ! empty( $s['image'] ) ) {
+			$kids[] = array( 'type' => 'image', 'query' => $s['image'], 'radius' => 10 );
+			$kids[] = array( 'type' => 'spacer', 'height' => 16 );
+		}
+		if ( ! empty( $s['icon'] ) ) {
+			$kids[] = array( 'type' => 'icon', 'icon' => $s['icon'], 'size' => 30, 'color' => isset( $s['accent'] ) ? $s['accent'] : null, 'align' => $align );
+			$kids[] = array( 'type' => 'spacer', 'height' => 12 );
+		}
+		if ( ! empty( $s['title'] ) ) { $kids[] = array( 'type' => 'heading', 'text' => $s['title'], 'tag' => 'h4', 'size' => 20, 'align' => $align ); }
+		if ( ! empty( $s['desc'] ) ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 8 );
+			$kids[] = array( 'type' => 'text', 'html' => $s['desc'], 'size' => 15, 'line_height' => 1.6, 'align' => $align );
+		}
+		if ( ! empty( $s['cta'] ) ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 16 );
+			$kids[] = array( 'type' => 'button', 'text' => $s['cta'], 'url' => isset( $s['cta_url'] ) ? $s['cta_url'] : '#', 'bg' => 'transparent', 'color' => isset( $s['accent'] ) ? $s['accent'] : null, 'border_color' => isset( $s['accent'] ) ? $s['accent'] : null, 'align' => $align );
+		}
+		$bg = isset( $s['card_bg'] ) ? $s['card_bg'] : '#ffffff';
+		return array( 'type' => 'col', 'settings' => array( 'background' => $bg, 'radius' => 14, 'shadow' => ! empty( $s['shadow'] ) || ! isset( $s['shadow'] ), 'padding' => 26, 'content_align' => $align ), 'children' => $kids );
+	}
+
+	private static function comp_testimonial_card( $s ) {
+		$align = isset( $s['align'] ) ? $s['align'] : 'left';
+		$kids  = array();
+		if ( ! empty( $s['avatar'] ) ) {
+			$kids[] = array( 'type' => 'image', 'query' => $s['avatar'], 'radius' => 999, 'width' => 60, 'align' => $align );
+			$kids[] = array( 'type' => 'spacer', 'height' => 12 );
+		}
+		$rating = isset( $s['rating'] ) && is_numeric( $s['rating'] ) ? (float) $s['rating'] : 5;
+		$kids[] = array( 'type' => 'star-rating', 'count' => $rating, 'size' => 16, 'align' => $align );
+		$kids[] = array( 'type' => 'spacer', 'height' => 10 );
+		if ( ! empty( $s['quote'] ) ) {
+			$q = trim( $s['quote'] );
+			if ( '"' !== substr( $q, 0, 1 ) ) { $q = '"' . $q . '"'; }
+			$kids[] = array( 'type' => 'text', 'html' => $q, 'size' => 16, 'line_height' => 1.6, 'align' => $align );
+		}
+		$by = trim( ( isset( $s['name'] ) ? $s['name'] : '' ) . ( ! empty( $s['role'] ) ? ' · ' . $s['role'] : '' ) );
+		if ( '' !== $by ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 12 );
+			$kids[] = array( 'type' => 'heading', 'text' => $by, 'tag' => 'h6', 'size' => 13, 'align' => $align );
+		}
+		$bg = isset( $s['card_bg'] ) ? $s['card_bg'] : '#ffffff';
+		return array( 'type' => 'col', 'settings' => array( 'background' => $bg, 'radius' => 14, 'shadow' => true, 'padding' => 26, 'content_align' => $align ), 'children' => $kids );
+	}
+
+	private static function comp_stat( $s ) {
+		$align = isset( $s['align'] ) ? $s['align'] : 'center';
+		$kids  = array();
+		$num   = isset( $s['number'] ) ? $s['number'] : ( isset( $s['value'] ) ? $s['value'] : '' );
+		if ( '' !== (string) $num ) { $kids[] = array( 'type' => 'heading', 'text' => (string) $num, 'tag' => 'h2', 'size' => 48, 'weight' => '800', 'color' => isset( $s['accent'] ) ? $s['accent'] : null, 'align' => $align ); }
+		if ( ! empty( $s['label'] ) ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 6 );
+			$kids[] = array( 'type' => 'text', 'html' => $s['label'], 'size' => 14, 'align' => $align );
+		}
+		return array( 'type' => 'col', 'content_align' => $align, 'children' => $kids );
+	}
+
+	private static function comp_quote( $s ) {
+		$align = isset( $s['align'] ) ? $s['align'] : 'center';
+		$kids  = array( array( 'type' => 'heading', 'text' => isset( $s['text'] ) ? $s['text'] : '', 'tag' => 'h3', 'size' => 30, 'weight' => '500', 'line_height' => 1.35, 'align' => $align ) );
+		if ( ! empty( $s['cite'] ) ) {
+			$kids[] = array( 'type' => 'spacer', 'height' => 14 );
+			$kids[] = array( 'type' => 'heading', 'text' => $s['cite'], 'tag' => 'h6', 'size' => 13, 'align' => $align );
+		}
+		return array( 'type' => 'col', 'content_align' => $align, 'children' => $kids );
+	}
+
+	/**
+	 * P2 repeat: expand a template N times into a row of equal columns. Source:
+	 * `{type:"repeat", count:3, template:{...}, items:[{...overrides}]}` — `items`
+	 * (if given) drives count and per-item settings merged onto the template.
+	 */
+	private static function comp_repeat( $block ) {
+		$s     = isset( $block['settings'] ) && is_array( $block['settings'] ) ? $block['settings'] : array();
+		$tpl   = isset( $s['template'] ) && is_array( $s['template'] ) ? $s['template']
+			: ( isset( $block['children'][0] ) && is_array( $block['children'][0] ) ? $block['children'][0] : null );
+		if ( null === $tpl ) { return array( 'type' => 'col', 'children' => array() ); }
+		$items = isset( $s['items'] ) && is_array( $s['items'] ) ? $s['items'] : array();
+		$count = ! empty( $items ) ? count( $items ) : ( isset( $s['count'] ) ? (int) $s['count'] : 3 );
+		$count = max( 1, min( 12, $count ) ); // bound runaway trees
+		$cols  = array();
+		for ( $i = 0; $i < $count; $i++ ) {
+			$node = $tpl;
+			if ( isset( $items[ $i ] ) && is_array( $items[ $i ] ) ) {
+				$ns = isset( $node['settings'] ) && is_array( $node['settings'] ) ? $node['settings'] : array();
+				$node['settings'] = array_merge( $ns, $items[ $i ] );
+			}
+			$cols[] = $node;
+		}
+		return array( 'type' => 'row', 'settings' => isset( $s['row'] ) && is_array( $s['row'] ) ? $s['row'] : array(), 'children' => $cols );
 	}
 
 	private static function render_children( $block, $cfg ) {

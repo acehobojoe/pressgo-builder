@@ -21,6 +21,18 @@ Containers (`section`, `row`, `col`) hold `children`. Widgets (`heading`, `text`
 - `divider` — a thin rule. `color`, `width` (percent), `align`.
 - `form` — a REAL working form (native Elementor Pro). Use this for any signup / contact / lead capture / newsletter-with-fields. Settings: `fields` (array of `{label, type, required, width}` where type is `text|email|tel|textarea|select`, width is `50` or `100`, and select adds `options:[...]`), `button` (submit label), `on_dark` (true on a dark background so fields render translucent/light), optional `recipient` (a real email; defaults to the site admin). Submissions email the site owner. Example: `{"type":"form","settings":{"on_dark":true,"button":"Subscribe","fields":[{"label":"First Name","type":"text","width":"50"},{"label":"Email","type":"email","required":true,"width":"50"}]}}`.
 
+## Component blocks (PREFER these over hand-assembling cards)
+
+These pre-built units bake in correct spacing, alignment, and mobile behavior. Use them instead of building cards from col+icon+text by hand — they look better and can't render broken.
+- `icon_box` — `{"type":"icon_box","icon":"fas fa-bolt","title":"...","desc":"...","accent":"#E2B714","align":"left"}`. A feature/benefit unit (icon, title, body).
+- `feature_card` — `{"type":"feature_card","title":"...","desc":"...","icon":"fas fa-...","image":"optional photo query","cta":"optional button","card_bg":"#fff"}`. A bordered/shadowed card.
+- `testimonial_card` — `{"type":"testimonial_card","quote":"...","name":"Sarah M.","role":"Verified buyer","rating":5,"avatar":"optional photo query"}`. Atomic review card with a real horizontal star rating. ALWAYS use this for testimonials.
+- `stat` — `{"type":"stat","number":"500+","label":"members","accent":"#E2B714"}`. One big number + label (put 3-4 in a row for a stat band).
+- `quote` — `{"type":"quote","text":"big pull quote","cite":"who said it"}`.
+- `repeat` — render a template N times without writing N copies: `{"type":"repeat","template":{"type":"feature_card",...},"items":[{"title":"A","desc":"..."},{"title":"B","desc":"..."}]}`. `items` supplies per-card values (merged onto the template); or use `"count":4` for identical copies. Capped at 12. Use this for any grid/list (features, team, pricing, steps) so the output stays small.
+
+Flat blocks: you may put settings at the block root instead of nesting — `{"type":"heading","text":"Hi","tag":"h1","size":56}` works the same as `{"type":"heading","settings":{...}}`.
+
 ## Settings cheat sheet
 
 Spacing (`padding`, `margin`) is a single number (all sides) or `{top,right,bottom,left}` in px.
