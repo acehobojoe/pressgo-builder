@@ -480,7 +480,9 @@ class PressGo_Freeform_Renderer {
 			'flex_direction'        => 'row',
 			'flex_direction_mobile' => $is_rating_row ? 'row' : 'column',
 			'flex_wrap'             => 'nowrap',
-			'flex_align_items'      => self::map_vertical_align( isset( $s['vertical_align'] ) ? $s['vertical_align'] : 'top' ),
+			// D2: default to stretch so cards in a row share equal height (ragged
+			// card grids were a recurring QA flag). Explicit vertical_align still wins.
+			'flex_align_items'      => isset( $s['vertical_align'] ) ? self::map_vertical_align( $s['vertical_align'] ) : 'stretch',
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap, 'isLinked' => true,
 			),
@@ -701,6 +703,10 @@ class PressGo_Freeform_Renderer {
 		$w     = PressGo_Widget_Helpers::icon_w( $icon, $color, $size, 'default' );
 		if ( isset( $s['align'] ) ) {
 			$w['settings']['align'] = $s['align'];
+		}
+		// D5: scale a sizable icon down on mobile so it doesn't dominate a stacked card.
+		if ( $size >= 20 ) {
+			$w['settings']['size_mobile'] = array( 'unit' => 'px', 'size' => max( 16, (int) round( $size * 0.75 ) ), 'sizes' => array() );
 		}
 		return $w;
 	}
