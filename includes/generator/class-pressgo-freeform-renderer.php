@@ -379,7 +379,9 @@ class PressGo_Freeform_Renderer {
 			'flex_gap'         => array( 'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true ),
 		);
 
-		self::apply_padding( $settings, $s, array( 'top' => 100, 'right' => 30, 'bottom' => 100, 'left' => 30 ), true );
+		// D1: tighter default vertical rhythm (was 100/100) — every template was
+		// flagged for loose/dead inter-section space. Explicit padding still wins.
+		self::apply_padding( $settings, $s, array( 'top' => 76, 'right' => 30, 'bottom' => 76, 'left' => 30 ), true );
 		self::apply_background( $settings, $s );
 		self::apply_margin( $settings, $s );
 		self::apply_radius_shadow( $settings, $s );
