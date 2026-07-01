@@ -157,6 +157,15 @@ class PressGo_AI_Builder {
 			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(11'] .e-child .elementor-widget-text-editor .elementor-text-editor,\n"
 			. "  .pg-sec--freeform .e-parent.e-con[style*='background-color: rgb(28'] .e-child .elementor-widget-text-editor .elementor-text-editor { color: rgba(255,255,255,0.82) !important; }\n"
 			. "}\n"
+			// Mobile safety net: text wraps cleanly (no mid-word clipping like
+			// 'no-pre nsultation'), form fields fill the width (no cut-off selects),
+			// and nothing forces a horizontal scroll.
+			. "@media (max-width: 767px) {\n"
+			. "  .pg-sec--freeform h1, .pg-sec--freeform h2, .pg-sec--freeform h3, .pg-sec--freeform h4, .pg-sec--freeform h5, .pg-sec--freeform h6, .pg-sec--freeform p, .pg-sec--freeform a, .pg-sec--freeform li, .pg-sec--freeform .elementor-heading-title, .pg-sec--freeform .elementor-widget-text-editor { overflow-wrap: break-word; word-break: normal; hyphens: none; }\n"
+			. "  .pg-sec--freeform .elementor-field-group { width: 100% !important; flex-basis: 100% !important; max-width: 100% !important; }\n"
+			. "  .pg-sec--freeform .elementor-field, .pg-sec--freeform select, .pg-sec--freeform input, .pg-sec--freeform textarea, .pg-sec--freeform .elementor-button { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }\n"
+			. "  .pg-sec--freeform.e-parent { overflow-x: hidden; }\n"
+			. "}\n"
 			. "</style>\n";
 	}
 
