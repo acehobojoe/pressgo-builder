@@ -392,6 +392,9 @@ class PressGo_AI_Builder {
 
 		$new = array();
 		$rendered = 0;
+		// Airy palette: render dark bands LIGHT (on the tint surface) so a pastel look
+		// isn't a bright accent on a near-black body. Non-airy moods keep dark bands.
+		$light_hero = ( '1' === get_option( 'pressgo_brand_light_hero', '' ) );
 		foreach ( $records as $idx => $rec ) {
 			$el = null;
 			if ( ! empty( $rec['source_tree'] ) ) {
@@ -400,8 +403,13 @@ class PressGo_AI_Builder {
 				// $force=true (global recolor). The source tree is passed by value and
 				// never mutated.
 				$role     = ! empty( $rec['rendered_bg_role'] ) ? $rec['rendered_bg_role'] : ( ! empty( $rec['bg_role'] ) ? $rec['bg_role'] : 'light' );
-				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $cfg, true );
-				$el       = PressGo_Freeform_Renderer::render( $overlaid, $cfg, $rec['pg_key'] );
+				$use_cfg  = $cfg;
+				if ( $light_hero && 'dark' === $role ) {
+					$role = 'light';
+					if ( ! empty( $cfg['colors']['tint_bg'] ) ) { $use_cfg['colors']['light_bg'] = $cfg['colors']['tint_bg']; }
+				}
+				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $use_cfg, true );
+				$el       = PressGo_Freeform_Renderer::render( $overlaid, $use_cfg, $rec['pg_key'] );
 				if ( null === $el ) {
 					// Keep the existing element instead of dropping it.
 					if ( isset( $by_marker[ $rec['pg_key'] ] ) ) { $el = $by_marker[ $rec['pg_key'] ]; }
@@ -2193,6 +2201,9 @@ class PressGo_AI_Builder {
 	private function is_brand_change_intent( $message ) {
 		$m = strtolower( (string) $message );
 		if ( preg_match( '/\badd\b.{0,30}\bsection\b/', $m ) ) { return false; } // an explicit add wins
+		// Descriptive / mood / comparative palette requests — "pastel", "softer",
+		// "too dark", "like an ice cream shop" — are brand-change intent now.
+		if ( $this->is_palette_intent( $message ) ) { return true; }
 		if ( preg_match( '/#[0-9a-f]{6}\b/i', $message ) ) { return true; }
 		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|white|cream)';
 		if ( preg_match( '/\b(make|use|change|switch|try|go|set).{0,24}\b' . $colorword . '\b/', $m ) ) { return true; }
@@ -2211,6 +2222,17 @@ class PressGo_AI_Builder {
 		$colors  = array();
 		$fonts   = array();
 		$summary = array();
+
+		// A mood / adjective / business-type / comparative request produces a FULL,
+		// coherent palette (backgrounds + accent + readable text), not a single accent.
+		$pal = $this->generate_palette_from_text( $message );
+		if ( null !== $pal ) {
+			$out = array( 'summary' => $pal['summary'], 'colors' => $pal['colors'] );
+			if ( ! empty( $pal['fonts'] ) )      { $out['fonts']  = $pal['fonts']; }
+			if ( ! empty( $pal['layout'] ) )     { $out['layout'] = $pal['layout']; }
+			if ( ! empty( $pal['light_hero'] ) ) { $out['light_hero'] = true; }
+			return $out;
+		}
 
 		$set_accent = function ( $hex ) use ( &$colors ) {
 			$colors['accent']       = $hex;
@@ -2269,8 +2291,17 @@ class PressGo_AI_Builder {
 		$args = array();
 		if ( ! empty( $change['colors'] ) ) { $args['colors'] = $change['colors']; }
 		if ( ! empty( $change['fonts'] ) ) { $args['fonts'] = $change['fonts']; }
+		if ( ! empty( $change['layout'] ) ) { $args['layout'] = $change['layout']; }
 		PressGo_MCP_Tools::merge_brand_foundation( $args );
 		update_option( 'pressgo_use_site_brand', '1', false );
+		// Airy palettes (pastel/candy/coastal) render dark bands light-on-tint at
+		// repaint — persisted as a site flag (merge_brand_foundation drops non-colors).
+		update_option( 'pressgo_brand_light_hero', ! empty( $change['light_hero'] ) ? '1' : '', false );
+		// Lock the brand so the mood also governs future composes (past the fresh-vibe guard).
+		$dstate = $this->discovery_state( $post_id );
+		if ( ! is_array( $dstate ) ) { $dstate = array(); }
+		$dstate['brand_locked'] = true;
+		$this->save_discovery_state( $post_id, $dstate );
 
 		$res = $this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
 		if ( false === $res ) {
@@ -2545,6 +2576,164 @@ class PressGo_AI_Builder {
 		$cfg           = $palettes[ $vibe ];
 		$cfg['layout'] = array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 );
 		return $cfg;
+	}
+
+	// ── Generative palette flexibility: any mood/description -> a coherent, contrast-
+	//    validated full palette (not a single tinted accent). Reuses the existing
+	//    repaint pipeline; each entry passes safe_bg's gates. ──
+
+	/**
+	 * Curated mood palettes. Each is a COMPLETE, coherent look (validated to satisfy
+	 * safe_bg's luminance/saturation gates). `light_hero` moods render dark bands
+	 * light-on-tint at repaint (so "pastel" isn't a bright accent on a near-black body).
+	 * Only accent/dark_bg/light_bg/text roles are specified; build_mood_cfg fills the rest.
+	 */
+	private function mood_library() {
+		return array(
+			'pastel'    => array( 'keywords' => array( 'pastel', 'soft palette' ), 'summary' => 'a soft pastel palette', 'light_hero' => true, 'font' => 'Poppins', 'radius' => 20,
+				'colors' => array( 'accent' => '#EC6BA8', 'dark_bg' => '#33223A', 'light_bg' => '#FCF6FB', 'tint_bg' => '#F6E4F0', 'text_dark' => '#33223A', 'text_muted' => '#8A6B7C' ) ),
+			'candy'     => array( 'keywords' => array( 'candy', 'ice cream', 'ice-cream', 'gelato', 'sweet', 'sprinkles', 'bubbly' ), 'summary' => 'a bright candy / ice-cream palette', 'light_hero' => true, 'font' => 'Poppins', 'radius' => 999,
+				'colors' => array( 'accent' => '#FF4D8D', 'dark_bg' => '#3E1F33', 'light_bg' => '#FFF5FA', 'tint_bg' => '#FCE3EF', 'text_dark' => '#3E1F33', 'text_muted' => '#8A6B7C' ) ),
+			'playful'   => array( 'keywords' => array( 'playful', 'fun', 'friendly', 'cheerful', 'whimsical' ), 'summary' => 'a playful, friendly palette', 'light_hero' => true, 'font' => 'Poppins', 'radius' => 16,
+				'colors' => array( 'accent' => '#7C3AED', 'dark_bg' => '#241A3D', 'light_bg' => '#FFFBF2', 'tint_bg' => '#EFE9FB', 'text_dark' => '#241A3D', 'text_muted' => '#6B647A' ) ),
+			'earthy'    => array( 'keywords' => array( 'earthy', 'organic', 'natural', 'rustic', 'artisan', 'handmade' ), 'summary' => 'an earthy, organic palette', 'light_hero' => true, 'font' => 'Lora', 'radius' => 10,
+				'colors' => array( 'accent' => '#B45309', 'dark_bg' => '#2A2419', 'light_bg' => '#FBF7F0', 'tint_bg' => '#F0E8DA', 'text_dark' => '#2A2419', 'text_muted' => '#78706A' ) ),
+			'coastal'   => array( 'keywords' => array( 'coastal', 'beach', 'nautical', 'ocean', 'surf', 'seaside' ), 'summary' => 'a fresh coastal palette', 'light_hero' => true, 'font' => 'Poppins', 'radius' => 12,
+				'colors' => array( 'accent' => '#0EA5E9', 'dark_bg' => '#0C2A3A', 'light_bg' => '#F0F9FF', 'tint_bg' => '#DCEEF7', 'text_dark' => '#0C2A3A', 'text_muted' => '#5B7688' ) ),
+			'neon'      => array( 'keywords' => array( 'neon', 'electric', 'vivid', 'loud', 'punchy' ), 'summary' => 'a bold electric palette', 'light_hero' => false, 'font' => 'Manrope', 'radius' => 8,
+				'colors' => array( 'accent' => '#22D3EE', 'dark_bg' => '#0A0A0F', 'light_bg' => '#F4F4F6', 'text_dark' => '#0A0A0F', 'text_muted' => '#5B6470' ) ),
+			'luxe'      => array( 'keywords' => array( 'luxe', 'luxury', 'premium', 'elegant', 'upscale', 'sophisticated' ), 'summary' => 'a refined luxe palette', 'light_hero' => false, 'font' => 'Playfair Display', 'radius' => 6,
+				'colors' => array( 'accent' => '#C4A35A', 'dark_bg' => '#0F0F12', 'light_bg' => '#FAFAF8', 'text_dark' => '#17151A', 'text_muted' => '#6B6560' ) ),
+			'corporate' => array( 'keywords' => array( 'corporate', 'professional', 'clean', 'trustworthy', 'business' ), 'summary' => 'a clean, professional palette', 'light_hero' => false, 'font' => 'Inter', 'radius' => 8,
+				'colors' => array( 'accent' => '#2563EB', 'dark_bg' => '#0F172A', 'light_bg' => '#F8FAFC', 'text_dark' => '#0F172A', 'text_muted' => '#64748B' ) ),
+		);
+	}
+
+	/** Assemble a full validated cfg from a mood entry (fills derived color roles). */
+	private function build_mood_cfg( $key, $mood ) {
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		$c = $mood['colors'];
+		$c['primary']      = $c['accent'];
+		$c['primary_dark'] = PressGo_Style_Utils::shade( $c['accent'], -0.15 );
+		$c['gold']         = $c['accent'];
+		$c['white']        = '#FFFFFF';
+		if ( empty( $c['text_light'] ) ) { $c['text_light'] = 'rgba(255,255,255,0.86)'; }
+		$cfg = array(
+			'colors' => $c,
+			'fonts'  => array( 'heading' => isset( $mood['font'] ) ? $mood['font'] : 'Poppins', 'body' => 'Inter' ),
+			'layout' => array( 'boxed_width' => 1180, 'button_radius' => isset( $mood['radius'] ) ? $mood['radius'] : 12, 'section_padding' => 96 ),
+		);
+		$cfg = $this->validate_palette( $cfg );
+		$cfg['summary'] = isset( $mood['summary'] ) ? $mood['summary'] : ( 'a ' . $key . ' palette' );
+		if ( ! empty( $mood['light_hero'] ) ) { $cfg['light_hero'] = true; }
+		return $cfg;
+	}
+
+	/** Deterministic contrast/luminance guardrails — repair (never reject) a palette. */
+	private function validate_palette( $cfg ) {
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		$c = isset( $cfg['colors'] ) && is_array( $cfg['colors'] ) ? $cfg['colors'] : array();
+		if ( ! empty( $c['light_bg'] ) ) {
+			list( $lum ) = $this->color_lum_sat( $c['light_bg'] );
+			if ( $lum <= 0.82 ) { $h = PressGo_Style_Utils::hex_to_hsl( $c['light_bg'] ); $c['light_bg'] = PressGo_Style_Utils::hsl_to_hex( $h['h'], min( 0.5, $h['s'] ), 0.96 ); }
+		}
+		if ( ! empty( $c['dark_bg'] ) ) {
+			list( $lum ) = $this->color_lum_sat( $c['dark_bg'] );
+			if ( $lum >= 0.28 ) { $h = PressGo_Style_Utils::hex_to_hsl( $c['dark_bg'] ); $c['dark_bg'] = PressGo_Style_Utils::hsl_to_hex( $h['h'], min( 0.6, max( 0.12, $h['s'] ) ), 0.15 ); }
+		}
+		if ( ! empty( $c['accent'] ) ) {
+			list( , $sat ) = $this->color_lum_sat( $c['accent'] );
+			if ( $sat < 0.30 ) { $h = PressGo_Style_Utils::hex_to_hsl( $c['accent'] ); $c['accent'] = PressGo_Style_Utils::hsl_to_hex( $h['h'], 0.5, $h['l'] ); $c['primary'] = $c['accent']; $c['gold'] = $c['accent']; }
+		}
+		if ( ! empty( $c['text_dark'] ) && ! empty( $c['light_bg'] ) ) {
+			$t = 0; while ( $t < 8 && PressGo_Style_Utils::contrast_ratio( $c['text_dark'], $c['light_bg'] ) < 4.5 ) { $c['text_dark'] = PressGo_Style_Utils::shade( $c['text_dark'], -0.1 ); $t++; }
+		}
+		$cfg['colors'] = $c;
+		return $cfg;
+	}
+
+	/**
+	 * Turn ANY style description into a full palette cfg, or null. Four tiers:
+	 * mood keyword -> business-type redirect -> adjective -> comparative nudge on the
+	 * CURRENT palette ("too dark", "softer", "warmer"). This is the entry point that
+	 * makes "make it pastel / like an ice cream shop / too dark" actually restyle.
+	 */
+	private function generate_palette_from_text( $message ) {
+		$m   = strtolower( (string) $message );
+		$lib = $this->mood_library();
+		// Tier 1: direct mood/synonym.
+		foreach ( $lib as $key => $mood ) {
+			foreach ( $mood['keywords'] as $kw ) {
+				if ( preg_match( '/\b' . preg_quote( $kw, '/' ) . '\b/', $m ) ) { return $this->build_mood_cfg( $key, $mood ); }
+			}
+		}
+		// Tier 2: business-type redirect ("make it look like a/an X").
+		$biz = array(
+			'candy'     => 'ice ?cream|gelato|candy|sweets?|toy|kids?|children|dessert',
+			'earthy'    => 'farm|garden|nursery|botanic|florist',
+			'spa'       => 'spa|yoga|wellness|massage|salon',
+			'corporate' => 'law|lawyer|finance|financial|advisor|consult|accountant|insurance|bank',
+			'coastal'   => 'surf|beach|nautical|sail|dive',
+			'luxe'      => 'jewel|couture|boutique|luxury',
+		);
+		foreach ( $biz as $key => $pat ) {
+			if ( isset( $lib[ $key ] ) && preg_match( '/\b(' . $pat . ')\b/', $m ) ) { return $this->build_mood_cfg( $key, $lib[ $key ] ); }
+		}
+		// Tier 3: adjective fallback.
+		$adj = array(
+			'pastel'    => 'soft|softer|gentle|muted|pale|delicate',
+			'playful'   => 'fun|friendly|bubbly|cheerful|whimsical',
+			'luxe'      => 'elegant|classy|refined|high-?end',
+			'earthy'    => 'natural|organic|rustic|warm and earthy',
+			'neon'      => 'bright|bold|vivid|loud|energetic',
+			'corporate' => 'minimal|clean|simple|professional',
+		);
+		foreach ( $adj as $key => $pat ) {
+			if ( isset( $lib[ $key ] ) && preg_match( '/\b(' . $pat . ')\b/', $m ) ) { return $this->build_mood_cfg( $key, $lib[ $key ] ); }
+		}
+		// Tier 4: comparative nudge on the CURRENT palette.
+		if ( preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale)|lighten|darken|lighter|darker|softer|soften|warmer|cooler|brighter|punchier|richer|friendlier|more (muted|vibrant|pastel|subtle|colou?rful|friendly))\b/', $m ) ) {
+			return $this->nudge_palette( $this->cfg_from_foundation(), $m );
+		}
+		return null;
+	}
+
+	/** Shift the WHOLE current palette by a described direction (not just the accent). */
+	private function nudge_palette( $cur_cfg, $m ) {
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		$c = isset( $cur_cfg['colors'] ) && is_array( $cur_cfg['colors'] ) ? $cur_cfg['colors'] : array();
+		$rot = function ( $hex, $deg ) { $h = PressGo_Style_Utils::hex_to_hsl( $hex ); return PressGo_Style_Utils::hsl_to_hex( $h['h'] + $deg, $h['s'], $h['l'] ); };
+		$is_hex = function ( $v ) { return is_string( $v ) && '#' === substr( $v, 0, 1 ) && 7 === strlen( $v ); };
+		$summary = 'adjusted the palette';
+		$light_hero = false;
+		if ( preg_match( '/\b(too dark|lighten|lighter|more light)\b/', $m ) ) {
+			if ( ! empty( $c['light_bg'] ) ) { $h = PressGo_Style_Utils::hex_to_hsl( $c['light_bg'] ); $c['light_bg'] = PressGo_Style_Utils::hsl_to_hex( $h['h'], $h['s'], 0.97 ); }
+			$c['tint_bg'] = isset( $c['light_bg'] ) ? $c['light_bg'] : '#F7F7F5';
+			$light_hero = true; $summary = 'lightened the whole palette';
+		}
+		if ( preg_match( '/\b(softer|soften|muted|more muted|washed ?out|more subtle|pastel)\b/', $m ) ) {
+			foreach ( array( 'accent', 'primary', 'gold', 'text_dark' ) as $k ) {
+				if ( ! empty( $c[ $k ] ) && $is_hex( $c[ $k ] ) ) { $h = PressGo_Style_Utils::hex_to_hsl( $c[ $k ] ); $c[ $k ] = PressGo_Style_Utils::hsl_to_hex( $h['h'], max( 0.0, $h['s'] - 0.2 ), $h['l'] ); }
+			}
+			$summary = 'softened the palette';
+		}
+		if ( preg_match( '/\bwarmer\b/', $m ) )       { foreach ( $c as $k => $v ) { if ( $is_hex( $v ) ) { $c[ $k ] = $rot( $v, -20 ); } } $summary = 'warmed the palette'; }
+		elseif ( preg_match( '/\bcooler\b/', $m ) )   { foreach ( $c as $k => $v ) { if ( $is_hex( $v ) ) { $c[ $k ] = $rot( $v, 20 ); } } $summary = 'cooled the palette'; }
+		if ( preg_match( '/\b(brighter|punchier|richer|more vibrant|more colou?rful)\b/', $m ) && ! empty( $c['accent'] ) ) {
+			$h = PressGo_Style_Utils::hex_to_hsl( $c['accent'] ); $c['accent'] = PressGo_Style_Utils::hsl_to_hex( $h['h'], min( 1.0, $h['s'] + 0.18 ), $h['l'] );
+			$c['primary'] = $c['accent']; $c['gold'] = $c['accent']; $summary = 'made it more vibrant';
+		}
+		$cfg = $this->validate_palette( array( 'colors' => $c ) );
+		if ( $light_hero ) { $cfg['light_hero'] = true; }
+		$cfg['summary'] = $summary;
+		return $cfg;
+	}
+
+	/** True if a message is a whole-palette/style request (routes to handle_brand_change). */
+	private function is_palette_intent( $message ) {
+		if ( null !== $this->generate_palette_from_text( $message ) ) { return true; }
+		$m = strtolower( (string) $message );
+		return (bool) preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale)|softer|soften|warmer|cooler|brighter|punchier|lighten|darken|more (muted|vibrant|pastel|subtle))\b/', $m );
 	}
 
 	// ── Brand confirm / lock-in (Phase 3) ───────────────────────────────────
@@ -3971,6 +4160,11 @@ class PressGo_AI_Builder {
 			if ( '' === $selected_key && $this->is_brand_change_intent( $message ) ) {
 				wp_send_json_success( $this->handle_brand_change( $post_id, $message ) );
 			}
+			// A palette/mood request is page-level even with a section selected — repaint
+			// the whole page (a single-band color tweak lacks palette words -> scoped).
+			if ( '' !== $selected_key && $this->is_palette_intent( $message ) ) {
+				wp_send_json_success( $this->handle_brand_change( $post_id, $message ) );
+			}
 			// Scoped edit: a section is selected and this is a plain edit/request —
 			// change THAT section in place instead of composing a brand-new one. This
 			// is what stops "here's my menu" from spawning an unrelated section.
@@ -4503,7 +4697,14 @@ class PressGo_AI_Builder {
 		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
 		$page_state = $this->freeform_page_state( $post_id );
 
-		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful, opinionated reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason. If they ask about colors/layout/fonts, give a real recommendation based on what's on the page. Do NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n"
+		// If a palette/style request somehow reached chat, DO IT instead of arguing —
+		// the user's taste wins on subjective color/mood calls.
+		if ( $this->is_palette_intent( $message ) ) {
+			$res = $this->handle_brand_change( $post_id, $message );
+			return array( 'text' => isset( $res['note'] ) ? $res['note'] : 'Updated the palette.', 'suggest' => null );
+		}
+
+		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason.\n\nTHE USER'S TASTE WINS. When they state a subjective preference (a color, mood, vibe, font, or 'make it feel X'), do NOT debate it and NEVER open with 'Hold on' or 'I'd push back'. You may note ONE short tradeoff in a single clause, then defer to them. If their words name a concrete change, END with a SUGGEST chip that executes it.\n\nDo NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n"
 			. "IMPORTANT: when you recommend something, or when you ask the user to choose, END your reply with 1 to 3 tappable suggestions so they don't have to type. Put each on its own line, formatted EXACTLY like this:\n[[SUGGEST: Short button label || the exact instruction for me to carry out]]\nThe instruction after || must be a concrete command I can act on right now (e.g. \"add a stats section\", \"make the hero bolder\", \"move the form to the bottom\"). Example: if you suggest a stats band, end with [[SUGGEST: Add a stats band || add a stats section]]. If the user must pick between options, give one SUGGEST per option. Omit the SUGGEST lines only for a pure factual answer with no obvious next step. Never mention the SUGGEST syntax in your prose.\n\n";
 		if ( '' !== $brief && 'pending' !== $brief ) {
 			$system .= "PAGE BRIEF:\n" . $brief . "\n\n";
