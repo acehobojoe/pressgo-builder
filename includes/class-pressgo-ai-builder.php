@@ -402,20 +402,24 @@ class PressGo_AI_Builder {
 				// repaint to the new brand we overlay the section's background ROLE with
 				// $force=true (global recolor). The source tree is passed by value and
 				// never mutated.
-				$role     = ! empty( $rec['rendered_bg_role'] ) ? $rec['rendered_bg_role'] : ( ! empty( $rec['bg_role'] ) ? $rec['bg_role'] : 'light' );
-				$use_cfg  = $cfg;
-				if ( $light_hero && 'dark' === $role ) {
-					$role = 'light';
+				// The SEMANTIC role (dark/light/accent) is stored; the light-hero flip is a
+				// render-time decision only, re-applied fresh each repaint. Persisting the
+				// flip corrupted the role so later moods couldn't restore dark bands.
+				$orig_role   = ! empty( $rec['rendered_bg_role'] ) ? $rec['rendered_bg_role'] : ( ! empty( $rec['bg_role'] ) ? $rec['bg_role'] : 'light' );
+				$render_role = $orig_role;
+				$use_cfg     = $cfg;
+				if ( $light_hero && 'dark' === $orig_role ) {
+					$render_role = 'light';
 					if ( ! empty( $cfg['colors']['tint_bg'] ) ) { $use_cfg['colors']['light_bg'] = $cfg['colors']['tint_bg']; }
 				}
-				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $role, $use_cfg, true );
+				$overlaid = $this->apply_role_overlay( $rec['source_tree'], $render_role, $use_cfg, true );
 				$el       = PressGo_Freeform_Renderer::render( $overlaid, $use_cfg, $rec['pg_key'] );
 				if ( null === $el ) {
 					// Keep the existing element instead of dropping it.
 					if ( isset( $by_marker[ $rec['pg_key'] ] ) ) { $el = $by_marker[ $rec['pg_key'] ]; }
 				} else {
 					$rendered++;
-					$records[ $idx ]['rendered_bg_role'] = $role;
+					$records[ $idx ]['rendered_bg_role'] = $orig_role; // never the flipped role
 				}
 				// Stamp the new palette regardless, so a later reorganize starts from the
 				// current brand (and repaints any kept-on-failure section next pass).
@@ -2234,15 +2238,16 @@ class PressGo_AI_Builder {
 			return $out;
 		}
 
+		// A named color / hex builds a COHERENT full palette around that hue (deep
+		// branded dark_bg, faint-tinted light_bg, readable text) — not just an accent
+		// swapped onto whatever backgrounds were there (which produced navy-on-pink).
 		$set_accent = function ( $hex ) use ( &$colors ) {
-			$colors['accent']       = $hex;
-			$colors['primary']      = $hex;
-			$colors['primary_dark'] = PressGo_Style_Utils::shade( $hex, -0.15 );
-			$colors['gold']         = $hex;
+			$full   = $this->palette_from_accent( $hex );
+			$colors = $full['colors'];
 		};
 		if ( preg_match( '/#([0-9a-f]{6})\b/i', $message, $hm ) ) {
 			$set_accent( '#' . $hm[1] );
-			$summary[] = 'a ' . '#' . strtoupper( $hm[1] ) . ' accent';
+			$summary[] = 'a ' . '#' . strtoupper( $hm[1] ) . ' palette';
 		} else {
 			$named = array(
 				'navy' => '#1E3A8A', 'blue' => '#2563EB', 'sky' => '#0EA5E9', 'teal' => '#0D9488', 'green' => '#16A34A',
@@ -2251,7 +2256,7 @@ class PressGo_AI_Builder {
 				'pink' => '#DB2777', 'rose' => '#E11D48', 'magenta' => '#C026D3', 'black' => '#0F1115', 'charcoal' => '#1F2937', 'slate' => '#475569',
 			);
 			foreach ( $named as $name => $hex ) {
-				if ( preg_match( '/\b' . $name . '\b/', $m ) ) { $set_accent( $hex ); $summary[] = $name . ' as your accent'; break; }
+				if ( preg_match( '/\b' . $name . '\b/', $m ) ) { $set_accent( $hex ); $summary[] = 'a ' . $name . ' palette'; break; }
 			}
 			if ( empty( $colors ) ) { // a transform on the current accent
 				$f   = $this->cfg_from_foundation();
@@ -2692,7 +2697,7 @@ class PressGo_AI_Builder {
 			if ( isset( $lib[ $key ] ) && preg_match( '/\b(' . $pat . ')\b/', $m ) ) { return $this->build_mood_cfg( $key, $lib[ $key ] ); }
 		}
 		// Tier 4: comparative nudge on the CURRENT palette.
-		if ( preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale)|lighten|darken|lighter|darker|softer|soften|warmer|cooler|brighter|punchier|richer|friendlier|more (muted|vibrant|pastel|subtle|colou?rful|friendly))\b/', $m ) ) {
+		if ( preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale|much colou?r|pink|colou?rful)|lighten|darken|lighter|darker|softer|soften|warmer|cooler|brighter|punchier|richer|friendlier|subtler|tone (it|the palette|things|the colou?rs?) down|dial (it|things|the colou?rs?) (down|back)|less colou?r|more (muted|vibrant|pastel|subtle|colou?rful|friendly))\b/', $m ) ) {
 			return $this->nudge_palette( $this->cfg_from_foundation(), $m );
 		}
 		return null;
@@ -2711,7 +2716,7 @@ class PressGo_AI_Builder {
 			$c['tint_bg'] = isset( $c['light_bg'] ) ? $c['light_bg'] : '#F7F7F5';
 			$light_hero = true; $summary = 'lightened the whole palette';
 		}
-		if ( preg_match( '/\b(softer|soften|muted|more muted|washed ?out|more subtle|pastel)\b/', $m ) ) {
+		if ( preg_match( '/\b(softer|soften|muted|more muted|washed ?out|more subtle|subtler|pastel|tone (it|the palette|things|the colou?rs?) down|dial (it|things|the colou?rs?) (down|back)|less colou?r|too much (colou?r|pink|colou?rful))\b/', $m ) ) {
 			foreach ( array( 'accent', 'primary', 'gold', 'text_dark' ) as $k ) {
 				if ( ! empty( $c[ $k ] ) && $is_hex( $c[ $k ] ) ) { $h = PressGo_Style_Utils::hex_to_hsl( $c[ $k ] ); $c[ $k ] = PressGo_Style_Utils::hsl_to_hex( $h['h'], max( 0.0, $h['s'] - 0.2 ), $h['l'] ); }
 			}
@@ -2729,11 +2734,32 @@ class PressGo_AI_Builder {
 		return $cfg;
 	}
 
+	/** Build a coherent full palette around a single accent color (for "make it navy"). */
+	private function palette_from_accent( $hex ) {
+		require_once PRESSGO_PLUGIN_DIR . 'includes/generator/class-pressgo-style-utils.php';
+		$h   = PressGo_Style_Utils::hex_to_hsl( $hex );
+		$hue = $h['h'];
+		$c   = array(
+			'accent'       => $hex,
+			'primary'      => $hex,
+			'primary_dark' => PressGo_Style_Utils::shade( $hex, -0.15 ),
+			'gold'         => $hex,
+			'white'        => '#FFFFFF',
+			'dark_bg'      => PressGo_Style_Utils::hsl_to_hex( $hue, 0.38, 0.11 ), // deep branded dark
+			'light_bg'     => PressGo_Style_Utils::hsl_to_hex( $hue, 0.28, 0.975 ), // barely-tinted light
+			'tint_bg'      => PressGo_Style_Utils::hsl_to_hex( $hue, 0.32, 0.94 ),
+			'text_dark'    => PressGo_Style_Utils::hsl_to_hex( $hue, 0.25, 0.15 ),
+			'text_muted'   => PressGo_Style_Utils::hsl_to_hex( $hue, 0.12, 0.45 ),
+			'text_light'   => 'rgba(255,255,255,0.85)',
+		);
+		return $this->validate_palette( array( 'colors' => $c ) );
+	}
+
 	/** True if a message is a whole-palette/style request (routes to handle_brand_change). */
 	private function is_palette_intent( $message ) {
 		if ( null !== $this->generate_palette_from_text( $message ) ) { return true; }
 		$m = strtolower( (string) $message );
-		return (bool) preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale)|softer|soften|warmer|cooler|brighter|punchier|lighten|darken|more (muted|vibrant|pastel|subtle))\b/', $m );
+		return (bool) preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale|much colou?r|pink|colou?rful)|softer|soften|warmer|cooler|brighter|punchier|lighten|darken|subtler|tone (it|the palette|things|the colou?rs?) down|dial (it|things|the colou?rs?) (down|back)|less colou?r|more (muted|vibrant|pastel|subtle))\b/', $m );
 	}
 
 	// ── Brand confirm / lock-in (Phase 3) ───────────────────────────────────
