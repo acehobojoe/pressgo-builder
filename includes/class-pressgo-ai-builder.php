@@ -4188,7 +4188,7 @@ class PressGo_AI_Builder {
 			}
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
-			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this) up|smart order|less cluttered|improve the (layout|design|look|flow))\b/i', $message ) ) {
+			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive|perfect)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this)( up| this page)?|clean up( the| this)? ?(page)?|smart order|less cluttered|improve the (layout|design|look|flow)|something (does ?n\'?t|does not) look right|something\'?s? (off|wrong|not right)|polish (it|this|the page|the design)|fix the (design|layout|look|page|mobile|spacing)|does (this|it) look (ok|okay|right|good|off|wrong))\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_reorganize( $post_id ) );
 			}
 			// Remove/trim -> delete a section (NEVER add). Casual phrasing too:
