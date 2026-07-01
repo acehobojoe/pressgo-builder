@@ -1991,13 +1991,19 @@ class PressGo_AI_Builder {
 		return $png ? 'data:image/png;base64,' . base64_encode( $png ) : '';
 	}
 
-	/** GLM vision critique (z-ai/glm-4.6v) -> parsed array, or null. */
+	/** The vision model for critiques. GLM's vision models return EMPTY on OpenRouter,
+	 *  so default to a proven-reliable one. Filterable. */
+	private function vision_model() {
+		return (string) apply_filters( 'pressgo_vision_model', 'google/gemini-2.5-flash' );
+	}
+
+	/** OpenRouter vision critique -> parsed array, or null. */
 	private function glm_vision_critique( $key, $data_url, $plan_text ) {
 		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
 			'timeout' => 120,
 			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
 			'body'    => wp_json_encode( array(
-				'model'           => 'z-ai/glm-4.6v',
+				'model'           => $this->vision_model(),
 				'max_tokens'      => 1500,
 				'response_format' => array( 'type' => 'json_object' ),
 				'messages'        => array(
@@ -2010,8 +2016,11 @@ class PressGo_AI_Builder {
 			) ),
 		) );
 		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
-		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
-		$j    = json_decode( $data['choices'][0]['message']['content'] ?? '', true );
+		$data    = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$content = $data['choices'][0]['message']['content'] ?? '';
+		$j       = json_decode( $content, true );
+		// Lenient fallback: some models wrap or prose-pad the JSON — extract the object.
+		if ( ! is_array( $j ) && preg_match( '/\{[\s\S]*\}/', (string) $content, $mm ) ) { $j = json_decode( $mm[0], true ); }
 		return is_array( $j ) ? $j : null;
 	}
 
@@ -2209,7 +2218,7 @@ class PressGo_AI_Builder {
 		// "too dark", "like an ice cream shop" — are brand-change intent now.
 		if ( $this->is_palette_intent( $message ) ) { return true; }
 		if ( preg_match( '/#[0-9a-f]{6}\b/i', $message ) ) { return true; }
-		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|white|cream)';
+		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|silver|indigo|lime|brown|mint|coral|white|cream)';
 		if ( preg_match( '/\b(make|use|change|switch|try|go|set).{0,24}\b' . $colorword . '\b/', $m ) ) { return true; }
 		if ( preg_match( '/\b' . $colorword . '\b.{0,16}\b(accent|theme|palette|colou?rs?|brand|vibe|look)\b/', $m ) ) { return true; }
 		if ( preg_match( '/\b(different|new|change|update|adjust).{0,12}\b(colou?rs?|palette|fonts?)\b/', $m ) ) { return true; }
@@ -2253,7 +2262,8 @@ class PressGo_AI_Builder {
 				'navy' => '#1E3A8A', 'blue' => '#2563EB', 'sky' => '#0EA5E9', 'teal' => '#0D9488', 'green' => '#16A34A',
 				'emerald' => '#059669', 'red' => '#DC2626', 'crimson' => '#B91C1C', 'maroon' => '#7F1D1D', 'orange' => '#EA580C',
 				'amber' => '#F59E0B', 'gold' => '#E2B714', 'yellow' => '#EAB308', 'purple' => '#7C3AED', 'violet' => '#7C3AED',
-				'pink' => '#DB2777', 'rose' => '#E11D48', 'magenta' => '#C026D3', 'black' => '#0F1115', 'charcoal' => '#1F2937', 'slate' => '#475569',
+				'pink' => '#DB2777', 'rose' => '#E11D48', 'magenta' => '#C026D3', 'black' => '#0F1115', 'charcoal' => '#334155', 'slate' => '#475569',
+				'gray' => '#475569', 'grey' => '#475569', 'silver' => '#64748B', 'indigo' => '#4F46E5', 'lime' => '#65A30D', 'brown' => '#92400E', 'mint' => '#10B981', 'coral' => '#F97362',
 			);
 			foreach ( $named as $name => $hex ) {
 				if ( preg_match( '/\b' . $name . '\b/', $m ) ) { $set_accent( $hex ); $summary[] = 'a ' . $name . ' palette'; break; }
