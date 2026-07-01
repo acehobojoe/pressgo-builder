@@ -103,6 +103,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
+		add_action( 'wp_ajax_pressgo_ai_unshackled',   array( $this, 'ajax_unshackled' ) ); // TS/HTML engine toggle
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
 		add_action( 'wp_head',                         array( $this, 'freeform_page_css' ), 20 );
 	}
@@ -4059,6 +4060,71 @@ class PressGo_AI_Builder {
 			echo ' ';
 			@flush();
 		};
+	}
+
+	// ── Unshackled (TypeScript/HTML) engine toggle — the model writes a full,
+	//    self-contained modern landing page with NO Elementor widget constraints,
+	//    so we can compare the ceiling against the Elementor path. ──
+
+	/** Generate a complete self-contained HTML landing page from a brief, or ''. */
+	private function generate_unshackled_html( $brief ) {
+		$key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $key ) { return ''; }
+		$sys = "You are an elite conversion web designer and front-end engineer. Output a COMPLETE, self-contained, production-quality responsive HTML landing page as a SINGLE document (<!doctype html> ... </html>). Modern CSS in one <style> block (flexbox/grid, CSS variables, tasteful gradients, hover states, subtle reveal animations); NO frameworks, NO Elementor, NO WordPress. Use real placeholder photos from https://images.unsplash.com with queries that fit the business. Match the depth and polish of a top agency landing page: sticky nav, a hero with an inline lead-form card, a services/features grid with real photos, a them-vs-us comparison, a team/credibility section, numbered how-it-works steps, testimonials with stars, an FAQ, a strong final CTA, and a rich footer. Mobile-perfect, cohesive palette, confident type. Preserve any real names, numbers, and details from the brief EXACTLY. Zero em dashes. Output ONLY the HTML, no prose, no code fences.";
+		$body = wp_json_encode( array(
+			'model'       => (string) apply_filters( 'pressgo_unshackled_model', 'z-ai/glm-5.2' ),
+			'max_tokens'  => 20000,
+			'temperature' => 0.6,
+			'messages'    => array(
+				array( 'role' => 'system', 'content' => $sys ),
+				array( 'role' => 'user', 'content' => "Build a landing page for this business:\n" . $brief ),
+			),
+		) );
+		$ch = curl_init( 'https://openrouter.ai/api/v1/chat/completions' );
+		curl_setopt_array( $ch, array(
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => $body,
+			CURLOPT_HTTPHEADER     => array( 'Content-Type: application/json', 'Authorization: Bearer ' . $key ),
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_TIMEOUT        => 240,
+		) );
+		$out  = curl_exec( $ch );
+		$code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		if ( 200 !== $code || ! $out ) { return ''; }
+		$j    = json_decode( $out, true );
+		$html = isset( $j['choices'][0]['message']['content'] ) ? $j['choices'][0]['message']['content'] : '';
+		$html = preg_replace( '/^```html\s*/i', '', trim( (string) $html ) );
+		$html = preg_replace( '/```\s*$/', '', $html );
+		return ( false !== stripos( $html, '<html' ) ) ? $html : '';
+	}
+
+	/** Build the unshackled HTML page for a post, save it as a static file in
+	 *  uploads, and return its public URL (or ''). */
+	private function build_unshackled_html( $post_id ) {
+		$brief = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		$st    = $this->discovery_state( $post_id );
+		if ( is_array( $st ) && ! empty( $st['business'] ) ) { $brief = trim( $st['business'] . "\n" . $brief ); }
+		if ( '' === trim( $brief ) ) { $brief = (string) get_the_title( $post_id ); }
+		$html = $this->generate_unshackled_html( $brief );
+		if ( '' === $html ) { return ''; }
+		$up  = wp_upload_dir();
+		$dir = trailingslashit( $up['basedir'] ) . 'pg-unshackled';
+		if ( ! is_dir( $dir ) ) { wp_mkdir_p( $dir ); }
+		file_put_contents( $dir . '/' . absint( $post_id ) . '.html', $html );
+		update_post_meta( $post_id, '_pressgo_unshackled_html', $html );
+		return trailingslashit( $up['baseurl'] ) . 'pg-unshackled/' . absint( $post_id ) . '.html?v=' . time();
+	}
+
+	/** AJAX: build the unshackled version and return its preview URL. */
+	public function ajax_unshackled() {
+		$this->check_auth();
+		@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.IniSet
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id ) { wp_send_json_error( 'No post.', 400 ); }
+		$url = $this->build_unshackled_html( $post_id );
+		if ( '' === $url ) { wp_send_json_error( 'Unshackled build failed (no HTML returned).', 422 ); }
+		wp_send_json_success( array( 'url' => $url ) );
 	}
 
 	public function ajax_freeform() {

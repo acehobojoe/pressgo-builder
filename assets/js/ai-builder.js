@@ -293,6 +293,33 @@
 	function closeModeMenu() {
 		if (modeMenu) { modeMenu.hidden = true; if (modeBtn) modeBtn.setAttribute('aria-expanded', 'false'); }
 	}
+	// Unshackled (HTML) engine toggle — build a full self-contained HTML page with
+	// no Elementor constraints and open it, so the ceiling can be compared to the
+	// Elementor render. A floating pill so it doesn't disturb the existing layout.
+	(function () {
+		var ub = document.createElement('button');
+		ub.type = 'button';
+		ub.textContent = '⚡ Unshackled (HTML)';
+		ub.title = 'Build this page with the unshackled HTML engine (no Elementor) and open it in a new tab';
+		ub.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;border:none;background:linear-gradient(135deg,#0f0f12,#3a3a44);color:#fff;padding:10px 16px;border-radius:999px;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.35);';
+		ub.addEventListener('click', function () {
+			ub.disabled = true; ub.style.opacity = '0.6'; ub.textContent = '⚡ Building… (~1 min)';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_unshackled');
+			fd.append('nonce', cfg.nonce);
+			fd.append('post_id', cfg.postId);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					ub.disabled = false; ub.style.opacity = '1'; ub.textContent = '⚡ Unshackled (HTML)';
+					if (j && j.success && j.data && j.data.url) { window.open(j.data.url, '_blank'); }
+					else { alert('Unshackled build failed: ' + ((j && j.data) ? (j.data.message || j.data) : 'unknown')); }
+				})
+				.catch(function () { ub.disabled = false; ub.style.opacity = '1'; ub.textContent = '⚡ Unshackled (HTML)'; alert('Network error building the unshackled version.'); });
+		});
+		document.body.appendChild(ub);
+	})();
+
 	if (modeBtn && modeMenu) {
 		applyMode(pgMode);
 		modeBtn.addEventListener('click', function (e) {
