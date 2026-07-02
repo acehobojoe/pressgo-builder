@@ -53,6 +53,22 @@ Layout tricks you have:
 - Narrow centered measure: small section `max_width` (e.g. 760) or `max_text_width` on text.
 - Stat band: a `row` with 3-4 equal `col`s, each holding a big number (heading, h2, 48-56px, weight 800, accent color) over a small uppercase label (text, 14-15px, tracked, muted color). No images, no cards, just numbers and labels on a contrasting background. Use this for "by the numbers" or "results" bands.
 
+## Gold-standard section patterns (use these shapes when the request names them)
+
+- SECTION HEADER KIT: body sections open with a tiny uppercase tracked EYEBROW naming the section's job ("THE DIFFERENCE", "KNOW THE WARNING SIGNS"), an H2 written as a claim (never a label), and a 1-2 line subhead that ends by pointing at the page's one offer.
+- CTA DISCIPLINE: ONE first-person CTA label for the whole page ("Get My Free Estimate", "BOOK MY FREE INTRO") on identical accent buttons. Under any submit, a 3-part reassurance line: no obligation + response-time promise + privacy.
+- HERO FORM CARD (only when the request asks): dark photo hero split 55/45. Left: credential eyebrow, offer H1, risk-reversal subhead, 3-4 check-icon trust rows, "Prefer to call?" line. Right: white rounded card with form title, speed microcopy, a real `form` (max 6 fields, ONE qualifying select), full-width accent submit, reassurance microcopy.
+- THEM-VS-US: never a 3-column table. 5-6 full-width stacked cards, each: feature as title, then a bold blunt brand claim ("Yes. Certified and trained.") over a muted competitor caricature ("Most: one guy and a rented saw"). Label + both answers live in every card so mobile stacking keeps meaning. The competitor is an archetype ("the average [trade] guy"), never a real business.
+- WARNING-SIGNS CHECKLIST: one bordered card of 6 icon_box rows (amber fas fa-exclamation-triangle), each a concrete observable symptom the reader can check from their window; the intro line turns the list into a CTA trigger.
+- PAIN MIRROR: 5-6 stacked second-person pain lines written verbatim as the prospect would say them, one persona per line, small accent markers; close with a short italic empathy paragraph pivoting to the mechanism the business sells.
+- FOUNDER/TEAM CARDS: portrait photo, accent uppercase name, credential line as its own subhead, bio written as who this person is FOR (situations they fix, not a resume), ending in a short italic signature one-liner.
+- NUMBERED STEPS: 3 columns, oversized accent numeral + H4 title + 2 lines; step 1 de-risks the CTA itself ("free", "a relaxed conversation"), step 3 ends on a payoff sentence.
+- STAT BAND: 3-4 `stat` blocks on a contrasting band using ONLY numbers the brief supplies; with none, build a trust strip instead (star-rating only if a real rating was given, plus bold credential words).
+- LEAD MAGNET: split with FREE DOWNLOAD eyebrow + curiosity-question H2 + guide image, beside a contrasting card holding a Name+Email-only `form`, a benefit-labeled submit ("GET THE GUIDE"), and one privacy line.
+- SERVICE AREA: real towns as 2-3 short bold text columns (never dozens of tiny pill columns — they stack 1-up on mobile), 2-3 anchor cities in the accent color, a "Don't see your area? Reach out anyway." fallback, then a "Based in [city]" split card with a map/terrain photo.
+- FAQ OBJECTION LADDER: 5-6 static Q/A pairs ordered cost -> credentials -> scariest-scenario fear -> speed -> logistics, questions in the visitor's voice, answers that re-sell (restate phone/hours/guarantee); close with "Still have questions?" + the CTA.
+- COPY DNA: quantified speed over vague speed ("usually the same day", "7 days a week"); credentials repeated across sections; region and town names woven in; benefit+reassurance pairs ("Stumps gone, yard smooth. No trip hazards, no regrowth."); testimonials are 3-4 sentence first-person stories that each prove ONE page promise and end on relief.
+
 ## Hard rules (the output must obey these or it renders broken)
 
 1. Root is exactly one `section`. One band per section call.

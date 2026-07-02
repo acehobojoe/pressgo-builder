@@ -1322,29 +1322,118 @@ class PressGo_AI_Builder {
 		return isset( $map[ $value ] ) ? $map[ $value ] : '';
 	}
 
-	/** Candidate next sections for a page goal (homepage vs paid landing page). */
-	private function section_suggestions( $goal ) {
-		if ( 'browse' === $goal ) {
-			return array(
-				array( 'key' => 'services',     'label' => 'Services',    'request' => 'Add a section showing the main services or what we offer, as clean cards.' ),
-				array( 'key' => 'about',        'label' => 'About us',     'request' => 'Add an about section: our story and what makes us different.' ),
-				array( 'key' => 'testimonials', 'label' => 'Reviews',      'request' => 'Add a testimonials section with customer reviews.' ),
-				array( 'key' => 'team',         'label' => 'Team',         'request' => 'Add a team section introducing our people.' ),
-				array( 'key' => 'gallery',      'label' => 'Gallery',      'request' => 'Add a gallery section showing examples of our work.' ),
-				array( 'key' => 'faq',          'label' => 'FAQ',          'request' => 'Add a frequently asked questions section.' ),
-				array( 'key' => 'contact',      'label' => 'Contact',      'request' => 'Add a contact section with a form and our details.' ),
-				array( 'key' => 'cta',          'label' => 'Final CTA',    'request' => 'Add a final call to action section.' ),
-			);
-		}
-		return array(
-			array( 'key' => 'benefits',     'label' => 'Benefits',     'request' => 'Add a benefits section: the top reasons to choose us.' ),
-			array( 'key' => 'how',          'label' => 'How it works', 'request' => 'Add a how it works section with three simple steps.' ),
-			array( 'key' => 'testimonials', 'label' => 'Reviews',      'request' => 'Add a social proof section with customer reviews.' ),
-			array( 'key' => 'features',     'label' => 'Features',     'request' => 'Add a features section highlighting what sets us apart.' ),
-			array( 'key' => 'pricing',      'label' => 'Pricing',      'request' => 'Add a pricing or offer section.' ),
-			array( 'key' => 'faq',          'label' => 'FAQ',          'request' => 'Add a frequently asked questions section.' ),
-			array( 'key' => 'cta',          'label' => 'Final CTA',    'request' => 'Add a final call to action section.' ),
+	/**
+	 * The full narrative arc per goal — the gold-standard ~11-section conversion
+	 * story (modeled on the owner's reference landers). tier 'core' builds in the
+	 * whole-page run (hero + 5 core = exactly the free daily cap of 6 builds);
+	 * 'extended' is offered as a continuation after the core run finishes. The
+	 * REQUEST strings are the product: each encodes a proven section pattern the
+	 * composer prompt teaches (see "Gold-standard section patterns").
+	 */
+	private function arc_library( $goal ) {
+		// ── Shared requests (identical across goals) ──
+		$badges = 'Add a slim trust-badge strip as a bridge under the hero: one centered row, tight vertical padding (40-50px), on the alternate background. Include a star-rating block plus a short rating line ONLY if the brief gave a real rating; otherwise skip stars entirely. Then 3-4 bold credential words from the brief (licensed, insured, certified, years in business) as inline text separated by middots, all in one text block so it stacks cleanly on mobile.';
+		$compare = 'Add a them-vs-us comparison: eyebrow "THE DIFFERENCE", H2 naming a competitor archetype (like "Why [business], not the average [trade] guy"). Build 5-6 comparison cards STACKED VERTICALLY, one per row, each card full page width (a col per card, one under the other — NEVER columns side by side and NEVER a table): title = the feature, desc = a blunt bold brand claim ("Yes. Certified and trained.") followed by a muted one-line competitor caricature ("Most: a vague verbal number, surprises later"). Each card keeps the label and both answers together so it reads perfectly stacked on mobile. Close with the page\'s single accent CTA button.';
+		$proof = 'Add social proof: an eyebrow like "5-STAR REVIEWS", an H2 claim like "What [region] customers say", then 3 testimonial_card blocks in a row. Write each quote as a 3-4 sentence first-person mini story that proves ONE specific promise this page makes (speed, quality/cleanup, a scary situation handled calmly), ending on relief; names are first-name-plus-initial with a nearby town or descriptor as the role. Never invent an aggregate count or rating unless the brief supplied one.';
+		$checklist = 'Add a warning-signs checklist: eyebrow "KNOW THE WARNING SIGNS", H2 naming the risk, and an intro line that converts the list into a CTA trigger ("Spot any of these and it\'s worth a free [offer]"). Then one bordered card (a col with border, radius, padding) holding 6 icon_box rows with amber fas fa-exclamation-triangle icons, each a concrete observable symptom the reader can check themselves, no abstract danger talk. Close with the accent CTA button.';
+		$how = 'Add a numbered 3-step section: eyebrow "HOW IT WORKS", H2 "How to get started", one-line subhead. Three equal columns, each an oversized accent numeral heading (1, 2, 3) over an H4 step title and 2 lines of copy; step 1 must de-risk the CTA itself ("free", "a relaxed conversation, no pressure") and step 3 must end on a payoff sentence. Close with the single accent CTA button.';
+		$founders = 'Add a founders/team section: centered H2 "Meet the founders" (or team), then a 2-up row of cards each with a real portrait photo query, the name as an accent uppercase heading, their credential line from the brief as its own smaller subhead, and a 3-4 sentence bio written as WHO THIS PERSON IS FOR (the situations they fix), never a resume. End each card with one short italic signature line. Use only credentials the brief gives; if there is only one person, make it a single asymmetric split profile instead.';
+		$stats = 'Add a stat band: 3-4 stat blocks in one row on the contrasting background, each a big accent number over a small tracked uppercase label. Use ONLY numbers present in the brief or already on the page (years, team size, jobs done, a real rating); if there are no real numbers, build a credibility band of 3-4 icon_box claims instead — never invent counts.';
+		$areas = 'Add a service-area section: eyebrow "SERVICE AREA", H2 "Serving [region]", subhead ending with the fallback "Don\'t see your area? Reach out anyway." List the real towns from the brief as 2-3 short columns of bold text lines (never dozens of tiny pills — columns must stack cleanly on mobile), with 2-3 anchor cities emphasized in the accent color. Below, an asymmetric split card: a map/terrain photo query beside "Based in [city], serving [region]" and the accent CTA button. Use only real place names given.';
+		$faq = 'Add an FAQ: eyebrow "FAQ", H2 in the visitor\'s voice ("Your questions, answered"), then a static list of 5-6 bold-question + 2-3-sentence-answer pairs with NO expand affordance, ordered as an objection ladder: cost first, then credentials/proof, then the scariest-scenario fear, then speed, then logistics. Answers re-sell: restate the phone, hours, or guarantee where the brief provides them. Close with a "Still have questions?" line and the accent CTA button (plus a call button beside it only if a real phone number exists).';
+		$magnet = 'Add a lead-magnet section: an asymmetric split with a "FREE DOWNLOAD" eyebrow, a curiosity-question H2 ("Want to know why X isn\'t working?"), 2-3 lines including a humility hook ("It\'s short, it\'s free, and it might explain a lot"), and an image query suggesting the guide. In the other column, a contrasting card with a real form block of ONLY Name and Email, a benefit-labeled submit like "GET THE GUIDE" (never "Submit"), and one privacy reassurance line under the button. This is an intentional second capture path for not-ready-yet visitors — build the form.';
+		$pain = 'Add a pain-mirror section: eyebrow "WHAT WE HEAR", H2 "If any of this sounds familiar, you\'re in the right place." Then 5-6 stacked rows (repeat of icon_box, left aligned, small accent marker icons), each ONE pain line written verbatim as the prospect would say it, one distinct persona per line (beginner, tried-and-failed, aging or injured, plateaued, time-poor). Pair the list with a real photo in an asymmetric split, and close with a short italic empathy paragraph that pivots to the mechanism: they needed [what this business does] built around their situation.';
+
+		// ── Goal-specific requests ──
+		$svc_grid = 'Add a services section: uppercase accent eyebrow "OUR SERVICES", an H2 written as a claim ("Whatever you need, [business] handles it"), and a one-line subhead that ends by pointing at the free offer. Below, 6 feature_card blocks arranged as TWO rows of THREE cards each (two separate 3-card rows — never all 6 in one row), each with a real job-photo query, the service name as its title, and exactly 2 lines of outcome-plus-reassurance copy ("Result first. Fear removed second."). ONE shared centered accent CTA button under the grid, no per-card buttons.';
+		$offers3 = 'Add the offers section: centered eyebrow like "HOW WE WORK", an H2 framing the specific problem this business was built to solve, and a short honest them-vs-us paragraph that grants each alternative its strength before its flaw and ends "so we combined the strengths of each" (only if alternatives genuinely exist for this business). Then 3 photo-top feature_cards naming each offer with concrete specifics from the brief (group sizes, session length, what\'s included), no prices. ONE shared centered CTA button under all three — the consult picks the program, not the visitor.';
+		$benefits_buy = 'Add a benefits section: eyebrow, claim H2, then a repeat grid of 3-4 icon_box or feature_card blocks, each pairing a life-level outcome headline with a one-line mechanism clause so results feel caused, not promised. Copy stays in the customer\'s terms, not product jargon. Close with the single accent CTA button.';
+		$pricing_buy = 'Add the offer/pricing section: eyebrow "PRICING", claim H2, then cards for the real tiers or products from the brief (feature_card repeat; visibly highlight one recommended option with an accent border). Show only prices and inclusions actually given (placeholder tier names are OK if none were, but never invent discounts or urgency). Per-card CTA buttons are allowed here, labeled specifically per tier.';
+		$about_browse = 'Add an about section: an asymmetric split with a real photo of the people or place, a "WHY US" style eyebrow, an H2 written as a claim, and two short paragraphs (values first, then method) with the single strongest credential phrase bolded. Close with the accent CTA button.';
+		$gallery_browse = 'Add a gallery section: eyebrow "OUR WORK", claim H2, then a repeat grid of 6 image blocks with varied specific photo queries matching this business\'s actual work, rounded corners. One shared CTA button below. Clean static grid, no lightbox or carousel affordances.';
+
+		// ── Final CTA per goal ──
+		$cta_form = 'Add the final CTA section on the dark background: centered H2 restating the free offer ("Get your free [offer] today"), a subhead stacking the page\'s credibility words plus "Or call [number]" if a real phone exists. Then a centered white rounded card with a REAL form block repeating the hero lead form (same fields, same benefit-worded submit label). Yes, this is intentionally a second form: it is the bottom-of-page capture so nobody scrolls back. Under the submit, one small reassurance line: no obligation + a response-time promise + "We never share your info."';
+		$cta_call = 'Add the final CTA band: dark background, centered H2 restating the offer, one reassurance line, then the real phone number as a huge heading with a tel:-linked accent button as the PRIMARY action. Below it, a compact white card titled "Prefer we call you?" with a real 3-field callback form (name, phone, best time to call) — an intentional second capture path, build it. Stack both paths centered so mobile stays clean.';
+		$cta_book = 'Add the final CTA section: centered H2 "Ready to take the first step?", an accent sub-line "It starts with a free [consultation/intro]", and ONE expectation-setting sentence that de-risks the ask ("You\'ll meet the team, talk through your goals, and get clarity on the right fit"). Below, a white card with a real form block: Name, Phone, Email, plus a "What are you looking for?" select whose options are the offers from this page plus "Not sure yet". Submit label is a benefit phrase like "BOOK MY FREE INTRO", with one privacy reassurance line under it.';
+		$cta_buy = 'Add the final CTA band: centered H2 restating the offer with its strongest real number if one exists, one risk-reversal line (guarantee or free trial, only if the brief gives one), and ONE big accent button with the page\'s CTA label. If the brief includes real urgency (a deadline, limited spots) state it plainly; never invent scarcity. Short centered band on the dark background.';
+		$cta_browse = 'Add a final CTA with contact capture: an H2 inviting the next step, a short line with the real phone/address/hours if given, and a compact real form block (name, email, message) inside a card so visitors can reach out from this page. One accent submit with a specific label, never "Submit".';
+
+		$C = 'core'; $E = 'extended';
+		$arcs = array(
+			'form' => array(
+				array( 'key' => 'badges',       'label' => 'Trust strip',      'tier' => $C, 'request' => $badges ),
+				array( 'key' => 'services',     'label' => 'Services',        'tier' => $C, 'request' => $svc_grid ),
+				array( 'key' => 'compare',      'label' => 'Why us vs them',   'tier' => $C, 'request' => $compare ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',         'tier' => $C, 'request' => $proof ),
+				array( 'key' => 'cta',          'label' => 'Final CTA + form', 'tier' => $C, 'request' => $cta_form ),
+				array( 'key' => 'checklist',    'label' => 'Warning signs',   'tier' => $E, 'request' => $checklist ),
+				array( 'key' => 'how',          'label' => 'How it works',    'tier' => $E, 'request' => $how ),
+				array( 'key' => 'founders',     'label' => 'Meet the team',   'tier' => $E, 'request' => $founders ),
+				array( 'key' => 'areas',        'label' => 'Service area',    'tier' => $E, 'request' => $areas ),
+				array( 'key' => 'faq',          'label' => 'FAQ',             'tier' => $E, 'request' => $faq ),
+				array( 'key' => 'stats',        'label' => 'Stat band',       'tier' => $E, 'request' => $stats ),
+			),
+			'call' => array(
+				array( 'key' => 'badges',       'label' => 'Trust strip',    'tier' => $C, 'request' => $badges ),
+				array( 'key' => 'services',     'label' => 'Services',      'tier' => $C, 'request' => $svc_grid ),
+				array( 'key' => 'compare',      'label' => 'Why us vs them', 'tier' => $C, 'request' => $compare ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',       'tier' => $C, 'request' => $proof ),
+				array( 'key' => 'cta',          'label' => 'Call-now CTA',  'tier' => $C, 'request' => $cta_call ),
+				array( 'key' => 'areas',        'label' => 'Service area',  'tier' => $E, 'request' => $areas ),
+				array( 'key' => 'checklist',    'label' => 'Warning signs', 'tier' => $E, 'request' => $checklist ),
+				array( 'key' => 'founders',     'label' => 'Meet the team', 'tier' => $E, 'request' => $founders ),
+				array( 'key' => 'faq',          'label' => 'FAQ',           'tier' => $E, 'request' => $faq ),
+				array( 'key' => 'how',          'label' => 'How it works',  'tier' => $E, 'request' => $how ),
+				array( 'key' => 'stats',        'label' => 'Stat band',     'tier' => $E, 'request' => $stats ),
+			),
+			'book' => array(
+				array( 'key' => 'pain',         'label' => 'Sounds familiar?',     'tier' => $C, 'request' => $pain ),
+				array( 'key' => 'services',     'label' => 'Ways to work with us', 'tier' => $C, 'request' => $offers3 ),
+				array( 'key' => 'founders',     'label' => 'Meet the founders',    'tier' => $C, 'request' => $founders ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',              'tier' => $C, 'request' => $proof ),
+				array( 'key' => 'cta',          'label' => 'Book CTA + form',      'tier' => $C, 'request' => $cta_book ),
+				array( 'key' => 'how',          'label' => '3 simple steps',       'tier' => $E, 'request' => $how ),
+				array( 'key' => 'stats',        'label' => 'Stat band',            'tier' => $E, 'request' => $stats ),
+				array( 'key' => 'magnet',       'label' => 'Free guide',           'tier' => $E, 'request' => $magnet ),
+				array( 'key' => 'faq',          'label' => 'FAQ',                  'tier' => $E, 'request' => $faq ),
+				array( 'key' => 'areas',        'label' => 'Location',             'tier' => $E, 'request' => $areas ),
+			),
+			'buy' => array(
+				array( 'key' => 'pain',         'label' => 'The problem',    'tier' => $C, 'request' => $pain ),
+				array( 'key' => 'benefits',     'label' => 'Benefits',       'tier' => $C, 'request' => $benefits_buy ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',        'tier' => $C, 'request' => $proof ),
+				array( 'key' => 'pricing',      'label' => 'Pricing',        'tier' => $C, 'request' => $pricing_buy ),
+				array( 'key' => 'cta',          'label' => 'Final CTA',      'tier' => $C, 'request' => $cta_buy ),
+				array( 'key' => 'compare',      'label' => 'Why us vs them', 'tier' => $E, 'request' => $compare ),
+				array( 'key' => 'how',          'label' => 'How it works',   'tier' => $E, 'request' => $how ),
+				array( 'key' => 'stats',        'label' => 'Stat band',      'tier' => $E, 'request' => $stats ),
+				array( 'key' => 'faq',          'label' => 'FAQ',            'tier' => $E, 'request' => $faq ),
+				array( 'key' => 'magnet',       'label' => 'Free guide',     'tier' => $E, 'request' => $magnet ),
+			),
+			'browse' => array(
+				array( 'key' => 'services',     'label' => 'Services',      'tier' => $C, 'request' => $svc_grid ),
+				array( 'key' => 'about',        'label' => 'About us',      'tier' => $C, 'request' => $about_browse ),
+				array( 'key' => 'stats',        'label' => 'Stat band',     'tier' => $C, 'request' => $stats ),
+				array( 'key' => 'testimonials', 'label' => 'Reviews',       'tier' => $C, 'request' => $proof ),
+				array( 'key' => 'cta',          'label' => 'Contact CTA',   'tier' => $C, 'request' => $cta_browse ),
+				array( 'key' => 'founders',     'label' => 'Meet the team', 'tier' => $E, 'request' => $founders ),
+				array( 'key' => 'gallery',      'label' => 'Gallery',       'tier' => $E, 'request' => $gallery_browse ),
+				array( 'key' => 'faq',          'label' => 'FAQ',           'tier' => $E, 'request' => $faq ),
+				array( 'key' => 'areas',        'label' => 'Service area',  'tier' => $E, 'request' => $areas ),
+				array( 'key' => 'magnet',       'label' => 'Free guide',    'tier' => $E, 'request' => $magnet ),
+			),
 		);
+		return isset( $arcs[ $goal ] ) ? $arcs[ $goal ] : $arcs['browse'];
+	}
+
+	/** Candidate next sections for a page goal — a projection of the arc library. */
+	private function section_suggestions( $goal ) {
+		$out = array();
+		foreach ( $this->arc_library( $goal ) as $s ) {
+			$out[] = array( 'key' => $s['key'], 'label' => $s['label'], 'request' => $s['request'] );
+		}
+		return $out;
 	}
 
 	/** Next-section suggestion chips (excludes what's already built), or null. */
@@ -1396,22 +1485,18 @@ class PressGo_AI_Builder {
 	 * always ending on a dedicated call-to-action (the form/booking lives there,
 	 * which keeps it out of the hero). Skips anything already built.
 	 */
-	private function whole_page_plan( $state ) {
+	private function whole_page_plan( $state ) { return $this->plan_for_tier( $state, 'core' ); }
+
+	/** The deeper sections offered as a continuation after the core run. */
+	private function extended_plan( $state ) { return $this->plan_for_tier( $state, 'extended' ); }
+
+	private function plan_for_tier( $state, $tier ) {
 		$goal  = ! empty( $state['answers']['goal'] ) ? $state['answers']['goal'] : 'browse';
 		$built = isset( $state['built_keys'] ) && is_array( $state['built_keys'] ) ? $state['built_keys'] : array();
-		$core  = ( 'browse' === $goal )
-			? array( 'services', 'about', 'testimonials', 'cta' )
-			: array( 'benefits', 'how', 'testimonials', 'cta' );
-		$by_key = array();
-		foreach ( $this->section_suggestions( $goal ) as $s ) { $by_key[ $s['key'] ] = $s; }
-		$plan = array();
-		foreach ( $core as $key ) {
-			if ( in_array( $key, $built, true ) || empty( $by_key[ $key ] ) ) { continue; }
-			$plan[] = array(
-				'request' => $by_key[ $key ]['request'],
-				'label'   => $by_key[ $key ]['label'],
-				'key'     => $key,
-			);
+		$plan  = array();
+		foreach ( $this->arc_library( $goal ) as $s ) {
+			if ( $tier !== $s['tier'] || in_array( $s['key'], $built, true ) ) { continue; }
+			$plan[] = array( 'request' => $s['request'], 'label' => $s['label'], 'key' => $s['key'] );
 		}
 		return $plan;
 	}
@@ -1437,6 +1522,10 @@ class PressGo_AI_Builder {
 			'services' => 'services', 'about' => 'about', 'testimonials' => 'proof', 'reviews' => 'proof',
 			'team' => 'team', 'gallery' => 'gallery', 'faq' => 'faq', 'contact' => 'cta', 'cta' => 'cta',
 			'pricing' => 'pricing', 'benefits' => 'features', 'features' => 'features', 'how' => 'steps', 'steps' => 'steps',
+			// Deep-arc keys (gold-standard narrative sections).
+			'badges' => 'social_proof', 'pain' => 'pain', 'compare' => 'compare', 'founders' => 'team',
+			'checklist' => 'checklist', 'magnet' => 'magnet', 'areas' => 'areas', 'stats' => 'stats',
+			'offers' => 'pricing',
 		);
 		return isset( $map[ $key ] ) ? $map[ $key ] : '';
 	}
@@ -1531,6 +1620,13 @@ class PressGo_AI_Builder {
 		if ( preg_match( '/\b(faq|frequently asked|questions?)\b/', $b ) )                       { return 'faq'; }
 		if ( preg_match( '/\b(reviews?|testimonials?|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
 		if ( preg_match( '/\b(how it works|steps?|get started|simple)\b/', $b ) )               { return 'steps'; }
+		// Deep-arc roles — before about/cta so their trees classify correctly
+		// (a magnet tree contains a form and must not fall to the cta branch).
+		if ( preg_match( '/\b(sounds familiar|struggl|tired of|frustrat|pain point)\b/', $b ) )            { return 'pain'; }
+		if ( preg_match( '/\b(vs\.?|versus|the difference|compare|comparison|average .* guy|other (gyms|companies|guys))\b/', $b ) ) { return 'compare'; }
+		if ( preg_match( '/\b(warning signs?|red flags?|symptoms|signs? (a|your|that|of))\b/', $b ) )       { return 'checklist'; }
+		if ( preg_match( '/\b(free (guide|download|checklist|ebook)|lead magnet|get the guide)\b/', $b ) )  { return 'magnet'; }
+		if ( preg_match( '/\b(service areas?|areas? we serve|serving [a-z]|towns we|cities we)\b/', $b ) )  { return 'areas'; }
 		if ( preg_match( '/\b(about|our story|why us|who we are|meet )\b/', $b ) )               { return 'about'; }
 		if ( preg_match( '/\b(team|staff|coaches|trainers|experts)\b/', $b ) )                   { return 'team'; }
 		if ( preg_match( '/\b(gallery|our work|portfolio|projects)\b/', $b ) )                   { return 'gallery'; }
@@ -1544,9 +1640,10 @@ class PressGo_AI_Builder {
 	/** Canonical narrative slot weight per role (lower = earlier on the page). */
 	private function role_weight( $role ) {
 		$w = array(
-			'hero' => 0, 'social_proof' => 10, 'about' => 20, 'services' => 30, 'features' => 32,
-			'unknown' => 35, 'steps' => 40, 'stats' => 45, 'gallery' => 50, 'team' => 55,
-			'pricing' => 60, 'proof' => 65, 'faq' => 80, 'contact' => 85, 'cta' => 90, 'footer' => 100,
+			'hero' => 0, 'social_proof' => 10, 'pain' => 15, 'about' => 20, 'services' => 30,
+			'features' => 32, 'compare' => 34, 'unknown' => 35, 'steps' => 40, 'stats' => 45,
+			'checklist' => 47, 'gallery' => 50, 'team' => 55, 'pricing' => 60, 'proof' => 65,
+			'magnet' => 70, 'areas' => 78, 'faq' => 80, 'contact' => 85, 'cta' => 90, 'footer' => 100,
 		);
 		return isset( $w[ $role ] ) ? $w[ $role ] : 35;
 	}
@@ -2147,6 +2244,8 @@ class PressGo_AI_Builder {
 			'hero' => 'hero', 'services' => 'services', 'features' => 'features', 'about' => 'about',
 			'proof' => 'testimonials', 'steps' => 'how-it-works', 'team' => 'team', 'gallery' => 'gallery',
 			'pricing' => 'pricing', 'faq' => 'FAQ', 'cta' => 'call-to-action', 'contact' => 'contact', 'unknown' => 'that',
+			'pain' => 'problem', 'compare' => 'comparison', 'checklist' => 'warning-signs', 'magnet' => 'free-guide',
+			'areas' => 'service-area', 'stats' => 'stats', 'social_proof' => 'trust strip',
 		);
 		return isset( $map[ $role ] ) ? $map[ $role ] : 'that';
 	}
@@ -4431,17 +4530,27 @@ class PressGo_AI_Builder {
 		if ( '' !== $brief && 'pending' !== $brief ) {
 			$framed = "PAGE BRIEF (the business + goal for this whole page — keep EVERY section consistent with this; do not introduce a different business):\n" . $brief . "\n\n" . $framed;
 		}
-		// The hero should sell, not collect. Lead it with a headline + one CTA
-		// BUTTON pointing at the page's main action; the form lives in its own
-		// dedicated section. (A form crammed into the hero reads as illogical —
-		// e.g. a gym whose hero IS a contact form.)
+		// Goal-aware hero. LEAD-GEN goals (form/call) get the split hero with an
+		// inline lead-form CARD beside the headline — the pattern the owner's
+		// gold-standard landers use. Everything else keeps "the hero sells": a
+		// headline + ONE CTA button, no form crammed into the hero.
 		if ( $was_first ) {
-			$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
+			$hero_goal = '';
+			$ds_hero   = $this->discovery_state( $post_id );
+			if ( is_array( $ds_hero ) && ! empty( $ds_hero['answers']['goal'] ) ) { $hero_goal = $ds_hero['answers']['goal']; }
+			if ( 'form' === $hero_goal || 'call' === $hero_goal ) {
+				$primary = ( 'call' === $hero_goal )
+					? "The PRIMARY action is the phone: put a tel:-linked accent button with the real number (only if the brief gives one) at the top of the left column, and title the form card \"Prefer we reach out?\" with a 3-field callback form (name, phone, best time)."
+					: "The form card IS the hero CTA: give it AT MOST 6 fields (name, phone, email, plus ONE qualifying select), and add NO separate CTA button in the left column.";
+				$framed = "This is the HERO (the page's first section) and this page's goal is LEAD CAPTURE, so build the split lead-gen hero: a dark photo background (background_image_query + strong overlay) holding a row with two cols, width 55 and 45. Left col: an uppercase letterspaced eyebrow of real credentials or service area, a big H1 naming the free offer, a 2-line subhead ending in a risk reversal like 'No cost, no pressure.', then 3-4 icon+text trust rows (fas fa-check-circle in the accent color), and a 'Prefer to call? [number]' line if the brief includes a phone. Right col: a white rounded card (radius, shadow, padding ~32) with a centered H3 naming the offer, one speed-promise microcopy line, a REAL `form` block (on_dark false), a full-width accent submit labeled with the offer (never 'Submit'), and one small reassurance line under it: no obligation + response-time promise + 'We never share your info.' " . $primary . "\n\n" . $framed;
+			} else {
+				$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
+			}
 		}
 		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
 		// already on the page, so the new section continues the same business,
 		// palette, and goal instead of re-inventing them statelessly.
-		$page_state = $this->freeform_page_state( $post_id );
+		$page_state = $this->freeform_page_state( $post_id, $whole_page );
 		if ( '' !== $page_state ) { $framed = $page_state . $framed; }
 		// Build ON-brand from the first draft when a site brand is active (toggle on,
 		// page not opted out) — not generated blind then repainted.
@@ -4512,6 +4621,16 @@ class PressGo_AI_Builder {
 		$role_hint = $was_first ? 'hero' : $this->role_from_section_key( $section_key );
 		if ( '' === $role_hint ) { $role_hint = $this->role_from_text( $message, false, $this->tree_has_form( $tree ) ); }
 		$this->store_ff_record( $post_id, $pg_key, $tree, $cfg, $role_hint );
+
+		// A hero that ships with the lead-form card already IS the offer — never
+		// re-ask the offer drip on this page.
+		if ( $was_first && $this->tree_has_form( $tree ) ) {
+			$ds_flag = $this->discovery_state( $post_id );
+			if ( is_array( $ds_flag ) ) {
+				$ds_flag['offer_asked'] = true;
+				$this->save_discovery_state( $post_id, $ds_flag );
+			}
+		}
 
 		$this->bump_usage( 4 ); // Nova (freeform) is the heaviest mode
 
@@ -4592,6 +4711,31 @@ class PressGo_AI_Builder {
 			$note .= ' (' . $left . ' more new-section build' . ( 1 === $left ? '' : 's' ) . ' left today — edits & reorders are free.)';
 		}
 
+		// Whole-page continuation: when the plan's last core step lands, offer the
+		// extended tier (or, at 0 builds left, say when it unlocks).
+		$extend = null;
+		if ( $whole_page && is_array( $dstate3 ) && ! $this->whole_page_plan( $dstate3 ) ) {
+			$ext = $this->extended_plan( $dstate3 );
+			if ( ! empty( $ext ) ) {
+				if ( $left > 0 ) {
+					$slice  = array_slice( $ext, 0, $left );
+					$extend = array(
+						'note'  => "That's the core page. Top-converting pages go deeper — I can add: " . implode( ', ', wp_list_pluck( $slice, 'label' ) ) . '.',
+						'chips' => array(
+							array( 'label' => 'Go deeper (+' . count( $slice ) . ' sections)', 'key' => 'extend', 'op' => 'extend', 'plan' => $slice ),
+							array( 'label' => 'Make it flow', 'key' => 'cohesion', 'action' => 'cohesion', 'request' => 'make everything flow better' ),
+							array( 'label' => "I'll tweak it myself", 'key' => 'noop', 'op' => 'continue', 'request' => '__noop' ),
+						),
+					);
+				} else {
+					$extend = array(
+						'note'  => "That's the core page. The deeper sections (" . implode( ', ', wp_list_pluck( $ext, 'label' ) ) . ') unlock when your builds reset in ' . $this->human_hours( $usage['resets_in'] ) . ' — edits and reorders are still free.',
+						'chips' => array(),
+					);
+				}
+			}
+		}
+
 		wp_send_json_success( array(
 			'preview_bust' => time(),
 			'sections'     => $sections_now,
@@ -4599,6 +4743,7 @@ class PressGo_AI_Builder {
 			'note'         => $note,
 			'suggest'      => $suggest,
 			'usage'        => $usage,
+			'extend'       => $extend,
 		) );
 	}
 
@@ -5084,7 +5229,7 @@ class PressGo_AI_Builder {
 	 * Returns '' for an empty page (the first section anchors it; nothing to
 	 * continue yet).
 	 */
-	public function freeform_page_state( $post_id ) {
+	public function freeform_page_state( $post_id, $in_plan = false ) {
 		$raw = get_post_meta( $post_id, '_elementor_data', true );
 		$els = null;
 		if ( is_string( $raw ) && '' !== $raw ) {
@@ -5129,7 +5274,7 @@ class PressGo_AI_Builder {
 		if ( '' !== $accent )     { $palparts[] = 'accent ' . $accent; }
 		if ( $palparts )          { $L[] = 'LOCKED PALETTE — use ONLY these colors: ' . implode( ', ', $palparts ) . '. Introduce NO other dark, light, or accent color.'; }
 		if ( '' !== $next_bg && '' !== $last_bg ) { $L[] = 'The last section background was ' . $last_bg . ', so use ' . $next_bg . ' for this one (alternate the rhythm — never two same-bg sections adjacent).'; }
-		if ( $has_form ) { $L[] = 'A lead-capture form ALREADY EXISTS on this page. Do NOT add another form, newsletter signup, or contact section unless the user explicitly asks for one this turn — route any CTA to the existing goal.'; }
+		if ( $has_form ) { $L[] = 'A lead-capture form ALREADY EXISTS on this page. Do NOT add another form, newsletter signup, or contact section unless THIS TURN\'s request explicitly asks for one (a repeated bottom-of-page lead form or a 2-field guide-download form, when explicitly requested, is intentional) — otherwise route any CTA to the existing goal.'; }
 		$L[] = 'SECTIONS ALREADY ON THE PAGE (in order, your new one is appended after):';
 		foreach ( $sections as $i => $s ) {
 			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ' — layout: ' . ( $s['layout'] ?? 'centered' ) . ( $s['has_form'] ? ' — has a form' : '' );
@@ -5144,7 +5289,9 @@ class PressGo_AI_Builder {
 			if ( 'grid' === ( $s['layout'] ?? '' ) ) { $has_stat = true; } // grids count as stat-eligible for variety
 		}
 		if ( ! $has_split && count( $sections ) >= 2 ) { $L[] = 'REQUIREMENT: this page still needs an asymmetric image+text split — use one for this section.'; }
-		if ( '' !== $next ) { $L[] = 'NEXT LOGICAL SECTION for this page: ' . $next . '. Do NOT repeat a section type already present.'; }
+		// During a whole-page plan run the plan's request is authoritative — the
+		// next-section hint would fight it, so suppress it.
+		if ( '' !== $next && ! $in_plan ) { $L[] = 'NEXT LOGICAL SECTION for this page: ' . $next . '. Do NOT repeat a section type already present.'; }
 		$L[] = '=== END PAGE STATE — now compose ONE section continuing this exact business, palette, and goal. ===';
 		return implode( "\n", $L ) . "\n\n";
 	}

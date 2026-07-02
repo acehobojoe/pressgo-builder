@@ -1451,8 +1451,18 @@
 			wholeRunning = false;
 			bar.remove();
 			refreshUsage();
-			if (wholeStop) append(el('pg-msg pg-msg-ai', 'Stopped there. Tap what to add next, or tell me your own.'));
-			else append(el('pg-msg pg-msg-ai', "That's your page. Want me to ✨ make it flow, or tweak anything?"));
+			if (wholeStop) {
+				append(el('pg-msg pg-msg-ai', 'Stopped there. Tap what to add next, or tell me your own.'));
+				if (lastData && lastData.suggest) renderSuggestions(lastData.suggest);
+				return;
+			}
+			// Core run done: offer the extended tier (deeper gold-standard sections).
+			if (lastData && lastData.extend) {
+				if ((lastData.extend.chips || []).length) renderSuggestions(lastData.extend);
+				else append(el('pg-msg pg-msg-ai', lastData.extend.note || "That's your page."));
+				return;
+			}
+			append(el('pg-msg pg-msg-ai', "That's your page. Want me to ✨ make it flow, or tweak anything?"));
 			if (lastData && lastData.suggest) renderSuggestions(lastData.suggest);
 		}
 		function step() {
@@ -1496,6 +1506,14 @@
 						? 'border:1.5px solid #5b4fff;background:#fff;color:#5b4fff;border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:600;'
 						: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
 			b.addEventListener('click', function () {
+				// "Go deeper": run the extended tier through the same whole-page runner
+				// (stop button, drip suppression, per-step usage all included).
+				if (c.op === 'extend' && c.plan && c.plan.length) {
+					Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (x) { x.disabled = true; x.style.opacity = '0.4'; });
+					append(el('pg-msg pg-msg-ai', 'Going deeper — ' + c.plan.length + ' more sections coming up.'));
+					runWholePagePlan(c.plan);
+					return;
+				}
 				// No-op "let me type something else": just clear the chips and hand the
 				// floor back to the input — never forces a build.
 				if (isNoop) { wrap.remove(); if (input) input.focus(); return; }
