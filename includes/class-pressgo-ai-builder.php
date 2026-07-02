@@ -2193,6 +2193,42 @@ class PressGo_AI_Builder {
 		return $j['issues'];
 	}
 
+	/** Answer a QUESTION about an attached screenshot: look, explain, offer the fix. */
+	private function vision_answer( $post_id, $question, $data_url ) {
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $or_key ) { return array( 'chat_mode' => true, 'note' => "I can't inspect screenshots right now — describe what you're seeing and I'll fix it." ); }
+		$loc  = $this->vqa_locate_from_screenshot( $post_id, $data_url );
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 90,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'body'    => wp_json_encode( array(
+				'model'      => $this->vision_model(),
+				'max_tokens' => 400,
+				'messages'   => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => "The user is building a landing page and attached this screenshot of it with the question: \"" . $question . "\". Answer directly and concretely in 2-3 plain sentences (what's wrong / why it looks that way, in design terms a non-designer gets). No preamble, no em dashes." ),
+					array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+				) ) ),
+			) ),
+		) );
+		$text = '';
+		if ( ! is_wp_error( $resp ) && 200 === (int) wp_remote_retrieve_response_code( $resp ) ) {
+			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+			$text = trim( (string) ( $data['choices'][0]['message']['content'] ?? '' ) );
+		}
+		if ( '' === $text ) { $text = "I couldn't read that screenshot clearly — tell me what looks off and I'll fix it."; }
+		$chips = null;
+		if ( $loc['idx'] >= 0 ) {
+			$recs  = $this->ff_sections( $post_id );
+			$label = $this->role_label( isset( $recs[ $loc['idx'] ]['semantic_role'] ) ? $recs[ $loc['idx'] ]['semantic_role'] : 'unknown' );
+			$req   = 'fix the ' . $label . ' section: ' . ( '' !== $loc['shows'] ? $loc['shows'] . ' — ' : '' ) . 'resolve what the user flagged: ' . $question;
+			$chips = array( 'note' => null, 'suggested' => true, 'chips' => array(
+				array( 'label' => 'Fix it', 'request' => $req, 'key' => '' ),
+				array( 'label' => "Leave it", 'request' => '__noop', 'key' => 'noop', 'op' => 'continue' ),
+			) );
+		}
+		return array( 'chat_mode' => true, 'note' => $text, 'suggest' => $chips );
+	}
+
 	/** Which stored section does the user's screenshot show? ['idx'=>int|-1,'shows'=>string]. */
 	private function vqa_locate_from_screenshot( $post_id, $data_url ) {
 		$out    = array( 'idx' => -1, 'shows' => '' );
@@ -4723,6 +4759,13 @@ class PressGo_AI_Builder {
 			// section and describe what it shows ("don't need icons here" + crop of
 			// the services cards -> edit THAT section, told what "here" means).
 			if ( ! empty( $ff_images ) ) {
+				// A QUESTION about the screenshot deserves an ANSWER, not a silent
+				// multi-minute rebuild ("why do these look weird" was kicking off a
+				// scoped re-compose behind a spinner). Look, explain, offer the fix.
+				$mq = strtolower( trim( $message ) );
+				if ( '?' === substr( $mq, -1 ) || preg_match( '/^(why|what|how|is |are |does |do |can |should |whats|why\'?s)/', $mq ) ) {
+					wp_send_json_success( $this->vision_answer( $post_id, $message, $ff_images[0] ) );
+				}
 				$loc = $this->vqa_locate_from_screenshot( $post_id, $ff_images[0] );
 				if ( '' !== $loc['shows'] ) {
 					$img_note = ' (the user attached a screenshot of the page; it shows: ' . $loc['shows'] . ' — apply the change to what the screenshot shows)';
