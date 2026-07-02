@@ -755,6 +755,7 @@ class PressGo_Freeform_Renderer {
 		$icon  = self::normalize_icon( isset( $s['icon'] ) ? $s['icon'] : 'fas fa-star' );
 		$color = isset( $s['color'] ) ? $s['color'] : ( isset( $cfg['colors']['primary'] ) ? $cfg['colors']['primary'] : '#2563EB' );
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 32;
+		$size  = min( 56, $size ); // an oversized decorative icon dominates the section (repeat offender in QA)
 		$w     = PressGo_Widget_Helpers::icon_w( $icon, $color, $size, 'default' );
 		if ( isset( $s['align'] ) ) {
 			$w['settings']['align'] = $s['align'];

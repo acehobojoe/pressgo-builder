@@ -4579,7 +4579,11 @@ class PressGo_AI_Builder {
 		// Cohesion engine: on a populated page, "make it flow / reorganize / fix the
 		// order / balance the colors" reorganizes the whole page instead of adding a
 		// section; "undo / put it back" reverts the last reorganize.
-		if ( ! $page_empty ) {
+		// NEVER during a whole-page plan run: the plan's request strings are rich
+		// prose ("clean, professional", "fix", "remove") that false-trigger these
+		// intents — a run once fired the palette engine TWICE mid-build. Plan steps
+		// are build instructions; they go straight to compose.
+		if ( ! $page_empty && ! $whole_page ) {
 			if ( preg_match( '/^\s*(undo|put it back|revert|go back)\b/i', $message ) ) {
 				wp_send_json_success( $this->cohesion_undo( $post_id ) );
 			}
