@@ -2193,6 +2193,28 @@ class PressGo_AI_Builder {
 		return $j['issues'];
 	}
 
+	/** Describe a reference screenshot for the text-only composer. '' on failure. */
+	private function vqa_describe_reference( $data_url ) {
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $or_key || '' === $data_url ) { return ''; }
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 60,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'body'    => wp_json_encode( array(
+				'model'      => $this->vision_model(),
+				'max_tokens' => 500,
+				'messages'   => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => 'Describe this design reference for a page builder that cannot see images: the layout structure (columns, splits, alignment), background tone, accent color, typography feel, imagery style, and any distinctive elements — 5-8 tight lines, concrete, no fluff. If it is not a design/screenshot, say NOT A DESIGN.' ),
+					array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+				) ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$txt  = trim( (string) ( $data['choices'][0]['message']['content'] ?? '' ) );
+		return ( '' === $txt || false !== stripos( $txt, 'NOT A DESIGN' ) ) ? '' : $txt;
+	}
+
 	/** Answer a QUESTION about an attached screenshot: look, explain, offer the fix. */
 	private function vision_answer( $post_id, $question, $data_url ) {
 		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
@@ -4707,6 +4729,30 @@ class PressGo_AI_Builder {
 			$discovery_stage = ''; // consumed — fall through and build the section
 		}
 
+		// Utility pages (404, thank-you, coming soon, privacy) don't fit the
+		// business interview — asking a 404 page for its "vibe" traps the user in
+		// a wizard. Detect them and build immediately with a tailored request.
+		if ( $page_empty && '' === $brief && preg_match( '/\b(404|not found|thank[- ]?you page|coming soon|under construction|maintenance page|privacy policy|terms (of service|page))\b/i', $message ) ) {
+			$util_state = array(
+				'answers'      => array( 'goal' => 'browse', 'industry' => 'other', 'vibe' => 'premium', 'photos' => 'stock' ),
+				'business'     => trim( $message ),
+				'brand_locked' => $this->brand_is_locked( $post_id ),
+				'hero_built'   => true,
+				'built_keys'   => array( 'hero' ),
+				'utility_page' => true,
+			);
+			$this->save_discovery_state( $post_id, $util_state );
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, 'Utility page: ' . trim( $message ) );
+			if ( preg_match( '/\b(404|not found)\b/i', $message ) ) {
+				$message = 'Build a single elegant 404 page section, full viewport height feel: an oversized display "404" (or a clever on-brand variant), one warm human line like "This page wandered off." , one short sentence pointing home, and ONE accent button "Back to the homepage" linking to /. Keep it minimal and on-brand: ' . $message;
+			} elseif ( preg_match( '/\bthank[- ]?you\b/i', $message ) ) {
+				$message = 'Build a single thank-you page section: a warm confirmation headline, one line setting expectations (when/how they will hear back), and ONE accent button back to the homepage. Minimal, on-brand: ' . $message;
+			} else {
+				$message = 'Build a single minimal utility page section for this request, on-brand, with one clear headline, one short supporting line, and one accent button home: ' . $message;
+			}
+			// falls through to compose with this message; no interview, no fork.
+		}
+
 		if ( $page_empty && '' === $brief ) {
 			$state  = $this->discovery_state( $post_id );
 			$master = $this->master_profile();
@@ -4857,6 +4903,14 @@ class PressGo_AI_Builder {
 				$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
 			}
 		}
+		// A reference screenshot on a fresh build: describe it with the vision model
+		// and inject it as direction (the composer itself is text-only).
+		if ( ! empty( $ff_images ) && $page_empty ) {
+			$ref_desc = $this->vqa_describe_reference( $ff_images[0] );
+			if ( '' !== $ref_desc ) {
+				$framed = "REFERENCE SCREENSHOT (the user attached this as direction — follow its layout, structure, and mood, adapted to this business):\n" . $ref_desc . "\n\n" . $framed;
+			}
+		}
 		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
 		// already on the page, so the new section continues the same business,
 		// palette, and goal instead of re-inventing them statelessly.
@@ -4962,7 +5016,7 @@ class PressGo_AI_Builder {
 		// Brand-first: on the very first section, before continuing, show the hero's
 		// real palette and ask the user to lock it in as the site brand. Stash the
 		// hero so a recolor/refont can rebuild just this section (append-then-confirm).
-		if ( $was_first && is_array( $dstate ) && ! $this->brand_is_locked( $post_id ) ) {
+		if ( $was_first && is_array( $dstate ) && empty( $dstate['utility_page'] ) && ! $this->brand_is_locked( $post_id ) ) {
 			$palette                = $this->extract_hero_palette( $tree, $cfg );
 			$dstate['hero_palette'] = $palette;
 			$dstate['hero_index']   = count( $elements ) - 1;
@@ -4975,7 +5029,7 @@ class PressGo_AI_Builder {
 		// lock step — but this is still the first section, so offer the same fork:
 		// build the whole page, or go section by section. (Without this, an
 		// already-branded page jumped straight to suggestions with no "build it all".)
-		if ( $was_first && is_array( $dstate ) && $this->brand_is_locked( $post_id ) ) {
+		if ( $was_first && is_array( $dstate ) && empty( $dstate['utility_page'] ) && $this->brand_is_locked( $post_id ) ) {
 			$d2 = $this->discovery_state( $post_id );
 			if ( ! is_array( $d2 ) ) { $d2 = $dstate; }
 			$d2['built_keys'] = array( 'hero' );
@@ -5605,6 +5659,7 @@ class PressGo_AI_Builder {
 		$L[] = $this->page_is_canvas( $post_id )
 			? 'This page is a standalone canvas (no theme header/footer). A dedicated top bar or footer SECTION is legitimate when requested.'
 			: 'This page uses the site theme, which already shows its own header and footer. NEVER build a top bar, nav, or footer section.';
+		$L[] = 'NEVER reuse or closely paraphrase any headline listed below — each section needs its OWN angle and its own phrasing (a page that repeats its hero line reads broken). Vary sentence rhythm; do not recycle the page\'s existing phrases.';
 		$L[] = 'SECTIONS ALREADY ON THE PAGE (in order, your new one is appended after):';
 		foreach ( $sections as $i => $s ) {
 			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ' — layout: ' . ( $s['layout'] ?? 'centered' ) . ( $s['has_form'] ? ' — has a form' : '' );
