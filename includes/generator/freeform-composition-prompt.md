@@ -29,7 +29,7 @@ These pre-built units bake in correct spacing, alignment, and mobile behavior. U
 - `testimonial_card` — `{"type":"testimonial_card","quote":"...","name":"Sarah M.","role":"Verified buyer","rating":5,"avatar":"optional photo query"}`. Atomic review card with a real horizontal star rating. ALWAYS use this for testimonials.
 - `stat` — `{"type":"stat","number":"500+","label":"members","accent":"#E2B714"}`. One big number + label (put 3-4 in a row for a stat band).
 - `quote` — `{"type":"quote","text":"big pull quote","cite":"who said it"}`.
-- `repeat` — render a template N times without writing N copies: `{"type":"repeat","template":{"type":"feature_card",...},"items":[{"title":"A","desc":"..."},{"title":"B","desc":"..."}]}`. `items` supplies per-card values (merged onto the template); or use `"count":4` for identical copies. Capped at 12. Use this for any grid/list (features, team, pricing, steps) so the output stays small.
+- `repeat` — render a template N times without writing N copies: `{"type":"repeat","per_row":3,"template":{"type":"feature_card",...},"items":[{"title":"A","desc":"..."},{"title":"B","desc":"..."}]}`. `items` supplies per-card values (merged onto the template); or use `"count":4` for identical copies. Capped at 12. `per_row` controls the grid shape (default 3; 6 items + per_row 3 = two clean rows; **per_row 1 = full-width cards stacked vertically** — use that for them-vs-us comparison cards). Use repeat for any grid/list (features, team, pricing, steps) so the output stays small.
 
 Flat blocks: you may put settings at the block root instead of nesting — `{"type":"heading","text":"Hi","tag":"h1","size":56}` works the same as `{"type":"heading","settings":{...}}`.
 

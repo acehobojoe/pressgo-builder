@@ -35,6 +35,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PressGo_Freeform_Renderer {
 
 	/**
+	 * Render-time image resolver (query -> URL). Component blocks (feature_card,
+	 * testimonial_card) carry photo QUERIES in their settings and only expand to
+	 * image widgets here at render — after the pre-render resolution pass already
+	 * ran — so without this hook every component photo silently dropped.
+	 * Auto-armed from PressGo_AI_Builder::resolve_image_query in render().
+	 *
+	 * @var callable|null fn( string $query, string $orientation ) : string URL|''
+	 */
+	public static $resolve_image = null;
+
+	/**
 	 * Whether the section currently being rendered has a dark background.
 	 * Set by render_section(), read by render_col() to inject visible
 	 * card borders on dark sections (the composer often gives cards a
@@ -57,6 +68,11 @@ class PressGo_Freeform_Renderer {
 	public static function render( $tree, $cfg, $pg_key = 'freeform' ) {
 		if ( ! is_array( $tree ) || ! isset( $tree['type'] ) || 'section' !== $tree['type'] ) {
 			return null;
+		}
+		// Arm the render-time image resolver so component photos resolve on EVERY
+		// render path (compose, repaint, cohesion, re-render from stored trees).
+		if ( null === self::$resolve_image && class_exists( 'PressGo_AI_Builder' ) && method_exists( 'PressGo_AI_Builder', 'resolve_image_query' ) ) {
+			self::$resolve_image = array( 'PressGo_AI_Builder', 'resolve_image_query' );
 		}
 
 		$section = self::render_block( $tree, $cfg, true );
@@ -286,7 +302,22 @@ class PressGo_Freeform_Renderer {
 			}
 			$cols[] = $node;
 		}
-		return array( 'type' => 'row', 'settings' => isset( $s['row'] ) && is_array( $s['row'] ) ? $s['row'] : array(), 'children' => $cols );
+		// Chunk into rows so 6 items never render as 6 cramped columns: per_row
+		// caps a row (default 3, max 4); per_row=1 stacks full-width cards.
+		$per = isset( $s['per_row'] ) && is_numeric( $s['per_row'] ) ? (int) $s['per_row'] : min( 3, $count );
+		$per = max( 1, min( 4, $per ) );
+		$row_s = isset( $s['row'] ) && is_array( $s['row'] ) ? $s['row'] : array();
+		if ( 1 === $per ) {
+			return array( 'type' => 'col', 'settings' => array( 'gap' => 16 ), 'children' => $cols );
+		}
+		if ( $count <= $per ) {
+			return array( 'type' => 'row', 'settings' => $row_s, 'children' => $cols );
+		}
+		$rows = array();
+		foreach ( array_chunk( $cols, $per ) as $chunk ) {
+			$rows[] = array( 'type' => 'row', 'settings' => $row_s, 'children' => $chunk );
+		}
+		return array( 'type' => 'col', 'settings' => array( 'gap' => 24 ), 'children' => $rows );
 	}
 
 	private static function render_children( $block, $cfg ) {
@@ -680,6 +711,14 @@ class PressGo_Freeform_Renderer {
 
 	private static function render_image( $s, $cfg ) {
 		$src    = isset( $s['src'] ) ? $s['src'] : '';
+		// Render-time resolution: component-expanded images (and any tree that
+		// skipped the pre-render pass, e.g. re-renders from stored trees) still
+		// carry a query — resolve it here so no photo silently drops.
+		if ( '' === $src && ! empty( $s['query'] ) && is_callable( self::$resolve_image ) ) {
+			$orient = ! empty( $s['portrait'] ) ? 'portrait' : 'landscape';
+			$src    = (string) call_user_func( self::$resolve_image, (string) $s['query'], $orient );
+		}
+		if ( '' === $src ) { return null; } // no image resolved — skip rather than render an empty frame
 		$alt    = isset( $s['alt'] ) ? self::strip_dashes( $s['alt'] ) : '';
 		$radius = isset( $s['radius'] ) && is_numeric( $s['radius'] ) ? (int) $s['radius'] : 12;
 		$shadow = ! empty( $s['shadow'] );
