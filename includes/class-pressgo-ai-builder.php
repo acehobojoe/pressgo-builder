@@ -1338,7 +1338,7 @@ class PressGo_AI_Builder {
 	private function arc_library( $goal ) {
 		// ── Shared requests (identical across goals) ──
 		$badges = 'Add a slim trust-badge strip as a bridge under the hero: one centered row, tight vertical padding (40-50px), on the alternate background. Include a star-rating block plus a short rating line ONLY if the brief gave a real rating; otherwise skip stars entirely. Then 3-4 bold credential words from the brief (licensed, insured, certified, years in business) as inline text separated by middots, all in one text block so it stacks cleanly on mobile.';
-		$compare = 'Add a them-vs-us comparison: eyebrow "THE DIFFERENCE", H2 naming a competitor archetype (like "Why [business], not the average [trade] guy"). Build 5-6 comparison cards STACKED VERTICALLY, one per row, each card full page width (use a repeat of feature_card with "per_row":1 — NEVER columns side by side and NEVER a table): title = the feature, desc = a blunt bold brand claim ("Yes. Certified and trained.") followed by a muted one-line competitor caricature ("Most: a vague verbal number, surprises later"). Each card keeps the label and both answers together so it reads perfectly stacked on mobile. Close with the page\'s single accent CTA button.';
+		$compare = 'Add a them-vs-us comparison: eyebrow "THE DIFFERENCE", H2 naming a competitor archetype (like "Why [business], not the average [trade] guy"). Build 5-6 comparison cards STACKED VERTICALLY, one per row, each card full page width (one white card per row, full width, stacked — NEVER columns side by side and NEVER a table). Inside each card: the feature name as an H4, then a row with a small GREEN fas fa-check-circle icon beside the bold brand claim ("Yes. Certified and trained."), then a row with a small MUTED RED fas fa-times-circle icon beside a one-line competitor caricature in muted text ("Most: a vague verbal number, surprises later"). Icon sits LEFT of its line, inline. Each card keeps the label and both answers together so it reads perfectly stacked on mobile. Close with the page\'s single accent CTA button.';
 		$proof = 'Add social proof: an eyebrow like "5-STAR REVIEWS", an H2 claim like "What [region] customers say", then 3 testimonial_card blocks in a row. Write each quote as a 3-4 sentence first-person mini story that proves ONE specific promise this page makes (speed, quality/cleanup, a scary situation handled calmly), ending on relief; names are first-name-plus-initial with a nearby town or descriptor as the role. Never invent an aggregate count or rating unless the brief supplied one.';
 		$checklist = 'Add a warning-signs checklist: eyebrow "KNOW THE WARNING SIGNS", H2 naming the risk, and an intro line that converts the list into a CTA trigger ("Spot any of these and it\'s worth a free [offer]"). Then one bordered card (a col with border, radius, padding) holding 6 icon_box rows with amber fas fa-exclamation-triangle icons, each a concrete observable symptom the reader can check themselves, no abstract danger talk. Close with the accent CTA button.';
 		$how = 'Add a numbered 3-step section: eyebrow "HOW IT WORKS", H2 "How to get started", one-line subhead. Three equal columns, each an oversized accent numeral heading (1, 2, 3) over an H4 step title and 2 lines of copy; step 1 must de-risk the CTA itself ("free", "a relaxed conversation, no pressure") and step 3 must end on a payoff sentence. Close with the single accent CTA button.';
@@ -1493,7 +1493,27 @@ class PressGo_AI_Builder {
 	private function whole_page_plan( $state ) { return $this->plan_for_tier( $state, 'core' ); }
 
 	/** The deeper sections offered as a continuation after the core run. */
-	private function extended_plan( $state ) { return $this->plan_for_tier( $state, 'extended' ); }
+	private function extended_plan( $state, $post_id = 0 ) {
+		$plan = $this->plan_for_tier( $state, 'extended' );
+		// Chrome is template-dependent: a CANVAS page is blank (no theme header or
+		// footer), so a dedicated top bar + footer belong in the deep tier. A normal
+		// template shows the site's own header/footer — never build chrome there.
+		if ( $post_id && $this->page_is_canvas( $post_id ) ) {
+			$built = isset( $state['built_keys'] ) && is_array( $state['built_keys'] ) ? $state['built_keys'] : array();
+			if ( ! in_array( 'topbar', $built, true ) ) {
+				array_unshift( $plan, array( 'key' => 'topbar', 'label' => 'Top bar', 'request' => 'Add a slim top utility BAR section (this page has no theme header): dark or transparent-dark background, ONE row with tight vertical padding (14-18px): the business name as a bold white heading on the left; on the right the real phone as a tel:-linked text plus one small accent button with the page CTA (skip the phone if the brief has none). No big headline, no imagery, no tall padding — it reads as a site header, not a section.' ) );
+			}
+			if ( ! in_array( 'footer', $built, true ) ) {
+				$plan[] = array( 'key' => 'footer', 'label' => 'Footer', 'request' => 'Add a real FOOTER section (this page has no theme footer): dark background, a 3-column row (business name + one-line tagline | phone and email from the brief | service area or hours), then a subtle divider and a small centered copyright line with the business name and year. Muted light text, small sizes (13-14px), NO pitch, NO form, NO big CTA — it reads as a site footer.' );
+			}
+		}
+		return $plan;
+	}
+
+	/** Does this page render standalone (Elementor Canvas: no theme header/footer)? */
+	private function page_is_canvas( $post_id ) {
+		return 'elementor_canvas' === (string) get_post_meta( $post_id, '_wp_page_template', true );
+	}
 
 	private function plan_for_tier( $state, $tier ) {
 		$goal  = ! empty( $state['answers']['goal'] ) ? $state['answers']['goal'] : 'browse';
@@ -1529,6 +1549,7 @@ class PressGo_AI_Builder {
 			'pricing' => 'pricing', 'benefits' => 'features', 'features' => 'features', 'how' => 'steps', 'steps' => 'steps',
 			// Deep-arc keys (gold-standard narrative sections).
 			'badges' => 'social_proof', 'pain' => 'pain', 'compare' => 'compare', 'founders' => 'team',
+			'topbar' => 'topbar', 'footer' => 'footer',
 			'checklist' => 'checklist', 'magnet' => 'magnet', 'areas' => 'areas', 'stats' => 'stats',
 			'offers' => 'pricing',
 		);
@@ -1645,7 +1666,7 @@ class PressGo_AI_Builder {
 	/** Canonical narrative slot weight per role (lower = earlier on the page). */
 	private function role_weight( $role ) {
 		$w = array(
-			'hero' => 0, 'social_proof' => 10, 'pain' => 15, 'about' => 20, 'services' => 30,
+			'topbar' => -10, 'hero' => 0, 'social_proof' => 10, 'pain' => 15, 'about' => 20, 'services' => 30,
 			'features' => 32, 'compare' => 34, 'unknown' => 35, 'steps' => 40, 'stats' => 45,
 			'checklist' => 47, 'gallery' => 50, 'team' => 55, 'pricing' => 60, 'proof' => 65,
 			'magnet' => 70, 'areas' => 78, 'faq' => 80, 'contact' => 85, 'cta' => 90, 'footer' => 100,
@@ -2103,6 +2124,154 @@ class PressGo_AI_Builder {
 		return $png ? 'data:image/png;base64,' . base64_encode( $png ) : '';
 	}
 
+	// ── Vision-QA loop: the compressed version of how the gold-standard landers
+	//    were made (25 iterate-with-eyes rounds) — screenshot in LEGIBLE CHUNKS,
+	//    critique each chunk, re-compose flagged sections, repeat until clean. ──
+
+	/** Fetch a full-page screenshot PNG for a viewport. Raw bytes or ''. */
+	private function vqa_fetch_png( $post_id, $viewport ) {
+		$preview = $this->signed_preview_url( $post_id );
+		$resp    = wp_remote_get(
+			'https://screenshot.pressgo.app/api/screenshot?url=' . rawurlencode( $preview . '&vqa=' . time() ) . '&viewport=' . $viewport . '&full_page=1&refresh=true',
+			array( 'timeout' => 45, 'headers' => array( 'X-Pressgo-MCP' => '1' ) )
+		);
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
+		return (string) wp_remote_retrieve_body( $resp );
+	}
+
+	/**
+	 * Slice a tall page PNG into legible vertical chunks (GD). A single 12000px
+	 * screenshot downscales into mush and makes even a good vision model hallucinate
+	 * "clipped text" that isn't there — chunks keep every slice readable.
+	 */
+	private function vqa_slices( $png, $slice_h = 1900, $max = 8 ) {
+		if ( '' === $png || ! function_exists( 'imagecreatefromstring' ) ) { return array(); }
+		$im = @imagecreatefromstring( $png );
+		if ( ! $im ) { return array(); }
+		$w = imagesx( $im ); $h = imagesy( $im );
+		$out = array();
+		for ( $y = 0; $y < $h && count( $out ) < $max; $y += $slice_h ) {
+			$ch = min( $slice_h, $h - $y );
+			if ( $ch < 200 ) { break; } // ignore a sliver tail
+			$part = imagecrop( $im, array( 'x' => 0, 'y' => $y, 'width' => $w, 'height' => $ch ) );
+			if ( ! $part ) { continue; }
+			ob_start();
+			imagepng( $part, null, 8 );
+			$out[] = 'data:image/png;base64,' . base64_encode( (string) ob_get_clean() );
+			imagedestroy( $part );
+		}
+		imagedestroy( $im );
+		return $out;
+	}
+
+	/** Critique ONE slice with the reliable vision model. Returns issues[] (may be empty). */
+	private function vqa_critique_slice( $or_key, $data_url, $viewport, $n, $total ) {
+		$rubric = "You are a strict landing-page QA reviewer. This is slice $n of $total of a " . strtoupper( $viewport ) . " screenshot (the page continues above/below the slice edges — NEVER report a section cut by the slice boundary as broken).\n"
+			. "If the slice shows a browser error/404/blank page, return {\"issues\":[],\"not_a_page\":true}.\n"
+			. "Report ONLY real, clearly visible FAILURES in THIS slice, judged against a top-agency conversion lander: (1) star/icon rows stacked vertically; (2) text or buttons genuinely clipped mid-word or overflowing; (3) a heading with no content beneath it (dead space); (4) large empty voids inside cards or between elements; (5) unreadable contrast; (6) cramped columns of squeezed text; (7) robotic or filler copy; (8) anything visibly broken.\n"
+			. "For each failure give the NEAREST SECTION HEADING text visible in the slice (verbatim) so it can be located, a concrete one-line problem, and a one-line concrete fix instruction. When unsure whether something is a failure, OMIT it.\n"
+			. 'Return ONLY JSON: {"issues":[{"heading":"...","problem":"...","fix":"...","severity":"high|med"}]}';
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 90,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'body'    => wp_json_encode( array(
+				'model'           => $this->vision_model(),
+				'max_tokens'      => 900,
+				'response_format' => array( 'type' => 'json_object' ),
+				'messages'        => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => $rubric ),
+					array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+				) ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return array(); }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$txt  = $data['choices'][0]['message']['content'] ?? '';
+		$j    = json_decode( (string) $txt, true );
+		if ( ! is_array( $j ) && preg_match( '/\{[\s\S]*\}/', (string) $txt, $m ) ) { $j = json_decode( $m[0], true ); }
+		if ( ! is_array( $j ) || ! empty( $j['not_a_page'] ) || empty( $j['issues'] ) || ! is_array( $j['issues'] ) ) { return array(); }
+		return $j['issues'];
+	}
+
+	/** Map a critique heading to a stored section record index, or -1. */
+	private function vqa_match_record( $records, $heading ) {
+		$h = strtolower( trim( (string) preg_replace( '/["\x{201C}\x{201D}]/u', '', (string) $heading ) ) );
+		if ( '' === $h ) { return -1; }
+		foreach ( $records as $i => $r ) {
+			$rh = strtolower( (string) ( isset( $r['heading'] ) ? $r['heading'] : '' ) );
+			if ( '' !== $rh && ( false !== strpos( $rh, $h ) || false !== strpos( $h, $rh ) ) ) { return $i; }
+		}
+		return -1;
+	}
+
+	/**
+	 * The loop: screenshot desktop+mobile -> chunked critiques -> re-compose the
+	 * flagged sections (free — a QA pass never charges builds) -> repeat. Max 2
+	 * rounds, max 3 fixes per round, keepalive between every network call.
+	 */
+	private function vision_qa_loop( $post_id, $keepalive = null, $max_rounds = 2 ) {
+		@set_time_limit( 600 ); // phpcs:ignore WordPress.PHP.IniSet
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $or_key ) { return array( 'note' => 'The quality pass needs the vision service configured.' ); }
+		$ping = function () use ( $keepalive ) { if ( is_callable( $keepalive ) ) { $keepalive(); } };
+		$records = $this->ff_sections( $post_id );
+		if ( count( $records ) < 2 ) { return array( 'note' => 'Not enough on the page yet for a quality pass — build a few sections first.' ); }
+
+		$fixed_all = array();
+		$rounds    = 0;
+		for ( $round = 1; $round <= $max_rounds; $round++ ) {
+			$rounds = $round;
+			$issues = array();
+			foreach ( array( 'desktop', 'mobile' ) as $vp ) {
+				$ping();
+				$png = $this->vqa_fetch_png( $post_id, $vp );
+				if ( '' === $png ) { continue; }
+				$slices = $this->vqa_slices( $png, 'mobile' === $vp ? 2400 : 1900 );
+				$total  = count( $slices );
+				foreach ( $slices as $n => $slice ) {
+					$ping();
+					foreach ( $this->vqa_critique_slice( $or_key, $slice, $vp, $n + 1, $total ) as $iss ) {
+						if ( empty( $iss['heading'] ) || empty( $iss['problem'] ) ) { continue; }
+						$idx = $this->vqa_match_record( $records, $iss['heading'] );
+						if ( $idx < 0 ) { continue; }
+						$sev = ( isset( $iss['severity'] ) && 'high' === $iss['severity'] ) ? 2 : 1;
+						if ( ! isset( $issues[ $idx ] ) ) { $issues[ $idx ] = array( 'sev' => 0, 'problems' => array() ); }
+						$issues[ $idx ]['sev'] += $sev;
+						$issues[ $idx ]['problems'][] = '[' . $vp . '] ' . $iss['problem'] . ( ! empty( $iss['fix'] ) ? ' Fix: ' . $iss['fix'] : '' );
+					}
+				}
+			}
+			if ( empty( $issues ) ) { break; } // page passed
+
+			// Fix the worst offenders this round (bounded), via free scoped re-compose.
+			uasort( $issues, function ( $a, $b ) { return $b['sev'] - $a['sev']; } );
+			$fixed_this = 0;
+			foreach ( $issues as $idx => $bundle ) {
+				if ( $fixed_this >= 3 ) { break; }
+				if ( empty( $records[ $idx ]['source_tree'] ) ) { continue; }
+				$ping();
+				$instr = "A design QA review of the rendered page found these problems in THIS section — fix them all while keeping the section's purpose, copy voice, palette, and everything not mentioned identical. HARD RULE: never delete content while fixing presentation — keep every testimonial, card, list item, and form field that exists; change only layout, spacing, sizing, colors, or the specific copy flagged:\n- " . implode( "\n- ", array_unique( $bundle['problems'] ) );
+				$res   = $this->scoped_edit_section( $post_id, $records[ $idx ], $instr, false );
+				if ( ! empty( $res['cohesion'] ) || ! empty( $res['scoped'] ) ) {
+					$fixed_this++;
+					$fixed_all[] = $this->role_label( isset( $records[ $idx ]['semantic_role'] ) ? $records[ $idx ]['semantic_role'] : 'unknown' );
+				}
+			}
+			if ( 0 === $fixed_this ) { break; } // nothing actionable — stop looping
+			$records = $this->ff_sections( $post_id ); // refreshed trees for the next round
+		}
+
+		$this->cohesion_flush( $post_id );
+		if ( empty( $fixed_all ) ) {
+			return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Ran a full visual quality pass on desktop and mobile — nothing broken worth touching. The page holds up.' );
+		}
+		return array(
+			'preview_bust' => time(),
+			'cohesion'     => true,
+			'note'         => 'Quality pass done (' . $rounds . ' round' . ( 1 === $rounds ? '' : 's' ) . '): reviewed every section on desktop and mobile and reworked ' . implode( ', ', array_unique( $fixed_all ) ) . '. Say "undo" if you liked it better before.',
+		);
+	}
+
 	/** The vision model for critiques. GLM's vision models return EMPTY on OpenRouter,
 	 *  so default to a proven-reliable one. Filterable. */
 	private function vision_model() {
@@ -2250,7 +2419,7 @@ class PressGo_AI_Builder {
 			'proof' => 'testimonials', 'steps' => 'how-it-works', 'team' => 'team', 'gallery' => 'gallery',
 			'pricing' => 'pricing', 'faq' => 'FAQ', 'cta' => 'call-to-action', 'contact' => 'contact', 'unknown' => 'that',
 			'pain' => 'problem', 'compare' => 'comparison', 'checklist' => 'warning-signs', 'magnet' => 'free-guide',
-			'areas' => 'service-area', 'stats' => 'stats', 'social_proof' => 'trust strip',
+			'areas' => 'service-area', 'stats' => 'stats', 'social_proof' => 'trust strip', 'topbar' => 'top bar', 'footer' => 'footer',
 		);
 		return isset( $map[ $role ] ) ? $map[ $role ] : 'that';
 	}
@@ -2447,7 +2616,7 @@ class PressGo_AI_Builder {
 	 *  user's change, re-render it under the same marker, and swap it into the page —
 	 *  so "change the headline" / "here's my menu" edits the section you're on, not a
 	 *  brand-new one. Snapshot-protected ("undo"). */
-	private function scoped_edit_section( $post_id, $rec, $message ) {
+	private function scoped_edit_section( $post_id, $rec, $message, $charge = true ) {
 		$tree = isset( $rec['source_tree'] ) ? $rec['source_tree'] : null;
 		if ( empty( $tree ) ) {
 			return array( 'note' => "I can't edit that section in place yet (it was built before this feature). Tell me what to add or remove instead." );
@@ -2497,7 +2666,7 @@ class PressGo_AI_Builder {
 		}
 		$this->save_ff_sections( $post_id, $records );
 		$this->cohesion_flush( $post_id );
-		$this->bump_usage( 4 );
+		if ( $charge ) { $this->bump_usage( 4 ); }
 
 		$label = $this->role_label( $rec['semantic_role'] ?? 'unknown' );
 		return array(
@@ -4356,6 +4525,12 @@ class PressGo_AI_Builder {
 			if ( '' === $discovery_stage && ! $whole_page && $this->is_text_reorder( $message ) ) {
 				wp_send_json_success( $this->handle_text_reorder( $post_id, $message ) );
 			}
+			// Full vision quality pass: iterate screenshot->critique->fix like the
+			// gold-standard pages were made. Checked before reflow so "make it
+			// perfect" runs the deep loop, not just a reorder.
+			if ( '' === $discovery_stage && ! $whole_page && preg_match( '/\b(make (it|this|the page) perfect|quality pass|full review|review (the|this) (whole )?page|deep clean|perfect (it|this|the page))\b/i', $message ) ) {
+				wp_send_json_success( $this->vision_qa_loop( $post_id, $this->freeform_keepalive() ) );
+			}
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
 			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive|perfect)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this)( up| this page)?|clean up( the| this)? ?(page)?|smart order|less cluttered|improve the (layout|design|look|flow)|something (does ?n\'?t|does not) look right|something\'?s? (off|wrong|not right)|polish (it|this|the page|the design)|fix the (design|layout|look|page|mobile|spacing)|does (this|it) look (ok|okay|right|good|off|wrong))\b/i', $message ) ) {
@@ -4547,7 +4722,7 @@ class PressGo_AI_Builder {
 				$primary = ( 'call' === $hero_goal )
 					? "The PRIMARY action is the phone: put a tel:-linked accent button with the real number (only if the brief gives one) at the top of the left column, and title the form card \"Prefer we reach out?\" with a 3-field callback form (name, phone, best time)."
 					: "The form card IS the hero CTA: give it AT MOST 6 fields (name, phone, email, plus ONE qualifying select), and add NO separate CTA button in the left column.";
-				$framed = "This is the HERO (the page's first section) and this page's goal is LEAD CAPTURE, so build the split lead-gen hero: a dark photo background (background_image_query + strong overlay) holding a row with two cols, width 55 and 45. Left col: an uppercase letterspaced eyebrow of real credentials or service area, a big H1 naming the free offer, a 2-line subhead ending in a risk reversal like 'No cost, no pressure.', then 3-4 icon+text trust rows (fas fa-check-circle in the accent color), and a 'Prefer to call? [number]' line if the brief includes a phone. Right col: a white rounded card (radius, shadow, padding ~32) with a centered H3 naming the offer, one speed-promise microcopy line, a REAL `form` block (on_dark false), a full-width accent submit labeled with the offer (never 'Submit'), and one small reassurance line under it: no obligation + response-time promise + 'We never share your info.' " . $primary . "\n\n" . $framed;
+				$framed = "This is the HERO (the page's first section) and this page's goal is LEAD CAPTURE, so build the split lead-gen hero: a dark photo background (background_image_query + strong overlay) holding a row with two cols, width 55 and 45, and vertical_align top so the form card hugs its own content (never stretches with dead space). Left col: an uppercase letterspaced eyebrow of real credentials or service area, a big H1 naming the free offer, a 2-line subhead ending in a risk reversal like 'No cost, no pressure.', then 3-4 TIGHT inline trust rows (each a row: a small fas fa-check-circle icon col ~8% wide in the accent color, beside the trust phrase as white text — icon LEFT of text on one line, never icon stacked above text), and a 'Prefer to call? [number]' line if the brief includes a phone. Right col: a white rounded card (radius, shadow, padding ~32) with a centered H3 naming the offer, one speed-promise microcopy line, a REAL `form` block (on_dark false), a full-width accent submit labeled with the offer (never 'Submit'), and one small reassurance line under it: no obligation + response-time promise + 'We never share your info.' " . $primary . "\n\n" . $framed;
 			} else {
 				$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
 			}
@@ -4626,6 +4801,21 @@ class PressGo_AI_Builder {
 		$role_hint = $was_first ? 'hero' : $this->role_from_section_key( $section_key );
 		if ( '' === $role_hint ) { $role_hint = $this->role_from_text( $message, false, $this->tree_has_form( $tree ) ); }
 		$this->store_ff_record( $post_id, $pg_key, $tree, $cfg, $role_hint );
+
+		// A top bar belongs at the very top: it was appended last, so splice its
+		// element and record to index 0 right after storing.
+		if ( 'topbar' === $section_key ) {
+			$els_tb = $this->read_elements( $post_id );
+			$recs_tb = $this->ff_sections( $post_id );
+			if ( count( $els_tb ) > 1 ) {
+				array_unshift( $els_tb, array_pop( $els_tb ) );
+				update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $els_tb ) ) ) );
+			}
+			if ( count( $recs_tb ) > 1 ) {
+				array_unshift( $recs_tb, array_pop( $recs_tb ) );
+				$this->save_ff_sections( $post_id, $recs_tb );
+			}
+		}
 
 		// A hero that ships with the lead-form card already IS the offer — never
 		// re-ask the offer drip on this page.
@@ -4720,7 +4910,7 @@ class PressGo_AI_Builder {
 		// extended tier (or, at 0 builds left, say when it unlocks).
 		$extend = null;
 		if ( $whole_page && is_array( $dstate3 ) && ! $this->whole_page_plan( $dstate3 ) ) {
-			$ext = $this->extended_plan( $dstate3 );
+			$ext = $this->extended_plan( $dstate3, $post_id );
 			if ( ! empty( $ext ) ) {
 				if ( $left > 0 ) {
 					$slice  = array_slice( $ext, 0, $left );
@@ -5280,6 +5470,9 @@ class PressGo_AI_Builder {
 		if ( $palparts )          { $L[] = 'LOCKED PALETTE — use ONLY these colors: ' . implode( ', ', $palparts ) . '. Introduce NO other dark, light, or accent color.'; }
 		if ( '' !== $next_bg && '' !== $last_bg ) { $L[] = 'The last section background was ' . $last_bg . ', so use ' . $next_bg . ' for this one (alternate the rhythm — never two same-bg sections adjacent).'; }
 		if ( $has_form ) { $L[] = 'A lead-capture form ALREADY EXISTS on this page. Do NOT add another form, newsletter signup, or contact section unless THIS TURN\'s request explicitly asks for one (a repeated bottom-of-page lead form or a 2-field guide-download form, when explicitly requested, is intentional) — otherwise route any CTA to the existing goal.'; }
+		$L[] = $this->page_is_canvas( $post_id )
+			? 'This page is a standalone canvas (no theme header/footer). A dedicated top bar or footer SECTION is legitimate when requested.'
+			: 'This page uses the site theme, which already shows its own header and footer. NEVER build a top bar, nav, or footer section.';
 		$L[] = 'SECTIONS ALREADY ON THE PAGE (in order, your new one is appended after):';
 		foreach ( $sections as $i => $s ) {
 			$L[] = '  ' . ( $i + 1 ) . '. ' . $s['type'] . ( '' !== $s['headline'] ? ' — "' . $s['headline'] . '"' : '' ) . ' — bg ' . ( '' !== $s['bg'] ? $s['bg'] : 'default' ) . ' — layout: ' . ( $s['layout'] ?? 'centered' ) . ( $s['has_form'] ? ' — has a form' : '' );
