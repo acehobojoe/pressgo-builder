@@ -1454,7 +1454,10 @@
 	// response suggests the rest — the wizard keeps leading section by section.
 	function renderSuggestions(s) {
 		if (!s || !s.chips || !s.chips.length) return;
-		append(el('pg-msg pg-msg-ai', s.note || 'What should we add next?'));
+		// Model-suggested reply chips (s.suggested) follow a reply that already
+		// frames them — a generic "What should we add next?" header above them
+		// reads as a redundant non-sequitur, so skip the note entirely.
+		if (!(s.suggested && !s.note)) append(el('pg-msg pg-msg-ai', s.note || 'What should we add next?'));
 		var wrap = document.createElement('div');
 		wrap.className = 'pg-suggest-chips';
 		wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px;';
