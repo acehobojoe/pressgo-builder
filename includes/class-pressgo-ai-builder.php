@@ -4631,6 +4631,27 @@ class PressGo_AI_Builder {
 				}
 			}
 		}
+		// Classify attachments IMMEDIATELY so photos survive every path (they were
+		// silently lost when the first message went to the interview): real PHOTOS
+		// sideload into the media library + the page's photo pool; a DESIGN
+		// screenshot on a fresh page is stashed as reference direction; a design/page
+		// screenshot on a populated page stays in $ff_images for locate/questions.
+		if ( ! empty( $ff_images ) && $post_id ) {
+			$cls_early = $this->vqa_classify_image( $ff_images[0] );
+			if ( 'photo' === $cls_early['type'] ) {
+				$added_early = $this->sideload_user_images( $post_id, $ff_images );
+				if ( $added_early ) {
+					$message .= "\n\nUSER PHOTOS (real images the user just supplied — use these as literal image src URLs):\n- " . implode( "\n- ", $added_early );
+				}
+				$ff_images = array(); // consumed as content
+			} else {
+				$exist_probe = get_post_meta( $post_id, '_elementor_data', true );
+				if ( ! is_string( $exist_probe ) || '' === $exist_probe ) {
+					if ( '' !== $cls_early['desc'] ) { update_post_meta( $post_id, '_pressgo_ref_desc', $cls_early['desc'] ); }
+					$ff_images = array(); // consumed as reference for the first build
+				}
+			}
+		}
 		// Page empty? Decode the data and check for any element. (The old check
 		// looked for "type", but rendered Elementor data uses "elType" — so it read
 		// every built page as empty, which silently disabled the follow-up drips.)
@@ -4805,7 +4826,7 @@ class PressGo_AI_Builder {
 		// Utility pages (404, thank-you, coming soon, privacy) don't fit the
 		// business interview — asking a 404 page for its "vibe" traps the user in
 		// a wizard. Detect them and build immediately with a tailored request.
-		if ( $page_empty && '' === $brief && preg_match( '/\b(404|not found|thank[- ]?you page|coming soon|under construction|maintenance page|privacy policy|terms (of service|page))\b/i', $message ) ) {
+		if ( $page_empty && '' === $brief && preg_match( '/\b(404|not found|thank[- ]?you page|coming soon|under construction|maintenance page|privacy policy|terms (of service|page)|(photo |image )?gallery( page)?|portfolio( page)?|menu page|contact( us)? page|about( us)? page|team page|pricing page|faq page)\b/i', $message ) ) {
 			$util_state = array(
 				'answers'      => array( 'goal' => 'browse', 'industry' => 'other', 'vibe' => 'premium', 'photos' => 'stock' ),
 				'business'     => trim( $message ),
@@ -4820,6 +4841,16 @@ class PressGo_AI_Builder {
 				$message = 'Build a single elegant 404 page section, full viewport height feel: an oversized display "404" (or a clever on-brand variant), one warm human line like "This page wandered off." , one short sentence pointing home, and ONE accent button "Back to the homepage" linking to /. Keep it minimal and on-brand: ' . $message;
 			} elseif ( preg_match( '/\bthank[- ]?you\b/i', $message ) ) {
 				$message = 'Build a single thank-you page section: a warm confirmation headline, one line setting expectations (when/how they will hear back), and ONE accent button back to the homepage. Minimal, on-brand: ' . $message;
+			} elseif ( preg_match( '/\b(gallery|portfolio)\b/i', $message ) ) {
+				$message = 'Build a GALLERY page section: an uppercase eyebrow, an H2 naming the place or work, one short warm intro line, then a large image grid (repeat, 3 per row, radius 12) — if USER PHOTOS are listed use EVERY one of them exactly once as literal src values; otherwise 6-9 varied specific stock queries fitting this business. End with ONE accent button (contact or back home). The gallery IS the page, no other pitch sections: ' . $message;
+			} elseif ( preg_match( '/\bmenu page\b/i', $message ) ) {
+				$message = 'Build a MENU page section: an eyebrow, the business name as H2, then the menu as clean grouped lists (category headings, item name bold left with a short description under it, price right) — use ONLY items and prices the user gave, otherwise tasteful placeholders clearly meant to be replaced. One accent button (order, call, or visit): ' . $message;
+			} elseif ( preg_match( '/\bcontact( us)? page\b/i', $message ) ) {
+				$message = 'Build a CONTACT page section: an H2 in the visitor\'s voice, one warm line, an asymmetric split with the real contact details and hours on one side (only what the brief gives) and a real form (name, email, message) in a card on the other, with a benefit-labeled submit: ' . $message;
+			} elseif ( preg_match( '/\b(about( us)?|team) page\b/i', $message ) ) {
+				$message = 'Build an ABOUT/TEAM page section: eyebrow, claim H2, a real photo beside two short story paragraphs (values then method), then founder or team cards if people are named (photo, accent uppercase name, credential subhead, who-this-person-is-for bio). One accent CTA at the end: ' . $message;
+			} elseif ( preg_match( '/\b(pricing|faq) page\b/i', $message ) ) {
+				$message = 'Build this single-purpose page section faithfully to its type (pricing cards from real tiers only, or a 6-question FAQ objection ladder), on-brand, ending with one accent CTA: ' . $message;
 			} else {
 				$message = 'Build a single minimal utility page section for this request, on-brand, with one clear headline, one short supporting line, and one accent button home: ' . $message;
 			}
@@ -4881,19 +4912,6 @@ class PressGo_AI_Builder {
 			// A screenshot names the target better than words: vision-match it to a
 			// section and describe what it shows ("don't need icons here" + crop of
 			// the services cards -> edit THAT section, told what "here" means).
-			if ( ! empty( $ff_images ) ) {
-				// Real PHOTOS dropped mid-conversation are content, not a page
-				// screenshot: pool them and let the message route normally with the
-				// URLs attached ("use these in the gallery" -> scoped edit sees them).
-				$cls_mid = $this->vqa_classify_image( $ff_images[0] );
-				if ( 'photo' === $cls_mid['type'] ) {
-					$added = $this->sideload_user_images( $post_id, $ff_images );
-					if ( $added ) {
-						$message .= "\n\nUSER PHOTOS (real images the user just supplied — use these as literal image src URLs):\n- " . implode( "\n- ", $added );
-					}
-					$ff_images = array(); // consumed as content
-				}
-			}
 			if ( ! empty( $ff_images ) ) {
 				// A QUESTION about the screenshot deserves an ANSWER, not a silent
 				// multi-minute rebuild ("why do these look weird" was kicking off a
@@ -4989,15 +5007,12 @@ class PressGo_AI_Builder {
 				$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
 			}
 		}
-		// Attached images on a fresh build: a DESIGN screenshot becomes direction;
-		// real PHOTOS ("here are some pics") get sideloaded and USED on the page.
-		if ( ! empty( $ff_images ) && $page_empty ) {
-			$cls = $this->vqa_classify_image( $ff_images[0] );
-			if ( 'design' === $cls['type'] && '' !== $cls['desc'] ) {
-				$framed = "REFERENCE SCREENSHOT (the user attached this as direction — follow its layout, structure, and mood, adapted to this business):\n" . $cls['desc'] . "\n\n" . $framed;
-			} else {
-				$this->sideload_user_images( $post_id, $ff_images );
-			}
+		// A stashed design reference (attached during the interview or first message)
+		// becomes direction for the first composes, then clears once the page exists.
+		$ref_desc = (string) get_post_meta( $post_id, '_pressgo_ref_desc', true );
+		if ( '' !== $ref_desc ) {
+			$framed = "REFERENCE SCREENSHOT (the user attached this as direction — follow its layout, structure, and mood, adapted to this business):\n" . $ref_desc . "\n\n" . $framed;
+			if ( ! $page_empty ) { delete_post_meta( $post_id, '_pressgo_ref_desc' ); }
 		}
 		// USER PHOTOS: real images the user supplied — the composer must use them
 		// (as literal image `src` values) BEFORE reaching for any stock query.
