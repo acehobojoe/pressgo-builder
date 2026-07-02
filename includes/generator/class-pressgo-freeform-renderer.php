@@ -574,6 +574,20 @@ class PressGo_Freeform_Renderer {
 			'flex_gap'         => array( 'unit' => 'px', 'column' => '0', 'row' => '0', 'isLinked' => true ),
 		);
 
+		// A lead-form column on a dark section must read as a white CARD — if the
+		// composer skipped the wrapper styling, apply it (bg, radius, padding) so
+		// the form never floats bare on a dark hero.
+		$has_form_child = false;
+		foreach ( $kids as $k ) {
+			if ( is_array( $k ) && 'form' === ( isset( $k['type'] ) ? $k['type'] : '' ) ) { $has_form_child = true; break; }
+		}
+		if ( $has_form_child && self::$section_is_dark && empty( $s['background'] ) ) {
+			$s['background'] = '#FFFFFF';
+			if ( ! isset( $s['radius'] ) )  { $s['radius'] = 16; }
+			if ( ! isset( $s['padding'] ) ) { $s['padding'] = 28; }
+			if ( ! isset( $s['shadow'] ) )  { $s['shadow'] = true; }
+		}
+
 		if ( $all_icons ) {
 			$settings['flex_direction']        = 'row';
 			$settings['flex_direction_mobile'] = 'row';
@@ -1079,6 +1093,18 @@ class PressGo_Freeform_Renderer {
 	 * names pass through (the display_errors guard catches their warnings).
 	 */
 	private static function normalize_icon( $icon ) {		if ( ! is_string( $icon ) || '' === $icon ) { return $icon; }
+		// Invalid icon names crash Elementor's font-icon-svg manager with PHP
+		// warning spam on every render (e.g. an invented "fas fa-pie"). Map the
+		// common inventions; anything with an illegal charset falls to a safe glyph.
+		static $invented = array(
+			'fa-pie' => 'fa-chart-pie', 'fa-cake' => 'fa-birthday-cake', 'fa-tree-large' => 'fa-tree',
+			'fa-sparkles' => 'fa-star', 'fa-badge-check' => 'fa-check-circle', 'fa-message' => 'fa-comment',
+			'fa-timer' => 'fa-clock', 'fa-scissors-alt' => 'fa-cut', 'fa-flower' => 'fa-seedling',
+		);
+		foreach ( $invented as $bad => $good ) {
+			if ( false !== strpos( $icon, $bad ) && false === strpos( $icon, $good ) ) { $icon = str_replace( $bad, $good, $icon ); }
+		}
+		if ( ! preg_match( '/^fa[srb]?\s+fa-[a-z0-9-]+$/', trim( $icon ) ) ) { return 'fas fa-check-circle'; }
 		static $map = array(
 			'fa-xmark'                  => 'fa-times',
 			'fa-circle-xmark'           => 'fa-times-circle',

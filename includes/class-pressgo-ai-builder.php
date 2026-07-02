@@ -5384,12 +5384,14 @@ class PressGo_AI_Builder {
 		if ( '' !== $or_key ) {
 			$tree = self::glm_compose( $or_key, $system, $framed, $keepalive );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
+			error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
 		if ( '' !== $cl_key ) {
 			$tree = self::claude_compose( $cl_key, $system, $framed );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
+		error_log( 'PressGo compose: BOTH models failed. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 200 ) ); // phpcs:ignore
 		return array( 'error' => 'Both models failed to return a valid section. Try rewording.' );
 	}
 
