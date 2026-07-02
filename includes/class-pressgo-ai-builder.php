@@ -2193,6 +2193,79 @@ class PressGo_AI_Builder {
 		return $j['issues'];
 	}
 
+	/** Sideload chat-dropped photos into the media library; returns their URLs and
+	 *  appends them to the page's user-photo pool (used before any stock). */
+	private function sideload_user_images( $post_id, $data_urls ) {
+		$urls = array();
+		foreach ( $data_urls as $du ) {
+			if ( ! preg_match( '#^data:(image/(png|jpe?g|gif|webp));base64,(.+)$#', $du, $m ) ) { continue; }
+			$bytes = base64_decode( $m[3] );
+			if ( ! $bytes ) { continue; }
+			$ext  = 'jpeg' === $m[2] ? 'jpg' : $m[2];
+			$up   = wp_upload_bits( 'pressgo-user-' . $post_id . '-' . wp_rand( 100, 999 ) . '.' . $ext, null, $bytes );
+			if ( ! empty( $up['error'] ) ) { continue; }
+			$att = wp_insert_attachment( array(
+				'post_mime_type' => $m[1],
+				'post_title'     => 'PressGo user photo',
+				'post_status'    => 'inherit',
+			), $up['file'], $post_id );
+			if ( ! is_wp_error( $att ) && $att ) {
+				require_once ABSPATH . 'wp-admin/includes/image.php';
+				wp_update_attachment_metadata( $att, wp_generate_attachment_metadata( $att, $up['file'] ) );
+				$urls[] = $up['url'];
+			}
+		}
+		if ( $urls ) {
+			$pool = get_post_meta( $post_id, '_pressgo_user_images', true );
+			if ( ! is_array( $pool ) ) { $pool = array(); }
+			update_post_meta( $post_id, '_pressgo_user_images', array_values( array_unique( array_merge( $pool, $urls ) ) ) );
+		}
+		return $urls;
+	}
+
+	/** The page's pool of REAL user photos (chat drops + media library when chosen). */
+	private function user_image_pool( $post_id ) {
+		$pool = get_post_meta( $post_id, '_pressgo_user_images', true );
+		$pool = is_array( $pool ) ? $pool : array();
+		$st   = $this->discovery_state( $post_id );
+		if ( is_array( $st ) && 'media_library' === ( $st['answers']['photos'] ?? '' ) ) {
+			$atts = get_posts( array( 'post_type' => 'attachment', 'post_mime_type' => 'image', 'numberposts' => 10, 'orderby' => 'date', 'order' => 'DESC' ) );
+			foreach ( $atts as $a ) {
+				$u = wp_get_attachment_image_url( $a->ID, 'large' );
+				if ( $u ) { $pool[] = $u; }
+			}
+		}
+		return array_values( array_unique( $pool ) );
+	}
+
+	/** Is this attached image a DESIGN reference or a content PHOTO? */
+	private function vqa_classify_image( $data_url ) {
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $or_key || '' === $data_url ) { return array( 'type' => 'photo', 'desc' => '' ); }
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 60,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'body'    => wp_json_encode( array(
+				'model'           => $this->vision_model(),
+				'max_tokens'      => 400,
+				'response_format' => array( 'type' => 'json_object' ),
+				'messages'        => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => 'Classify this image. Is it (a) a SCREENSHOT of a website/app/design mockup, or (b) a regular PHOTO (people, places, products, work)? If a screenshot/design: describe its layout structure, background tone, accent color, typography feel, and distinctive elements in 5-8 tight lines. If a photo: describe the subject in one line. Return ONLY JSON: {"type":"design"|"photo","desc":"..."}' ),
+					array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+				) ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return array( 'type' => 'photo', 'desc' => '' ); }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$txt  = (string) ( $data['choices'][0]['message']['content'] ?? '' );
+		$j    = json_decode( $txt, true );
+		if ( ! is_array( $j ) && preg_match( '/\{[\s\S]*\}/', $txt, $m ) ) { $j = json_decode( $m[0], true ); }
+		return array(
+			'type' => ( isset( $j['type'] ) && 'design' === $j['type'] ) ? 'design' : 'photo',
+			'desc' => isset( $j['desc'] ) ? sanitize_textarea_field( (string) $j['desc'] ) : '',
+		);
+	}
+
 	/** Describe a reference screenshot for the text-only composer. '' on failure. */
 	private function vqa_describe_reference( $data_url ) {
 		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
@@ -4809,6 +4882,19 @@ class PressGo_AI_Builder {
 			// section and describe what it shows ("don't need icons here" + crop of
 			// the services cards -> edit THAT section, told what "here" means).
 			if ( ! empty( $ff_images ) ) {
+				// Real PHOTOS dropped mid-conversation are content, not a page
+				// screenshot: pool them and let the message route normally with the
+				// URLs attached ("use these in the gallery" -> scoped edit sees them).
+				$cls_mid = $this->vqa_classify_image( $ff_images[0] );
+				if ( 'photo' === $cls_mid['type'] ) {
+					$added = $this->sideload_user_images( $post_id, $ff_images );
+					if ( $added ) {
+						$message .= "\n\nUSER PHOTOS (real images the user just supplied — use these as literal image src URLs):\n- " . implode( "\n- ", $added );
+					}
+					$ff_images = array(); // consumed as content
+				}
+			}
+			if ( ! empty( $ff_images ) ) {
 				// A QUESTION about the screenshot deserves an ANSWER, not a silent
 				// multi-minute rebuild ("why do these look weird" was kicking off a
 				// scoped re-compose behind a spinner). Look, explain, offer the fix.
@@ -4903,13 +4989,21 @@ class PressGo_AI_Builder {
 				$framed = "This is the HERO (the page's first section). Lead with a strong headline, a short supporting line, and a SINGLE call-to-action BUTTON that points at the main action. Do NOT embed a multi-field form in the hero — forms belong in their own dedicated section further down the page.\n\n" . $framed;
 			}
 		}
-		// A reference screenshot on a fresh build: describe it with the vision model
-		// and inject it as direction (the composer itself is text-only).
+		// Attached images on a fresh build: a DESIGN screenshot becomes direction;
+		// real PHOTOS ("here are some pics") get sideloaded and USED on the page.
 		if ( ! empty( $ff_images ) && $page_empty ) {
-			$ref_desc = $this->vqa_describe_reference( $ff_images[0] );
-			if ( '' !== $ref_desc ) {
-				$framed = "REFERENCE SCREENSHOT (the user attached this as direction — follow its layout, structure, and mood, adapted to this business):\n" . $ref_desc . "\n\n" . $framed;
+			$cls = $this->vqa_classify_image( $ff_images[0] );
+			if ( 'design' === $cls['type'] && '' !== $cls['desc'] ) {
+				$framed = "REFERENCE SCREENSHOT (the user attached this as direction — follow its layout, structure, and mood, adapted to this business):\n" . $cls['desc'] . "\n\n" . $framed;
+			} else {
+				$this->sideload_user_images( $post_id, $ff_images );
 			}
+		}
+		// USER PHOTOS: real images the user supplied — the composer must use them
+		// (as literal image `src` values) BEFORE reaching for any stock query.
+		$pool = $this->user_image_pool( $post_id );
+		if ( ! empty( $pool ) ) {
+			$framed = "USER PHOTOS — the user supplied these REAL images. Use them as literal image `src` URLs (hero, about, services, gallery) BEFORE any stock `query`; spread them across the page and don't repeat one unless few exist:\n- " . implode( "\n- ", array_slice( $pool, 0, 10 ) ) . "\n\n" . $framed;
 		}
 		// Page-level reasoning: prepend a PAGE STATE block derived from the sections
 		// already on the page, so the new section continues the same business,
