@@ -2193,6 +2193,44 @@ class PressGo_AI_Builder {
 		return $j['issues'];
 	}
 
+	/** Which stored section does the user's screenshot show? ['idx'=>int|-1,'shows'=>string]. */
+	private function vqa_locate_from_screenshot( $post_id, $data_url ) {
+		$out    = array( 'idx' => -1, 'shows' => '' );
+		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' === $or_key || '' === $data_url ) { return $out; }
+		$records = $this->ff_sections( $post_id );
+		if ( empty( $records ) ) { return $out; }
+		$list = array();
+		foreach ( $records as $i => $r ) {
+			$list[] = $i . '. [' . ( isset( $r['semantic_role'] ) ? $r['semantic_role'] : '?' ) . '] "' . mb_substr( (string) ( isset( $r['heading'] ) ? $r['heading'] : '' ), 0, 70 ) . '"';
+		}
+		$q = "This screenshot is a crop of a landing page. The page's sections, in order, are:\n" . implode( "\n", $list ) . "\n\nWhich ONE section (by index) does the screenshot mainly show? Also describe in one short line what is visible (layout + any obvious element the user might be pointing at, e.g. 'service cards with small icons above the titles'). Return ONLY JSON: {\"index\": <int or -1 if unsure>, \"shows\": \"one line\"}";
+		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			'timeout' => 60,
+			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'body'    => wp_json_encode( array(
+				'model'           => $this->vision_model(),
+				'max_tokens'      => 300,
+				'response_format' => array( 'type' => 'json_object' ),
+				'messages'        => array( array( 'role' => 'user', 'content' => array(
+					array( 'type' => 'text', 'text' => $q ),
+					array( 'type' => 'image_url', 'image_url' => array( 'url' => $data_url ) ),
+				) ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return $out; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$txt  = isset( $data['choices'][0]['message']['content'] ) ? (string) $data['choices'][0]['message']['content'] : '';
+		$j    = json_decode( $txt, true );
+		if ( ! is_array( $j ) && preg_match( '/\{[\s\S]*\}/', $txt, $m ) ) { $j = json_decode( $m[0], true ); }
+		if ( is_array( $j ) ) {
+			$idx = isset( $j['index'] ) ? (int) $j['index'] : -1;
+			if ( $idx >= 0 && $idx < count( $records ) ) { $out['idx'] = $idx; }
+			$out['shows'] = isset( $j['shows'] ) ? sanitize_text_field( (string) $j['shows'] ) : '';
+		}
+		return $out;
+	}
+
 	/** Map a critique heading to a stored section record index, or -1. */
 	private function vqa_match_record( $records, $heading ) {
 		$h = strtolower( trim( (string) preg_replace( '/["\x{201C}\x{201D}]/u', '', (string) $heading ) ) );
@@ -4445,6 +4483,23 @@ class PressGo_AI_Builder {
 		$discovery_stage = isset( $_POST['discovery_stage'] ) ? sanitize_key( wp_unslash( $_POST['discovery_stage'] ) ) : '';
 		$discovery_value = isset( $_POST['discovery_value'] ) ? sanitize_text_field( wp_unslash( $_POST['discovery_value'] ) ) : '';
 		$section_key     = isset( $_POST['section_key'] ) ? sanitize_key( wp_unslash( $_POST['section_key'] ) ) : ''; // which suggested section the user tapped
+		// Attached screenshots (same wire format as the recipe chat): used to locate
+		// WHICH section the user means and to describe what they're pointing at.
+		$ff_images = array();
+		if ( ! empty( $_POST['images'] ) ) {
+			$dec_imgs = json_decode( wp_unslash( (string) $_POST['images'] ), true );
+			if ( is_array( $dec_imgs ) ) {
+				foreach ( $dec_imgs as $im ) {
+					if ( count( $ff_images ) >= 3 ) { break; }
+					if ( ! is_array( $im ) || empty( $im['base64'] ) ) { continue; }
+					$b64  = preg_replace( '/\s+/', '', (string) $im['base64'] );
+					$mime = isset( $im['mediaType'] ) ? sanitize_text_field( (string) $im['mediaType'] ) : '';
+					if ( $b64 && preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
+						$ff_images[] = 'data:' . $mime . ';base64,' . $b64;
+					}
+				}
+			}
+		}
 		// Page empty? Decode the data and check for any element. (The old check
 		// looked for "type", but rendered Elementor data uses "elType" — so it read
 		// every built page as empty, which silently disabled the follow-up drips.)
@@ -4661,11 +4716,39 @@ class PressGo_AI_Builder {
 		// on a real change verb against a section that exists (a build request for a
 		// not-yet-built section falls through to compose).
 		$wants_new_section_msg = (bool) preg_match( '/\b(add|create|insert|build|new|another)\b.{0,40}\bsection\b/i', $message );
-		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && ! $wants_new_section_msg && $this->is_edit_intent( $message ) ) {
-			$edit_target = $this->resolve_edit_target( $post_id, $message, $selected_key );
-			if ( is_array( $edit_target ) ) {
-				wp_send_json_success( $this->scoped_edit_section( $post_id, $edit_target, $message ) );
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && ! $wants_new_section_msg ) {
+			$edit_target = null;
+			$img_note    = '';
+			// A screenshot names the target better than words: vision-match it to a
+			// section and describe what it shows ("don't need icons here" + crop of
+			// the services cards -> edit THAT section, told what "here" means).
+			if ( ! empty( $ff_images ) ) {
+				$loc = $this->vqa_locate_from_screenshot( $post_id, $ff_images[0] );
+				if ( '' !== $loc['shows'] ) {
+					$img_note = ' (the user attached a screenshot of the page; it shows: ' . $loc['shows'] . ' — apply the change to what the screenshot shows)';
+				}
+				if ( $loc['idx'] >= 0 ) {
+					$recs_img = $this->ff_sections( $post_id );
+					if ( isset( $recs_img[ $loc['idx'] ] ) ) { $edit_target = $recs_img[ $loc['idx'] ]; }
+				}
 			}
+			$is_edit  = $this->is_edit_intent( $message );
+			$is_drop  = mb_strlen( $message ) > 100; // pasted real content (reviews, a menu, bios)
+			if ( null === $edit_target && ( $is_edit || $is_drop ) ) {
+				$edit_target = $this->resolve_edit_target( $post_id, $message, $selected_key );
+			}
+			if ( is_array( $edit_target ) && ( $is_edit || $is_drop || ! empty( $ff_images ) ) ) {
+				$instr = $message . $img_note;
+				if ( $is_drop && ! $is_edit ) {
+					// Content drop: real reviews/menu/bios pasted in — update the matching
+					// section with the REAL material instead of building another section.
+					$instr = "The user provided REAL content for this section. Replace the invented or placeholder content with it faithfully (keep the section's layout, style, and palette; use their exact names, quotes, and numbers):\n" . $message . $img_note;
+				}
+				wp_send_json_success( $this->scoped_edit_section( $post_id, $edit_target, $instr ) );
+			}
+			// Screenshot given but no section matched: keep the description so the
+			// downstream compose/chat at least knows what the user is looking at.
+			if ( '' !== $img_note ) { $message .= $img_note; }
 		}
 
 		$last_chat = (string) get_post_meta( $post_id, self::META_LAST_CHAT, true );

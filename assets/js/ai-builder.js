@@ -1526,6 +1526,14 @@
 		chatStarted = true;
 		input.value = '';
 		var fields = { message: text };
+		// Attached screenshots ride along (same wire format as the recipe chat) so
+		// "don't need icons here" + a screenshot actually reaches the builder.
+		if (pendingImages.length) {
+			fields.images = JSON.stringify(pendingImages.map(function (im) {
+				return { base64: im.base64, mediaType: im.mediaType };
+			}));
+			clearPendingImages();
+		}
 		var kind = freeformThinkKind(text); // status caption matches the request intent
 		// Typed answer during an interview: route it into the awaited stage so it
 		// lands in the same slot a chip tap would (server parses the text).
