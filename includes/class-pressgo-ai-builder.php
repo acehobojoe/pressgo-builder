@@ -1645,7 +1645,7 @@ class PressGo_AI_Builder {
 		if ( $is_first ) { return 'hero'; }
 		$b = strtolower( (string) $blob );
 		if ( preg_match( '/\b(faq|frequently asked|questions?)\b/', $b ) )                       { return 'faq'; }
-		if ( preg_match( '/\b(reviews?|testimonials?|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
+		if ( preg_match( '/\b(reviews?|testimonials?|social proof|backers?|supporters?|donors?|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
 		if ( preg_match( '/\b(how it works|steps?|get started|simple)\b/', $b ) )               { return 'steps'; }
 		// Deep-arc roles — before about/cta so their trees classify correctly
 		// (a magnet tree contains a form and must not fall to the cta branch).
@@ -4606,6 +4606,10 @@ class PressGo_AI_Builder {
 		// whitespace (emitted during the compose call) reaches the browser through
 		// nginx + Cloudflare before the proxy timeout fires.
 		@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.IniSet
+		// A tab refresh mid-build must not kill the compose: PHP aborts on the first
+		// write (our keepalive!) to a disconnected client, which silently lost builds.
+		// Finish the work and persist it — the user comes back to a built section.
+		@ignore_user_abort( true );
 		@ini_set( 'zlib.output_compression', '0' );
 		// nginx buffers FastCGI output by default, which holds the keepalive
 		// whitespace until the response ends -> Cloudflare sees 100s of silence and
@@ -5304,7 +5308,7 @@ class PressGo_AI_Builder {
 			}
 		}
 
-		wp_send_json_success( array(
+		wp_send_json_success( $this->turn_out( $post_id, array(
 			'preview_bust' => time(),
 			'sections'     => $sections_now,
 			'model'        => $used_model,
@@ -5312,7 +5316,7 @@ class PressGo_AI_Builder {
 			'suggest'      => $suggest,
 			'usage'        => $usage,
 			'extend'       => $extend,
-		) );
+		) ) );
 	}
 
 	/**
