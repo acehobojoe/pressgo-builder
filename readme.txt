@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.4.1
+Stable tag: 2.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.4.2 =
+* One honest meter: on PressGo API sites the credits pill is the single gauge (it updates live as sections build); the daily usage bar now only appears for own-OpenRouter-key setups, and the old tier popup is gone
+* Edits really are free: scoped section rewrites, hero restyles, and quality-pass fixes no longer spend credits — only NEW sections cost 1
+* Automatic refunds: if a section build fails after being charged (model returned something unusable), the credit is returned to your balance within seconds
+* Voice notes: recording size capped safely under the API body limit so long memos error clearly instead of failing silently
 
 = 2.4.1 =
 * Nova now works everywhere: freeform builds, the visual quality pass, screenshot understanding, chat, and voice transcription all run through your PressGo API key out of the box — no extra keys or setup. Section builds cost 1 credit each (edits, reorders, palette changes, and chat remain free).

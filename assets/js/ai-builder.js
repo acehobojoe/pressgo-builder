@@ -359,13 +359,6 @@
 		setInterval(function () {
 			if (usageResetTarget) usageReset.textContent = fmtReset(usageResetTarget - Math.floor(Date.now() / 1000));
 		}, 30000);
-		function toggleTiers(e) { if (e) e.stopPropagation(); if (tiersPop) tiersPop.hidden = !tiersPop.hidden; }
-		usageEl.addEventListener('click', toggleTiers);          // the whole meter is the upgrade entry point
-		if (usageUpg)  usageUpg.addEventListener('click', toggleTiers);
-		if (tiersPopX) tiersPopX.addEventListener('click', function (e) { e.stopPropagation(); tiersPop.hidden = true; });
-		document.addEventListener('click', function (e) {
-			if (tiersPop && !tiersPop.hidden && !tiersPop.contains(e.target) && !usageEl.contains(e.target)) tiersPop.hidden = true;
-		});
 	}
 
 	function typingNode() {
@@ -1314,6 +1307,7 @@
 		var d = res.json;
 		if (d && d.success) {
 			var data = d.data || {};
+			if (data.preview_bust && !usageEl) refreshCredits(); // proxy mode: sections spend credits
 			// Mid-interview / confirm: render the question + chips and wait. A confirm
 			// step (brand lock) shows the freshly-built hero, so reload the preview
 			// first, then render its swatches + chips.

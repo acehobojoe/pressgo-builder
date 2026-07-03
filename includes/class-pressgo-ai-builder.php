@@ -647,7 +647,7 @@ class PressGo_AI_Builder {
 		// Payload guard — a runaway recording shouldn't blow past PHP's
 		// post_max_size and fail with a generic error. Base64 inflates ~4/3,
 		// so cap on the decoded size (~8MB ≈ a few minutes of Opus). Filterable.
-		$max_bytes = (int) apply_filters( 'pressgo_transcribe_max_bytes', 8 * 1024 * 1024 );
+		$max_bytes = (int) apply_filters( 'pressgo_transcribe_max_bytes', 6 * 1024 * 1024 ); // base64 inflates ~1.33x; keep under the API's 10MB body limit
 		if ( ( strlen( $b64 ) * 3 ) / 4 > $max_bytes ) {
 			wp_send_json_error( 'Recording is too long. Keep it under a minute or so.', 413 );
 		}
@@ -2487,6 +2487,25 @@ class PressGo_AI_Builder {
 		return null !== self::nova_backend();
 	}
 
+	/**
+	 * Reverse a charged Nova compose whose result never became a section
+	 * (invalid tree, upstream error after the charge). Fire-and-forget; the
+	 * backend's refund guards (recent charge, once per generation, hourly cap)
+	 * make this abuse-safe. No-op in direct-OpenRouter mode — nothing charged.
+	 */
+	private static function nova_refund( $generation_id ) {
+		if ( '' === (string) $generation_id ) { return; }
+		if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) { return; }
+		$pg = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' === $pg ) { return; }
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		wp_remote_post( $base . '/api/plugin/builder/refund', array(
+			'timeout' => 10,
+			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
+			'body'    => wp_json_encode( array( 'generationId' => $generation_id ) ),
+		) );
+	}
+
 	/** OpenRouter vision critique -> parsed array, or null. */
 	private function glm_vision_critique( $data_url, $plan_text ) {
 		$be   = self::nova_backend( 'vision' );
@@ -2856,7 +2875,7 @@ class PressGo_AI_Builder {
 			. wp_json_encode( $tree )
 			. "\n\nApply ONLY this change and keep everything else (layout, structure, other copy, images, colors) identical:\n" . $message
 			. "\n\nOutput the FULL updated section as one JSON block tree (root {\"type\":\"section\"}). No prose, no code fences.";
-		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive() );
+		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive(), 'edit' );
 		if ( empty( $composed['tree'] ) ) {
 			return array( 'note' => "I couldn't make that change cleanly — try rewording it." );
 		}
@@ -3630,7 +3649,7 @@ class PressGo_AI_Builder {
 		$biz         = ! empty( $state['business'] ) ? $state['business'] : $brief;
 		$framed      = "PAGE BRIEF (keep EVERY detail consistent with this):\n" . $brief . "\n\nREVISION: " . $nudge .
 			"\n\nCompose ONE landing-page HERO section as a JSON block tree (root {\"type\":\"section\"}). Output the JSON object only: no prose, no code fences. Request: " . $biz;
-		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive() );
+		$composed = $this->compose_freeform_tree( $system, $framed, $this->freeform_keepalive(), 'edit' );
 		if ( empty( $composed['tree'] ) ) {
 			return array( 'note' => "I couldn't generate a different version just now — your current hero is still in place. Lock it in, or tell me a specific change.", 'preview_bust' => time() );
 		}
@@ -4256,21 +4275,6 @@ class PressGo_AI_Builder {
 			.pg-usage-upgrade{display:none}
 			.pg-usage-upgrade.is-show{display:inline-flex!important;border-color:#f0b429;color:#92400e;background:#fef6e7}
 			.pg-usage-upgrade.is-full{border-color:#ef4444;color:#fff;background:#dc2626}
-			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:600px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
-			.pg-tiers-pop[hidden]{display:none}
-			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
-			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
-			.pg-tiers-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-			@media(max-width:680px){.pg-tiers-grid{grid-template-columns:repeat(2,1fr)}.pg-tiers-pop{width:380px}}
-			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:10px;padding:13px 12px}
-			.pg-tier-card.is-pop{border-color:#6366f1;box-shadow:0 4px 14px rgba(99,102,241,.12)}
-			.pg-tier-card.is-current{border-color:#16a34a}
-			.pg-tier-flag{position:absolute;top:-9px;left:11px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:#6366f1;padding:2px 7px;border-radius:999px}
-			.pg-tier-flag.is-now{background:#16a34a}
-			.pg-tier-name{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64748b}
-			.pg-tier-price{font-size:22px;font-weight:800;letter-spacing:-.5px;margin:3px 0 0}
-			.pg-tier-cap{font-size:12.5px;font-weight:700;margin:7px 0 3px;color:#0f172a}
-			.pg-tier-blurb{font-size:11.5px;color:#64748b;line-height:1.35}
 			/* mode selector (Ada / Iris / Nova) */
 			.pg-mode{position:relative;flex-shrink:0}
 			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 10px;border:1px solid #e5e5e5;border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
@@ -4288,16 +4292,11 @@ class PressGo_AI_Builder {
 			.pg-mode-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:5px}
 			.pg-mode-check{color:#5b4fff;opacity:0;flex-shrink:0}
 			.pg-mode-opt.is-active .pg-mode-check{opacity:1}
-			/* credits retired in favour of the usage meter */
+			<?php if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
+			/* own-key (dev) mode: no credits involved — the daily meter is the gauge */
 			.pg-credits-pill{display:none!important}
-			/* the usage meter is now the upgrade entry point */
-			.pg-usage{cursor:pointer;border-radius:7px;padding:3px 6px;margin:0 2px;transition:background .12s}
-			.pg-usage:hover{background:#f4f5f7}
-			.pg-tier-cur{margin-top:11px;font-size:11.5px;font-weight:700;color:#16a34a;text-align:center}
-			.pg-tier-cta{display:block;margin-top:11px;padding:8px;border-radius:8px;text-align:center;font-size:12.5px;font-weight:700;text-decoration:none;color:#1d2230;background:#fff;border:1px solid #d7dbe2;transition:background .12s,border-color .12s}
-			.pg-tier-cta:hover{background:#f4f5f7;border-color:#c3c8d2}
-			.pg-tier-cta.is-pop{background:#5b4fff;color:#fff;border-color:#5b4fff}
-			.pg-tier-cta.is-pop:hover{background:#4a40e0;border-color:#4a40e0}
+			<?php endif; ?>
+			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4323,44 +4322,13 @@ class PressGo_AI_Builder {
 					?>
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
+					<?php if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
 					<div class="pg-usage" id="pg-usage" title="Daily usage, resets every day at 00:00 UTC"><span class="pg-usage-label">Usage</span><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div><span class="pg-usage-reset" id="pg-usage-reset"></span></div>
-						<button type="button" class="pg-builder-ghost pg-usage-upgrade" id="pg-usage-upgrade" hidden>Upgrade</button>
-						<span class="pg-credits-pill" id="pg-credits">— credits</span>
+					<?php endif; ?>
+						<span class="pg-credits-pill" id="pg-credits" title="Your PressGo credits. New sections cost 1 each; edits, reorders and palette changes are free.">&mdash; credits</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
 				</div>
 			</header>
-			<?php
-				$pg_tier_now = $this->usage_tier();
-				$pg_tiers = array(
-					'free'    => array( 'Free',    '$0',     '1 full page a day',     'Full page + a quality pass, daily' ),
-					'starter' => array( 'Starter', '$5/mo',  '3 pages a day',         'Sonnet first-builds, all sections' ),
-					'pro'     => array( 'Pro',     '$12/mo', '8 pages a day',         'Pro mode, header/footer/globals' ),
-					'dev'     => array( 'Dev',     '$49/mo', 'Effectively unlimited', 'Agencies, multiple sites' ),
-				);
-				?>
-				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
-					<div class="pg-tiers-pop-head"><span>Daily build limits, reset every day</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
-					<div class="pg-tiers-grid">
-						<?php foreach ( $pg_tiers as $tk => $t ) :
-							$cls = 'pg-tier-card';
-							if ( $tk === $pg_tier_now ) { $cls .= ' is-current'; }
-							if ( 'pro' === $tk ) { $cls .= ' is-pop'; }
-							?>
-							<div class="<?php echo esc_attr( $cls ); ?>">
-								<?php if ( $tk === $pg_tier_now ) : ?><span class="pg-tier-flag is-now">Current</span><?php elseif ( 'pro' === $tk ) : ?><span class="pg-tier-flag">Popular</span><?php endif; ?>
-								<div class="pg-tier-name"><?php echo esc_html( $t[0] ); ?></div>
-								<div class="pg-tier-price"><?php echo esc_html( $t[1] ); ?></div>
-								<div class="pg-tier-cap"><?php echo esc_html( $t[2] ); ?></div>
-								<div class="pg-tier-blurb"><?php echo esc_html( $t[3] ); ?></div>
-								<?php if ( $tk === $pg_tier_now ) : ?>
-									<div class="pg-tier-cur">Current plan</div>
-								<?php elseif ( 'free' !== $tk ) : ?>
-									<a class="pg-tier-cta<?php echo 'pro' === $tk ? ' is-pop' : ''; ?>" href="https://pressgo.app/upgrade?plan=<?php echo esc_attr( $tk ); ?>" target="_blank" rel="noopener">Upgrade to <?php echo esc_html( $t[0] ); ?></a>
-								<?php endif; ?>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				</div>
 				<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
@@ -5329,6 +5297,7 @@ class PressGo_AI_Builder {
 		// reordering, "make it flow" and delete are all free — only new builds count).
 		$usage = $this->usage_state();
 		$left  = isset( $usage['builds_left'] ) ? (int) $usage['builds_left'] : 99;
+		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) { $left = 99; } // proxy mode: credits govern, the local meter never gates
 		if ( 0 === $left ) {
 			$note .= ' That\'s your last build for today — editing, reordering and "make it flow" are still free, and your builds reset in ' . $this->human_hours( $usage['resets_in'] ) . '.';
 		} elseif ( $left <= 3 ) {
@@ -5800,10 +5769,10 @@ class PressGo_AI_Builder {
 	 *                                 bytes to the browser (prevents Cloudflare
 	 *                                 524 on slow reasoning turns).
 	 */
-	public function compose_freeform_tree( $system, $framed, $keepalive = null ) {
+	public function compose_freeform_tree( $system, $framed, $keepalive = null, $op = 'compose' ) {
 		self::$nova_last_error = '';
 		if ( self::nova_ready() ) {
-			$tree = self::glm_compose( $system, $framed, $keepalive );
+			$tree = self::glm_compose( $system, $framed, $keepalive, 'z-ai/glm-5.2', $op );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 		}
@@ -5816,7 +5785,7 @@ class PressGo_AI_Builder {
 			// No own Anthropic key: the Claude fallback rides the same backend
 			// (OpenRouter hosts the Anthropic models under anthropic/*).
 			if ( is_callable( $keepalive ) ) { $keepalive(); }
-			$tree = self::glm_compose( $system, $framed, $keepalive, 'anthropic/claude-sonnet-4.5' );
+			$tree = self::glm_compose( $system, $framed, $keepalive, 'anthropic/claude-sonnet-4.5', $op );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
 		if ( 'credits' === self::$nova_last_error ) {
@@ -5840,7 +5809,7 @@ class PressGo_AI_Builder {
 	 * (prevents Cloudflare 524 at 100s of silence). Without $keepalive, falls
 	 * back to a simple wp_remote_post (CLI / harness paths).
 	 */
-	private static function glm_compose( $system, $framed, $keepalive = null, $model = 'z-ai/glm-5.2' ) {
+	private static function glm_compose( $system, $framed, $keepalive = null, $model = 'z-ai/glm-5.2', $op = 'compose' ) {
 		$body = wp_json_encode( array(
 			'model'           => $model,
 			'max_tokens'      => 12000,
@@ -5858,23 +5827,27 @@ class PressGo_AI_Builder {
 		if ( ! $keepalive ) {
 			$blk = json_decode( $body, true );
 			unset( $blk['stream'] );
-			$be   = self::nova_backend( 'compose' );
+			$be   = self::nova_backend( $op );
 			$resp = wp_remote_post( $be['url'], array(
 				'timeout' => 150,
 				'headers' => $be['wp'],
 				'body'    => wp_json_encode( $blk ),
 			) );
 			if ( is_wp_error( $resp ) ) { return null; }
+			$gen  = (string) wp_remote_retrieve_header( $resp, 'x-nova-generation-id' );
 			$code = (int) wp_remote_retrieve_response_code( $resp );
 			if ( 402 === $code ) { self::$nova_last_error = 'credits'; return null; }
-			if ( 200 !== $code ) { return null; }
+			if ( 200 !== $code ) { self::nova_refund( $gen ); return null; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
-			return self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
+			$tree = self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
+			if ( null === $tree ) { self::nova_refund( $gen ); } // charged but unusable — give the credit back
+			return $tree;
 		}
 
 		// Keepalive path: cURL streaming, assemble SSE chunks into the full JSON.
 		$accumulated = '';
-		$be = self::nova_backend( 'compose' );
+		$gen_id      = '';
+		$be = self::nova_backend( $op );
 		$ch = curl_init( $be['url'] );
 		curl_setopt_array( $ch, array(
 			CURLOPT_POST           => true,
@@ -5891,6 +5864,10 @@ class PressGo_AI_Builder {
 				$keepalive();
 				return strlen( $chunk );
 			},
+			CURLOPT_HEADERFUNCTION => function ( $ch, $line ) use ( &$gen_id ) {
+				if ( 0 === stripos( $line, 'x-nova-generation-id:' ) ) { $gen_id = trim( substr( $line, 21 ) ); }
+				return strlen( $line );
+			},
 		) );
 		$ok  = curl_exec( $ch );
 		$err = curl_error( $ch );
@@ -5898,7 +5875,7 @@ class PressGo_AI_Builder {
 		curl_close( $ch );
 
 		if ( 402 === (int) $status ) { self::$nova_last_error = 'credits'; return null; }
-		if ( ! $ok || $err || 200 !== (int) $status ) { return null; }
+		if ( ! $ok || $err || 200 !== (int) $status ) { self::nova_refund( $gen_id ); return null; }
 
 		// Parse the SSE stream: extract content deltas from data: lines.
 		$content = '';
@@ -5912,7 +5889,9 @@ class PressGo_AI_Builder {
 			$delta = $evt['choices'][0]['delta']['content'] ?? '';
 			if ( is_string( $delta ) && '' !== $delta ) { $content .= $delta; }
 		}
-		return self::extract_section_json( $content );
+		$tree = self::extract_section_json( $content );
+		if ( null === $tree ) { self::nova_refund( $gen_id ); } // charged but unusable — give the credit back
+		return $tree;
 	}
 
 	private static function claude_compose( $key, $system, $framed ) {
