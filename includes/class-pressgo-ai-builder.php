@@ -4736,6 +4736,23 @@ class PressGo_AI_Builder {
 			if ( '' === $discovery_stage && ! $whole_page && $this->is_text_reorder( $message ) ) {
 				wp_send_json_success( $this->handle_text_reorder( $post_id, $message ) );
 			}
+			// Typed "build the whole page / finish the page" works like the chip:
+			// return the ordered plan for the client runner (core first, else the
+			// extended tier) instead of falling into clarify.
+			if ( '' === $discovery_stage && preg_match( '/\b(build|finish|complete|do)\b.{0,12}\b(the )?(whole|entire|rest of the|full)? ?page\b|\bbuild everything\b|\bkeep building\b/i', $message ) && ! preg_match( '/\bsection\b/i', $message ) ) {
+				$wp_state = $this->discovery_state( $post_id );
+				if ( is_array( $wp_state ) ) {
+					$plan_now = $this->whole_page_plan( $wp_state );
+					if ( empty( $plan_now ) ) { $plan_now = $this->extended_plan( $wp_state, $post_id ); }
+					if ( ! empty( $plan_now ) ) {
+						wp_send_json_success( array(
+							'whole_page_plan' => $plan_now,
+							'note'            => "On it — building out the rest of your page, one section at a time. Watch them land below; hit Stop or say \"stop\" anytime.",
+						) );
+					}
+					wp_send_json_success( array( 'chat_mode' => true, 'note' => "The page already has every planned section — tell me a specific section to add, or say \"make it perfect\" for a quality pass." ) );
+				}
+			}
 			// Full vision quality pass: iterate screenshot->critique->fix like the
 			// gold-standard pages were made. Checked before reflow so "make it
 			// perfect" runs the deep loop, not just a reorder.
@@ -5165,10 +5182,14 @@ class PressGo_AI_Builder {
 		// C4: auto-tidy the page when a new section creates a clear order/rhythm
 		// problem (draft pages only, deterministic + fast, debounced). Non-blocking.
 		$auto_note = '';
-		try {
-			$auto_note = (string) $this->cohesion_autorun( $post_id );
-		} catch ( \Throwable $e ) {
-			$auto_note = '';
+		// Never auto-tidy mid-plan: the arc already alternates the rhythm, and a
+		// surprise recolor between steps reads as "it changed my colors randomly".
+		if ( ! $whole_page ) {
+			try {
+				$auto_note = (string) $this->cohesion_autorun( $post_id );
+			} catch ( \Throwable $e ) {
+				$auto_note = '';
+			}
 		}
 		// If we reorganized, the section count is unchanged but the data was rewritten.
 		$sections_now = count( $this->read_elements( $post_id ) );

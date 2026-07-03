@@ -1279,8 +1279,13 @@
 			if (fields[k] != null) fd.append(k, fields[k]);
 		});
 
-		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+		// A hung request must never freeze a build run forever — abort at 5 minutes
+		// (GLM compose is capped at 4) and let the runner move on.
+		var pgAbort = new AbortController();
+		var pgAbortTimer = setTimeout(function () { pgAbort.abort(); }, 300000);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd, signal: pgAbort.signal })
 			.then(function (r) {
+				clearTimeout(pgAbortTimer);
 				// Read as text first so a non-JSON body (PHP warning/HTML) surfaces a
 				// real message instead of a blind "network error".
 				return r.text().then(function (body) {
@@ -1294,9 +1299,12 @@
 				handleFreeformResult(res);
 				if (done) done(res && res.json && res.json.data);
 			})
-			.catch(function () {
+			.catch(function (err) {
+				clearTimeout(pgAbortTimer);
 				think.stop(); think.node.remove();
-				append(el('pg-msg-error', 'Network error during Pro mode compose — try again.'));
+				append(el('pg-msg-error', (err && err.name === 'AbortError')
+					? 'That step took too long — skipped it. (You can ask for that section again.)'
+					: 'Network error during Pro mode compose — try again.'));
 				setBusy(false);
 				if (done) done(null);
 			});
