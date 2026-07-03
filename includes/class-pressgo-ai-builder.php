@@ -2799,7 +2799,17 @@ class PressGo_AI_Builder {
 		}
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
-		$framed = "EDIT AN EXISTING SECTION (do not start over). Here is the current section as a JSON block tree:\n"
+		// Anchor the edit to THIS page's premise — without it, "make the services
+		// section about the speeding ticket" on a personal fundraiser page composed
+		// a ticket-defense LAW FIRM (right section, reinvented business).
+		$brief_ctx = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		$recs_ctx  = $this->ff_sections( $post_id );
+		$hero_head = ! empty( $recs_ctx[0]['heading'] ) ? (string) $recs_ctx[0]['heading'] : '';
+		$premise   = '';
+		if ( '' !== $brief_ctx && 'pending' !== $brief_ctx ) { $premise .= "THIS PAGE'S BRIEF (stay on this exact business/premise — never reinterpret it as a different kind of page):\n" . $brief_ctx . "\n"; }
+		if ( '' !== $hero_head ) { $premise .= "The page's hero says: \"" . $hero_head . "\" — every section serves THAT story.\n"; }
+		if ( '' !== $premise ) { $premise .= "\n"; }
+		$framed = $premise . "EDIT AN EXISTING SECTION (do not start over). Here is the current section as a JSON block tree:\n"
 			. wp_json_encode( $tree )
 			. "\n\nApply ONLY this change and keep everything else (layout, structure, other copy, images, colors) identical:\n" . $message
 			. "\n\nOutput the FULL updated section as one JSON block tree (root {\"type\":\"section\"}). No prose, no code fences.";
