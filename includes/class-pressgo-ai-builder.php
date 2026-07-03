@@ -1644,6 +1644,7 @@ class PressGo_AI_Builder {
 	private function role_from_text( $blob, $is_first, $has_form ) {
 		if ( $is_first ) { return 'hero'; }
 		$b = strtolower( (string) $blob );
+		if ( preg_match( '/\b(footer|sign-?off|copyright|back[ -]to[ -]top)\b/', $b ) )          { return 'footer'; }
 		if ( preg_match( '/\b(faq|frequently asked|questions?)\b/', $b ) )                       { return 'faq'; }
 		if ( preg_match( '/\b(reviews?|testimonials?|social proof|backers?|supporters?|donors?|what .* say|members|love|stories|results)\b/', $b ) ) { return 'proof'; }
 		if ( preg_match( '/\b(how it works|steps?|get started|simple)\b/', $b ) )               { return 'steps'; }
@@ -2545,7 +2546,10 @@ class PressGo_AI_Builder {
 			$rm = isset( $grp['remove'] ) ? (array) $grp['remove'] : array();
 			foreach ( $rm as $rn ) {
 				$ri = ( (int) $rn ) - 1;
-				if ( $ri > 0 && $ri < count( $plan ) ) { $remove[ $ri ] = true; } // never the hero (index 0)
+				if ( $ri <= 0 || $ri >= count( $plan ) ) { continue; } // never the hero (index 0)
+				$rrole = $plan[ $ri ]['semantic_role'] ?? '';
+				if ( in_array( $rrole, array( 'footer', 'topbar' ), true ) ) { continue; } // chrome is never "redundant"
+				$remove[ $ri ] = true;
 			}
 		}
 		$remove = array_keys( $remove );
