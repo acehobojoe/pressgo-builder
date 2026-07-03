@@ -1516,6 +1516,7 @@ class PressGo_AI_Builder {
 	}
 
 	private function plan_for_tier( $state, $tier ) {
+		if ( ! empty( $state['utility_page'] ) ) { return array(); } // a 404/gallery page is complete as built
 		$goal  = ! empty( $state['answers']['goal'] ) ? $state['answers']['goal'] : 'browse';
 		$built = isset( $state['built_keys'] ) && is_array( $state['built_keys'] ) ? $state['built_keys'] : array();
 		$plan  = array();
@@ -2168,7 +2169,7 @@ class PressGo_AI_Builder {
 	private function vqa_critique_slice( $or_key, $data_url, $viewport, $n, $total ) {
 		$rubric = "You are a strict landing-page QA reviewer. This is slice $n of $total of a " . strtoupper( $viewport ) . " screenshot (the page continues above/below the slice edges — NEVER report a section cut by the slice boundary as broken).\n"
 			. "If the slice shows a browser error/404/blank page, return {\"issues\":[],\"not_a_page\":true}.\n"
-			. "Report ONLY real, clearly visible FAILURES in THIS slice, judged against a top-agency conversion lander: (1) star/icon rows stacked vertically; (2) text or buttons genuinely clipped mid-word or overflowing; (3) a heading with no content beneath it (dead space); (4) large empty voids inside cards or between elements; (5) unreadable contrast; (6) cramped columns of squeezed text; (7) robotic or filler copy; (8) anything visibly broken.\n"
+			. "Report ONLY real, clearly visible FAILURES in THIS slice, judged against a top-agency conversion lander: (1) star/icon rows stacked vertically; (2) text or buttons genuinely clipped mid-word or overflowing; (3) a heading with no content beneath it (dead space); (4) large empty voids inside cards or between elements; (5) unreadable contrast; (6) cramped columns of squeezed text; (7) robotic or filler copy; (8) anything visibly broken. THEN also list up to 2 QUALITY upgrades judged against a top-agency lander (weak CTA prominence, generic imagery, flat visual hierarchy, redundant copy) with severity med.\n"
 			. "For each failure give the NEAREST SECTION HEADING text visible in the slice (verbatim) so it can be located, a concrete one-line problem, and a one-line concrete fix instruction. When unsure whether something is a failure, OMIT it.\n"
 			. 'Return ONLY JSON: {"issues":[{"heading":"...","problem":"...","fix":"...","severity":"high|med"}]}';
 		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
@@ -2666,6 +2667,12 @@ class PressGo_AI_Builder {
 	private function is_brand_change_intent( $message ) {
 		$m = strtolower( (string) $message );
 		if ( preg_match( '/\badd\b.{0,30}\bsection\b/', $m ) ) { return false; } // an explicit add wins
+		// Element-scoped issues route to EDIT, not a brand change (same guard as
+		// is_palette_intent — "the background image for the top section" is an edit).
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo)\b/', $m )
+			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $m ) ) {
+			return false;
+		}
 		// Descriptive / mood / comparative palette requests — "pastel", "softer",
 		// "too dark", "like an ice cream shop" — are brand-change intent now.
 		if ( $this->is_palette_intent( $message ) ) { return true; }
@@ -3219,6 +3226,14 @@ class PressGo_AI_Builder {
 
 	/** True if a message is a whole-palette/style request (routes to handle_brand_change). */
 	private function is_palette_intent( $message ) {
+		// An issue scoped to a page ELEMENT ("the hero image is too dark", "the
+		// placeholder text has low contrast") is an EDIT of that element — hijacking
+		// it into a global repaint was the #1 destroyer in chat-campaign testing.
+		$me = strtolower( (string) $message );
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section)\b/', $me )
+			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $me ) ) {
+			return false;
+		}
 		if ( null !== $this->generate_palette_from_text( $message ) ) { return true; }
 		$m = strtolower( (string) $message );
 		return (bool) preg_match( '/\b(too (dark|light|bright|dull|loud|muted|pale|much colou?r|pink|colou?rful)|softer|soften|warmer|cooler|brighter|punchier|lighten|darken|subtler|tone (it|the palette|things|the colou?rs?) down|dial (it|things|the colou?rs?) (down|back)|less colou?r|more (muted|vibrant|pastel|subtle))\b/', $m );
@@ -4797,7 +4812,7 @@ class PressGo_AI_Builder {
 		// Just-in-time conversion drips: when the user asks for a reviews or CTA
 		// section and we don't yet know their proof/offer, ask once (skippable)
 		// before composing it. Follow-up sections only — never the hero.
-		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page ) {
+		if ( ! $page_empty && '' === $discovery_stage && ! $whole_page && ! $this->is_edit_intent( $message ) ) {
 			$jit = $this->discovery_state( $post_id );
 			if ( is_array( $jit ) ) {
 				$intent = $this->ff_section_intent( $message );
@@ -5359,6 +5374,30 @@ class PressGo_AI_Builder {
 		if ( preg_match( '/\b(that|this|it)\b.{0,20}\b(section|one)\b/i', $m ) ) {
 			$last = end( $recs );
 			return ! empty( $last['source_tree'] ) ? $last : null;
+		}
+		// Fuzzy fallback: issue reports usually QUOTE the section's own words
+		// ("the 'View the Full Menu' button", "the WHY CLIENTS TRUST OUR FIRM
+		// section") — score records by distinctive-word overlap with the message.
+		$stop = array( 'this','that','with','from','your','have','more','could','would','should','section','button','the','and','for','are','too','has','its','their','also' );
+		$mwords = array_filter( preg_split( '/[^a-z0-9]+/', $m ), function ( $w ) use ( $stop ) { return strlen( $w ) >= 4 && ! in_array( $w, $stop, true ); } );
+		$best = -1; $best_score = 0;
+		foreach ( $recs as $i => $r ) {
+			$rh = strtolower( (string) ( $r['heading'] ?? '' ) . ' ' . $this->role_label( $r['semantic_role'] ?? '' ) );
+			if ( '' === trim( $rh ) ) { continue; }
+			$sc = 0;
+			foreach ( $mwords as $w ) { if ( false !== strpos( $rh, $w ) ) { $sc++; } }
+			if ( $sc > $best_score ) { $best_score = $sc; $best = $i; }
+		}
+		if ( $best >= 0 && $best_score >= 2 && ! empty( $recs[ $best ]['source_tree'] ) ) { return $recs[ $best ]; }
+		// A single-word match still wins when it's UNAMBIGUOUS (that word appears in
+		// exactly one section) — "the Full Menu button" -> the one menu section.
+		if ( $best >= 0 && 1 === $best_score && ! empty( $recs[ $best ]['source_tree'] ) ) {
+			$ties = 0;
+			foreach ( $recs as $r2 ) {
+				$rh2 = strtolower( (string) ( $r2['heading'] ?? '' ) . ' ' . $this->role_label( $r2['semantic_role'] ?? '' ) );
+				foreach ( $mwords as $w ) { if ( false !== strpos( $rh2, $w ) ) { $ties++; break; } }
+			}
+			if ( 1 === $ties ) { return $recs[ $best ]; }
 		}
 		return null;
 	}
