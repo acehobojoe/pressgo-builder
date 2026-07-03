@@ -5470,7 +5470,7 @@ class PressGo_AI_Builder {
 		}
 
 		$system = "You are PressGo's landing-page design partner. The user is building a page section by section. You can see what's already on the page (below). They're asking a question or sharing a thought, NOT requesting a build. Give a short, helpful reply (2-4 sentences max). Be direct and specific to their page. If they ask what to add next, suggest 1-2 concrete sections with a reason.\n\nTHE USER'S TASTE WINS. When they state a subjective preference (a color, mood, vibe, font, or 'make it feel X'), do NOT debate it and NEVER open with 'Hold on' or 'I'd push back'. You may note ONE short tradeoff in a single clause, then defer to them. If their words name a concrete change, END with a SUGGEST chip that executes it.\n\nDo NOT build anything, do NOT output JSON, do NOT use em dashes. Write like a sharp human designer, not a chatbot.\n\n"
-			. "IMPORTANT: when you recommend something, or when you ask the user to choose, END your reply with 1 to 3 tappable suggestions so they don't have to type. Put each on its own line, formatted EXACTLY like this:\n[[SUGGEST: Short button label || the exact instruction for me to carry out]]\nThe instruction after || must be a concrete command I can act on right now (e.g. \"add a stats section\", \"make the hero bolder\", \"move the form to the bottom\"). Example: if you suggest a stats band, end with [[SUGGEST: Add a stats band || add a stats section]]. If the user must pick between options, give one SUGGEST per option. Omit the SUGGEST lines only for a pure factual answer with no obvious next step. NEVER suggest something that already exists on the page or that you just said you would do — chips are for the NEXT genuine decision, and 2 contrasting options beat 3 similar ones. Never mention the SUGGEST syntax in your prose.\n\n";
+			. "IMPORTANT: when you recommend something, or when you ask the user to choose, END your reply with 1 to 3 tappable suggestions so they don't have to type. Put each on its own line, formatted EXACTLY like this:\n[[SUGGEST: Short button label || the exact instruction for me to carry out || exact heading of the ONE section this targets, or - if it is not about one existing section]]\nWhen your suggestion edits, replaces, or removes an EXISTING section, the third field MUST be that section's exact heading as listed in the page state, so the action lands on the right section. The instruction after || must be a concrete command I can act on right now (e.g. \"add a stats section\", \"make the hero bolder\", \"move the form to the bottom\"). Example: if you suggest a stats band, end with [[SUGGEST: Add a stats band || add a stats section]]. If the user must pick between options, give one SUGGEST per option. Omit the SUGGEST lines only for a pure factual answer with no obvious next step. NEVER suggest something that already exists on the page or that you just said you would do — chips are for the NEXT genuine decision, and 2 contrasting options beat 3 similar ones. Never mention the SUGGEST syntax in your prose.\n\n";
 		if ( '' !== $brief && 'pending' !== $brief ) {
 			$system .= "PAGE BRIEF:\n" . $brief . "\n\n";
 		}
@@ -5503,11 +5503,23 @@ class PressGo_AI_Builder {
 		// Each chip's request is a concrete command, so a tap routes deterministically
 		// to BUILD/EDIT through the normal cascade.
 		$chips = array();
-		if ( preg_match_all( '/\[\[\s*SUGGEST:\s*(.+?)\s*\|\|\s*(.+?)\s*\]\]/is', $text, $mm, PREG_SET_ORDER ) ) {
+		if ( preg_match_all( '/\[\[\s*SUGGEST:\s*(.+?)\s*\|\|\s*(.+?)\s*(?:\|\|\s*(.+?)\s*)?\]\]/is', $text, $mm, PREG_SET_ORDER ) ) {
+			$recs_for_chips = $this->ff_sections( $post_id );
 			foreach ( $mm as $one ) {
 				$label = trim( preg_replace( '/\s+/', ' ', $one[1] ) );
 				$req   = trim( preg_replace( '/\s+/', ' ', $one[2] ) );
-				if ( '' !== $label && '' !== $req ) { $chips[] = array( 'label' => $label, 'request' => $req, 'key' => '' ); }
+				if ( '' === $label || '' === $req ) { continue; }
+				$chip = array( 'label' => $label, 'request' => $req, 'key' => '' );
+				// Third field: the target section's heading -> resolve to its pg_key so
+				// the tap becomes a SCOPED EDIT on exactly that section ("Replace the
+				// grid section..." previously fell to chat because the words could not
+				// find the section — the model always knew which one it meant).
+				$hint = isset( $one[3] ) ? trim( preg_replace( '/\s+/', ' ', $one[3] ) ) : '';
+				if ( '' !== $hint && '-' !== $hint ) {
+					$ci = $this->vqa_match_record( $recs_for_chips, $hint );
+					if ( $ci >= 0 && ! empty( $recs_for_chips[ $ci ]['pg_key'] ) ) { $chip['section'] = $recs_for_chips[ $ci ]['pg_key']; }
+				}
+				$chips[] = $chip;
 				if ( count( $chips ) >= 3 ) { break; }
 			}
 			$text = trim( preg_replace( '/\[\[\s*SUGGEST:.*?\]\]/is', '', $text ) );

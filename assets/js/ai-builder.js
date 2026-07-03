@@ -1506,7 +1506,9 @@
 					if (x !== b) x.style.opacity = '0.4';
 				});
 				if (!isFlow) { b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca'; }
-				postFreeform({ message: c.request, section_key: c.key }, c.label, isFlow ? 'cohesion' : 'section');
+				var chipFields = { message: c.request, section_key: c.key };
+				if (c.section) chipFields.selected_section = c.section; // model-targeted chip -> scoped edit on that exact section
+				postFreeform(chipFields, c.label, isFlow ? 'cohesion' : (c.section ? 'edit' : 'section'));
 			});
 			wrap.appendChild(b);
 		});
