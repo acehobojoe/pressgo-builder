@@ -4975,6 +4975,25 @@ class PressGo_AI_Builder {
 				}
 				wp_send_json_success( $this->scoped_edit_section( $post_id, $edit_target, $instr ) );
 			}
+			// Edit intent with NO resolvable target: don't die in generic clarify —
+			// ask WHICH section with targeted chips (a tap runs the scoped edit).
+			if ( null === $edit_target && $is_edit && ! $is_drop ) {
+				$recs_ask = $this->ff_sections( $post_id );
+				$ask = array();
+				foreach ( $recs_ask as $rq ) {
+					if ( empty( $rq['pg_key'] ) ) { continue; }
+					$lbl = '' !== trim( (string) ( $rq['heading'] ?? '' ) ) ? mb_substr( $rq['heading'], 0, 34 ) : $this->role_label( $rq['semantic_role'] ?? 'unknown' );
+					$ask[] = array( 'label' => $lbl, 'request' => $message, 'key' => '', 'section' => $rq['pg_key'] );
+					if ( count( $ask ) >= 5 ) { break; }
+				}
+				if ( $ask ) {
+					wp_send_json_success( array(
+						'chat_mode' => true,
+						'note'      => "Got it — which section is that in? Tap it and I'll make the change there.",
+						'suggest'   => array( 'note' => null, 'suggested' => true, 'chips' => $ask ),
+					) );
+				}
+			}
 			// Screenshot given but no section matched: keep the description so the
 			// downstream compose/chat at least knows what the user is looking at.
 			if ( '' !== $img_note ) { $message .= $img_note; }
