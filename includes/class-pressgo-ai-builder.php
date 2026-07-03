@@ -4806,12 +4806,12 @@ class PressGo_AI_Builder {
 			// brand deterministically and repaint, instead of a random re-roll or an add.
 			// With a section selected, "make it blue" is a scoped edit (handled below).
 			if ( '' === $selected_key && $this->is_brand_change_intent( $message ) ) {
-				wp_send_json_success( $this->handle_brand_change( $post_id, $message ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->handle_brand_change( $post_id, $message ) ) );
 			}
 			// A palette/mood request is page-level even with a section selected — repaint
 			// the whole page (a single-band color tweak lacks palette words -> scoped).
 			if ( '' !== $selected_key && $this->is_palette_intent( $message ) ) {
-				wp_send_json_success( $this->handle_brand_change( $post_id, $message ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->handle_brand_change( $post_id, $message ) ) );
 			}
 			// Scoped edit: a section is selected and this is a plain edit/request —
 			// change THAT section in place instead of composing a brand-new one. This
@@ -4820,7 +4820,7 @@ class PressGo_AI_Builder {
 			$sel_rec = ( '' !== $selected_key ) ? $this->ff_record_by_key( $post_id, $selected_key ) : null;
 			$wants_new_section = (bool) preg_match( '/\b(add|create|insert|build|new)\b.{0,40}\bsection\b/i', $message );
 			if ( is_array( $sel_rec ) && ! $wants_new_section ) {
-				wp_send_json_success( $this->scoped_edit_section( $post_id, $sel_rec, $message ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->scoped_edit_section( $post_id, $sel_rec, $message ) ) );
 			}
 		}
 
@@ -4988,7 +4988,7 @@ class PressGo_AI_Builder {
 					// section with the REAL material instead of building another section.
 					$instr = "The user provided REAL content for this section. Replace the invented or placeholder content with it faithfully (keep the section's layout, style, and palette; use their exact names, quotes, and numbers):\n" . $message . $img_note;
 				}
-				wp_send_json_success( $this->scoped_edit_section( $post_id, $edit_target, $instr ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->scoped_edit_section( $post_id, $edit_target, $instr ) ) );
 			}
 			// Edit intent with NO resolvable target: don't die in generic clarify —
 			// ask WHICH section with targeted chips (a tap runs the scoped edit).
@@ -5036,7 +5036,7 @@ class PressGo_AI_Builder {
 				) );
 			}
 			if ( 'clarify' === $cls ) {
-				wp_send_json_success( $this->clarify_envelope( $post_id, $message ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->clarify_envelope( $post_id, $message ) ) );
 			}
 			// 'build_high' falls through to compose a new section.
 		}
@@ -5357,6 +5357,18 @@ class PressGo_AI_Builder {
 	 * the floor instead of having a build forced on them. Runs early so a leading
 	 * "no" isn't grabbed by a downstream build verb.
 	 */
+	/** Stamp the OUTCOME note onto the last telemetry turn (message in -> note out). */
+	private function turn_out( $post_id, $res ) {
+		if ( ! $post_id || ! is_array( $res ) ) { return $res; }
+		$tlog = get_post_meta( $post_id, '_pressgo_chat_log', true );
+		if ( is_array( $tlog ) && $tlog ) {
+			$k = count( $tlog ) - 1;
+			$tlog[ $k ]['out'] = mb_substr( (string) ( $res['note'] ?? ( $res['question'] ?? '' ) ), 0, 200 );
+			update_post_meta( $post_id, '_pressgo_chat_log', $tlog );
+		}
+		return $res;
+	}
+
 	private function is_decline( $message ) {
 		$m = strtolower( trim( (string) $message ) );
 		if ( ! preg_match( '/^\s*(no\b|nope|nah|not that|not really|stop|wait|hold on|cancel|never ?mind|forget (it|that|the|about)|scrap (it|that)|actually,?\s+(let\'?s|can we|i|maybe)|instead\b)/i', $m ) ) {
@@ -5406,13 +5418,22 @@ class PressGo_AI_Builder {
 			'features?|benefits?'                        => 'features',
 			'steps|how it works|process'                 => 'steps',
 		);
+		// When a message names MULTIPLE sections ("change the services section to
+		// match the hero"), the SUBJECT is the earliest-mentioned one — map order
+		// must never beat sentence order (a services edit once landed on the hero).
+		$best_pos = PHP_INT_MAX; $best_rec = null;
 		foreach ( $map as $pat => $role ) {
-			if ( preg_match( '/\b(' . $pat . ')\b/i', $m ) ) {
+			if ( preg_match( '/\b(' . $pat . ')\b/i', $m, $mm, PREG_OFFSET_CAPTURE ) ) {
+				$pos = (int) $mm[0][1];
+				if ( $pos >= $best_pos ) { continue; }
 				foreach ( $recs as $r ) {
-					if ( ( $r['semantic_role'] ?? '' ) === $role && ! empty( $r['source_tree'] ) ) { return $r; }
+					if ( ( $r['semantic_role'] ?? '' ) === $role && ! empty( $r['source_tree'] ) ) {
+						$best_pos = $pos; $best_rec = $r; break;
+					}
 				}
 			}
 		}
+		if ( null !== $best_rec ) { return $best_rec; }
 		// "that section / this one / it" with no noun -> the most-recently built.
 		if ( preg_match( '/\b(that|this|it)\b.{0,20}\b(section|one)\b/i', $m ) ) {
 			$last = end( $recs );
