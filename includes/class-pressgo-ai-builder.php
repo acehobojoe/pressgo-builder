@@ -2669,7 +2669,7 @@ class PressGo_AI_Builder {
 		if ( preg_match( '/\badd\b.{0,30}\bsection\b/', $m ) ) { return false; } // an explicit add wins
 		// Element-scoped issues route to EDIT, not a brand change (same guard as
 		// is_palette_intent — "the background image for the top section" is an edit).
-		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo)\b/', $m )
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|footer|nav|menu|gallery|testimonials?)\b/', $m )
 			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $m ) ) {
 			return false;
 		}
@@ -2677,7 +2677,7 @@ class PressGo_AI_Builder {
 		// "too dark", "like an ice cream shop" — are brand-change intent now.
 		if ( $this->is_palette_intent( $message ) ) { return true; }
 		if ( preg_match( '/#[0-9a-f]{6}\b/i', $message ) ) { return true; }
-		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|silver|indigo|lime|brown|mint|coral|white|cream)';
+		$colorword = '(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|silver|indigo|lime|brown|mint|coral|peach|salmon|olive|burgundy|turquoise|white|cream)';
 		if ( preg_match( '/\b(make|use|change|switch|try|go|set).{0,24}\b' . $colorword . '\b/', $m ) ) { return true; }
 		if ( preg_match( '/\b' . $colorword . '\b.{0,16}\b(accent|theme|palette|colou?rs?|brand|vibe|look)\b/', $m ) ) { return true; }
 		if ( preg_match( '/\b(different|new|change|update|adjust).{0,12}\b(colou?rs?|palette|fonts?)\b/', $m ) ) { return true; }
@@ -2723,6 +2723,7 @@ class PressGo_AI_Builder {
 				'amber' => '#F59E0B', 'gold' => '#E2B714', 'yellow' => '#EAB308', 'purple' => '#7C3AED', 'violet' => '#7C3AED',
 				'pink' => '#DB2777', 'rose' => '#E11D48', 'magenta' => '#C026D3', 'black' => '#0F1115', 'charcoal' => '#334155', 'slate' => '#475569',
 				'gray' => '#475569', 'grey' => '#475569', 'silver' => '#64748B', 'indigo' => '#4F46E5', 'lime' => '#65A30D', 'brown' => '#92400E', 'mint' => '#10B981', 'coral' => '#F97362',
+				'peach' => '#FB923C', 'salmon' => '#FA8072', 'olive' => '#6B8E23', 'burgundy' => '#9F1239', 'turquoise' => '#14B8A6',
 			);
 			foreach ( $named as $name => $hex ) {
 				if ( preg_match( '/\b' . $name . '\b/', $m ) ) { $set_accent( $hex ); $summary[] = 'a ' . $name . ' palette'; break; }
@@ -3240,7 +3241,7 @@ class PressGo_AI_Builder {
 		// placeholder text has low contrast") is an EDIT of that element — hijacking
 		// it into a global repaint was the #1 destroyer in chat-campaign testing.
 		$me = strtolower( (string) $message );
-		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section)\b/', $me )
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section|footer|nav|menu|gallery|testimonials?)\b/', $me )
 			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $me ) ) {
 			return false;
 		}
@@ -4670,7 +4671,7 @@ class PressGo_AI_Builder {
 				'msg' => mb_substr( (string) $message, 0, 300 ),
 				'img' => count( $ff_images ),
 				'sel' => (string) $selected_key,
-				'wp'  => $whole_page ? 1 : 0,
+				'wp'  => empty( $_POST['whole_page'] ) ? 0 : 1,
 			);
 			if ( count( $tlog ) > 60 ) { $tlog = array_slice( $tlog, -60 ); }
 			update_post_meta( $post_id, '_pressgo_chat_log', $tlog );
@@ -5385,6 +5386,9 @@ class PressGo_AI_Builder {
 
 	private function is_decline( $message ) {
 		$m = strtolower( trim( (string) $message ) );
+		// "no, like ..." / "no I mean ..." is a CORRECTION carrying a new request —
+		// route the request, don't wave it off.
+		if ( preg_match( '/^no,?\s+(like|i mean|make|change|use|try|do|add|just)\b/', $m ) ) { return false; }
 		if ( ! preg_match( '/^\s*(no\b|nope|nah|not that|not really|stop|wait|hold on|cancel|never ?mind|forget (it|that|the|about)|scrap (it|that)|actually,?\s+(let\'?s|can we|i|maybe)|instead\b)/i', $m ) ) {
 			return false;
 		}
@@ -5535,7 +5539,7 @@ class PressGo_AI_Builder {
 		$m    = strtolower( trim( (string) $message ) );
 		$core = preg_replace( '/^(just|please|ok|okay|so|now|can you|could you|i\'?d like to|i wanna|i want to|hey|alright|yeah)\s+/i', '', $m );
 		if ( $this->is_vague_feedback( $m ) ) { return 'clarify'; }
-		$build_verb = '(add|build|create|make|insert|put|give me|gimme|design|generate|compose|throw in|drop in|i need|i want|let\'?s add|set up|whip up|need|want)';
+		$build_verb = '(add|build|create|make|insert|put|give me|gimme|design|generate|compose|throw in|drop in|i need|i want|let\'?s add|set up|whip up|need|want|finish|wrap up|round out|close (it |the page )?out)';
 		$noun       = '(section|hero|gallery|pricing|faq|form|testimonials?|reviews?|cta|map|features?|services?|band|grid|team|blank|contact|about|footer|header|menu|steps|benefits?|stats?|quote)';
 		if ( preg_match( '/\b' . $build_verb . '\b.{0,40}\b' . $noun . '\b/i', $core ) ) { return 'build_high'; }
 		// A real question ("what should I add next?", "which layout works?") is CHAT
