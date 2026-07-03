@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.5
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,18 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.4.0 =
+* New: whole-page builds — describe your business once and Nova plans and builds a complete landing page (hero, trust strip, story, proof, offer, final CTA), then offers "Go deeper" sections to extend it
+* New: "make it perfect" visual quality pass — the builder screenshots your page on desktop and mobile, critiques it section by section, and fixes what it finds
+* New: talk to it like a person — move sections around, change the palette by mood or color name ("make it peach"), merge fixes and style changes in one message, undo when you change your mind
+* New: drop photos straight into chat and they're uploaded and placed
+* Improved: edits stay on YOUR page's story — a section rewrite can't drift into inventing a different business
+* Improved: header and footer are handled as page chrome — cleanup passes will never remove or reorder them, and canvas vs. theme-template pages each keep the right chrome
+* Improved: builds keep running if you refresh the tab mid-build
+* Improved: daily usage rebalanced — Free now covers one complete page plus a quality pass every day (Starter ~3 pages/day, Pro ~8/day); the visual quality pass counts like one build, all other edits stay free
+* Improved: clearer errors and faster model fallback when a compose takes too long
+* Under the hood: full uninstall cleanup (options, transients, page metadata), debug logging only when WP_DEBUG is on
 
 = 2.3.5 =
 * New: Brand panel in the AI Builder topbar — view and edit your site's colors, fonts, name and voice, or clear it to relearn from your next build

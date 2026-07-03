@@ -1330,7 +1330,8 @@ class PressGo_AI_Builder {
 	/**
 	 * The full narrative arc per goal — the gold-standard ~11-section conversion
 	 * story (modeled on the owner's reference landers). tier 'core' builds in the
-	 * whole-page run (hero + 5 core = exactly the free daily cap of 6 builds);
+	 * whole-page run (hero + 5 core = 24 units; the free daily cap of 32 leaves
+	 * room for a quality pass or one extra section on top);
 	 * 'extended' is offered as a continuation after the core run finishes. The
 	 * REQUEST strings are the product: each encodes a proven section pattern the
 	 * composer prompt teaches (see "Gold-standard section patterns").
@@ -2388,6 +2389,7 @@ class PressGo_AI_Builder {
 		$records = $this->ff_sections( $post_id );
 		if ( count( $records ) < 2 ) { return array( 'note' => 'Not enough on the page yet for a quality pass — build a few sections first.' ); }
 
+		$this->bump_usage( 4 ); // a full quality pass costs like one build (vision calls + bounded recomposes stay free inside it)
 		$fixed_all = array();
 		$rounds    = 0;
 		for ( $round = 1; $round <= $max_rounds; $round++ ) {
@@ -4294,9 +4296,9 @@ class PressGo_AI_Builder {
 			<?php
 				$pg_tier_now = $this->usage_tier();
 				$pg_tiers = array(
-					'free'    => array( 'Free',    '$0',     'Light daily use',       'Resets daily, core sections' ),
-					'starter' => array( 'Starter', '$5/mo',  'More daily headroom',   'Sonnet first-builds, all sections' ),
-					'pro'     => array( 'Pro',     '$12/mo', 'Lots of headroom',      'Pro mode, header/footer/globals' ),
+					'free'    => array( 'Free',    '$0',     '1 full page a day',     'Full page + a quality pass, daily' ),
+					'starter' => array( 'Starter', '$5/mo',  '3 pages a day',         'Sonnet first-builds, all sections' ),
+					'pro'     => array( 'Pro',     '$12/mo', '8 pages a day',         'Pro mode, header/footer/globals' ),
 					'dev'     => array( 'Dev',     '$49/mo', 'Effectively unlimited', 'Agencies, multiple sites' ),
 				);
 				?>
@@ -5766,7 +5768,7 @@ class PressGo_AI_Builder {
 		if ( '' !== $or_key ) {
 			$tree = self::glm_compose( $or_key, $system, $framed, $keepalive );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
-			error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
 		if ( '' !== $cl_key ) {
@@ -5774,7 +5776,7 @@ class PressGo_AI_Builder {
 			$tree = self::claude_compose( $cl_key, $system, $framed );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
-		error_log( 'PressGo compose: BOTH models failed. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 200 ) ); // phpcs:ignore
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: BOTH models failed. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 200 ) ); // phpcs:ignore
 		return array( 'error' => 'Both models failed to return a valid section. Try rewording.' );
 	}
 
@@ -6109,7 +6111,7 @@ class PressGo_AI_Builder {
 		// costs more units the heavier its mode (basic 1, Iris/vision 3, Nova/
 		// freeform 4), so the meter reflects real token burn. Filterable.
 		return apply_filters( 'pressgo_usage_caps', array(
-			'free' => 24, 'starter' => 60, 'pro' => 160, 'dev' => 400,
+			'free' => 32, 'starter' => 96, 'pro' => 240, 'dev' => 1000,
 		) );
 	}
 
