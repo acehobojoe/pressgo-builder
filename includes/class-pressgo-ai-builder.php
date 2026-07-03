@@ -4646,6 +4646,21 @@ class PressGo_AI_Builder {
 				}
 			}
 		}
+		// Turn telemetry: keep the last 60 chat turns per page server-side so a
+		// frustrating session can be diagnosed after the fact.
+		if ( $post_id && '' !== trim( (string) $message ) ) {
+			$tlog = get_post_meta( $post_id, '_pressgo_chat_log', true );
+			if ( ! is_array( $tlog ) ) { $tlog = array(); }
+			$tlog[] = array(
+				't'   => gmdate( 'Y-m-d H:i:s' ),
+				'msg' => mb_substr( (string) $message, 0, 300 ),
+				'img' => count( $ff_images ),
+				'sel' => (string) $selected_key,
+				'wp'  => $whole_page ? 1 : 0,
+			);
+			if ( count( $tlog ) > 60 ) { $tlog = array_slice( $tlog, -60 ); }
+			update_post_meta( $post_id, '_pressgo_chat_log', $tlog );
+		}
 		// Classify attachments IMMEDIATELY so photos survive every path (they were
 		// silently lost when the first message went to the interview): real PHOTOS
 		// sideload into the media library + the page's photo pool; a DESIGN
@@ -5343,7 +5358,15 @@ class PressGo_AI_Builder {
 	 * "no" isn't grabbed by a downstream build verb.
 	 */
 	private function is_decline( $message ) {
-		return (bool) preg_match( '/^\s*(no\b|nope|nah|not that|not really|stop|wait|hold on|cancel|never ?mind|forget (it|that|the|about)|scrap (it|that)|actually,?\s+(let\'?s|can we|i|maybe)|instead\b)/i', (string) $message );
+		$m = strtolower( trim( (string) $message ) );
+		if ( ! preg_match( '/^\s*(no\b|nope|nah|not that|not really|stop|wait|hold on|cancel|never ?mind|forget (it|that|the|about)|scrap (it|that)|actually,?\s+(let\'?s|can we|i|maybe)|instead\b)/i', $m ) ) {
+			return false;
+		}
+		// If it contains a change command or a build command, it's not JUST a decline.
+		if ( mb_strlen( $m ) > 30 && ( $this->is_edit_intent( $m ) || preg_match( '/\b(add|build|create|make|insert|put|design|generate)\b/i', $m ) || preg_match( '/\b(update|change)\b/i', $m ) ) ) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -5379,7 +5402,8 @@ class PressGo_AI_Builder {
 			'gallery|photos|images'                      => 'gallery',
 			'reviews?|testimonials?|social proof'        => 'proof',
 			'team|staff|about us|about'                  => 'about',
-			'services?|features?|benefits?'              => 'features',
+			'services?'                                  => 'services',
+			'features?|benefits?'                        => 'features',
 			'steps|how it works|process'                 => 'steps',
 		);
 		foreach ( $map as $pat => $role ) {
