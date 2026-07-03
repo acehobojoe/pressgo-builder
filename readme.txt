@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,11 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.4.1 =
+* Nova now works everywhere: freeform builds, the visual quality pass, screenshot understanding, chat, and voice transcription all run through your PressGo API key out of the box — no extra keys or setup. Section builds cost 1 credit each (edits, reorders, palette changes, and chat remain free).
+* Clear "out of credits" message with a top-up link, instead of a generic failure
+* Sites with their own OpenRouter key keep talking to OpenRouter directly, unchanged
 
 = 2.4.0 =
 * New: whole-page builds — describe your business once and Nova plans and builds a complete landing page (hero, trust strip, story, proof, offer, final CTA), then offers "Go deeper" sections to extend it

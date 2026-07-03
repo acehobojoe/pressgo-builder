@@ -652,9 +652,8 @@ class PressGo_AI_Builder {
 			wp_send_json_error( 'Recording is too long. Keep it under a minute or so.', 413 );
 		}
 
-		$api_key = get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $api_key ) {
-			wp_send_json_error( 'Voice transcription requires an OpenRouter key in PressGo settings.', 400 );
+		if ( ! self::nova_ready() ) {
+			wp_send_json_error( 'Voice transcription needs a PressGo API key (or an OpenRouter key) in PressGo settings.', 400 );
 		}
 
 		// Normalize the MediaRecorder mime to a bare OpenRouter format:
@@ -669,7 +668,7 @@ class PressGo_AI_Builder {
 		}
 		$format = trim( $format );
 
-		$result = self::transcribe_via_openrouter( $api_key, $b64, $format );
+		$result = self::transcribe_via_openrouter( $b64, $format );
 		if ( is_wp_error( $result ) ) {
 			$status = (int) ( $result->get_error_data()['status'] ?? 502 );
 			wp_send_json_error( $result->get_error_message(), $status );
@@ -683,10 +682,11 @@ class PressGo_AI_Builder {
 	 * OpenRouter request, returns the transcribed string or a WP_Error that
 	 * carries a user-facing message + HTTP status for the handler to relay.
 	 */
-	private static function transcribe_via_openrouter( $key, $b64, $format ) {
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+	private static function transcribe_via_openrouter( $b64, $format ) {
+		$be   = self::nova_backend( 'transcribe' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 120,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'    => self::transcribe_model(),
 				'messages' => array(
@@ -2168,15 +2168,16 @@ class PressGo_AI_Builder {
 	}
 
 	/** Critique ONE slice with the reliable vision model. Returns issues[] (may be empty). */
-	private function vqa_critique_slice( $or_key, $data_url, $viewport, $n, $total ) {
+	private function vqa_critique_slice( $data_url, $viewport, $n, $total ) {
 		$rubric = "You are a strict landing-page QA reviewer. This is slice $n of $total of a " . strtoupper( $viewport ) . " screenshot (the page continues above/below the slice edges — NEVER report a section cut by the slice boundary as broken).\n"
 			. "If the slice shows a browser error/404/blank page, return {\"issues\":[],\"not_a_page\":true}.\n"
 			. "Report ONLY real, clearly visible FAILURES in THIS slice, judged against a top-agency conversion lander: (1) star/icon rows stacked vertically; (2) text or buttons genuinely clipped mid-word or overflowing; (3) a heading with no content beneath it (dead space); (4) large empty voids inside cards or between elements; (5) unreadable contrast; (6) cramped columns of squeezed text; (7) robotic or filler copy; (8) anything visibly broken. THEN also list up to 2 QUALITY upgrades judged against a top-agency lander (weak CTA prominence, generic imagery, flat visual hierarchy, redundant copy) with severity med.\n"
 			. "For each failure give the NEAREST SECTION HEADING text visible in the slice (verbatim) so it can be located, a concrete one-line problem, and a one-line concrete fix instruction. When unsure whether something is a failure, OMIT it.\n"
 			. 'Return ONLY JSON: {"issues":[{"heading":"...","problem":"...","fix":"...","severity":"high|med"}]}';
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 90,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'           => $this->vision_model(),
 				'max_tokens'      => 900,
@@ -2243,11 +2244,11 @@ class PressGo_AI_Builder {
 
 	/** Is this attached image a DESIGN reference or a content PHOTO? */
 	private function vqa_classify_image( $data_url ) {
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $or_key || '' === $data_url ) { return array( 'type' => 'photo', 'desc' => '' ); }
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+		if ( ! self::nova_ready() || '' === $data_url ) { return array( 'type' => 'photo', 'desc' => '' ); }
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 60,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'           => $this->vision_model(),
 				'max_tokens'      => 400,
@@ -2271,11 +2272,11 @@ class PressGo_AI_Builder {
 
 	/** Describe a reference screenshot for the text-only composer. '' on failure. */
 	private function vqa_describe_reference( $data_url ) {
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $or_key || '' === $data_url ) { return ''; }
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+		if ( ! self::nova_ready() || '' === $data_url ) { return ''; }
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 60,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'      => $this->vision_model(),
 				'max_tokens' => 500,
@@ -2293,12 +2294,12 @@ class PressGo_AI_Builder {
 
 	/** Answer a QUESTION about an attached screenshot: look, explain, offer the fix. */
 	private function vision_answer( $post_id, $question, $data_url ) {
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $or_key ) { return array( 'chat_mode' => true, 'note' => "I can't inspect screenshots right now — describe what you're seeing and I'll fix it." ); }
+		if ( ! self::nova_ready() ) { return array( 'chat_mode' => true, 'note' => "I can't inspect screenshots right now — describe what you're seeing and I'll fix it." ); }
 		$loc  = $this->vqa_locate_from_screenshot( $post_id, $data_url );
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 90,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'      => $this->vision_model(),
 				'max_tokens' => 400,
@@ -2330,8 +2331,7 @@ class PressGo_AI_Builder {
 	/** Which stored section does the user's screenshot show? ['idx'=>int|-1,'shows'=>string]. */
 	private function vqa_locate_from_screenshot( $post_id, $data_url ) {
 		$out    = array( 'idx' => -1, 'shows' => '' );
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $or_key || '' === $data_url ) { return $out; }
+		if ( ! self::nova_ready() || '' === $data_url ) { return $out; }
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { return $out; }
 		$list = array();
@@ -2339,9 +2339,10 @@ class PressGo_AI_Builder {
 			$list[] = $i . '. [' . ( isset( $r['semantic_role'] ) ? $r['semantic_role'] : '?' ) . '] "' . mb_substr( (string) ( isset( $r['heading'] ) ? $r['heading'] : '' ), 0, 70 ) . '"';
 		}
 		$q = "This screenshot is a crop of a landing page. The page's sections, in order, are:\n" . implode( "\n", $list ) . "\n\nWhich ONE section (by index) does the screenshot mainly show? Also describe in one short line what is visible (layout + any obvious element the user might be pointing at, e.g. 'service cards with small icons above the titles'). Return ONLY JSON: {\"index\": <int or -1 if unsure>, \"shows\": \"one line\"}";
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 60,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or_key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'           => $this->vision_model(),
 				'max_tokens'      => 300,
@@ -2383,8 +2384,7 @@ class PressGo_AI_Builder {
 	 */
 	private function vision_qa_loop( $post_id, $keepalive = null, $max_rounds = 2 ) {
 		@set_time_limit( 600 ); // phpcs:ignore WordPress.PHP.IniSet
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' === $or_key ) { return array( 'note' => 'The quality pass needs the vision service configured.' ); }
+		if ( ! self::nova_ready() ) { return array( 'note' => 'The quality pass needs the vision service configured.' ); }
 		$ping = function () use ( $keepalive ) { if ( is_callable( $keepalive ) ) { $keepalive(); } };
 		$records = $this->ff_sections( $post_id );
 		if ( count( $records ) < 2 ) { return array( 'note' => 'Not enough on the page yet for a quality pass — build a few sections first.' ); }
@@ -2403,7 +2403,7 @@ class PressGo_AI_Builder {
 				$total  = count( $slices );
 				foreach ( $slices as $n => $slice ) {
 					$ping();
-					foreach ( $this->vqa_critique_slice( $or_key, $slice, $vp, $n + 1, $total ) as $iss ) {
+					foreach ( $this->vqa_critique_slice( $slice, $vp, $n + 1, $total ) as $iss ) {
 						if ( empty( $iss['heading'] ) || empty( $iss['problem'] ) ) { continue; }
 						$idx = $this->vqa_match_record( $records, $iss['heading'] );
 						if ( $idx < 0 ) { continue; }
@@ -2451,11 +2451,48 @@ class PressGo_AI_Builder {
 		return (string) apply_filters( 'pressgo_vision_model', 'google/gemini-2.5-flash' );
 	}
 
+	/** Set by glm_compose when the backend rejects a call for billing reasons. */
+	private static $nova_last_error = '';
+
+	/**
+	 * Nova model backend — where OpenAI-shape chat.completions calls go.
+	 * A site-owner OpenRouter key talks to OpenRouter directly (dev/own-key
+	 * setups); otherwise the user's PressGo account key routes through the
+	 * pressgo.app Nova proxy, which holds the provider key server-side and
+	 * bills compose calls as credits. Returns null when neither is configured.
+	 */
+	private static function nova_backend( $op = 'chat' ) {
+		$or = (string) get_option( 'pressgo_openrouter_key', '' );
+		if ( '' !== $or ) {
+			return array(
+				'url'  => 'https://openrouter.ai/api/v1/chat/completions',
+				'wp'   => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $or ),
+				'curl' => array( 'Content-Type: application/json', 'Authorization: Bearer ' . $or ),
+			);
+		}
+		$pg = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' !== $pg ) {
+			$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+			return array(
+				'url'  => $base . '/api/plugin/nova',
+				'wp'   => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg, 'X-Nova-Op' => $op ),
+				'curl' => array( 'Content-Type: application/json', 'X-PressGo-Key: ' . $pg, 'X-Nova-Op: ' . $op ),
+			);
+		}
+		return null;
+	}
+
+	/** Can Nova reach a model backend at all? */
+	private static function nova_ready() {
+		return null !== self::nova_backend();
+	}
+
 	/** OpenRouter vision critique -> parsed array, or null. */
-	private function glm_vision_critique( $key, $data_url, $plan_text ) {
-		$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+	private function glm_vision_critique( $data_url, $plan_text ) {
+		$be   = self::nova_backend( 'vision' );
+		$resp = wp_remote_post( $be['url'], array(
 			'timeout' => 120,
-			'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+			'headers' => $be['wp'],
 			'body'    => wp_json_encode( array(
 				'model'           => $this->vision_model(),
 				'max_tokens'      => 1500,
@@ -2519,8 +2556,7 @@ class PressGo_AI_Builder {
 		}
 		$plan_text = implode( "\n", $lines );
 
-		$or   = (string) get_option( 'pressgo_openrouter_key', '' );
-		$crit = '' !== $or ? $this->glm_vision_critique( $or, $data_url, $plan_text ) : null;
+		$crit = self::nova_ready() ? $this->glm_vision_critique( $data_url, $plan_text ) : null;
 		if ( ! is_array( $crit ) ) {
 			$cl = (string) get_option( 'pressgo_freeform_key', '' );
 			if ( '' !== $cl ) { $crit = $this->claude_vision_critique( $cl, $data_url, $plan_text ); }
@@ -4963,8 +4999,8 @@ class PressGo_AI_Builder {
 			if ( ! empty( $state['business'] ) ) { $message = $state['business']; }
 		}
 
-		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
-			wp_send_json_error( 'Pro mode is not configured on this site (no compose key).', 500 );
+		if ( ! self::nova_ready() && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
+			wp_send_json_error( 'Nova needs a PressGo API key. Add one under PressGo > Settings (free keys at pressgo.app).', 500 );
 		}
 
 		// ── Conversational mode ──────────────────────────────────────────
@@ -5600,7 +5636,6 @@ class PressGo_AI_Builder {
 	 * Returns ['text'=>string, 'suggest'=>array|null].
 	 */
 	private function freeform_chat( $post_id, $message, $brief ) {
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
 		$page_state = $this->freeform_page_state( $post_id );
 
 		// If a palette/style request somehow reached chat, DO IT instead of arguing —
@@ -5620,8 +5655,8 @@ class PressGo_AI_Builder {
 		}
 
 		$text = '';
-		if ( '' !== $or_key ) {
-			$text = self::glm_chat( $or_key, $system, $message, $this->freeform_keepalive() );
+		if ( self::nova_ready() ) {
+			$text = self::glm_chat( $system, $message, $this->freeform_keepalive() );
 		}
 		if ( '' === $text ) {
 			$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
@@ -5673,7 +5708,7 @@ class PressGo_AI_Builder {
 	 * GLM-5.2 chat (not compose) via OpenRouter streaming. Returns plain text.
 	 * Uses the same keepalive mechanism as glm_compose to prevent Cloudflare 524.
 	 */
-	private static function glm_chat( $key, $system, $user, $keepalive = null ) {
+	private static function glm_chat( $system, $user, $keepalive = null ) {
 		$body = wp_json_encode( array(
 			'model'      => 'z-ai/glm-5.2',
 			'max_tokens' => 1000,
@@ -5687,9 +5722,10 @@ class PressGo_AI_Builder {
 		if ( ! $keepalive ) {
 			$blk = json_decode( $body, true );
 			unset( $blk['stream'] ); // blocking request must not stream (SSE body won't json_decode)
-			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			$be   = self::nova_backend( 'chat' );
+			$resp = wp_remote_post( $be['url'], array(
 				'timeout' => 120,
-				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+				'headers' => $be['wp'],
 				'body'    => wp_json_encode( $blk ),
 			) );
 			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return ''; }
@@ -5698,11 +5734,12 @@ class PressGo_AI_Builder {
 		}
 
 		$accumulated = '';
-		$ch = curl_init( 'https://openrouter.ai/api/v1/chat/completions' );
+		$be = self::nova_backend( 'chat' );
+		$ch = curl_init( $be['url'] );
 		curl_setopt_array( $ch, array(
 			CURLOPT_POST           => true,
 			CURLOPT_POSTFIELDS     => $body,
-			CURLOPT_HTTPHEADER     => array( 'Content-Type: application/json', 'Authorization: Bearer ' . $key ),
+			CURLOPT_HTTPHEADER     => $be['curl'],
 			CURLOPT_RETURNTRANSFER => false,
 			CURLOPT_HEADER         => false,
 			CURLOPT_TIMEOUT        => 120,
@@ -5764,9 +5801,9 @@ class PressGo_AI_Builder {
 	 *                                 524 on slow reasoning turns).
 	 */
 	public function compose_freeform_tree( $system, $framed, $keepalive = null ) {
-		$or_key = (string) get_option( 'pressgo_openrouter_key', '' );
-		if ( '' !== $or_key ) {
-			$tree = self::glm_compose( $or_key, $system, $framed, $keepalive );
+		self::$nova_last_error = '';
+		if ( self::nova_ready() ) {
+			$tree = self::glm_compose( $system, $framed, $keepalive );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 		}
@@ -5775,6 +5812,15 @@ class PressGo_AI_Builder {
 			if ( is_callable( $keepalive ) ) { $keepalive(); } // ping before the silent blocking fallback
 			$tree = self::claude_compose( $cl_key, $system, $framed );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
+		} elseif ( self::nova_ready() && 'credits' !== self::$nova_last_error ) {
+			// No own Anthropic key: the Claude fallback rides the same backend
+			// (OpenRouter hosts the Anthropic models under anthropic/*).
+			if ( is_callable( $keepalive ) ) { $keepalive(); }
+			$tree = self::glm_compose( $system, $framed, $keepalive, 'anthropic/claude-sonnet-4.5' );
+			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
+		}
+		if ( 'credits' === self::$nova_last_error ) {
+			return array( 'error' => 'You are out of PressGo credits. Top up at pressgo.app/dashboard and keep building.' );
 		}
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: BOTH models failed. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 200 ) ); // phpcs:ignore
 		return array( 'error' => 'Both models failed to return a valid section. Try rewording.' );
@@ -5794,9 +5840,9 @@ class PressGo_AI_Builder {
 	 * (prevents Cloudflare 524 at 100s of silence). Without $keepalive, falls
 	 * back to a simple wp_remote_post (CLI / harness paths).
 	 */
-	private static function glm_compose( $key, $system, $framed, $keepalive = null ) {
+	private static function glm_compose( $system, $framed, $keepalive = null, $model = 'z-ai/glm-5.2' ) {
 		$body = wp_json_encode( array(
-			'model'           => 'z-ai/glm-5.2',
+			'model'           => $model,
 			'max_tokens'      => 12000,
 			'response_format' => array( 'type' => 'json_object' ),
 			'stream'          => true,
@@ -5812,26 +5858,28 @@ class PressGo_AI_Builder {
 		if ( ! $keepalive ) {
 			$blk = json_decode( $body, true );
 			unset( $blk['stream'] );
-			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
+			$be   = self::nova_backend( 'compose' );
+			$resp = wp_remote_post( $be['url'], array(
 				'timeout' => 150,
-				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
+				'headers' => $be['wp'],
 				'body'    => wp_json_encode( $blk ),
 			) );
-			if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+			if ( is_wp_error( $resp ) ) { return null; }
+			$code = (int) wp_remote_retrieve_response_code( $resp );
+			if ( 402 === $code ) { self::$nova_last_error = 'credits'; return null; }
+			if ( 200 !== $code ) { return null; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
 			return self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
 		}
 
 		// Keepalive path: cURL streaming, assemble SSE chunks into the full JSON.
 		$accumulated = '';
-		$ch = curl_init( 'https://openrouter.ai/api/v1/chat/completions' );
+		$be = self::nova_backend( 'compose' );
+		$ch = curl_init( $be['url'] );
 		curl_setopt_array( $ch, array(
 			CURLOPT_POST           => true,
 			CURLOPT_POSTFIELDS     => $body,
-			CURLOPT_HTTPHEADER     => array(
-				'Content-Type: application/json',
-				'Authorization: Bearer ' . $key,
-			),
+			CURLOPT_HTTPHEADER     => $be['curl'],
 			CURLOPT_RETURNTRANSFER => false,
 			CURLOPT_HEADER         => false,
 			CURLOPT_TIMEOUT        => 240,
@@ -5849,6 +5897,7 @@ class PressGo_AI_Builder {
 		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
 		curl_close( $ch );
 
+		if ( 402 === (int) $status ) { self::$nova_last_error = 'credits'; return null; }
 		if ( ! $ok || $err || 200 !== (int) $status ) { return null; }
 
 		// Parse the SSE stream: extract content deltas from data: lines.
