@@ -4779,7 +4779,7 @@ class PressGo_AI_Builder {
 			// Runs before the edit branch (which would otherwise treat "move" as an
 			// in-place edit) and before reflow.
 			if ( '' === $discovery_stage && ! $whole_page && $this->is_text_reorder( $message ) ) {
-				wp_send_json_success( $this->handle_text_reorder( $post_id, $message ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->handle_text_reorder( $post_id, $message ) ) );
 			}
 			// Typed "build the whole page / finish the page" works like the chip:
 			// return the ordered plan for the client runner (core first, else the
@@ -4807,7 +4807,16 @@ class PressGo_AI_Builder {
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
 			if ( preg_match( '/\b(make (everything|it|this) ?(look )?(better|nicer|cleaner|neater|tidier|prettier|polished|professional|cohesive|more cohesive|perfect)|make (everything|it|this).*(flow|cohesive)|flow better|re-?organi[sz]e|fix the order|redo the order|balance the colou?rs?|tidy (it|this)( up)?|clean (it|this)( up| this page)?|clean up( the| this)? ?(page)?|smart order|less cluttered|improve the (layout|design|look|flow)|something (does ?n\'?t|does not) look right|something\'?s? (off|wrong|not right)|polish (it|this|the page|the design)|fix the (design|layout|look|page|mobile|spacing)|does (this|it) look (ok|okay|right|good|off|wrong))\b/i', $message ) ) {
-				wp_send_json_success( $this->cohesion_reorganize( $post_id ) );
+				// Compound "make it flow AND make everything peach": run the color
+				// change FIRST (it repaints), then reorganize — never drop half the ask.
+				$flow_note_prefix = '';
+				if ( $this->is_brand_change_intent( $message ) ) {
+					$bc = $this->handle_brand_change( $post_id, $message );
+					if ( ! empty( $bc['cohesion'] ) && ! empty( $bc['note'] ) ) { $flow_note_prefix = rtrim( preg_replace( '/ Say "undo".*$/', '', $bc['note'] ) ) . ' '; }
+				}
+				$flow_res = $this->cohesion_reorganize( $post_id );
+				if ( '' !== $flow_note_prefix && ! empty( $flow_res['note'] ) ) { $flow_res['note'] = $flow_note_prefix . $flow_res['note']; }
+				wp_send_json_success( $this->turn_out( $post_id, $flow_res ) );
 			}
 			// Remove/trim -> delete a section (NEVER add). Casual phrasing too:
 			// "take something out", "it's too long", "too many sections", "lose one".
@@ -5486,7 +5495,7 @@ class PressGo_AI_Builder {
 
 	/** "move the form to the bottom", "put pricing first" -> a text-driven reorder. */
 	private function is_text_reorder( $message ) {
-		return (bool) preg_match( '/\b(move|put|send|push|drop|reorder|reposition)\b.{0,40}\b(bottom|top|end|start|beginning|first|last|up|down|above|below)\b/i', (string) $message );
+		return (bool) preg_match( '/\b(move|put|send|push|drop|reorder|reposition|needs? to (be|go)|should (be|go)|belongs?)\b.{0,40}\b(at the )?(bottom|top|end|start|beginning|first|last|up|down|above|below)\b/i', (string) $message );
 	}
 
 	/** Resolve the target section from text and move it to the top or bottom. */
@@ -5494,6 +5503,11 @@ class PressGo_AI_Builder {
 		$records = $this->ff_sections( $post_id );
 		if ( count( $records ) < 2 ) { return array( 'note' => "There's nothing to reorder yet." ); }
 		$target = $this->resolve_edit_target( $post_id, $message );
+		// Bare "it/this" right after a build means the section just built.
+		if ( ( ! is_array( $target ) || empty( $target['pg_key'] ) ) && preg_match( '/\b(it|this|that)\b/i', $message ) ) {
+			$last_r = end( $records );
+			if ( is_array( $last_r ) && ! empty( $last_r['pg_key'] ) ) { $target = $last_r; }
+		}
 		if ( ! is_array( $target ) || empty( $target['pg_key'] ) ) {
 			return array( 'note' => 'Which section should I move? Name it, like "move the pricing to the bottom".' );
 		}
