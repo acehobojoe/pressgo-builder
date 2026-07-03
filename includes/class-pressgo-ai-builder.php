@@ -4543,7 +4543,7 @@ class PressGo_AI_Builder {
 			CURLOPT_POSTFIELDS     => $body,
 			CURLOPT_HTTPHEADER     => array( 'Content-Type: application/json', 'Authorization: Bearer ' . $key ),
 			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_TIMEOUT        => 240,
+			CURLOPT_TIMEOUT        => 150, // a single section should never take 4 min — fail over to Claude sooner
 		) );
 		$out  = curl_exec( $ch );
 		$code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
@@ -5713,6 +5713,7 @@ class PressGo_AI_Builder {
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
 		if ( '' !== $cl_key ) {
+			if ( is_callable( $keepalive ) ) { $keepalive(); } // ping before the silent blocking fallback
 			$tree = self::claude_compose( $cl_key, $system, $framed );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
@@ -5753,7 +5754,7 @@ class PressGo_AI_Builder {
 			$blk = json_decode( $body, true );
 			unset( $blk['stream'] );
 			$resp = wp_remote_post( 'https://openrouter.ai/api/v1/chat/completions', array(
-				'timeout' => 240,
+				'timeout' => 150,
 				'headers' => array( 'content-type' => 'application/json', 'Authorization' => 'Bearer ' . $key ),
 				'body'    => wp_json_encode( $blk ),
 			) );
