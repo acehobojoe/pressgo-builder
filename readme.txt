@@ -18,7 +18,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 
 **Two ways to use it:**
 
-**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = 10 credits/month. $15 one-time pack = 75 credits. PressGo Plus = $12/mo for 100 credits + unlimited MCP.
+**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. $15 one-time pack = 75 extra credits anytime.
 
 **2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
 
@@ -61,7 +61,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 
 **How It Works:**
 
-1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — you get **10 free credits per month**
+1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — every day includes **a full page of free builds**, plus 10 bonus credits a month
 2. Enter the key in PressGo &rarr; Settings
 3. Go to PressGo &rarr; AI Builder and click "+ New page" (or AI-enable an existing page)
 4. Describe the page in chat, drop in reference screenshots if you have them, and watch it build in the live preview
@@ -96,7 +96,31 @@ No user data is sent to any service until you explicitly click the Generate butt
 * [Anthropic Privacy Policy](https://www.anthropic.com/policies/privacy)
 * [Anthropic API Usage Policy](https://www.anthropic.com/policies/aup)
 
-**4. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) — OPT-IN ONLY**
+**4. OpenRouter (`openrouter.ai`) — optional, only if you add your own OpenRouter key**
+
+Sites that configure their own OpenRouter key (an advanced option) send Nova build prompts, page screenshots for the visual quality pass, and voice recordings for transcription directly to `openrouter.ai` over HTTPS, where they are processed by the models you selected. Without an OpenRouter key these same requests go through the PressGo API (section 2) instead, which forwards them to AI models using PressGo's provider account.
+
+* [OpenRouter Terms](https://openrouter.ai/terms)
+* [OpenRouter Privacy Policy](https://openrouter.ai/privacy)
+
+**5. PressGo Screenshot Service (`screenshot.pressgo.app`)**
+
+Page thumbnails in the builder list and the AI's visual self-review ("A(eyes)", the Nova quality pass) work by sending a signed, short-lived preview URL of your page to `screenshot.pressgo.app`, which loads that URL in a headless browser and returns a PNG. The service sees the rendered page (the same thing a site visitor would see) and does not store screenshots beyond a short processing window. Screenshots used for AI review are then analyzed by the AI model per your API mode above.
+
+* [PressGo Privacy Policy](https://pressgo.app/privacy)
+
+**6. Stock photo APIs (`api.pexels.com`, `images.unsplash.com`) — only when you ask for stock photos**
+
+When you ask the builder for stock photography, it searches Pexels (and loads Unsplash image URLs the AI selected) over HTTPS. Your search terms are derived from your page's industry/topic; no personal data is sent.
+
+* [Pexels Terms](https://www.pexels.com/terms-of-service/)
+* [Unsplash Terms](https://unsplash.com/terms)
+
+**7. Voice input (microphone)**
+
+If you use the microphone button, your recording is sent for transcription to the service matching your API mode (PressGo API, or OpenRouter with your own key) and is not stored after the text is returned. Nothing is recorded until you press the mic button.
+
+**8. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) — OPT-IN ONLY**
 
 On first install you'll see a notice asking whether you want to share anonymous usage data. Nothing is sent until you click "Allow & continue". If you click "Skip" or simply dismiss the notice, no telemetry data is ever transmitted. The opt-in choice can be changed anytime in PressGo &rarr; MCP Server.
 
@@ -127,7 +151,7 @@ Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.ap
 
 = Do I need an API key? =
 
-Start free — no credit card. Create a free PressGo account at [pressgo.app/register](https://pressgo.app/register) and you get **10 free page credits every month**. From there you have two ways to power it: (1) keep using your free PressGo account (recommended — 10 credits/month, top up anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
+Start free — no credit card. Create a free PressGo account at [pressgo.app/register](https://pressgo.app/register) and every day includes **enough builds for a full page** (the allowance resets at midnight UTC), plus 10 bonus credits a month for overflow. From there you have two ways to power it: (1) keep using your free PressGo account (recommended — 10 credits/month, top up anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
 
 = How much does it cost per page? =
 
