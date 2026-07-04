@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.4.2
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,6 +165,13 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.0 =
+* NEW BILLING MODEL: every account now gets a daily allowance of included builds that resets at midnight UTC — Free covers a full page every day (8 section builds/day + 10 bonus credits a month), Plus ($12/mo) covers ~8 pages a day (64/day + 100 bonus credits)
+* The usage bar in the builder now shows your real account allowance and when it resets; credits become bonus overflow, only spent after the day's included builds
+* Upgrade to Plus without leaving the builder — the usage bar opens a plans panel with live checkout
+* Edits, reorders, palette changes, quality passes and chat remain free at every level, even when the day's builds are spent
+* Failed builds auto-refund whichever bucket they charged (daily allowance or credits)
 
 = 2.4.2 =
 * One honest meter: on PressGo API sites the credits pill is the single gauge (it updates live as sections build); the daily usage bar now only appears for own-OpenRouter-key setups, and the old tier popup is gone

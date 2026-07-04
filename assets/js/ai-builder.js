@@ -344,6 +344,11 @@
 			usageEl.title = u.builds_left + ' new-section build' + (u.builds_left === 1 ? '' : 's') +
 				' left today. Editing, reordering, delete and "make it flow" are free. Click to see plans.';
 		}
+		if (typeof u.credits === 'number' && credPill) {
+			credPill.textContent = u.credits + (u.credits === 1 ? ' credit' : ' credits');
+			credPill.hidden = u.credits === 0; // pill = overflow only; the bar is the meter
+			lastCreditValue = u.credits;
+		}
 	}
 	function refreshUsage() {
 		var fd = new FormData();
@@ -355,10 +360,34 @@
 			.catch(function () {});
 	}
 	if (usageEl) {
-		renderUsage(cfg.usage);
+		if (cfg.usage) renderUsage(cfg.usage);
+		else refreshUsage(); // PressGo-API mode: the window lives server-side
 		setInterval(function () {
 			if (usageResetTarget) usageReset.textContent = fmtReset(usageResetTarget - Math.floor(Date.now() / 1000));
 		}, 30000);
+		function toggleTiers(e) { if (e) e.stopPropagation(); if (tiersPop) tiersPop.hidden = !tiersPop.hidden; }
+		if (tiersPop) {
+			usageEl.addEventListener('click', toggleTiers);
+			if (usageUpg)  usageUpg.addEventListener('click', toggleTiers);
+			if (tiersPopX) tiersPopX.addEventListener('click', function (e) { e.stopPropagation(); tiersPop.hidden = true; });
+			document.addEventListener('click', function (e) {
+				if (!tiersPop.hidden && !tiersPop.contains(e.target) && !usageEl.contains(e.target)) tiersPop.hidden = true;
+			});
+		}
+		var plusBtn = document.getElementById('pg-plus-btn');
+		if (plusBtn) plusBtn.addEventListener('click', function () {
+			plusBtn.disabled = true; plusBtn.textContent = 'Opening checkout…';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_subscribe');
+			fd.append('nonce', cfg.nonce);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					plusBtn.disabled = false; plusBtn.textContent = 'Upgrade to Plus';
+					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
+				})
+				.catch(function () { plusBtn.disabled = false; plusBtn.textContent = 'Upgrade to Plus'; });
+		});
 	}
 
 	function typingNode() {
@@ -1307,7 +1336,7 @@
 		var d = res.json;
 		if (d && d.success) {
 			var data = d.data || {};
-			if (data.preview_bust && !usageEl) refreshCredits(); // proxy mode: sections spend credits
+			if (data.preview_bust) { refreshUsage(); if (!cfg.usage) refreshCredits(); } // window + overflow both move server-side
 			// Mid-interview / confirm: render the question + chips and wait. A confirm
 			// step (brand lock) shows the freshly-built hero, so reload the preview
 			// first, then render its swatches + chips.

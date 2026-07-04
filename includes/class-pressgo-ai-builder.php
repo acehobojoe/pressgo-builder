@@ -102,6 +102,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_list_images',  array( $this, 'ajax_list_images' ) );
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
+		add_action( 'wp_ajax_pressgo_ai_subscribe',    array( $this, 'ajax_subscribe' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 		add_action( 'wp_ajax_pressgo_ai_unshackled',   array( $this, 'ajax_unshackled' ) ); // TS/HTML engine toggle
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
@@ -2453,6 +2454,7 @@ class PressGo_AI_Builder {
 
 	/** Set by glm_compose when the backend rejects a call for billing reasons. */
 	private static $nova_last_error = '';
+	private static $nova_wall_msg   = '';
 
 	/**
 	 * Nova model backend — where OpenAI-shape chat.completions calls go.
@@ -4296,7 +4298,22 @@ class PressGo_AI_Builder {
 			/* own-key (dev) mode: no credits involved — the daily meter is the gauge */
 			.pg-credits-pill{display:none!important}
 			<?php endif; ?>
-			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px}
+			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px;cursor:pointer;transition:background .12s}
+			.pg-usage:hover{background:#f4f5f7}
+			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:440px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
+			.pg-tiers-pop[hidden]{display:none}
+			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
+			.pg-tiers-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:11px;padding:14px}
+			.pg-tier-card.is-pop{border-color:#5b4fff;box-shadow:0 4px 16px rgba(91,79,255,.14)}
+			.pg-tier-flag{position:absolute;top:-8px;right:10px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:#5b4fff;padding:2px 7px;border-radius:999px}
+			.pg-tier-name{font-size:13.5px;font-weight:800;color:#1d2230}
+			.pg-tier-price{font-size:19px;font-weight:800;color:#1d2230;margin-top:2px}
+			.pg-tier-cap{font-size:12px;font-weight:700;color:#5b4fff;margin-top:6px}
+			.pg-tier-blurb{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.45}
+			.pg-tier-cta{margin-top:10px;width:100%;border:none;border-radius:8px;background:#5b4fff;color:#fff;font-size:12.5px;font-weight:700;padding:8px 0;cursor:pointer}
+			.pg-tier-cta:hover{background:#4a3fe6}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4322,13 +4339,35 @@ class PressGo_AI_Builder {
 					?>
 					<button type="button" class="pg-builder-ghost" id="pg-history" title="Every AI change saves the previous design first — restore any earlier version of this page">History</button>
 					<button type="button" class="pg-builder-ghost" id="pg-clear-chat" title="Clear chat history for this page (does not change the page itself)">Clear chat</button>
-					<?php if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
-					<div class="pg-usage" id="pg-usage" title="Daily usage, resets every day at 00:00 UTC"><span class="pg-usage-label">Usage</span><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div><span class="pg-usage-reset" id="pg-usage-reset"></span></div>
+					<div class="pg-usage" id="pg-usage" title="Daily builds included with your account, reset every day at 00:00 UTC"><span class="pg-usage-label">Usage</span><div class="pg-usage-track"><span class="pg-usage-fill" id="pg-usage-fill"></span></div><span class="pg-usage-reset" id="pg-usage-reset"></span></div>
+					<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
+						<button type="button" class="pg-builder-ghost pg-usage-upgrade" id="pg-usage-upgrade" hidden>Upgrade</button>
 					<?php endif; ?>
-						<span class="pg-credits-pill" id="pg-credits" title="Your PressGo credits. New sections cost 1 each; edits, reorders and palette changes are free.">&mdash; credits</span>
+						<span class="pg-credits-pill" id="pg-credits" title="Extra credits — only spent after your daily included builds run out. Edits, reorders and palette changes are always free.">&mdash; credits</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
 				</div>
 			</header>
+			<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
+				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
+					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
+					<div class="pg-tiers-grid">
+						<div class="pg-tier-card">
+							<div class="pg-tier-name">Free</div>
+							<div class="pg-tier-price">$0</div>
+							<div class="pg-tier-cap">1 full page a day</div>
+							<div class="pg-tier-blurb">8 section builds daily + 10 bonus credits a month. Edits are always free.</div>
+						</div>
+						<div class="pg-tier-card is-pop">
+							<span class="pg-tier-flag">8&times; more</span>
+							<div class="pg-tier-name">Plus</div>
+							<div class="pg-tier-price">$12/mo</div>
+							<div class="pg-tier-cap">~8 pages a day</div>
+							<div class="pg-tier-blurb">64 section builds daily + 100 bonus credits a month.</div>
+							<button type="button" class="pg-tier-cta is-pop" id="pg-plus-btn">Upgrade to Plus</button>
+						</div>
+					</div>
+				</div>
+			<?php endif; ?>
 				<div class="pg-builder-shell">
 				<aside class="pg-chat" id="pg-chat">
 					<div class="pg-chat-log" id="pg-chat-log"></div>
@@ -4444,7 +4483,7 @@ class PressGo_AI_Builder {
 					$pg_uprev = array();
 					if ( isset( $_GET['pg_used'] ) ) { $pg_uprev['used'] = sanitize_text_field( wp_unslash( $_GET['pg_used'] ) ); }
 					if ( isset( $_GET['pg_tier'] ) ) { $pg_uprev['tier'] = sanitize_key( wp_unslash( $_GET['pg_tier'] ) ); }
-					echo wp_json_encode( $this->usage_state( $pg_uprev ) );
+					echo ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) ? 'null' : wp_json_encode( $this->usage_state( $pg_uprev ) );
 				?>,
 				firstRun: <?php
 					// Starter prompts for the post-key-save flow AND any site
@@ -5789,7 +5828,8 @@ class PressGo_AI_Builder {
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
 		if ( 'credits' === self::$nova_last_error ) {
-			return array( 'error' => 'You are out of PressGo credits. Top up at pressgo.app/dashboard and keep building.' );
+			$msg = '' !== self::$nova_wall_msg ? self::$nova_wall_msg : 'You are out of PressGo credits. Top up at pressgo.app/dashboard and keep building.';
+			return array( 'error' => $msg );
 		}
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: BOTH models failed. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 200 ) ); // phpcs:ignore
 		return array( 'error' => 'Both models failed to return a valid section. Try rewording.' );
@@ -5836,7 +5876,12 @@ class PressGo_AI_Builder {
 			if ( is_wp_error( $resp ) ) { return null; }
 			$gen  = (string) wp_remote_retrieve_header( $resp, 'x-nova-generation-id' );
 			$code = (int) wp_remote_retrieve_response_code( $resp );
-			if ( 402 === $code ) { self::$nova_last_error = 'credits'; return null; }
+			if ( 402 === $code ) {
+				self::$nova_last_error = 'credits';
+				$err = json_decode( wp_remote_retrieve_body( $resp ), true );
+				if ( ! empty( $err['error'] ) ) { self::$nova_wall_msg = (string) $err['error']; }
+				return null;
+			}
 			if ( 200 !== $code ) { self::nova_refund( $gen ); return null; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
 			$tree = self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
@@ -5874,7 +5919,12 @@ class PressGo_AI_Builder {
 		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
 		curl_close( $ch );
 
-		if ( 402 === (int) $status ) { self::$nova_last_error = 'credits'; return null; }
+		if ( 402 === (int) $status ) {
+			self::$nova_last_error = 'credits';
+			$err = json_decode( trim( $accumulated ), true );
+			if ( ! empty( $err['error'] ) ) { self::$nova_wall_msg = (string) $err['error']; }
+			return null;
+		}
 		if ( ! $ok || $err || 200 !== (int) $status ) { self::nova_refund( $gen_id ); return null; }
 
 		// Parse the SSE stream: extract content deltas from data: lines.
@@ -6183,10 +6233,47 @@ class PressGo_AI_Builder {
 
 	public function ajax_usage() {
 		$this->check_auth();
+		// PressGo-API mode: the daily window lives server-side (per ACCOUNT,
+		// not per site) — proxy it so the bar shows billing truth.
+		if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) {
+			$pg = (string) get_option( 'pressgo_account_key', '' );
+			if ( '' !== $pg ) {
+				$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+				$r = wp_remote_get( $base . '/api/plugin/allowance', array( 'timeout' => 15, 'headers' => array( 'X-PressGo-Key' => $pg ) ) );
+				$j = json_decode( wp_remote_retrieve_body( $r ), true );
+				if ( is_array( $j ) && isset( $j['used'], $j['cap'] ) ) {
+					wp_send_json_success( array(
+						'used'        => (int) $j['used'],
+						'cap'         => (int) $j['cap'],
+						'tier'        => (string) ( $j['tier'] ?? 'free' ),
+						'resets_in'   => (int) ( $j['resets_in'] ?? 0 ),
+						'builds_left' => max( 0, (int) $j['cap'] - (int) $j['used'] ),
+						'credits'     => (int) ( $j['credits'] ?? 0 ),
+					) );
+				}
+			}
+			wp_send_json_error( 'allowance unavailable', 502 );
+		}
 		$preview = array();
 		if ( isset( $_GET['used'] ) ) { $preview['used'] = sanitize_text_field( wp_unslash( $_GET['used'] ) ); }
 		if ( isset( $_GET['tier'] ) ) { $preview['tier'] = sanitize_key( wp_unslash( $_GET['tier'] ) ); }
 		wp_send_json_success( $this->usage_state( $preview ) );
+	}
+
+	/** Create a Plus subscription checkout for this site's PressGo account. */
+	public function ajax_subscribe() {
+		$this->check_auth();
+		$pg = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' === $pg ) { wp_send_json_error( 'No PressGo API key configured.', 400 ); }
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$r = wp_remote_post( $base . '/api/plugin/subscribe', array(
+			'timeout' => 20,
+			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
+			'body'    => '{}',
+		) );
+		$j = json_decode( wp_remote_retrieve_body( $r ), true );
+		if ( is_array( $j ) && ! empty( $j['url'] ) ) { wp_send_json_success( array( 'url' => $j['url'], 'already' => ! empty( $j['already'] ) ) ); }
+		wp_send_json_error( 'Could not start checkout — try pressgo.app/dashboard.', 502 );
 	}
 
 	public function ajax_toggle() {
