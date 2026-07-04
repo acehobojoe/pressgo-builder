@@ -1337,6 +1337,13 @@
 		if (d && d.success) {
 			var data = d.data || {};
 			if (data.preview_bust) { refreshUsage(); if (!cfg.usage) refreshCredits(); } // window + overflow both move server-side
+			// Peak-moment review ask (whole page completed / quality pass done).
+			if (data.review_ask) {
+				cfg.review = cfg.review || { url: 'https://wordpress.org/support/plugin/pressgo-builder/reviews/#new-post' };
+				cfg.review.ask = true;
+				cfg.review.builds = data.review_builds || cfg.review.builds || 3;
+				setTimeout(maybeAskReview, 1200); // let the build note land first
+			}
 			// Mid-interview / confirm: render the question + chips and wait. A confirm
 			// step (brand lock) shows the freshly-built hero, so reload the preview
 			// first, then render its swatches + chips.
@@ -1772,7 +1779,7 @@
 		var card = el('pg-msg pg-msg-built');
 		card.style.borderColor = '#F59E0B';
 		var txt = document.createElement('div');
-		txt.innerHTML = '<strong>That’s ' + (r.builds || 5) + ' pages built with PressGo.</strong> If it’s been useful, a quick review genuinely keeps this thing going.';
+		txt.innerHTML = '<strong>That’s ' + (r.builds || 5) + ' builds with PressGo.</strong> If it’s been useful, a quick review genuinely keeps this thing going.';
 		card.appendChild(txt);
 		var rowEl = document.createElement('div');
 		rowEl.style.cssText = 'margin-top:10px;display:flex;gap:8px;';

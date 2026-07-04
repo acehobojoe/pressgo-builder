@@ -4851,7 +4851,12 @@ class PressGo_AI_Builder {
 			// gold-standard pages were made. Checked before reflow so "make it
 			// perfect" runs the deep loop, not just a reorder.
 			if ( '' === $discovery_stage && ! $whole_page && preg_match( '/\b(make (it|this|the page) perfect|quality pass|full review|review (the|this) (whole )?page|deep clean|perfect (it|this|the page))\b/i', $message ) ) {
-				wp_send_json_success( $this->vision_qa_loop( $post_id, $this->freeform_keepalive() ) );
+				$vqa_res = $this->vision_qa_loop( $post_id, $this->freeform_keepalive() );
+				if ( is_array( $vqa_res ) && empty( $vqa_res['error'] ) ) {
+					$vqa_res['review_ask']    = $this->review_moment();
+					$vqa_res['review_builds'] = (int) get_option( 'pressgo_build_count', 0 );
+				}
+				wp_send_json_success( $vqa_res );
 			}
 			// Polish/improve -> reflow the whole page. Checked BEFORE delete so
 			// "clean it up" / "tidy it" reorganize rather than remove.
@@ -5328,6 +5333,7 @@ class PressGo_AI_Builder {
 		$headline = $this->tree_headline( $tree );
 		if ( '' !== $headline && ! $was_first ) { $built_phrase .= ' — "' . $headline . '"'; }
 		$note = $built_phrase . ' (' . $sections_now . ' on the page now).';
+		update_option( 'pressgo_build_count', (int) get_option( 'pressgo_build_count', 0 ) + 1, false ); // review-ask + first-run gates count Nova builds too
 		$disclosure = $this->unsupported_widget_disclosure( $message );
 		if ( '' !== $disclosure ) { $note .= ' ' . $disclosure; }
 		$note .= $auto_note;
@@ -5376,7 +5382,20 @@ class PressGo_AI_Builder {
 			'suggest'      => $suggest,
 			'usage'        => $usage,
 			'extend'       => $extend,
+			'review_ask'   => ( null !== $extend ) ? $this->review_moment() : false,
+			'review_builds' => (int) get_option( 'pressgo_build_count', 0 ),
 		) ) );
+	}
+
+	/**
+	 * Should this turn surface the review ask? Only at PEAK moments (a whole
+	 * page just completed, a quality pass just finished) and only for users
+	 * who've genuinely gotten value (3+ successful builds), max 3 shows ever.
+	 */
+	private function review_moment() {
+		return (int) get_option( 'pressgo_build_count', 0 ) >= 3
+			&& ! get_option( 'pressgo_review_ask_done' )
+			&& (int) get_option( 'pressgo_review_ask_shown', 0 ) < 3;
 	}
 
 	/**
