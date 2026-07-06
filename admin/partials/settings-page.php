@@ -7,6 +7,73 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 <div class="wrap pressgo-settings">
 	<h1>PressGo Settings</h1>
 
+	<?php
+	// ── Account & plan (PressGo API mode with a key) ──
+	$pg_acct_key = (string) get_option( 'pressgo_account_key', '' );
+	if ( 'pressgo' === $api_mode && '' !== $pg_acct_key ) :
+		$pg_allow = get_transient( 'pressgo_settings_allowance' );
+		if ( ! is_array( $pg_allow ) ) {
+			$pg_base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+			$pg_resp = wp_remote_get( $pg_base . '/api/plugin/allowance', array( 'timeout' => 8, 'headers' => array( 'X-PressGo-Key' => $pg_acct_key ) ) );
+			$pg_allow = json_decode( wp_remote_retrieve_body( $pg_resp ), true );
+			if ( is_array( $pg_allow ) && isset( $pg_allow['cap'] ) ) { set_transient( 'pressgo_settings_allowance', $pg_allow, MINUTE_IN_SECONDS ); }
+		}
+		if ( is_array( $pg_allow ) && isset( $pg_allow['cap'] ) ) :
+			$pg_tier  = (string) ( $pg_allow['tier'] ?? 'free' );
+			$pg_paid  = 'free' !== $pg_tier;
+			$pg_nonce = wp_create_nonce( 'pressgo_ai_admin' );
+			?>
+	<div class="pressgo-settings-info" id="pressgo-account-panel" style="margin-top:16px">
+		<h3>Account &amp; plan</h3>
+		<ul>
+			<li><strong>Connected as:</strong> <?php echo esc_html( (string) ( $pg_allow['account'] ?? '' ) ); ?>
+				<span style="display:inline-block;margin-left:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 8px;border-radius:999px"><?php echo esc_html( ucfirst( $pg_tier ) ); ?> plan</span></li>
+			<li><strong>Today's builds:</strong> <?php echo (int) $pg_allow['used']; ?> of <?php echo (int) $pg_allow['cap']; ?> used (resets at midnight UTC). Edits, reorders and palette changes are always free.</li>
+			<li><strong>Bonus credits:</strong> <?php echo (int) ( $pg_allow['credits'] ?? 0 ); ?> — used automatically after the daily builds run out.</li>
+			<?php if ( ! empty( $pg_allow['plan_ends'] ) ) : ?>
+				<li style="color:#b45309"><strong>Plan canceled:</strong> stays active until <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $pg_allow['plan_ends'] ) ) ); ?>, then drops to Free.</li>
+			<?php endif; ?>
+		</ul>
+		<p>
+			<?php if ( 'free' === $pg_tier ) : ?>
+				<button type="button" class="button button-primary pressgo-plan-btn" data-plan="plus">Upgrade to Plus — $12/mo</button>
+				<button type="button" class="button pressgo-plan-btn" data-plan="agency">Go Agency — $49/mo</button>
+			<?php elseif ( 'agency' !== $pg_tier ) : ?>
+				<button type="button" class="button pressgo-plan-btn" data-plan="agency">Upgrade to Agency — $49/mo</button>
+			<?php endif; ?>
+			<?php if ( $pg_paid ) : ?>
+				<button type="button" class="button" id="pressgo-manage-plan-btn">Manage or cancel plan</button>
+			<?php endif; ?>
+			<a class="button button-secondary" href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>
+		</p>
+	</div>
+	<script>
+	(function () {
+		function post(action, extra, btn) {
+			var label = btn.textContent;
+			btn.disabled = true; btn.textContent = 'Opening…';
+			var fd = new FormData();
+			fd.append('action', action);
+			fd.append('nonce', '<?php echo esc_js( $pg_nonce ); ?>');
+			Object.keys(extra || {}).forEach(function (k) { fd.append(k, extra[k]); });
+			fetch(ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					btn.disabled = false; btn.textContent = label;
+					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
+					else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open — try pressgo.app/dashboard.');
+				})
+				.catch(function () { btn.disabled = false; btn.textContent = label; });
+		}
+		document.querySelectorAll('.pressgo-plan-btn').forEach(function (b) {
+			b.addEventListener('click', function () { post('pressgo_ai_subscribe', { plan: b.getAttribute('data-plan') }, b); });
+		});
+		var m = document.getElementById('pressgo-manage-plan-btn');
+		if (m) m.addEventListener('click', function () { post('pressgo_ai_billing', {}, m); });
+	})();
+	</script>
+	<?php endif; endif; ?>
+
 	<form method="post" action="options.php">
 		<?php
 		settings_fields( 'pressgo_settings' );

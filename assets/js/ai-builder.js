@@ -363,10 +363,16 @@
 				var cardRank = rank[cardPlan] != null ? rank[cardPlan] : 0;
 				var btn = card.querySelector('.pg-tier-cta');
 				if (cardRank === myRank || (cardPlan === 'plus' && u.tier === 'pro')) {
+					var curLabel = 'Current plan';
+					if (u.plan_ends) {
+						var endD = new Date(u.plan_ends);
+						if (!isNaN(endD)) curLabel = 'Ends ' + endD.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+					}
 					if (btn) {
 						var cur = document.createElement('div');
 						cur.className = 'pg-tier-cur';
-						cur.textContent = 'Current plan';
+						cur.textContent = curLabel;
+						if (u.plan_ends) { cur.style.color = '#b45309'; cur.style.borderColor = '#fde68a'; cur.style.background = '#fffbeb'; cur.title = 'Your plan is canceled and stays active until this date, then drops to Free.'; }
 						btn.replaceWith(cur);
 					} else if (!card.querySelector('.pg-tier-cur') && cardPlan === 'free' && myRank === 0) {
 						var cur2 = document.createElement('div');

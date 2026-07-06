@@ -6390,6 +6390,7 @@ class PressGo_AI_Builder {
 						'builds_left' => max( 0, (int) $j['cap'] - (int) $j['used'] ),
 						'credits'     => (int) ( $j['credits'] ?? 0 ),
 						'account'     => sanitize_email( (string) ( $j['account'] ?? '' ) ),
+						'plan_ends'   => isset( $j['plan_ends'] ) && $j['plan_ends'] ? sanitize_text_field( (string) $j['plan_ends'] ) : '',
 					) );
 				}
 			}
