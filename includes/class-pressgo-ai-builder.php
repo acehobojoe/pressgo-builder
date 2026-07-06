@@ -103,6 +103,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 		add_action( 'wp_ajax_pressgo_ai_subscribe',    array( $this, 'ajax_subscribe' ) );
+		add_action( 'wp_ajax_pressgo_ai_billing',      array( $this, 'ajax_billing_portal' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 		add_action( 'wp_ajax_pressgo_ai_unshackled',   array( $this, 'ajax_unshackled' ) ); // TS/HTML engine toggle
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
@@ -4408,6 +4409,8 @@ class PressGo_AI_Builder {
 			.pg-tiers-acct{margin:-4px 0 10px;font-size:11.5px;color:#334155}
 			.pg-tiers-acct .pg-acct-plan{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 7px;border-radius:999px}
 			.pg-tier-card.is-dim{opacity:.55}
+			.pg-tiers-manage{display:block;margin:8px auto 0;border:none;background:none;font-size:11px;color:#94a3b8;text-decoration:underline;cursor:pointer}
+			.pg-tiers-manage:hover{color:#475569}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4469,6 +4472,7 @@ class PressGo_AI_Builder {
 						</div>
 					</div>
 					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
+					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Manage or cancel your plan</button>
 				</div>
 			<?php endif; ?>
 				<div class="pg-builder-shell">
@@ -6412,6 +6416,22 @@ class PressGo_AI_Builder {
 		$j = json_decode( wp_remote_retrieve_body( $r ), true );
 		if ( is_array( $j ) && ! empty( $j['url'] ) ) { wp_send_json_success( array( 'url' => $j['url'], 'already' => ! empty( $j['already'] ) ) ); }
 		wp_send_json_error( 'Could not start checkout — try pressgo.app/dashboard.', 502 );
+	}
+
+	/** Open the Stripe billing portal for this site's PressGo account (cancel / card / invoices). */
+	public function ajax_billing_portal() {
+		$this->check_auth();
+		$pg = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' === $pg ) { wp_send_json_error( 'No PressGo API key configured.', 400 ); }
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$r = wp_remote_post( $base . '/api/plugin/billing-portal', array(
+			'timeout' => 20,
+			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
+			'body'    => '{}',
+		) );
+		$j = json_decode( wp_remote_retrieve_body( $r ), true );
+		if ( is_array( $j ) && ! empty( $j['url'] ) ) { wp_send_json_success( array( 'url' => $j['url'] ) ); }
+		wp_send_json_error( is_array( $j ) && ! empty( $j['error'] ) ? $j['error'] : 'Could not open billing — try pressgo.app/dashboard.', 502 );
 	}
 
 	public function ajax_toggle() {

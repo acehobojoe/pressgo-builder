@@ -377,6 +377,8 @@
 				}
 				card.classList.toggle('is-dim', cardRank < myRank);
 			});
+			var manageEl = document.getElementById('pg-manage-plan');
+			if (manageEl) manageEl.hidden = myRank === 0; // paid plans get the cancel door
 		}
 		var credLine = document.getElementById('pg-tiers-credits');
 		if (credLine && typeof u.credits === 'number') {
@@ -430,6 +432,21 @@
 		}
 		wireSubscribe(document.getElementById('pg-plus-btn'));
 		wireSubscribe(document.getElementById('pg-agency-btn'));
+		var manageBtn = document.getElementById('pg-manage-plan');
+		if (manageBtn) manageBtn.addEventListener('click', function () {
+			manageBtn.disabled = true; manageBtn.textContent = 'Opening…';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_billing');
+			fd.append('nonce', cfg.nonce);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					manageBtn.disabled = false; manageBtn.textContent = 'Manage or cancel your plan';
+					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
+					else if (j && j.data) alert(typeof j.data === 'string' ? j.data : 'Could not open billing.');
+				})
+				.catch(function () { manageBtn.disabled = false; manageBtn.textContent = 'Manage or cancel your plan'; });
+		});
 	}
 
 	function typingNode() {
