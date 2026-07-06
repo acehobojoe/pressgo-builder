@@ -108,3 +108,7 @@ Replicate its LAYOUT and STRUCTURE faithfully: the band background, the content 
     { "type": "button", "settings": { "text": "Book a Free Consult", "url": "#", "bg": "#e2b714", "color": "#181a1c", "align": "left", "icon": "fas fa-arrow-right" } }
   ]
 }
+
+## Inline links and centering (hard rules)
+- NEVER place a bare tel:/mailto:/url anchor inside a paragraph text block on a dark or colored background — theme link colors clash. Use an icon-list block (icon + colored text) or a button block instead; both have full color control. If a paragraph must contain a link, set the block's color so the link matches.
+- To center a button or widget that sits inside a column/container, set the CONTAINER's alignment (align: center on the parent), not just the widget's own align — a widget-level align is overridden by its flex parent.

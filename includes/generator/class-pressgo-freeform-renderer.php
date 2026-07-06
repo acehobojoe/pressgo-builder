@@ -693,9 +693,12 @@ class PressGo_Freeform_Renderer {
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : 1.7;
 		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : '400'; // honor bold/light body copy
 		// Inline links should take the widget's text color, not the theme's link
-		// color (often a clashing magenta on dark footers). Inject it on each <a>.
-		if ( $color && false !== strpos( $html, '<a' ) ) {
-			$html = preg_replace( '/<a(\s)/i', '<a style="color:' . esc_attr( $color ) . '"$1', $html );
+		// color (often a clashing magenta on dark footers). Inject it on each <a>
+		// — and when the block sets no color, force 'inherit' so tel:/mailto:
+		// anchors follow the surrounding copy instead of the kit default.
+		if ( false !== strpos( $html, '<a' ) ) {
+			$link_color = $color ? esc_attr( $color ) : 'inherit';
+			$html = preg_replace( '/<a(\s)(?![^>]*style=)/i', '<a style="color:' . $link_color . '"$1', $html );
 		}
 		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh, null, $weight );
 		// text_w doesn't expose transform/letter-spacing; plumb them directly so
