@@ -2732,7 +2732,7 @@ class PressGo_AI_Builder {
 		if ( preg_match( '/\badd\b.{0,30}\bsection\b/', $m ) ) { return false; } // an explicit add wins
 		// Element-scoped issues route to EDIT, not a brand change (same guard as
 		// is_palette_intent — "the background image for the top section" is an edit).
-		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|footer|nav|menu|gallery|testimonials?)\b/', $m )
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|footer|nav|menu|gallery|testimonials?|links?|phone|number|text|heading)\b/', $m )
 			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $m ) ) {
 			return false;
 		}
@@ -3304,7 +3304,7 @@ class PressGo_AI_Builder {
 		// placeholder text has low contrast") is an EDIT of that element — hijacking
 		// it into a global repaint was the #1 destroyer in chat-campaign testing.
 		$me = strtolower( (string) $message );
-		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section|footer|nav|menu|gallery|testimonials?)\b/', $me )
+		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section|footer|nav|menu|gallery|testimonials?|links?|phone|number|text|heading)\b/', $me )
 			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $me ) ) {
 			return false;
 		}
