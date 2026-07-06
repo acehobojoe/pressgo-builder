@@ -7418,7 +7418,8 @@ class PressGo_AI_Builder {
 			. "11. SCREENSHOT-AS-PHOTO: is any placed image actually a screenshot of a webpage or app (UI cards, buttons, browser chrome visible inside the image)? Automatic FAIL — remove it.\n"
 			. ( $png_mobile ? "12. On the mobile shot: any overflow, broken stacking, cramped/overlapping elements, or text too small to read?\n" : "" )
 			. "\nIf any item FAILS, call set_page_config again with the FULL corrected config, fixing ONLY the real failures and leaving everything else exactly as it is. "
-			. "If every item PASSES, reply with one short sentence confirming it looks good and ask if they want any other changes — do NOT call the tool.";
+			. "If every item PASSES, reply with one short sentence confirming it looks good and ask if they want any other changes — do NOT call the tool. "
+			. "BINARY CONTRACT: your reply is EITHER the corrective tool call (with a one-line summary) OR that single all-clear sentence. Describing problems in prose WITHOUT calling the tool in the same response is a review failure — the user sees complaints about their page and nothing gets fixed.";
 
 		$content = array(
 			array( 'type' => 'image', 'source' => array(
