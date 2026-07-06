@@ -356,16 +356,27 @@
 			acctEl.appendChild(planTag);
 		}
 		if (u.tier) {
-			var paid = u.tier !== 'free';
-			var plusBtnEl = document.getElementById('pg-plus-btn');
-			if (plusBtnEl && paid) {
-				var cur = document.createElement('div');
-				cur.className = 'pg-tier-cur';
-				cur.textContent = 'Current plan';
-				plusBtnEl.replaceWith(cur);
-			}
-			var freeCard = document.getElementById('pg-tier-free');
-			if (freeCard) freeCard.classList.toggle('is-dim', paid);
+			var rank = { free: 0, plus: 1, pro: 1, agency: 2 };
+			var myRank = rank[u.tier] != null ? rank[u.tier] : 0;
+			document.querySelectorAll('.pg-tier-card[data-plan]').forEach(function (card) {
+				var cardPlan = card.getAttribute('data-plan');
+				var cardRank = rank[cardPlan] != null ? rank[cardPlan] : 0;
+				var btn = card.querySelector('.pg-tier-cta');
+				if (cardRank === myRank || (cardPlan === 'plus' && u.tier === 'pro')) {
+					if (btn) {
+						var cur = document.createElement('div');
+						cur.className = 'pg-tier-cur';
+						cur.textContent = 'Current plan';
+						btn.replaceWith(cur);
+					} else if (!card.querySelector('.pg-tier-cur') && cardPlan === 'free' && myRank === 0) {
+						var cur2 = document.createElement('div');
+						cur2.className = 'pg-tier-cur';
+						cur2.textContent = 'Current plan';
+						card.appendChild(cur2);
+					}
+				}
+				card.classList.toggle('is-dim', cardRank < myRank);
+			});
 		}
 		var credLine = document.getElementById('pg-tiers-credits');
 		if (credLine && typeof u.credits === 'number') {
@@ -399,20 +410,26 @@
 				if (!tiersPop.hidden && !tiersPop.contains(e.target) && !usageEl.contains(e.target)) tiersPop.hidden = true;
 			});
 		}
-		var plusBtn = document.getElementById('pg-plus-btn');
-		if (plusBtn) plusBtn.addEventListener('click', function () {
-			plusBtn.disabled = true; plusBtn.textContent = 'Opening checkout…';
-			var fd = new FormData();
-			fd.append('action', 'pressgo_ai_subscribe');
-			fd.append('nonce', cfg.nonce);
-			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
-				.then(function (r) { return r.json(); })
-				.then(function (j) {
-					plusBtn.disabled = false; plusBtn.textContent = 'Upgrade to Plus';
-					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
-				})
-				.catch(function () { plusBtn.disabled = false; plusBtn.textContent = 'Upgrade to Plus'; });
-		});
+		function wireSubscribe(btn) {
+			if (!btn) return;
+			var label = btn.textContent;
+			btn.addEventListener('click', function () {
+				btn.disabled = true; btn.textContent = 'Opening checkout…';
+				var fd = new FormData();
+				fd.append('action', 'pressgo_ai_subscribe');
+				fd.append('nonce', cfg.nonce);
+				fd.append('plan', btn.getAttribute('data-plan') || 'plus');
+				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						btn.disabled = false; btn.textContent = label;
+						if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
+					})
+					.catch(function () { btn.disabled = false; btn.textContent = label; });
+			});
+		}
+		wireSubscribe(document.getElementById('pg-plus-btn'));
+		wireSubscribe(document.getElementById('pg-agency-btn'));
 	}
 
 	function typingNode() {

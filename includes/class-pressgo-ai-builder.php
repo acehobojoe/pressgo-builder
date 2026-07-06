@@ -4388,11 +4388,12 @@ class PressGo_AI_Builder {
 			.pg-credits-pill{display:none!important}
 			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px;cursor:pointer;transition:background .12s}
 			.pg-usage:hover{background:#f4f5f7}
-			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:440px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
+			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:640px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
 			.pg-tiers-pop[hidden]{display:none}
 			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
 			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
-			.pg-tiers-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+			.pg-tiers-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+			@media(max-width:760px){.pg-tiers-grid{grid-template-columns:1fr}.pg-tiers-pop{width:340px}}
 			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:11px;padding:14px}
 			.pg-tier-card.is-pop{border-color:#5b4fff;box-shadow:0 4px 16px rgba(91,79,255,.14)}
 			.pg-tier-flag{position:absolute;top:-8px;right:10px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:#5b4fff;padding:2px 7px;border-radius:999px}
@@ -4445,19 +4446,26 @@ class PressGo_AI_Builder {
 					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
 					<div class="pg-tiers-acct" id="pg-tiers-acct"></div>
 					<div class="pg-tiers-grid">
-						<div class="pg-tier-card" id="pg-tier-free">
+						<div class="pg-tier-card" id="pg-tier-free" data-plan="free">
 							<div class="pg-tier-name">Free</div>
 							<div class="pg-tier-price">$0</div>
 							<div class="pg-tier-cap">1 full page a day</div>
 							<div class="pg-tier-blurb">8 section builds daily + 10 bonus credits a month. Edits are always free.</div>
 						</div>
-						<div class="pg-tier-card is-pop">
-							<span class="pg-tier-flag">8&times; more</span>
+						<div class="pg-tier-card is-pop" data-plan="plus">
+							<span class="pg-tier-flag">Popular</span>
 							<div class="pg-tier-name">Plus</div>
 							<div class="pg-tier-price">$12/mo</div>
 							<div class="pg-tier-cap">~8 pages a day</div>
 							<div class="pg-tier-blurb">64 section builds daily + 100 bonus credits a month.</div>
-							<button type="button" class="pg-tier-cta is-pop" id="pg-plus-btn">Upgrade to Plus</button>
+							<button type="button" class="pg-tier-cta is-pop" id="pg-plus-btn" data-plan="plus">Upgrade to Plus</button>
+						</div>
+						<div class="pg-tier-card" data-plan="agency">
+							<div class="pg-tier-name">Agency</div>
+							<div class="pg-tier-price">$49/mo</div>
+							<div class="pg-tier-cap">~40 pages a day</div>
+							<div class="pg-tier-blurb">400 builds daily + 400 bonus credits a month. Built for client work.</div>
+							<button type="button" class="pg-tier-cta" id="pg-agency-btn" data-plan="agency">Go Agency</button>
 						</div>
 					</div>
 					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
@@ -4819,6 +4827,16 @@ class PressGo_AI_Builder {
 			);
 			if ( count( $tlog ) > 60 ) { $tlog = array_slice( $tlog, -60 ); }
 			update_post_meta( $post_id, '_pressgo_chat_log', $tlog );
+			// "try again" — re-run the previous real request verbatim (the renderer-
+			// rejection reply explicitly promises this phrasing works).
+			if ( preg_match( '/^\s*(try (it |that )?again|retry|run it again|one more try|take another (run|shot|try)( at it)?)\s*[.!]*\s*$/i', (string) $message ) ) {
+				for ( $ti = count( $tlog ) - 2; $ti >= 0; $ti-- ) {
+					$pm = strtolower( trim( (string) ( $tlog[ $ti ]['msg'] ?? '' ) ) );
+					if ( '' === $pm || preg_match( '/^(try |retry|run it again|one more|take another|undo|put it back|revert)/', $pm ) ) { continue; }
+					$message = (string) $tlog[ $ti ]['msg'];
+					break;
+				}
+			}
 		}
 		// Classify attachments IMMEDIATELY so photos survive every path (they were
 		// silently lost when the first message went to the interview): real PHOTOS
@@ -4890,7 +4908,7 @@ class PressGo_AI_Builder {
 		// are build instructions; they go straight to compose.
 		if ( ! $page_empty && ! $whole_page ) {
 			if ( preg_match( '/^\s*(undo|put it back|revert|go back)\b/i', $message ) ) {
-				wp_send_json_success( $this->cohesion_undo( $post_id ) );
+				wp_send_json_success( $this->turn_out( $post_id, $this->cohesion_undo( $post_id ) ) );
 			}
 			// Decline / redirect: wave off the last idea and reopen the floor instead
 			// of forcing a build. Runs before any build/delete verb can grab it, and
@@ -6385,10 +6403,11 @@ class PressGo_AI_Builder {
 		$pg = (string) get_option( 'pressgo_account_key', '' );
 		if ( '' === $pg ) { wp_send_json_error( 'No PressGo API key configured.', 400 ); }
 		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$plan = isset( $_POST['plan'] ) && 'agency' === $_POST['plan'] ? 'agency' : 'plus';
 		$r = wp_remote_post( $base . '/api/plugin/subscribe', array(
 			'timeout' => 20,
 			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
-			'body'    => '{}',
+			'body'    => wp_json_encode( array( 'plan' => $plan ) ),
 		) );
 		$j = json_decode( wp_remote_retrieve_body( $r ), true );
 		if ( is_array( $j ) && ! empty( $j['url'] ) ) { wp_send_json_success( array( 'url' => $j['url'], 'already' => ! empty( $j['already'] ) ) ); }
