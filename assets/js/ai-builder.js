@@ -266,15 +266,15 @@
 	// One dropdown replaces the old vision + Pro-mode toggles. Modes are
 	// mutually exclusive: basic = recipe build, eyes = recipe + A(eyes)
 	// self-review pass, freeform = Nova "build anything" composer.
-	var MODE_NAMES = { basic: 'Ada', eyes: 'Iris', freeform: 'Nova' };
+	var MODE_NAMES = { basic: 'Ada', freeform: 'Nova' }; // Iris retired: the self-review runs automatically on first builds and on request
 	var modeWrap    = document.getElementById('pg-mode');
 	var modeBtn     = document.getElementById('pg-mode-btn');
 	var modeMenu    = document.getElementById('pg-mode-menu');
 	var modeCurrent = document.getElementById('pg-mode-current');
 	try {
 		var storedMode = localStorage.getItem('pgMode');
+		if (storedMode === 'eyes') storedMode = 'basic'; // Iris users land on Ada; the review still runs on first builds + on request
 		if (storedMode && MODE_NAMES[storedMode]) pgMode = storedMode;
-		else if (cfg.firstRun || localStorage.getItem('pgVision') === '1') pgMode = 'eyes'; // default/migrate to self-review
 	} catch (e) {}
 
 	function applyMode(m) {
@@ -283,7 +283,6 @@
 		try { localStorage.setItem('pgMode', m); } catch (e) {}
 		if (modeCurrent) modeCurrent.textContent = MODE_NAMES[m];
 		if (modeWrap) {
-			modeWrap.classList.toggle('is-eyes', m === 'eyes');
 			modeWrap.classList.toggle('is-freeform', m === 'freeform');
 		}
 		if (modeMenu) modeMenu.querySelectorAll('.pg-mode-opt').forEach(function (o) {
@@ -972,7 +971,6 @@
 		// Visual editor scoping: with a section selected, the server narrows
 		// the AI's patch to that key.
 		if (selectedSectionKey) fd.append('selected_section', selectedSectionKey);
-		if (pgMode === 'eyes') fd.append('vision', '1');
 		if (pendingImages.length) {
 			fd.append('images', JSON.stringify(pendingImages.map(function (im) {
 				return { base64: im.base64, mediaType: im.mediaType };

@@ -4504,10 +4504,6 @@ class PressGo_AI_Builder {
 												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
-											<button type="button" class="pg-mode-opt" role="option" data-mode="eyes">
-												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Iris</span><span class="pg-mode-opt-desc">Reviews her own work for accuracy &middot; ~3&times; tokens</span></span>
-												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
-											</button>
 											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
 												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
@@ -6519,7 +6515,9 @@ class PressGo_AI_Builder {
 		if ( '' !== $selected && preg_match( '/^[a-z_]+(#[0-9]+)?$/', $selected ) && '' !== $user_msg ) {
 			$user_msg .= "\n\n[The user has the '" . $selected . "' section selected in the preview. Scope this request to that section — patch only that key — unless the message clearly refers to the whole page or another section.]";
 		}
-		$vision   = ! empty( $_POST['vision'] );
+		$vision   = ! empty( $_POST['vision'] )
+			|| 0 === (int) get_option( 'pressgo_build_count', 0 ) // first impression gets the self-review
+			|| preg_match( '/\b(review|check|look over|inspect|proofread)\b.{0,16}\b(page|site|design|it|this|everything)\b|\bdoes (it|this|the page) look (ok|okay|good|right)\b/i', (string) ( $_POST['message'] ?? '' ) );
 
 		// Optional inline images (drag/drop, paste, or file picker). Supports a
 		// JSON `images` array [{base64, mediaType}] for multi-select, and falls

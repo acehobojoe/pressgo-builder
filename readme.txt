@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.0
+Stable tag: 2.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 
 **Two ways to use it:**
 
-**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. PressGo Agency = $49/mo for ~40 pages a day + 400 bonus credits, built for client work. $15 one-time pack = 75 extra credits anytime.
+**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. The AI **screenshots and reviews its own work** automatically on your first build — and any time you say "review my page" — then applies a correction pass if it spots a real issue. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. PressGo Agency = $49/mo for ~40 pages a day + 400 bonus credits, built for client work. $15 one-time pack = 75 extra credits anytime.
 
 **2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
 
@@ -65,7 +65,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 2. Enter the key in PressGo &rarr; Settings
 3. Go to PressGo &rarr; AI Builder and click "+ New page" (or AI-enable an existing page)
 4. Describe the page in chat, drop in reference screenshots if you have them, and watch it build in the live preview
-5. Keep chatting to iterate — change colors, swap sections, rewrite copy. Toggle on **A(eyes)** to have the AI screenshot its own work and self-correct
+5. Keep chatting to iterate — change colors, swap sections, rewrite copy. Say **"review my page"** anytime and the AI screenshots its own work and self-corrects
 6. Click "Edit in Elementor" anytime to drop into the native editor for hands-on tweaks
 
 == External Services ==
@@ -189,6 +189,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.1 =
+* Simpler mode picker: two honest choices — Ada (fast, reliable, a full page in ~15 seconds) and Nova (custom freeform, builds anything). The old middle mode (Iris) is retired: its self-review now runs automatically on your first build and whenever you say "review my page", in every mode — no 3x-cost toggle to reason about
+* The self-review is stricter with itself: it either fixes what it finds or gives one clear all-clear — it will never list problems and walk away
+* Better with menus and headers: asking for a menu builds a real top bar on the page and tells you plainly how to get a site-wide menu (theme or Theme Builder) instead of silently skipping it
+* Better at copying screenshots: the AI now enumerates what it sees, says up front what it can't reproduce, and fixes the worst-matching section when you say it doesn't match
 
 = 2.5.0 =
 * NEW BILLING MODEL: every account gets a daily allowance of included builds that resets at midnight UTC — Free covers a full page every day (8 section builds/day + 10 bonus credits a month), Plus ($12/mo) covers ~8 pages a day (64/day + 100 bonus credits), and the new Agency plan ($49/mo) covers ~40 pages a day (400/day + 400 bonus credits) for client work
