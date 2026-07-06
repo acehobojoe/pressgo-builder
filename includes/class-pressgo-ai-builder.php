@@ -2454,6 +2454,8 @@ class PressGo_AI_Builder {
 
 	/** Set by glm_compose when the backend rejects a call for billing reasons. */
 	private static $nova_last_error = '';
+	/** Generation id of the most recent charged compose (for refunds after downstream rejection). */
+	private static $nova_last_gen = '';
 	private static $nova_wall_msg   = '';
 
 	/**
@@ -4294,10 +4296,8 @@ class PressGo_AI_Builder {
 			.pg-mode-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:5px}
 			.pg-mode-check{color:#5b4fff;opacity:0;flex-shrink:0}
 			.pg-mode-opt.is-active .pg-mode-check{opacity:1}
-			<?php if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
-			/* own-key (dev) mode: no credits involved — the daily meter is the gauge */
+			/* one meter: the usage bar. Bonus credits surface inside the plans popup. */
 			.pg-credits-pill{display:none!important}
-			<?php endif; ?>
 			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px;cursor:pointer;transition:background .12s}
 			.pg-usage:hover{background:#f4f5f7}
 			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:440px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
@@ -4314,6 +4314,9 @@ class PressGo_AI_Builder {
 			.pg-tier-blurb{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.45}
 			.pg-tier-cta{margin-top:10px;width:100%;border:none;border-radius:8px;background:#5b4fff;color:#fff;font-size:12.5px;font-weight:700;padding:8px 0;cursor:pointer}
 			.pg-tier-cta:hover{background:#4a3fe6}
+			.pg-tier-cur{margin-top:10px;width:100%;text-align:center;font-size:12px;font-weight:700;color:#16a34a;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:8px 0}
+			.pg-tiers-credits{margin-top:10px;font-size:11.5px;color:#64748b;text-align:center}
+			.pg-tier-card.is-dim{opacity:.55}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4351,7 +4354,7 @@ class PressGo_AI_Builder {
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
 					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
 					<div class="pg-tiers-grid">
-						<div class="pg-tier-card">
+						<div class="pg-tier-card" id="pg-tier-free">
 							<div class="pg-tier-name">Free</div>
 							<div class="pg-tier-price">$0</div>
 							<div class="pg-tier-cap">1 full page a day</div>
@@ -4366,6 +4369,7 @@ class PressGo_AI_Builder {
 							<button type="button" class="pg-tier-cta is-pop" id="pg-plus-btn">Upgrade to Plus</button>
 						</div>
 					</div>
+					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
 				</div>
 			<?php endif; ?>
 				<div class="pg-builder-shell">
@@ -5209,7 +5213,10 @@ class PressGo_AI_Builder {
 		$pg_key  = $this->new_pg_key( $post_id );
 		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, $pg_key );
 		if ( null === $section ) {
-			wp_send_json_error( 'Renderer rejected the composed tree.', 422 );
+			self::nova_refund( self::$nova_last_gen ); // charged, but nothing usable landed
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo render REJECT tree head: ' . mb_substr( wp_json_encode( $tree ), 0, 400 ) ); // phpcs:ignore
+			$this->turn_out( $post_id, array( 'error' => 'renderer rejected tree' ) );
+			wp_send_json_error( 'That one came out malformed on my end, so I tossed it instead of adding something broken. Say "try again" and I\'ll take another run at it.', 422 );
 		}
 
 		// Append to the existing page (build section by section).
@@ -5894,6 +5901,7 @@ class PressGo_AI_Builder {
 			) );
 			if ( is_wp_error( $resp ) ) { return null; }
 			$gen  = (string) wp_remote_retrieve_header( $resp, 'x-nova-generation-id' );
+			self::$nova_last_gen = $gen;
 			$code = (int) wp_remote_retrieve_response_code( $resp );
 			if ( 402 === $code ) {
 				self::$nova_last_error = 'credits';
@@ -5929,7 +5937,7 @@ class PressGo_AI_Builder {
 				return strlen( $chunk );
 			},
 			CURLOPT_HEADERFUNCTION => function ( $ch, $line ) use ( &$gen_id ) {
-				if ( 0 === stripos( $line, 'x-nova-generation-id:' ) ) { $gen_id = trim( substr( $line, 21 ) ); }
+				if ( 0 === stripos( $line, 'x-nova-generation-id:' ) ) { $gen_id = trim( substr( $line, 21 ) ); self::$nova_last_gen = $gen_id; }
 				return strlen( $line );
 			},
 		) );

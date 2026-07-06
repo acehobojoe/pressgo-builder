@@ -344,11 +344,27 @@
 			usageEl.title = u.builds_left + ' new-section build' + (u.builds_left === 1 ? '' : 's') +
 				' left today. Editing, reordering, delete and "make it flow" are free. Click to see plans.';
 		}
-		if (typeof u.credits === 'number' && credPill) {
-			credPill.textContent = u.credits + (u.credits === 1 ? ' credit' : ' credits');
-			credPill.hidden = u.credits === 0; // pill = overflow only; the bar is the meter
-			lastCreditValue = u.credits;
+		// The popup carries the plan state: paid tiers see "Current plan" instead
+		// of an upgrade button, and bonus credits (overflow) show as one quiet line.
+		if (u.tier) {
+			var paid = u.tier !== 'free';
+			var plusBtnEl = document.getElementById('pg-plus-btn');
+			if (plusBtnEl && paid) {
+				var cur = document.createElement('div');
+				cur.className = 'pg-tier-cur';
+				cur.textContent = 'Current plan';
+				plusBtnEl.replaceWith(cur);
+			}
+			var freeCard = document.getElementById('pg-tier-free');
+			if (freeCard) freeCard.classList.toggle('is-dim', paid);
 		}
+		var credLine = document.getElementById('pg-tiers-credits');
+		if (credLine && typeof u.credits === 'number') {
+			credLine.textContent = u.credits > 0
+				? '+ ' + u.credits + ' bonus credit' + (u.credits === 1 ? '' : 's') + ' — used automatically after your daily builds'
+				: '';
+		}
+		if (typeof u.credits === 'number') lastCreditValue = u.credits;
 	}
 	function refreshUsage() {
 		var fd = new FormData();
