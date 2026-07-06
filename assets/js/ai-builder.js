@@ -346,6 +346,15 @@
 		}
 		// The popup carries the plan state: paid tiers see "Current plan" instead
 		// of an upgrade button, and bonus credits (overflow) show as one quiet line.
+		var acctEl = document.getElementById('pg-tiers-acct');
+		if (acctEl && u.account) {
+			acctEl.innerHTML = '';
+			acctEl.appendChild(document.createTextNode('Connected as ' + u.account));
+			var planTag = document.createElement('span');
+			planTag.className = 'pg-acct-plan';
+			planTag.textContent = (u.tier === 'free' ? 'Free' : u.tier) + ' plan';
+			acctEl.appendChild(planTag);
+		}
 		if (u.tier) {
 			var paid = u.tier !== 'free';
 			var plusBtnEl = document.getElementById('pg-plus-btn');

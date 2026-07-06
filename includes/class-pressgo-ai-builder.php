@@ -1959,6 +1959,9 @@ class PressGo_AI_Builder {
 
 	private function cohesion_snapshot( $post_id, $records ) {
 		update_post_meta( $post_id, self::META_COHESION_UNDO, wp_slash( array(
+			'brand_foundation' => get_option( 'pressgo_brand_foundation', null ),
+			'use_site_brand'   => (string) get_option( 'pressgo_use_site_brand', '' ),
+			'light_hero'       => (string) get_option( 'pressgo_brand_light_hero', '' ),
 			'elementor_data' => (string) get_post_meta( $post_id, '_elementor_data', true ),
 			'records'        => $records,
 		) ) );
@@ -2642,6 +2645,15 @@ class PressGo_AI_Builder {
 		}
 		update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
 		$this->save_ff_sections( $post_id, isset( $snap['records'] ) ? $snap['records'] : array() );
+		if ( array_key_exists( 'brand_foundation', $snap ) ) {
+			if ( is_array( $snap['brand_foundation'] ) ) {
+				update_option( 'pressgo_brand_foundation', $snap['brand_foundation'] );
+			} else {
+				delete_option( 'pressgo_brand_foundation' );
+			}
+			update_option( 'pressgo_use_site_brand', (string) ( $snap['use_site_brand'] ?? '' ), false );
+			update_option( 'pressgo_brand_light_hero', (string) ( $snap['light_hero'] ?? '' ), false );
+		}
 		delete_post_meta( $post_id, self::META_COHESION_UNDO );
 		$this->cohesion_flush( $post_id );
 		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Put it back the way it was.' );
@@ -4392,6 +4404,8 @@ class PressGo_AI_Builder {
 			.pg-tier-cta:hover{background:#4a3fe6}
 			.pg-tier-cur{margin-top:10px;width:100%;text-align:center;font-size:12px;font-weight:700;color:#16a34a;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:8px 0}
 			.pg-tiers-credits{margin-top:10px;font-size:11.5px;color:#64748b;text-align:center}
+			.pg-tiers-acct{margin:-4px 0 10px;font-size:11.5px;color:#334155}
+			.pg-tiers-acct .pg-acct-plan{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 7px;border-radius:999px}
 			.pg-tier-card.is-dim{opacity:.55}
 			</style>
 		</head>
@@ -4429,6 +4443,7 @@ class PressGo_AI_Builder {
 			<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
 					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
+					<div class="pg-tiers-acct" id="pg-tiers-acct"></div>
 					<div class="pg-tiers-grid">
 						<div class="pg-tier-card" id="pg-tier-free">
 							<div class="pg-tier-name">Free</div>
@@ -6352,6 +6367,7 @@ class PressGo_AI_Builder {
 						'resets_in'   => (int) ( $j['resets_in'] ?? 0 ),
 						'builds_left' => max( 0, (int) $j['cap'] - (int) $j['used'] ),
 						'credits'     => (int) ( $j['credits'] ?? 0 ),
+						'account'     => sanitize_email( (string) ( $j['account'] ?? '' ) ),
 					) );
 				}
 			}
