@@ -1341,7 +1341,7 @@ class PressGo_AI_Builder {
 		// ── Shared requests (identical across goals) ──
 		$badges = 'Add a slim trust-badge strip as a bridge under the hero: one centered row, tight vertical padding (40-50px), on the alternate background. Include a star-rating block plus a short rating line ONLY if the brief gave a real rating; otherwise skip stars entirely. Then 3-4 bold credential words from the brief (licensed, insured, certified, years in business) as inline text separated by middots, all in one text block so it stacks cleanly on mobile.';
 		$compare = 'Add a them-vs-us comparison: eyebrow "THE DIFFERENCE", H2 naming a competitor archetype (like "Why [business], not the average [trade] guy"). Build 5-6 comparison cards STACKED VERTICALLY, one per row, each card full page width (one white card per row, full width, stacked — NEVER columns side by side and NEVER a table). Inside each card: the feature name as an H4, then a row with a small GREEN fas fa-check-circle icon beside the bold brand claim ("Yes. Certified and trained."), then a row with a small MUTED RED fas fa-times-circle icon beside a one-line competitor caricature in muted text ("Most: a vague verbal number, surprises later"). Icon sits LEFT of its line, inline. Each card keeps the label and both answers together so it reads perfectly stacked on mobile. Close with the page\'s single accent CTA button.';
-		$proof = 'Add social proof: an eyebrow like "5-STAR REVIEWS", an H2 claim like "What [region] customers say", then 3 testimonial_card blocks in a row. Write each quote as a 3-4 sentence first-person mini story that proves ONE specific promise this page makes (speed, quality/cleanup, a scary situation handled calmly), ending on relief; names are first-name-plus-initial with a nearby town or descriptor as the role. Never invent an aggregate count or rating unless the brief supplied one.';
+		$proof = 'Add social proof: an eyebrow like "5-STAR REVIEWS", an H2 claim like "What [region] customers say", then 3 testimonial_card blocks in a row. If the brief contains REAL customer quotes, use them EXACTLY as given (verbatim quote, the real name, town or descriptor as the role) and shape each around ONE specific promise this page makes. If the brief supplies NO real reviews, do NOT write quotes: keep the designed heading, but each card\'s quote body must be the bracketed placeholder "[Paste a real customer review here. What did they hire you for, and how did it go?]" with name "[Customer name]" and role "[Town]" so the owner swaps in real ones. Never invent reviewer names, quotes, an aggregate count, or a rating.';
 		$checklist = 'Add a warning-signs checklist: eyebrow "KNOW THE WARNING SIGNS", H2 naming the risk, and an intro line that converts the list into a CTA trigger ("Spot any of these and it\'s worth a free [offer]"). Then one bordered card (a col with border, radius, padding) holding 6 icon_box rows with amber fas fa-exclamation-triangle icons, each a concrete observable symptom the reader can check themselves, no abstract danger talk. Close with the accent CTA button.';
 		$how = 'Add a numbered 3-step section: eyebrow "HOW IT WORKS", H2 "How to get started", one-line subhead. Three equal columns, each an oversized accent numeral heading (1, 2, 3) over an H4 step title and 2 lines of copy; step 1 must de-risk the CTA itself ("free", "a relaxed conversation, no pressure") and step 3 must end on a payoff sentence. Close with the single accent CTA button.';
 		$founders = 'Add a founders/team section: centered H2 "Meet the founders" (or team), then a 2-up row of cards each with a real portrait photo query, the name as an accent uppercase heading, their credential line from the brief as its own smaller subhead, and a 3-4 sentence bio written as WHO THIS PERSON IS FOR (the situations they fix), never a resume. End each card with one short italic signature line. Use only credentials the brief gives; if there is only one person, make it a single asymmetric split profile instead.';
@@ -2885,6 +2885,17 @@ class PressGo_AI_Builder {
 		}
 		$newtree = $this->resolve_freeform_images( $composed['tree'] );
 
+		// A recompose that hands back the same tree is a FAILED edit, not a success —
+		// live turns claimed "Updated your hero" while rendering pixel-identical
+		// (inline style stripped / color field ignored). Detect it and answer honestly.
+		$old_json = wp_json_encode( $tree );
+		$new_json = wp_json_encode( $newtree );
+		if ( $old_json === $new_json
+			|| wp_json_encode( $this->ff_strip_volatile( $tree ) ) === wp_json_encode( $this->ff_strip_volatile( $newtree ) ) ) {
+			return array( 'note' => "I couldn't find a way to change that — try describing it differently (name the element and what it should become), or it may be controlled by your theme." );
+		}
+		$caveat = $this->ff_edit_caveat( $message, $old_json, $new_json );
+
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
 		require_once $gen . 'class-pressgo-style-utils.php';
 		require_once $gen . 'class-pressgo-element-factory.php';
@@ -2925,8 +2936,63 @@ class PressGo_AI_Builder {
 			'preview_bust' => time(),
 			'cohesion'     => true,
 			'scoped'       => true,
-			'note'         => 'Updated your ' . ( 'that' === $label ? 'selected' : $label ) . ' section. Say "undo" to revert, or X out of it to work on the whole page.',
+			'note'         => 'Updated your ' . ( 'that' === $label ? 'selected' : $label ) . ' section.' . $caveat . ' Say "undo" to revert, or X out of it to work on the whole page.',
 		);
+	}
+
+	/** Strip volatile keys (element/widget ids) so tree comparison sees real changes only. */
+	private function ff_strip_volatile( $node ) {
+		if ( ! is_array( $node ) ) { return $node; }
+		unset( $node['id'], $node['_id'] );
+		foreach ( $node as $k => $v ) {
+			if ( is_array( $v ) ) { $node[ $k ] = $this->ff_strip_volatile( $v ); }
+		}
+		return $node;
+	}
+
+	/**
+	 * Deterministic post-edit check: when the message clearly demanded a color or
+	 * specific wording, verify the new tree actually reflects it. Returns '' or a
+	 * caveat sentence appended to the success note. Regex only — a vision pass per
+	 * edit turn would be too slow/expensive.
+	 */
+	private function ff_edit_caveat( $message, $old_json, $new_json ) {
+		$msg    = (string) $message;
+		$m      = strtolower( $msg );
+		$missed = array();
+
+		if ( preg_match_all( '/#([0-9a-f]{6}|[0-9a-f]{3})\b/i', $msg, $hx ) ) {
+			// A demanded hex must appear somewhere in the new tree.
+			$found = false;
+			foreach ( $hx[0] as $hex ) {
+				if ( false !== stripos( $new_json, $hex ) ) { $found = true; break; }
+			}
+			if ( ! $found ) { $missed[] = 'color'; }
+		} elseif ( preg_match( '/\b(colou?r|make|turn|set|paint)\b/', $m )
+			&& preg_match( '/\b(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|silver|indigo|lime|brown|mint|coral|peach|salmon|olive|burgundy|turquoise|white|cream)\b/', $m ) ) {
+			// A named-color demand must move SOME color token; identical color sets
+			// between old and new mean the color field wasn't honored.
+			if ( $this->ff_color_tokens( $old_json ) === $this->ff_color_tokens( $new_json ) ) { $missed[] = 'color'; }
+		}
+
+		// "change X to say \"New words\"" — the last quoted string is the
+		// replacement copy and must appear in the new tree.
+		if ( preg_match( '/\b(say|says|to read|reads?|change|replace|rename|instead of|wording|text)\b/', $m )
+			&& preg_match_all( '/["\x{201C}\x{201D}]([^"\x{201C}\x{201D}]{3,80})["\x{201C}\x{201D}]/u', $msg, $qm ) && ! empty( $qm[1] ) ) {
+			$want = end( $qm[1] );
+			if ( false === stripos( $new_json, $want ) ) { $missed[] = 'wording'; }
+		}
+
+		if ( empty( $missed ) ) { return ''; }
+		return ' Heads up: I may not have fully applied the ' . implode( ' and ', $missed ) . " you asked for — check the preview and tell me if it didn't take.";
+	}
+
+	/** Sorted list of color-ish tokens (#hex / rgb()/rgba()) found in a JSON string. */
+	private function ff_color_tokens( $json ) {
+		preg_match_all( '/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i', (string) $json, $mm );
+		$t = array_map( 'strtolower', $mm[0] );
+		sort( $t );
+		return $t;
 	}
 
 	/** Which section a "remove the X" message refers to: a record index, or -1. */
@@ -3197,6 +3263,16 @@ class PressGo_AI_Builder {
 		}
 		if ( ! empty( $c['text_dark'] ) && ! empty( $c['light_bg'] ) ) {
 			$t = 0; while ( $t < 8 && PressGo_Style_Utils::contrast_ratio( $c['text_dark'], $c['light_bg'] ) < 4.5 ) { $c['text_dark'] = PressGo_Style_Utils::shade( $c['text_dark'], -0.1 ); $t++; }
+		}
+		// Every palette carries an explicit link color (the accent, darkened until it
+		// reads on the light bg) — otherwise anchors fall back to the Elementor kit
+		// default, which clashes (magenta on generated palettes) on every page.
+		if ( empty( $c['link'] ) && ! empty( $c['accent'] ) ) {
+			$link = $c['accent'];
+			if ( ! empty( $c['light_bg'] ) ) {
+				$t = 0; while ( $t < 8 && PressGo_Style_Utils::contrast_ratio( $link, $c['light_bg'] ) < 4.5 ) { $link = PressGo_Style_Utils::shade( $link, -0.12 ); $t++; }
+			}
+			$c['link'] = $link;
 		}
 		$cfg['colors'] = $c;
 		return $cfg;
