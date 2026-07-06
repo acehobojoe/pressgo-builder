@@ -3262,6 +3262,16 @@ class PressGo_AI_Builder {
 		if ( ! empty( $c['text_dark'] ) && ! empty( $c['light_bg'] ) ) {
 			$t = 0; while ( $t < 8 && PressGo_Style_Utils::contrast_ratio( $c['text_dark'], $c['light_bg'] ) < 4.5 ) { $c['text_dark'] = PressGo_Style_Utils::shade( $c['text_dark'], -0.1 ); $t++; }
 		}
+		// Every palette carries an explicit link color (the accent, darkened until it
+		// reads on the light bg) — otherwise anchors fall back to the Elementor kit
+		// default, which clashes (magenta on generated palettes) on every page.
+		if ( empty( $c['link'] ) && ! empty( $c['accent'] ) ) {
+			$link = $c['accent'];
+			if ( ! empty( $c['light_bg'] ) ) {
+				$t = 0; while ( $t < 8 && PressGo_Style_Utils::contrast_ratio( $link, $c['light_bg'] ) < 4.5 ) { $link = PressGo_Style_Utils::shade( $link, -0.12 ); $t++; }
+			}
+			$c['link'] = $link;
+		}
 		$cfg['colors'] = $c;
 		return $cfg;
 	}
