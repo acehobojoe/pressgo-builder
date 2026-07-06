@@ -18,7 +18,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 
 **Two ways to use it:**
 
-**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. $15 one-time pack = 75 extra credits anytime.
+**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. Toggle on **A(eyes)** and the AI screenshots its own work after each build, vision-reviews it, and applies a correction pass if needed. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. PressGo Agency = $49/mo for ~40 pages a day + 400 bonus credits, built for client work. $15 one-time pack = 75 extra credits anytime.
 
 **2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
 
@@ -191,11 +191,16 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 == Changelog ==
 
 = 2.5.0 =
-* NEW BILLING MODEL: every account now gets a daily allowance of included builds that resets at midnight UTC — Free covers a full page every day (8 section builds/day + 10 bonus credits a month), Plus ($12/mo) covers ~8 pages a day (64/day + 100 bonus credits)
-* The usage bar in the builder now shows your real account allowance and when it resets; credits become bonus overflow, only spent after the day's included builds
-* Upgrade to Plus without leaving the builder — the usage bar opens a plans panel with live checkout
-* Edits, reorders, palette changes, quality passes and chat remain free at every level, even when the day's builds are spent
-* Failed builds auto-refund whichever bucket they charged (daily allowance or credits)
+* NEW BILLING MODEL: every account gets a daily allowance of included builds that resets at midnight UTC — Free covers a full page every day (8 section builds/day + 10 bonus credits a month), Plus ($12/mo) covers ~8 pages a day (64/day + 100 bonus credits), and the new Agency plan ($49/mo) covers ~40 pages a day (400/day + 400 bonus credits) for client work
+* The usage bar in the builder shows your real account allowance and when it resets; credits become bonus overflow, only spent after the day's included builds
+* Upgrade, manage, or CANCEL your plan without leaving WordPress — the usage bar opens a plans panel with live checkout and a Stripe billing portal link, and PressGo → Settings has a full Account & plan section (connected account, plan, today's builds, credits)
+* Canceled plans show exactly when they end ("Ends Aug 6") in the builder and in Settings
+* Edits, reorders, palette changes, quality passes and chat are free at every level and in every mode — even when the day's builds are spent
+* Failed builds auto-refund whichever bucket they charged (daily allowance or credits), including builds the renderer rejects — and "try again" now genuinely retries your last request
+* HONEST EDITS: if an edit didn't actually change anything, the builder says so instead of claiming success; if a requested color or wording didn't land, it flags it so you can check the preview
+* NO INVENTED SOCIAL PROOF: testimonial and stats sections built without real quotes or numbers now use clearly-marked placeholders you replace — never fabricated reviewer names, ratings, or statistics
+* Undo now also restores your site's brand colors if a repaint changed them
+* Links inside text always match your palette (no more theme-default magenta on dark sections)
 
 = 2.4.2 =
 * One honest meter: on PressGo API sites the credits pill is the single gauge (it updates live as sections build); the daily usage bar now only appears for own-OpenRouter-key setups, and the old tier popup is gone
