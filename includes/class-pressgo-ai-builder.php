@@ -2883,6 +2883,17 @@ class PressGo_AI_Builder {
 		}
 		$newtree = $this->resolve_freeform_images( $composed['tree'] );
 
+		// A recompose that hands back the same tree is a FAILED edit, not a success —
+		// live turns claimed "Updated your hero" while rendering pixel-identical
+		// (inline style stripped / color field ignored). Detect it and answer honestly.
+		$old_json = wp_json_encode( $tree );
+		$new_json = wp_json_encode( $newtree );
+		if ( $old_json === $new_json
+			|| wp_json_encode( $this->ff_strip_volatile( $tree ) ) === wp_json_encode( $this->ff_strip_volatile( $newtree ) ) ) {
+			return array( 'note' => "I couldn't find a way to change that — try describing it differently (name the element and what it should become), or it may be controlled by your theme." );
+		}
+		$caveat = $this->ff_edit_caveat( $message, $old_json, $new_json );
+
 		$gen = PRESSGO_PLUGIN_DIR . 'includes/generator/';
 		require_once $gen . 'class-pressgo-style-utils.php';
 		require_once $gen . 'class-pressgo-element-factory.php';
@@ -2923,8 +2934,63 @@ class PressGo_AI_Builder {
 			'preview_bust' => time(),
 			'cohesion'     => true,
 			'scoped'       => true,
-			'note'         => 'Updated your ' . ( 'that' === $label ? 'selected' : $label ) . ' section. Say "undo" to revert, or X out of it to work on the whole page.',
+			'note'         => 'Updated your ' . ( 'that' === $label ? 'selected' : $label ) . ' section.' . $caveat . ' Say "undo" to revert, or X out of it to work on the whole page.',
 		);
+	}
+
+	/** Strip volatile keys (element/widget ids) so tree comparison sees real changes only. */
+	private function ff_strip_volatile( $node ) {
+		if ( ! is_array( $node ) ) { return $node; }
+		unset( $node['id'], $node['_id'] );
+		foreach ( $node as $k => $v ) {
+			if ( is_array( $v ) ) { $node[ $k ] = $this->ff_strip_volatile( $v ); }
+		}
+		return $node;
+	}
+
+	/**
+	 * Deterministic post-edit check: when the message clearly demanded a color or
+	 * specific wording, verify the new tree actually reflects it. Returns '' or a
+	 * caveat sentence appended to the success note. Regex only — a vision pass per
+	 * edit turn would be too slow/expensive.
+	 */
+	private function ff_edit_caveat( $message, $old_json, $new_json ) {
+		$msg    = (string) $message;
+		$m      = strtolower( $msg );
+		$missed = array();
+
+		if ( preg_match_all( '/#([0-9a-f]{6}|[0-9a-f]{3})\b/i', $msg, $hx ) ) {
+			// A demanded hex must appear somewhere in the new tree.
+			$found = false;
+			foreach ( $hx[0] as $hex ) {
+				if ( false !== stripos( $new_json, $hex ) ) { $found = true; break; }
+			}
+			if ( ! $found ) { $missed[] = 'color'; }
+		} elseif ( preg_match( '/\b(colou?r|make|turn|set|paint)\b/', $m )
+			&& preg_match( '/\b(navy|blue|sky|teal|green|emerald|red|crimson|maroon|orange|amber|gold|yellow|purple|violet|lavender|pink|rose|magenta|black|charcoal|slate|grey|gray|silver|indigo|lime|brown|mint|coral|peach|salmon|olive|burgundy|turquoise|white|cream)\b/', $m ) ) {
+			// A named-color demand must move SOME color token; identical color sets
+			// between old and new mean the color field wasn't honored.
+			if ( $this->ff_color_tokens( $old_json ) === $this->ff_color_tokens( $new_json ) ) { $missed[] = 'color'; }
+		}
+
+		// "change X to say \"New words\"" — the last quoted string is the
+		// replacement copy and must appear in the new tree.
+		if ( preg_match( '/\b(say|says|to read|reads?|change|replace|rename|instead of|wording|text)\b/', $m )
+			&& preg_match_all( '/["\x{201C}\x{201D}]([^"\x{201C}\x{201D}]{3,80})["\x{201C}\x{201D}]/u', $msg, $qm ) && ! empty( $qm[1] ) ) {
+			$want = end( $qm[1] );
+			if ( false === stripos( $new_json, $want ) ) { $missed[] = 'wording'; }
+		}
+
+		if ( empty( $missed ) ) { return ''; }
+		return ' Heads up: I may not have fully applied the ' . implode( ' and ', $missed ) . " you asked for — check the preview and tell me if it didn't take.";
+	}
+
+	/** Sorted list of color-ish tokens (#hex / rgb()/rgba()) found in a JSON string. */
+	private function ff_color_tokens( $json ) {
+		preg_match_all( '/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i', (string) $json, $mm );
+		$t = array_map( 'strtolower', $mm[0] );
+		sort( $t );
+		return $t;
 	}
 
 	/** Which section a "remove the X" message refers to: a record index, or -1. */
