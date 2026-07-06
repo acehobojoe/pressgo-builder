@@ -2733,7 +2733,7 @@ class PressGo_AI_Builder {
 		// Element-scoped issues route to EDIT, not a brand change (same guard as
 		// is_palette_intent — "the background image for the top section" is an edit).
 		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|footer|nav|menu|gallery|testimonials?|links?|phone|number|text|heading)\b/', $m )
-			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $m ) ) {
+			&& ! preg_match( '/\b(whole page|entire page|everything)\b|\b(change|update|make|new|redo|switch|refresh|try|give|want)\b[^.]{0,24}\b(palette|colou?r scheme|brand colou?rs?|overall)\b/', $m ) ) {
 			return false;
 		}
 		// Descriptive / mood / comparative palette requests — "pastel", "softer",
@@ -3305,7 +3305,7 @@ class PressGo_AI_Builder {
 		// it into a global repaint was the #1 destroyer in chat-campaign testing.
 		$me = strtolower( (string) $message );
 		if ( preg_match( '/\b(hero|headline|button|cta|image|photo|placeholder|icon|form|card|input|field|logo|section|footer|nav|menu|gallery|testimonials?|links?|phone|number|text|heading)\b/', $me )
-			&& ! preg_match( '/\b(whole page|entire page|everything|overall|palette|colou?r scheme|brand colou?rs?)\b/', $me ) ) {
+			&& ! preg_match( '/\b(whole page|entire page|everything)\b|\b(change|update|make|new|redo|switch|refresh|try|give|want)\b[^.]{0,24}\b(palette|colou?r scheme|brand colou?rs?|overall)\b/', $me ) ) {
 			return false;
 		}
 		if ( null !== $this->generate_palette_from_text( $message ) ) { return true; }
