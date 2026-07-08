@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.1
+Stable tag: 2.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -189,6 +189,10 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.2 =
+* One-click account creation: fresh installs can now create their free PressGo account (10 builds/month) right inside the builder — enter your email, click once, start building. No more copying keys between browser tabs
+* Smoother screenshots: parallel screenshot requests now queue briefly instead of failing with a rate-limit error
 
 = 2.5.1 =
 * Simpler mode picker: two honest choices — Ada (fast, reliable, a full page in ~15 seconds) and Nova (custom freeform, builds anything). The old middle mode (Iris) is retired: its self-review now runs automatically on your first build and whenever you say "review my page", in every mode — no 3x-cost toggle to reason about

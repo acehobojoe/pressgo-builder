@@ -75,6 +75,7 @@ class PressGo_AI_Builder {
 
 		// Ajax endpoints (logged-in users only).
 		add_action( 'wp_ajax_pressgo_ai_chat',         array( $this, 'ajax_chat' ) );
+		add_action( 'wp_ajax_pressgo_ai_quick_register', array( $this, 'ajax_quick_register' ) );
 		add_action( 'wp_ajax_pressgo_ai_toggle',       array( $this, 'ajax_toggle' ) );
 		add_action( 'wp_ajax_pressgo_ai_create_page',  array( $this, 'ajax_create_page' ) );
 		add_action( 'wp_ajax_pressgo_ai_get_chat',     array( $this, 'ajax_get_chat' ) );
@@ -183,6 +184,45 @@ class PressGo_AI_Builder {
 			'brand'   => ! empty( $brand ) ? $brand : null,
 			'enabled' => '1' === get_option( 'pressgo_use_site_brand', '1' ),
 		);
+	}
+
+	/**
+	 * One-click account creation from inside the builder. Fresh installs used
+	 * to be sent out to pressgo.app/register to hand-copy a key back — the
+	 * single biggest activation leak. This creates the account server-side
+	 * (10 free credits, key auto-minted) and saves the key in one round trip.
+	 */
+	public function ajax_quick_register() {
+		$this->check_auth();
+		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => 'Enter a valid email address.' ) );
+		}
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$resp = wp_remote_post( $base . '/api/plugin/quick-register', array(
+			'timeout' => 20,
+			'headers' => array( 'Content-Type' => 'application/json' ),
+			'body'    => wp_json_encode( array( 'email' => $email, 'site_url' => home_url() ) ),
+		) );
+		if ( is_wp_error( $resp ) ) {
+			wp_send_json_error( array( 'message' => 'Could not reach pressgo.app — check your connection and try again.' ) );
+		}
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+		$body = json_decode( wp_remote_retrieve_body( $resp ), true );
+		if ( 409 === $code ) {
+			wp_send_json_error( array(
+				'code'    => 'existing_account',
+				'message' => isset( $body['message'] ) ? $body['message'] : 'That email already has an account. Grab your key at pressgo.app/dashboard.',
+			) );
+		}
+		if ( 200 !== $code || empty( $body['apiKey'] ) ) {
+			$msg = isset( $body['error'] ) && is_string( $body['error'] ) ? $body['error'] : 'Signup failed. Try again or register at pressgo.app.';
+			wp_send_json_error( array( 'message' => $msg ) );
+		}
+		update_option( 'pressgo_api_mode', 'pressgo' );
+		update_option( 'pressgo_account_key', sanitize_text_field( $body['apiKey'] ) );
+		delete_transient( 'pressgo_settings_allowance' );
+		wp_send_json_success( array( 'email' => $email ) );
 	}
 
 	/**
@@ -4587,6 +4627,14 @@ class PressGo_AI_Builder {
 					if ( isset( $_GET['pg_used'] ) ) { $pg_uprev['used'] = sanitize_text_field( wp_unslash( $_GET['pg_used'] ) ); }
 					if ( isset( $_GET['pg_tier'] ) ) { $pg_uprev['tier'] = sanitize_key( wp_unslash( $_GET['pg_tier'] ) ); }
 					echo ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) ? 'null' : wp_json_encode( $this->usage_state( $pg_uprev ) );
+				?>,
+				connect: <?php
+					// One-click signup card. needsAccount gates the composer until
+					// the site has a pg_ key (or runs its own key in direct mode).
+					echo wp_json_encode( array(
+						'needsAccount' => ! PressGo_Admin::has_api_configured(),
+						'adminEmail'   => sanitize_email( get_option( 'admin_email', '' ) ),
+					) );
 				?>,
 				firstRun: <?php
 					// Starter prompts for the post-key-save flow AND any site

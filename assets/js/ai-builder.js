@@ -621,11 +621,92 @@
 		append(card);
 	}
 
+	// ===== One-click account connect (fresh installs, no key yet) =====
+	// Before this card, fresh installs were told to go register at pressgo.app
+	// and hand-copy a key back — most never returned. One field, one click,
+	// account + key created server-side, straight into the first build.
+	var connectState = cfg.connect || {};
+	function needsAccount() { return !!connectState.needsAccount; }
+	function renderConnectCard() {
+		var existing = document.getElementById('pg-connect-card');
+		if (existing) {
+			existing.style.transition = 'box-shadow .15s';
+			existing.style.boxShadow = '0 0 0 3px rgba(91,79,255,.25)';
+			setTimeout(function () { existing.style.boxShadow = ''; }, 600);
+			existing.scrollIntoView({ block: 'nearest' });
+			return;
+		}
+		var card = el('pg-msg pg-msg-built');
+		card.id = 'pg-connect-card';
+		card.style.borderColor = '#5b4fff';
+		var txt = document.createElement('div');
+		txt.innerHTML = '<strong>One quick step before your first build.</strong><div style="margin-top:4px">Create a free PressGo account. 10 free page builds every month, no card needed.</div>';
+		card.appendChild(txt);
+		var row = document.createElement('div');
+		row.style.cssText = 'margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+		var em = document.createElement('input');
+		em.type = 'email';
+		em.value = connectState.adminEmail || '';
+		em.placeholder = 'you@example.com';
+		em.style.cssText = 'flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e0f4;border-radius:8px;font-size:13px;';
+		var btn = document.createElement('button');
+		btn.type = 'button';
+		btn.textContent = 'Create my free account';
+		btn.style.cssText = 'background:#5b4fff;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
+		var msg = document.createElement('div');
+		msg.style.cssText = 'margin-top:8px;font-size:12px;color:#6b7280;width:100%';
+		msg.innerHTML = 'Already have an account? <a href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Get your key from the dashboard</a> and paste it under PressGo &gt; Settings.';
+		function doRegister() {
+			var email = (em.value || '').trim();
+			if (!email) { em.focus(); return; }
+			btn.disabled = true;
+			btn.textContent = 'Creating…';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_quick_register');
+			fd.append('nonce', cfg.nonce);
+			fd.append('email', email);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					if (j && j.success) {
+						connectState.needsAccount = false;
+						card.remove();
+						append(el('pg-msg-system', 'Account created. You’ve got 10 free builds this month and your key is saved on this site (we emailed a copy to ' + email + '). Now, tell me what kind of page you want.'));
+						input.focus();
+					} else {
+						btn.disabled = false;
+						btn.textContent = 'Create my free account';
+						var m = (j && j.data && j.data.message) ? j.data.message : 'Signup failed. Try again.';
+						msg.innerHTML = escapeHtml(m) + ' <a href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>';
+						msg.style.color = '#b45309';
+					}
+				})
+				.catch(function () {
+					btn.disabled = false;
+					btn.textContent = 'Create my free account';
+					msg.textContent = 'Network error. Try again.';
+					msg.style.color = '#b45309';
+				});
+		}
+		btn.addEventListener('click', doRegister);
+		em.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doRegister(); } });
+		row.appendChild(em);
+		row.appendChild(btn);
+		card.appendChild(row);
+		card.appendChild(msg);
+		append(card);
+	}
+
 	function renderHistory(messages) {
 		// Never clobber a live conversation (belt to chatStarted's suspenders).
 		if (log.querySelector('.pg-msg-user')) return;
 		log.innerHTML = '';
 		if (!messages || !messages.length) {
+			if (needsAccount()) {
+				append(el('pg-msg-system', 'Welcome to PressGo. Describe a page and I’ll design and build it right here on your site.'));
+				renderConnectCard();
+				return;
+			}
 			if (cfg.firstRun) { renderFirstRun(); return; }
 			// A next-page chip landed us here with a ready prompt.
 			if (cfg.prefill && !input.value) {
@@ -1658,6 +1739,7 @@
 
 	form.addEventListener('submit', function (e) {
 		e.preventDefault();
+		if (needsAccount()) { renderConnectCard(); return; }
 		var text = (input.value || '').trim();
 		if (!text) return;
 		if (pgMode === 'freeform') { sendFreeform(text); }
