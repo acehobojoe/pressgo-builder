@@ -882,10 +882,24 @@ class PressGo_AI_Builder {
 		$this->turn_label = 'Before restoring the ' . ( $ts ? wp_date( 'M j, H:i', $ts ) : '#' . $rev_id ) . ' version';
 		$this->snapshot_revision( $post_id );
 
-		// Restore the FULL per-target state: post_content (Gutenberg/Divi
-		// designs live there) + every design meta the snapshot carried, and
-		// remove the design metas it did NOT carry so the page can't end up
-		// claimed by two builders at once.
+		$this->apply_revision_restore( $post_id, $rev, $is_snap );
+
+		$this->purge_post_caches( $post_id );
+		wp_send_json_success( array(
+			'preview_bust'  => time(),
+			'restored_from' => $ts ? wp_date( 'M j, H:i', $ts ) : '',
+		) );
+	}
+
+	/**
+	 * Apply a design revision onto the live page — the FULL per-target state:
+	 * post_content (Gutenberg/Divi designs live there) + every design meta the
+	 * snapshot carried, and remove the design metas it did NOT carry so the
+	 * page can't end up claimed by two builders at once. Shared by the History
+	 * panel restore and the chat "change it back" intercept.
+	 */
+	private function apply_revision_restore( $post_id, $rev, $is_snap ) {
+		$rev_id = (int) $rev->ID;
 		wp_update_post( wp_slash( array(
 			'ID'           => $post_id,
 			'post_content' => (string) $rev->post_content,
@@ -912,12 +926,44 @@ class PressGo_AI_Builder {
 			// path) instead of editing a config that no longer matches reality.
 			delete_post_meta( $post_id, self::META_AI_CONFIG );
 		}
+	}
 
-		$this->purge_post_caches( $post_id );
-		wp_send_json_success( array(
-			'preview_bust'  => time(),
-			'restored_from' => $ts ? wp_date( 'M j, H:i', $ts ) : '',
-		) );
+	/**
+	 * Chat revert: "change it back", "undo that", "revert". Restores the most
+	 * recent design snapshot locally — no AI call, no credit. Returns the
+	 * snapshot's human label ('' on failure / nothing to restore).
+	 */
+	private function restore_latest_snapshot( $post_id ) {
+		$revs = wp_get_post_revisions( $post_id, array( 'posts_per_page' => 20 ) );
+		foreach ( $revs as $rev ) {
+			$is_snap = '1' === (string) get_metadata( 'post', $rev->ID, '_pressgo_snapshot', true );
+			$data    = get_metadata( 'post', $rev->ID, '_elementor_data', true );
+			if ( ! $is_snap && ! $data ) { continue; }
+			$ts = get_post_time( 'U', true, $rev );
+			$label = $ts ? wp_date( 'M j, H:i', $ts ) : ( '#' . $rev->ID );
+			// Snapshot the live state first so the revert is itself revertable.
+			$this->turn_label = 'Before reverting (chat)';
+			$this->snapshot_revision( $post_id );
+			$this->apply_revision_restore( $post_id, $rev, $is_snap );
+			$this->purge_post_caches( $post_id );
+			return $label;
+		}
+		return '';
+	}
+
+	/**
+	 * Detect a bare revert/undo message. Long messages are left to the AI —
+	 * they usually carry specifics ("revert the hero but keep the new copy").
+	 */
+	private function is_revert_request( $message ) {
+		$m = strtolower( trim( $message ) );
+		if ( '' === $m || ( function_exists( 'mb_strlen' ) ? mb_strlen( $m ) : strlen( $m ) ) > 80 ) {
+			return false;
+		}
+		return (bool) preg_match(
+			'/^(please |can you |could you |just )*(revert|undo|roll ?back|go back|put (it|that|this) back|change (it|that|this) back|restore (it|that|this|the (page|previous|last)( version)?)?|bring (it|that|this) back)\b[^,]*$/i',
+			$m
+		);
 	}
 
 	public function ajax_clear_chat() {
@@ -2541,7 +2587,7 @@ class PressGo_AI_Builder {
 	 * backend's refund guards (recent charge, once per generation, hourly cap)
 	 * make this abuse-safe. No-op in direct-OpenRouter mode — nothing charged.
 	 */
-	private static function nova_refund( $generation_id ) {
+	private static function nova_refund( $generation_id, $reason = '' ) {
 		if ( '' === (string) $generation_id ) { return; }
 		if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) ) { return; }
 		$pg = (string) get_option( 'pressgo_account_key', '' );
@@ -2550,7 +2596,10 @@ class PressGo_AI_Builder {
 		wp_remote_post( $base . '/api/plugin/builder/refund', array(
 			'timeout' => 10,
 			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
-			'body'    => wp_json_encode( array( 'generationId' => $generation_id ) ),
+			'body'    => wp_json_encode( array(
+				'generationId' => $generation_id,
+				'reason'       => substr( (string) $reason, 0, 300 ),
+			) ),
 		) );
 	}
 
@@ -5370,7 +5419,7 @@ class PressGo_AI_Builder {
 		$pg_key  = $this->new_pg_key( $post_id );
 		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, $pg_key );
 		if ( null === $section ) {
-			self::nova_refund( self::$nova_last_gen ); // charged, but nothing usable landed
+			self::nova_refund( self::$nova_last_gen, 'nova: nothing usable landed' ); // charged, but nothing usable landed
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo render REJECT tree head: ' . mb_substr( wp_json_encode( $tree ), 0, 400 ) ); // phpcs:ignore
 			$this->turn_out( $post_id, array( 'error' => 'renderer rejected tree' ) );
 			wp_send_json_error( 'That one came out malformed on my end, so I tossed it instead of adding something broken. Say "try again" and I\'ll take another run at it.', 422 );
@@ -6066,10 +6115,10 @@ class PressGo_AI_Builder {
 				if ( ! empty( $err['error'] ) ) { self::$nova_wall_msg = (string) $err['error']; }
 				return null;
 			}
-			if ( 200 !== $code ) { self::nova_refund( $gen ); return null; }
+			if ( 200 !== $code ) { self::nova_refund( $gen, 'nova: upstream HTTP ' . $code ); return null; }
 			$data = json_decode( wp_remote_retrieve_body( $resp ), true );
 			$tree = self::extract_section_json( $data['choices'][0]['message']['content'] ?? '' );
-			if ( null === $tree ) { self::nova_refund( $gen ); } // charged but unusable — give the credit back
+			if ( null === $tree ) { self::nova_refund( $gen, 'nova: unusable tree (parse failed)' ); } // charged but unusable — give the credit back
 			return $tree;
 		}
 
@@ -6109,7 +6158,7 @@ class PressGo_AI_Builder {
 			if ( ! empty( $err['error'] ) ) { self::$nova_wall_msg = (string) $err['error']; }
 			return null;
 		}
-		if ( ! $ok || $err || 200 !== (int) $status ) { self::nova_refund( $gen_id ); return null; }
+		if ( ! $ok || $err || 200 !== (int) $status ) { self::nova_refund( $gen_id, 'nova: stream failed HTTP ' . $status . ( $err ? ' ' . $err : '' ) ); return null; }
 
 		// Parse the SSE stream: extract content deltas from data: lines.
 		$content = '';
@@ -6124,7 +6173,7 @@ class PressGo_AI_Builder {
 			if ( is_string( $delta ) && '' !== $delta ) { $content .= $delta; }
 		}
 		$tree = self::extract_section_json( $content );
-		if ( null === $tree ) { self::nova_refund( $gen_id ); } // charged but unusable — give the credit back
+		if ( null === $tree ) { self::nova_refund( $gen_id, 'nova: unusable tree (parse failed)' ); } // charged but unusable — give the credit back
 		return $tree;
 	}
 
@@ -6650,6 +6699,23 @@ class PressGo_AI_Builder {
 		// so History reads "Before: <what you asked for>".
 		$this->turn_label = 'Before: ' . ( function_exists( 'mb_substr' ) ? mb_substr( $stored_text, 0, 80 ) : substr( $stored_text, 0, 80 ) );
 
+		// "Change it back" intercept — restore the last design snapshot locally.
+		// Instant, free, and reliable: the model can't rewind a page it can only
+		// see as config, and chat logs showed users begging for revert while the
+		// History panel sat unnoticed. Falls through to the AI if no snapshot.
+		if ( ! $has_images && $this->is_revert_request( $user_msg ) ) {
+			$restored_label = $this->restore_latest_snapshot( $post_id );
+			if ( '' !== $restored_label ) {
+				$revert_msg = 'Done — I put the page back to how it was before the last change (the ' . $restored_label . ' snapshot). No credits were used. If you meant an older version, open History (the clock icon up top) and pick any earlier snapshot.';
+				$history[] = array( 'role' => 'assistant', 'content' => $revert_msg, 'built' => true, 'summary' => 'Reverted to the previous version' );
+				update_post_meta( $post_id, self::META_AI_CHAT, $history );
+				$emit( 'text',  array( 'text' => $revert_msg ) );
+				$emit( 'built', array( 'summary' => 'Reverted to the previous version', 'preview_bust' => time() ) );
+				$emit( 'done',  array() );
+				exit;
+			}
+		}
+
 		// Build pageContext + sanitize messages for Anthropic. Prefer the stored
 		// CONFIG (clean, readable — business/sections/colors right there) so the
 		// AI knows it's editing and never re-interrogates. Fall back to the
@@ -6719,6 +6785,19 @@ class PressGo_AI_Builder {
 				$image_note .= "When several fit, spread them across the page (a gallery is great for multiple photos; use the strongest for the hero).\n";
 			}
 			$image_note .= "HONESTY: you cannot see what an unlabeled URL contains — never claim an unlabeled image shows something specific (dogs, food, your team). If you place unlabeled library images, say you used their library photos and that they can ask to swap any that look wrong.\n";
+		}
+
+		// Tell the AI which REAL forms exist on this site (form plugins render
+		// + process them; PressGo embeds them via the form_embed section).
+		// Without this, users with WPForms/CF7 installed were told PressGo
+		// can't do forms — the single most common build-killer in chat logs.
+		$site_forms = self::site_form_shortcodes();
+		if ( ! empty( $site_forms ) ) {
+			$image_note .= "\n\nWorking forms that ALREADY EXIST on this site (built with the user's form plugin). To place one on the page, add a `form_embed` section: { headline, subheadline, form_shortcode, note? } — form_shortcode must be one of these EXACT shortcodes, never an invented one:\n";
+			foreach ( $site_forms as $f ) {
+				$image_note .= '- ' . $f['shortcode'] . ' — "' . $f['title'] . '" (' . $f['plugin'] . ")\n";
+			}
+			$image_note .= "The form keeps its plugin's styling and submission handling. If the user asks for a NEW form or different fields, tell them to create/edit it in their form plugin first (mention the plugin by name), then you'll place it.\n";
 		}
 
 		// Map THIS turn's attachments to their imported URLs. Without this the
@@ -6825,6 +6904,9 @@ class PressGo_AI_Builder {
 			// (native lead forms etc.) when the site can actually render them.
 			'siteCapabilities'          => array(
 				'elementorPro' => PressGo::is_elementor_pro_active(),
+				// True when a form plugin with at least one real form is
+				// installed — unlocks the form_embed guidance server-side.
+				'formEmbeds'   => ! empty( self::site_form_shortcodes( 1 ) ),
 			),
 			// Continuous branding: when the Site Brand toggle is on and a
 			// foundation exists, the AI reuses the established palette/fonts/
@@ -6913,7 +6995,7 @@ class PressGo_AI_Builder {
 				// call, but our local apply failed — reverse it so the user isn't
 				// billed for a page that never rendered.
 				if ( ! empty( $tool_use['generationId'] ) && ! empty( $tool_use['creditsCharged'] ) ) {
-					$this->request_refund( $api_key, $tool_use['generationId'] );
+					$this->request_refund( $api_key, $tool_use['generationId'], $apply_error );
 				}
 			}
 		}
@@ -7181,6 +7263,84 @@ class PressGo_AI_Builder {
 	 * Image URLs the user has uploaded for this page (attachments parented to
 	 * it), newest first. Feeds the AI a pool of real images to place.
 	 */
+	/**
+	 * Enumerate REAL forms from installed form plugins as embeddable
+	 * shortcodes. This is what lets the AI place working forms on Elementor
+	 * Free sites — the #1 chat-only frustration was users with WPForms/CF7
+	 * installed being told PressGo can't do forms.
+	 *
+	 * Returns array of ['shortcode' => '[wpforms id="12"]', 'title' => 'Contact Us', 'plugin' => 'WPForms'].
+	 */
+	public static function site_form_shortcodes( $limit = 12 ) {
+		$forms = array();
+
+		// Contact Form 7 — forms are a CPT.
+		if ( class_exists( 'WPCF7_ContactForm' ) ) {
+			foreach ( get_posts( array( 'post_type' => 'wpcf7_contact_form', 'numberposts' => $limit, 'post_status' => 'publish' ) ) as $p ) {
+				$forms[] = array(
+					'shortcode' => '[contact-form-7 id="' . $p->ID . '" title="' . esc_attr( $p->post_title ) . '"]',
+					'title'     => $p->post_title,
+					'plugin'    => 'Contact Form 7',
+				);
+			}
+		}
+
+		// WPForms — forms are a CPT.
+		if ( class_exists( 'WPForms' ) || function_exists( 'wpforms' ) ) {
+			foreach ( get_posts( array( 'post_type' => 'wpforms', 'numberposts' => $limit, 'post_status' => 'publish' ) ) as $p ) {
+				$forms[] = array(
+					'shortcode' => '[wpforms id="' . $p->ID . '" title="false"]',
+					'title'     => $p->post_title,
+					'plugin'    => 'WPForms',
+				);
+			}
+		}
+
+		// Gravity Forms.
+		if ( class_exists( 'GFAPI' ) ) {
+			try {
+				foreach ( (array) GFAPI::get_forms( true ) as $gf ) {
+					if ( empty( $gf['id'] ) ) { continue; }
+					$forms[] = array(
+						'shortcode' => '[gravityform id="' . (int) $gf['id'] . '" title="false" description="false" ajax="true"]',
+						'title'     => isset( $gf['title'] ) ? (string) $gf['title'] : ( 'Form ' . $gf['id'] ),
+						'plugin'    => 'Gravity Forms',
+					);
+				}
+			} catch ( \Throwable $e ) { /* enumeration is best-effort */ }
+		}
+
+		// Ninja Forms.
+		if ( function_exists( 'Ninja_Forms' ) ) {
+			try {
+				foreach ( (array) Ninja_Forms()->form()->get_forms() as $nf ) {
+					$forms[] = array(
+						'shortcode' => '[ninja_form id="' . (int) $nf->get_id() . '"]',
+						'title'     => (string) $nf->get_setting( 'title' ),
+						'plugin'    => 'Ninja Forms',
+					);
+				}
+			} catch ( \Throwable $e ) { /* best-effort */ }
+		}
+
+		// Fluent Forms — custom table.
+		if ( defined( 'FLUENTFORM' ) ) {
+			global $wpdb;
+			$table = $wpdb->prefix . 'fluentform_forms';
+			if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
+				foreach ( (array) $wpdb->get_results( "SELECT id, title FROM {$table} WHERE status = 'published' LIMIT {$limit}" ) as $ff ) {
+					$forms[] = array(
+						'shortcode' => '[fluentform id="' . (int) $ff->id . '"]',
+						'title'     => (string) $ff->title,
+						'plugin'    => 'Fluent Forms',
+					);
+				}
+			}
+		}
+
+		return array_slice( $forms, 0, $limit );
+	}
+
 	private function page_image_urls( $post_id, $limit = 16 ) {
 		$out  = array();
 		$seen = array();
@@ -7509,7 +7669,10 @@ class PressGo_AI_Builder {
 			'pageContext'      => $page_context,
 			'mode'             => 'edit',
 			'pluginVersion'    => PRESSGO_VERSION,
-			'siteCapabilities' => array( 'elementorPro' => PressGo::is_elementor_pro_active() ),
+			'siteCapabilities' => array(
+				'elementorPro' => PressGo::is_elementor_pro_active(),
+				'formEmbeds'   => ! empty( self::site_form_shortcodes( 1 ) ),
+			),
 			'renderTarget'     => class_exists( 'PressGo_Render_Targets' ) ? PressGo_Render_Targets::resolve( $post_id ) : 'elementor',
 		), $silent );
 		if ( ! empty( $result['error'] ) ) { $emit( 'vision_ok' ); return; }
@@ -7560,7 +7723,7 @@ class PressGo_AI_Builder {
 	 * failed. Fire-and-forget; the endpoint is idempotent and only refunds a real,
 	 * un-refunded charge tagged with this generationId.
 	 */
-	private function request_refund( $api_key, $generation_id ) {
+	private function request_refund( $api_key, $generation_id, $reason = '' ) {
 		if ( empty( $api_key ) || empty( $generation_id ) ) {
 			return;
 		}
@@ -7570,7 +7733,13 @@ class PressGo_AI_Builder {
 				'Content-Type'  => 'application/json',
 				'X-PressGo-Key' => $api_key,
 			),
-			'body'    => wp_json_encode( array( 'generationId' => $generation_id ) ),
+			// reason travels with the refund so apply failures are diagnosable
+			// server-side — before this, "Refund: apply failed" rows carried
+			// zero information about WHAT failed.
+			'body'    => wp_json_encode( array(
+				'generationId' => $generation_id,
+				'reason'       => substr( (string) $reason, 0, 300 ),
+			) ),
 		) );
 	}
 

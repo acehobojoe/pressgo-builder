@@ -6640,7 +6640,82 @@ class PressGo_Section_Builder {
 	}
 
 	// ──────────────────────────────────────────────
-	// 17b. Newsletter Inline (headline left, button right — compact)
+	// 17b. Form Embed — an EXISTING form-plugin form (WPForms, CF7, Gravity,
+	// Ninja, Fluent, Formidable, Forminator, HappyForms) rendered via its
+	// shortcode inside a styled centered card. This is how Elementor-Free
+	// sites get real working forms: the form plugin renders + processes it,
+	// PressGo just gives it a beautiful home.
+	// ──────────────────────────────────────────────
+
+	public static function build_form_embed( $cfg ) {
+		$c  = $cfg['colors'];
+		$fe = isset( $cfg['form_embed'] ) ? $cfg['form_embed'] : array();
+		if ( empty( $fe ) || ! is_array( $fe ) ) { return null; }
+
+		$shortcode = isset( $fe['form_shortcode'] ) && is_scalar( $fe['form_shortcode'] ) ? trim( (string) $fe['form_shortcode'] ) : '';
+		// SECURITY: the Elementor shortcode widget executes whatever it's
+		// given. Only allowlisted form-plugin shortcodes may pass — never an
+		// arbitrary or hallucinated shortcode string.
+		if ( ! preg_match( '/^\[(contact-form-7|wpforms|gravityform|ninja_form|fluentform|formidable|forminator_form|happyforms)(\s[^\[\]]*)?\]$/i', $shortcode ) ) {
+			return null;
+		}
+
+		$children = array();
+		if ( ! empty( $fe['headline'] ) && is_scalar( $fe['headline'] ) ) {
+			$children[] = PressGo_Widget_Helpers::heading_w( $cfg, (string) $fe['headline'],
+				'h2', 'center', PressGo_Style_Utils::card_text(), 34, '800', -0.5, 1.25, null, 27 );
+			$children[] = PressGo_Widget_Helpers::spacer_w( 8 );
+		}
+		if ( ! empty( $fe['subheadline'] ) && is_scalar( $fe['subheadline'] ) ) {
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, (string) $fe['subheadline'],
+				'center', PressGo_Style_Utils::card_text_muted(), 16 );
+		}
+		if ( ! empty( $children ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
+		}
+		$children[] = PressGo_Widget_Helpers::shortcode_w( $shortcode );
+		if ( ! empty( $fe['note'] ) && is_scalar( $fe['note'] ) ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 14 );
+			$children[] = PressGo_Widget_Helpers::text_w( $cfg, (string) $fe['note'], 'center',
+				PressGo_Style_Utils::card_text_muted(), 13 );
+		}
+
+		$r = (string) $cfg['layout']['card_radius'];
+		$card_col = PressGo_Element_Factory::col( $children, array(
+			'background_background' => 'classic',
+			'background_color'      => PressGo_Style_Utils::$dark_theme ? 'rgba(255,255,255,0.06)' : $c['white'],
+			'border_radius'         => array(
+				'unit' => 'px', 'top' => $r, 'right' => $r,
+				'bottom' => $r, 'left' => $r, 'isLinked' => true,
+			),
+			'border_border'         => 'solid',
+			'border_width'          => array(
+				'unit' => 'px', 'top' => '1', 'right' => '1',
+				'bottom' => '1', 'left' => '1', 'isLinked' => true,
+			),
+			'border_color'          => $c['border'],
+			'_box_shadow_box_shadow_type' => 'yes',
+			'_box_shadow_box_shadow'      => array(
+				'horizontal' => 0, 'vertical' => 4, 'blur' => 24,
+				'spread' => -2, 'color' => 'rgba(0,0,0,0.06)',
+			),
+			'padding'               => array(
+				'unit' => 'px', 'top' => '48', 'right' => '48',
+				'bottom' => '48', 'left' => '48', 'isLinked' => true,
+			),
+			'padding_mobile'        => array(
+				'unit' => 'px', 'top' => '28', 'right' => '20',
+				'bottom' => '28', 'left' => '20', 'isLinked' => false,
+			),
+		) );
+
+		return PressGo_Element_Factory::outer( $cfg,
+			array( PressGo_Element_Factory::row( $cfg, array( $card_col ), 0 ) ),
+			$c['light_bg'], null, 70, 70 );
+	}
+
+	// ──────────────────────────────────────────────
+	// 17c. Newsletter Inline (headline left, button right — compact)
 	// ──────────────────────────────────────────────
 
 	public static function build_newsletter_inline( $cfg ) {

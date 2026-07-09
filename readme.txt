@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.2
+Stable tag: 2.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,7 +32,8 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 * Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
 * "Watch URL" — share a live preview link with clients while you build
 * 19 section types with 56 layout variants
-* Every element is native Elementor — fully editable, no shortcodes
+* Every element is native Elementor — fully editable
+* Embeds your existing WPForms / Contact Form 7 / Gravity / Ninja / Fluent forms as real working forms
 * Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
 * Choose your Claude model: Sonnet 4.5 (default for paid), Opus 4.6, or Haiku 4.5 (free)
 * Works with Elementor Free — no Pro required
@@ -57,6 +58,7 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 * Final CTA (4 variants: default, card, image, split with checklist)
 * Footer (2 variants: dark, light)
 * Blog posts grid (requires Elementor Pro)
+* Form embed (your existing form-plugin form in a styled card)
 * Legal disclaimer
 
 **How It Works:**
@@ -189,6 +191,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.3 =
+* REAL FORMS: the AI can now place your existing WPForms, Contact Form 7, Gravity Forms, Ninja Forms, or Fluent Forms form on any page it builds — ask for "the contact form" and it embeds the actual working form (its styling and submissions stay with your form plugin). If the form you want doesn't exist yet, it tells you exactly where to create it instead of faking one
+* "Change it back" now actually changes it back: saying undo/revert in chat instantly restores the page's previous snapshot — no AI call, no credits used, and History (the clock icon) still holds every earlier version
+* The AI is now explicit about edit scope: chat edits touch only the page you have open, and it tells you when a site-brand change will restyle other PressGo pages
+* Failed applies now report why they failed, and the credit refund carries the reason — so those rare "built but didn't render" moments get fixed instead of shrugged at
 
 = 2.5.2 =
 * One-click account creation: fresh installs can now create their free PressGo account (10 builds/month) right inside the builder — enter your email, click once, start building. No more copying keys between browser tabs

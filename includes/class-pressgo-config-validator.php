@@ -125,7 +125,7 @@ class PressGo_Config_Validator {
 			// Auto-detect sections from config keys.
 			$known_sections = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
 				'schedule', 'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
-				'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final',
+				'logo_bar', 'team', 'gallery', 'newsletter', 'form_embed', 'map', 'cta_final',
 				'sticky_bar', 'footer', 'disclaimer' );
 			$detected = array();
 			foreach ( $known_sections as $s ) {
@@ -912,7 +912,7 @@ class PressGo_Config_Validator {
 		}
 		$known = array( 'hero', 'stats', 'social_proof', 'features', 'steps',
 			'schedule', 'results', 'competitive_edge', 'testimonials', 'faq', 'blog', 'pricing',
-			'logo_bar', 'team', 'gallery', 'newsletter', 'map', 'cta_final',
+			'logo_bar', 'team', 'gallery', 'newsletter', 'form_embed', 'map', 'cta_final',
 			'sticky_bar', 'footer', 'disclaimer' );
 		$counts = array();
 		$order  = array();

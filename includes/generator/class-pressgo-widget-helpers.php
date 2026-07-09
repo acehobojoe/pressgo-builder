@@ -394,6 +394,18 @@ class PressGo_Widget_Helpers {
 	}
 
 	/**
+	 * Shortcode widget — renders any WP shortcode. The workhorse behind
+	 * form_embed: WPForms / CF7 / Gravity / Ninja forms all render through
+	 * their own shortcode, styled by their own plugin, inside the PressGo
+	 * layout.
+	 */
+	public static function shortcode_w( $shortcode ) {
+		return PressGo_Element_Factory::widget( 'shortcode', array(
+			'shortcode' => (string) $shortcode,
+		) );
+	}
+
+	/**
 	 * Divider widget.
 	 */
 	public static function divider_w( $color = 'rgba(0,0,0,0.08)', $width = 100, $align = 'center', $weight = 1 ) {

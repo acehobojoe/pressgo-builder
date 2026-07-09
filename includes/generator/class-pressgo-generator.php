@@ -30,6 +30,7 @@ class PressGo_Generator {
 		'team'             => 'build_team',
 		'gallery'          => 'build_gallery',
 		'newsletter'       => 'build_newsletter',
+		'form_embed'       => 'build_form_embed',
 		'map'              => 'build_map',
 		// Sticky bar sits between content and trailing chrome in canonical
 		// order — reconcile_sections splices an unlisted instance right before
