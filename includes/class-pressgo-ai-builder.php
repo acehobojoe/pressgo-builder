@@ -76,6 +76,9 @@ class PressGo_AI_Builder {
 		// Ajax endpoints (logged-in users only).
 		add_action( 'wp_ajax_pressgo_ai_chat',         array( $this, 'ajax_chat' ) );
 		add_action( 'wp_ajax_pressgo_ai_quick_register', array( $this, 'ajax_quick_register' ) );
+		add_action( 'wp_ajax_pressgo_ai_hand_raise',      array( $this, 'ajax_hand_raise' ) );
+		add_action( 'wp_ajax_pressgo_ai_hand_raise_seen', array( $this, 'ajax_hand_raise_seen' ) );
+		add_action( 'wp_ajax_pressgo_ai_hand_raise_done', array( $this, 'ajax_hand_raise_done' ) );
 		add_action( 'wp_ajax_pressgo_ai_toggle',       array( $this, 'ajax_toggle' ) );
 		add_action( 'wp_ajax_pressgo_ai_create_page',  array( $this, 'ajax_create_page' ) );
 		add_action( 'wp_ajax_pressgo_ai_get_chat',     array( $this, 'ajax_get_chat' ) );
@@ -202,7 +205,12 @@ class PressGo_AI_Builder {
 		$resp = wp_remote_post( $base . '/api/plugin/quick-register', array(
 			'timeout' => 20,
 			'headers' => array( 'Content-Type' => 'application/json' ),
-			'body'    => wp_json_encode( array( 'email' => $email, 'site_url' => home_url() ) ),
+			'body'    => wp_json_encode( array(
+				'email'      => $email,
+				'site_url'   => home_url(),
+				// Signup-time hand-raise: earliest agency-lead signal we get.
+				'wants_help' => ! empty( $_POST['wants_help'] ),
+			) ),
 		) );
 		if ( is_wp_error( $resp ) ) {
 			wp_send_json_error( array( 'message' => 'Could not reach pressgo.app — check your connection and try again.' ) );
@@ -223,6 +231,48 @@ class PressGo_AI_Builder {
 		update_option( 'pressgo_account_key', sanitize_text_field( $body['apiKey'] ) );
 		delete_transient( 'pressgo_settings_allowance' );
 		wp_send_json_success( array( 'email' => $email ) );
+	}
+
+	/**
+	 * Hand-raise: the user asked for human help from PressGo Digital. Relays
+	 * to the backend (which emails the team with their build history) and
+	 * marks the ask resolved so the card never nags again.
+	 */
+	public function ajax_hand_raise() {
+		$this->check_auth();
+		$api_key = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' === $api_key ) {
+			wp_send_json_error( array( 'message' => 'No PressGo account connected.' ) );
+		}
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$resp = wp_remote_post( $base . '/api/plugin/hand-raise', array(
+			'timeout' => 15,
+			'headers' => array( 'Content-Type' => 'application/json', 'X-PressGo-Key' => $api_key ),
+			'body'    => wp_json_encode( array(
+				'site_url' => home_url(),
+				'source'   => 'builder_card',
+				'note'     => sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) ),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) {
+			wp_send_json_error( array( 'message' => 'Could not send right now — email joe@pressgodigital.com directly.' ) );
+		}
+		update_option( 'pressgo_hand_raise_done', 'raised', false );
+		wp_send_json_success();
+	}
+
+	/** Hand-raise card actually rendered — burn a shown-credit. */
+	public function ajax_hand_raise_seen() {
+		$this->check_auth();
+		update_option( 'pressgo_hand_raise_shown', (int) get_option( 'pressgo_hand_raise_shown', 0 ) + 1, false );
+		wp_send_json_success();
+	}
+
+	/** Hand-raise dismissed — never ask again. */
+	public function ajax_hand_raise_done() {
+		$this->check_auth();
+		update_option( 'pressgo_hand_raise_done', 'dismissed', false );
+		wp_send_json_success();
 	}
 
 	/**
@@ -4683,6 +4733,17 @@ class PressGo_AI_Builder {
 					echo wp_json_encode( array(
 						'needsAccount' => ! PressGo_Admin::has_api_configured(),
 						'adminEmail'   => sanitize_email( get_option( 'admin_email', '' ) ),
+					) );
+				?>,
+				handRaise: <?php
+					// "Talk to a human" card — the agency-attach signal. Shows
+					// after the 2nd successful build (they've gotten real value,
+					// they're serious), max 3 renders ever, any click ends it.
+					$hr_builds = (int) get_option( 'pressgo_build_count', 0 );
+					echo wp_json_encode( array(
+						'ask' => ( $hr_builds >= 2
+							&& ! get_option( 'pressgo_hand_raise_done' )
+							&& (int) get_option( 'pressgo_hand_raise_shown', 0 ) < 3 ),
 					) );
 				?>,
 				firstRun: <?php

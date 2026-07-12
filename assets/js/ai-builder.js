@@ -653,6 +653,15 @@
 		btn.type = 'button';
 		btn.textContent = 'Create my free account';
 		btn.style.cssText = 'background:#5b4fff;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
+		var helpWrap = document.createElement('label');
+		helpWrap.style.cssText = 'display:flex;align-items:flex-start;gap:7px;margin-top:10px;font-size:12px;color:#4b5563;cursor:pointer;width:100%';
+		var helpCb = document.createElement('input');
+		helpCb.type = 'checkbox';
+		helpCb.style.cssText = 'margin-top:2px;';
+		var helpTxt = document.createElement('span');
+		helpTxt.textContent = 'I’d also like a free review of my site from a real marketing team (PressGo is built by one)';
+		helpWrap.appendChild(helpCb);
+		helpWrap.appendChild(helpTxt);
 		var msg = document.createElement('div');
 		msg.style.cssText = 'margin-top:8px;font-size:12px;color:#6b7280;width:100%';
 		msg.innerHTML = 'Already have an account? <a href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Get your key from the dashboard</a> and paste it under PressGo &gt; Settings.';
@@ -665,6 +674,7 @@
 			fd.append('action', 'pressgo_ai_quick_register');
 			fd.append('nonce', cfg.nonce);
 			fd.append('email', email);
+			if (helpCb.checked) fd.append('wants_help', '1');
 			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 				.then(function (r) { return r.json(); })
 				.then(function (j) {
@@ -693,6 +703,7 @@
 		row.appendChild(em);
 		row.appendChild(btn);
 		card.appendChild(row);
+		card.appendChild(helpWrap);
 		card.appendChild(msg);
 		append(card);
 	}
@@ -1189,7 +1200,7 @@
 					// next-page chips for the following build — two cards
 					// stacking after one event buries both.
 					refreshUsage(); // a build just landed — update the daily bar
-					if (!maybeAskReview()) { maybeOfferNextPages(); }
+					if (!maybeAskReview() && !maybeAskHandRaise()) { maybeOfferNextPages(); }
 					// First build on a brand-less site just LEARNED the brand —
 					// surface it without requiring a reload.
 					if (cfg.brand && !cfg.brand.exists && !brandHintShown) {
@@ -1948,6 +1959,70 @@
 		no.textContent = 'No thanks';
 		no.style.cssText = 'background:transparent;border:1px solid #e2e0f4;color:#6b7280;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;';
 		no.addEventListener('click', function () { done('dismissed'); });
+		rowEl.appendChild(yes);
+		rowEl.appendChild(no);
+		card.appendChild(rowEl);
+		append(card);
+		return true;
+	}
+
+	// ===== Hand-raise (talk to a human — after 2nd build, max 3 shows) =====
+	// PressGo is built by a working marketing agency; users who want human
+	// help are the most valuable signal in the product. Peak moment only
+	// (right after a successful build), never the same turn as the review ask.
+	var handRaiseRendered = false;
+	function maybeAskHandRaise() {
+		var h = cfg.handRaise;
+		if (!h || !h.ask || handRaiseRendered) return false;
+		handRaiseRendered = true;
+		var seenFd = new FormData();
+		seenFd.append('action', 'pressgo_ai_hand_raise_seen');
+		seenFd.append('nonce', cfg.nonce);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: seenFd });
+		var card = el('pg-msg pg-msg-built');
+		card.style.borderColor = '#10b981';
+		var txt = document.createElement('div');
+		txt.innerHTML = '<strong>PressGo is built by a real marketing agency.</strong><div style="margin-top:4px">Want a human to look at your site and tell you how to get more leads from it? Free 15 minute review, no strings.</div>';
+		card.appendChild(txt);
+		var rowEl = document.createElement('div');
+		rowEl.style.cssText = 'margin-top:10px;display:flex;gap:8px;';
+		var yes = document.createElement('button');
+		yes.type = 'button';
+		yes.textContent = '🙋 Yes, review my site';
+		yes.style.cssText = 'background:#10b981;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
+		yes.addEventListener('click', function () {
+			yes.disabled = true;
+			yes.textContent = 'Sending…';
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_hand_raise');
+			fd.append('nonce', cfg.nonce);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					card.remove();
+					if (j && j.success) {
+						append(el('pg-msg-system', 'Done. A real person from PressGo Digital will email you within a business day with a review of your site.'));
+					} else {
+						var m = (j && j.data && j.data.message) ? j.data.message : 'Could not send. Email joe@pressgodigital.com directly.';
+						append(el('pg-msg-system', m));
+					}
+				})
+				.catch(function () {
+					card.remove();
+					append(el('pg-msg-system', 'Could not send. Email joe@pressgodigital.com directly.'));
+				});
+		});
+		var no = document.createElement('button');
+		no.type = 'button';
+		no.textContent = 'No thanks';
+		no.style.cssText = 'background:transparent;border:1px solid #e2e0f4;color:#6b7280;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;';
+		no.addEventListener('click', function () {
+			var fd = new FormData();
+			fd.append('action', 'pressgo_ai_hand_raise_done');
+			fd.append('nonce', cfg.nonce);
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd });
+			card.remove();
+		});
 		rowEl.appendChild(yes);
 		rowEl.appendChild(no);
 		card.appendChild(rowEl);

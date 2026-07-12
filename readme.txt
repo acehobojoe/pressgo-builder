@@ -4,11 +4,11 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.3
+Stable tag: 2.5.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI page builder for Elementor — describe a landing page, watch it build live, then refine by chat. Every element is a native Elementor widget.
+AI website builder for Elementor — describe your page in chat, watch it build live, refine by talking. Every element is a native Elementor widget.
 
 == Description ==
 
@@ -191,6 +191,10 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.4 =
+* Optional human help: PressGo is built by a working marketing agency (PressGo Digital), and you can now raise your hand for a free site review — a card in the builder after your second build, or a checkbox when you create your account. Totally optional, one click to dismiss forever
+* Listing copy refresh
 
 = 2.5.3 =
 * REAL FORMS: the AI can now place your existing WPForms, Contact Form 7, Gravity Forms, Ninja Forms, or Fluent Forms form on any page it builds — ask for "the contact form" and it embeds the actual working form (its styling and submissions stay with your form plugin). If the form you want doesn't exist yet, it tells you exactly where to create it instead of faking one
