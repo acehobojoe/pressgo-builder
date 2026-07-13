@@ -62,6 +62,10 @@ class PressGo_License {
 				'key'             => $key,
 				'plugin_version'  => defined( 'PRESSGO_VERSION' ) ? PRESSGO_VERSION : '0',
 				'site_url'        => home_url(),
+				// Two-key maze fix: if this site has no pg_ account key, the
+				// backend mints one for the license's owner and returns it —
+				// pasting just the license fully connects the builder.
+				'needs_account_key' => '' === trim( (string) get_option( 'pressgo_account_key', '' ) ),
 			) ),
 		) );
 
@@ -96,6 +100,15 @@ class PressGo_License {
 				'last_checked' => time(),
 				'source'       => 'remote',
 			);
+			// Auto-connect: the backend minted an account key for this
+			// license's owner because the site had none. Save it so the
+			// builder works from the very first license paste.
+			if ( ! empty( $body['account_key'] ) && is_string( $body['account_key'] )
+				&& 0 === strpos( $body['account_key'], 'pg_' )
+				&& '' === trim( (string) get_option( 'pressgo_account_key', '' ) ) ) {
+				update_option( 'pressgo_api_mode', 'pressgo' );
+				update_option( 'pressgo_account_key', sanitize_text_field( $body['account_key'] ) );
+			}
 		} else {
 			$state = array(
 				'valid'        => false,

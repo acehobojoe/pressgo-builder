@@ -6132,6 +6132,28 @@ class PressGo_AI_Builder {
 		$text = trim( (string) $text );
 		if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $text, $m ) ) { $text = trim( $m[1] ); }
 		$tree = json_decode( $text, true );
+		// Model wrapped the JSON in prose ("Here's the section: {...} Let me
+		// know...") — the #1 real cause of "unusable tree" refunds. Carve out
+		// the first balanced {...} region, string-aware, and decode that.
+		if ( ! is_array( $tree ) ) {
+			$start = strpos( $text, '{' );
+			if ( false !== $start ) {
+				$depth = 0; $in_str = false; $esc = false; $end = -1;
+				$len = strlen( $text );
+				for ( $i = $start; $i < $len; $i++ ) {
+					$ch = $text[ $i ];
+					if ( $esc ) { $esc = false; continue; }
+					if ( '\\' === $ch && $in_str ) { $esc = true; continue; }
+					if ( '"' === $ch ) { $in_str = ! $in_str; continue; }
+					if ( $in_str ) { continue; }
+					if ( '{' === $ch ) { $depth++; }
+					elseif ( '}' === $ch ) { $depth--; if ( 0 === $depth ) { $end = $i; break; } }
+				}
+				if ( $end > $start ) {
+					$tree = json_decode( substr( $text, $start, $end - $start + 1 ), true );
+				}
+			}
+		}
 		if ( ! is_array( $tree ) || ( isset( $tree['type'] ) && 'section' !== $tree['type'] ) ) { return null; }
 		return $tree;
 	}
