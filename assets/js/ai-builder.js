@@ -539,7 +539,7 @@
 	var STARTERS = [
 		{ chip: 'Roofing company', text: 'A landing page for my roofing company that gets homeowners to book a free roof inspection. Highlight that we\'re local, licensed, and fast. Include reviews and a quote form.' },
 		{ chip: 'Yoga studio', text: 'A landing page for my yoga studio that gets people to sign up for a free intro class. Calm, welcoming vibe with class types, a schedule, and a signup form.' },
-		{ chip: 'SaaS app', text: 'A landing page for my SaaS app that gets visitors to start a free trial. Clear value prop, three key features, social proof, and a strong call to action.' },
+		{ chip: 'Google Ads page', text: 'A landing page for my Google Ads campaign that turns clicks into phone calls. One clear offer, trust points, real reviews, and a quote form. My business: (describe it here)' },
 		{ chip: 'Dentist', text: 'A landing page for my dental practice that gets new patients to request an appointment. Friendly and trustworthy, with services, insurance info, and a booking form.' },
 		{ chip: 'Restaurant', text: 'A landing page for my restaurant that drives reservations and online orders. Showcase the menu highlights, atmosphere photos, hours, and location.' },
 	];
@@ -726,7 +726,7 @@
 				setTimeout(function () { input.focus(); }, 50);
 				return;
 			}
-			append(el('pg-msg-system', 'Tell me what kind of page you want — business, vibe, the goal. I\'ll ask 1-2 follow-ups then build a first draft.'));
+			append(el('pg-msg-system', 'Tell me about your business and what this page should get people to do: call, book, or fill out a form. I\'ll ask 1-2 follow-ups, then build a first draft.'));
 			return;
 		}
 		messages.forEach(function (m) {
@@ -1032,6 +1032,47 @@
 			});
 	}
 
+	// ===== Stream-death recovery =====
+	// Both Jul 13 test hangs: the SERVER finished the build while the browser
+	// stream died (proxy buffering, deploys, wifi) — the user stared at a
+	// spinner over finished work. Don't guess; ask the server what happened.
+	// If the stored history's last turn is an assistant reply, the turn
+	// completed: render it, refresh the preview, move on.
+	function recoverFromStreamDeath() {
+		var note = el('pg-msg-system', 'Connection hiccup — checking what actually happened…');
+		append(note);
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_get_chat');
+		fd.append('nonce', cfg.nonce);
+		fd.append('post_id', cfg.postId);
+		setTimeout(function () {
+			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+				.then(function (r) { return r.json(); })
+				.then(function (j) {
+					note.remove();
+					var msgs = (j && j.success && j.data && Array.isArray(j.data.messages)) ? j.data.messages : [];
+					var last = msgs.length ? msgs[msgs.length - 1] : null;
+					if (last && last.role === 'assistant') {
+						// Turn completed server-side — surface the reply we missed.
+						if (last.content) append(el('pg-msg pg-msg-assistant', last.content));
+						if (last.built) {
+							var b = el('pg-msg pg-msg-built');
+							b.innerHTML = '<strong>Built:</strong> ' + escapeHtml(last.summary || '(page updated)');
+							append(b);
+						}
+						reloadPreview(Date.now());
+						append(el('pg-msg-system', 'The connection dropped, but the work finished and saved. Preview refreshed — carry on.'));
+					} else {
+						append(el('pg-msg-error', 'The connection dropped and that request didn’t finish. Your page is unchanged — send it again.'));
+					}
+				})
+				.catch(function () {
+					note.remove();
+					append(el('pg-msg-warn', 'Connection dropped. Refresh this page — if your build finished, it’ll be here.'));
+				});
+		}, 2500);
+	}
+
 	function sendMessage(text) {
 		chatStarted = true; // any still-pending history retries become no-ops
 		// Optimistic user bubble — shows any attached images inline.
@@ -1104,10 +1145,10 @@
 			if (visionNotice) { visionNotice.remove(); visionNotice = null; }
 			clearBuildList();
 			// If the page already built, a stalled review is harmless — finish
-			// quietly. Otherwise the build itself stalled; tell the user how to
-			// recover.
+			// quietly. Otherwise ask the server what actually happened instead
+			// of guessing (the work often finished while the stream died).
 			if (!streamFailed && !builtOnce) {
-				append(el('pg-msg-warn', 'That stalled before finishing. Your page may have saved anyway — refresh the preview, or send your request again.'));
+				recoverFromStreamDeath();
 			}
 			setBusy(false);
 		}
@@ -1363,7 +1404,10 @@
 				var raw = (e && e.message) ? e.message : '';
 				var friendly;
 				if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
-					friendly = 'Network error — check your connection and try again.';
+					// Mid-stream network death — the server may have finished.
+					recoverFromStreamDeath();
+					setBusy(false);
+					return;
 				} else if (/^Upstream error/i.test(raw)) {
 					friendly = raw;
 				} else {
@@ -1479,9 +1523,14 @@
 			.catch(function (err) {
 				clearTimeout(pgAbortTimer);
 				think.stop(); think.node.remove();
-				append(el('pg-msg-error', (err && err.name === 'AbortError')
-					? 'That step took too long — skipped it. (You can ask for that section again.)'
-					: 'Network error during Pro mode compose — try again.'));
+				if (err && err.name === 'AbortError') {
+					append(el('pg-msg-error', 'That step took too long — skipped it. (You can ask for that section again.)'));
+				} else {
+					// Connection died mid-compose — the section often finishes
+					// and saves server-side anyway. Show it instead of an error.
+					reloadPreview(Date.now());
+					append(el('pg-msg-warn', 'The connection dropped mid-build. If the section finished, it’s in the preview now (just refreshed) — otherwise send that again.'));
+				}
 				setBusy(false);
 				if (done) done(null);
 			});
@@ -1799,6 +1848,16 @@
 						append(el('pg-msg-system', page.status === 'publish'
 							? 'Page is live: ' + page.url
 							: 'Page unpublished — back to draft.'));
+						// Post-publish is the peak hand-raise moment: a live
+						// page with nobody sending traffic to it is the exact
+						// pain the agency solves. Reuses the card's own caps
+						// (max 3 shows ever, any click ends it).
+						if (page.status === 'publish' && cfg.handRaise && cfg.handRaise.ask && !handRaiseRendered) {
+							setTimeout(function () {
+								append(el('pg-msg-system', 'Now the question every live page faces: who\'s sending traffic to it?'));
+								maybeAskHandRaise();
+							}, 900);
+						}
 					}
 				});
 		}

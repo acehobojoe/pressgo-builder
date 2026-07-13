@@ -1,20 +1,20 @@
-=== PressGo AI — Landing Page & Website Builder for Elementor ===
+=== PressGo AI — Landing Page Builder for Elementor ===
 Contributors: acehobojoe
-Tags: elementor, ai page builder, landing page, website builder, ai website builder
+Tags: elementor, landing page, landing page builder, lead generation, ai page builder
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.4
+Stable tag: 2.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI website builder for Elementor — describe your page in chat, watch it build live, refine by talking. Every element is a native Elementor widget.
+AI landing pages for businesses that run ads. Describe your page in chat, watch it build live in native Elementor. Built by a real marketing agency.
 
 == Description ==
 
-PressGo turns WordPress + Elementor into a chat-driven landing-page builder. Tell the AI what you want, watch it stream the page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, center the icons. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
+PressGo builds the page that makes your ads work. It turns WordPress + Elementor into a chat-driven landing-page builder for businesses that run Google and Meta ads (or want to): tell the AI about your offer, watch it stream a lead-focused page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, wire in your real contact form. Every element is a native Elementor widget, so you can jump into the Elementor editor for hands-on tweaks anytime.
 
-PressGo is an AI website builder and no-code landing page generator for WordPress: describe your page in plain English through a ChatGPT-style chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required.
+PressGo is an AI landing page builder for WordPress: describe your page in plain English through a chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page (or the ads sending traffic to it), that help is one click away.
 
 **Two ways to use it:**
 
@@ -191,6 +191,14 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.5 =
+* Paste one key, everything connects: entering your Plus license now automatically connects your account too — no more hunting for a second key
+* Forms work everywhere: on Elementor Free, AI-built forms now render your real Contact Form 7 / WPForms form (previously they could silently disappear), and asking for a specific form plugin is honored even when Elementor Pro is installed
+* Embedded forms now look designed: styled labels, inputs, and buttons that match your page, on light and dark layouts
+* Connection-drop recovery: if your connection hiccups mid-build, the builder now checks what actually finished and shows it instead of leaving you on a spinner
+* Smarter layouts when you have no photos yet: no more empty image slots or dead space
+* Refocused for landing pages: starter ideas and copy now speak to lead generation — calls, bookings, and form fills
 
 = 2.5.4 =
 * Optional human help: PressGo is built by a working marketing agency (PressGo Digital), and you can now raise your hand for a free site review — a card in the builder after your second build, or a checkbox when you create your account. Totally optional, one click to dismiss forever
