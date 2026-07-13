@@ -68,6 +68,12 @@ class PressGo_AI_Builder {
 		// keeps its own blank template when present.
 		add_filter( 'template_include', array( $this, 'maybe_canvas_template' ), 99 );
 
+		// Embedded form-plugin forms (form_embed section / Nova form fallback)
+		// need our scoped stylesheet or they render as raw browser controls —
+		// unreadable labels on dark cards, a 1998 Submit button. Tiny file,
+		// enqueued only on AI-built pages.
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_form_embed_css' ) );
+
 		// Purge caches after ANY Elementor save (not just AI-builder applies),
 		// so a designer who edits in the native Elementor editor and clicks
 		// Update/Publish sees their changes immediately instead of a stale page.
@@ -283,6 +289,20 @@ class PressGo_AI_Builder {
 		$this->check_auth();
 		update_option( 'pressgo_review_ask_done', sanitize_key( $_POST['choice'] ?? 'dismissed' ), false );
 		wp_send_json_success();
+	}
+
+	/** Scoped form styling on AI-built pages (see assets/css/pressgo-form-embed.css). */
+	public function enqueue_form_embed_css() {
+		if ( ! is_singular() ) { return; }
+		$post_id = get_queried_object_id();
+		if ( ! $post_id || ! get_post_meta( $post_id, self::META_AI_ENABLED, true ) ) { return; }
+		$css_path = PRESSGO_PLUGIN_DIR . 'assets/css/pressgo-form-embed.css';
+		wp_enqueue_style(
+			'pressgo-form-embed',
+			PRESSGO_PLUGIN_URL . 'assets/css/pressgo-form-embed.css',
+			array(),
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : PRESSGO_VERSION
+		);
 	}
 
 	/**

@@ -1,0 +1,128 @@
+/**
+ * PressGo form-embed styling — makes third-party form plugins (CF7, WPForms,
+ * Gravity, Ninja, Fluent) look designed inside PressGo layouts. Their default
+ * markup ships unstyled: gray-on-dark labels, raw browser inputs, a 1998
+ * Submit button. Scoped to .pressgo-form-embed so nothing leaks site-wide.
+ * Dark-card variant: .pressgo-form-embed-dark.
+ */
+
+.pressgo-form-embed p { margin: 0 0 16px; }
+
+.pressgo-form-embed label {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: #374151;
+	line-height: 1.4;
+}
+
+.pressgo-form-embed input[type="text"],
+.pressgo-form-embed input[type="email"],
+.pressgo-form-embed input[type="tel"],
+.pressgo-form-embed input[type="url"],
+.pressgo-form-embed input[type="number"],
+.pressgo-form-embed input[type="date"],
+.pressgo-form-embed select,
+.pressgo-form-embed textarea {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 12px 14px;
+	margin-top: 4px;
+	font-size: 15px;
+	line-height: 1.45;
+	color: #111827;
+	background: #ffffff;
+	border: 1px solid #d1d5db;
+	border-radius: 10px;
+	outline: none;
+	transition: border-color .15s, box-shadow .15s;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.pressgo-form-embed textarea { min-height: 120px; resize: vertical; }
+
+.pressgo-form-embed input:focus,
+.pressgo-form-embed select:focus,
+.pressgo-form-embed textarea:focus {
+	border-color: #6b7280;
+	box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.15);
+}
+
+.pressgo-form-embed input[type="submit"],
+.pressgo-form-embed button[type="submit"] {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 14px 22px;
+	margin-top: 6px;
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	color: #ffffff;
+	background: #111827;
+	border: 0;
+	border-radius: 10px;
+	cursor: pointer;
+	transition: opacity .15s, transform .05s;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.pressgo-form-embed input[type="submit"]:hover,
+.pressgo-form-embed button[type="submit"]:hover { opacity: 0.9; }
+.pressgo-form-embed input[type="submit"]:active,
+.pressgo-form-embed button[type="submit"]:active { transform: translateY(1px); }
+
+/* Plugin-specific tidy-ups */
+.pressgo-form-embed .wpcf7-spinner { display: block; margin: 8px auto 0; }
+.pressgo-form-embed .wpcf7-response-output,
+.pressgo-form-embed .wpforms-error,
+.pressgo-form-embed .gform_validation_errors {
+	margin: 12px 0 0;
+	padding: 10px 14px;
+	font-size: 14px;
+	border-radius: 8px;
+	border: 1px solid #fca5a5;
+	background: #fef2f2;
+	color: #991b1b;
+}
+.pressgo-form-embed .wpcf7-form.sent .wpcf7-response-output {
+	border-color: #86efac;
+	background: #f0fdf4;
+	color: #166534;
+}
+.pressgo-form-embed .wpcf7-not-valid-tip { font-size: 13px; color: #dc2626; margin-top: 4px; }
+
+/* ── Dark-card variant ─────────────────────────────────────────── */
+.pressgo-form-embed-dark label { color: rgba(255, 255, 255, 0.88); }
+
+.pressgo-form-embed-dark input[type="text"],
+.pressgo-form-embed-dark input[type="email"],
+.pressgo-form-embed-dark input[type="tel"],
+.pressgo-form-embed-dark input[type="url"],
+.pressgo-form-embed-dark input[type="number"],
+.pressgo-form-embed-dark input[type="date"],
+.pressgo-form-embed-dark select,
+.pressgo-form-embed-dark textarea {
+	color: #111827;
+	background: rgba(255, 255, 255, 0.96);
+	border-color: rgba(255, 255, 255, 0.25);
+}
+.pressgo-form-embed-dark input:focus,
+.pressgo-form-embed-dark select:focus,
+.pressgo-form-embed-dark textarea:focus {
+	border-color: rgba(255, 255, 255, 0.6);
+	box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.pressgo-form-embed-dark input[type="submit"],
+.pressgo-form-embed-dark button[type="submit"] {
+	color: #111827;
+	background: #ffffff;
+}
+
+.pressgo-form-embed-dark .wpcf7-response-output,
+.pressgo-form-embed-dark .wpforms-error {
+	background: rgba(254, 242, 242, 0.95);
+}

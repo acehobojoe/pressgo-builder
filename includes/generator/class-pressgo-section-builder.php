@@ -6673,7 +6673,8 @@ class PressGo_Section_Builder {
 		if ( ! empty( $children ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 24 );
 		}
-		$children[] = PressGo_Widget_Helpers::shortcode_w( $shortcode );
+		$children[] = PressGo_Widget_Helpers::shortcode_w( $shortcode,
+			'pressgo-form-embed' . ( PressGo_Style_Utils::$dark_theme ? ' pressgo-form-embed-dark' : '' ) );
 		if ( ! empty( $fe['note'] ) && is_scalar( $fe['note'] ) ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 14 );
 			$children[] = PressGo_Widget_Helpers::text_w( $cfg, (string) $fe['note'], 'center',

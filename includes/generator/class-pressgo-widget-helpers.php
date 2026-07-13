@@ -399,9 +399,12 @@ class PressGo_Widget_Helpers {
 	 * their own shortcode, styled by their own plugin, inside the PressGo
 	 * layout.
 	 */
-	public static function shortcode_w( $shortcode ) {
+	public static function shortcode_w( $shortcode, $classes = 'pressgo-form-embed' ) {
 		return PressGo_Element_Factory::widget( 'shortcode', array(
-			'shortcode' => (string) $shortcode,
+			'shortcode'    => (string) $shortcode,
+			// Scoped styling hook — assets/css/pressgo-form-embed.css makes
+			// the third-party form's raw markup match the page design.
+			'_css_classes' => (string) $classes,
 		) );
 	}
 

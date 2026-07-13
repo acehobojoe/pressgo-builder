@@ -811,9 +811,13 @@ class PressGo_Freeform_Renderer {
 		// An EXPLICIT form-plugin shortcode wins on ANY tier — "use my
 		// contact form 7" must place the user's real form even when Pro's
 		// native form widget is available.
-		$explicit = ! empty( $s['shortcode'] ) && is_scalar( $s['shortcode'] ) ? trim( (string) $s['shortcode'] ) : '';
+		$explicit  = ! empty( $s['shortcode'] ) && is_scalar( $s['shortcode'] ) ? trim( (string) $s['shortcode'] ) : '';
+		// Scoped styling (assets/css/pressgo-form-embed.css): the form plugin's
+		// raw markup gets designed inputs/labels/button; dark cards flip the
+		// variant so labels stay legible.
+		$sc_class  = 'pressgo-form-embed' . ( ! empty( $s['on_dark'] ) ? ' pressgo-form-embed-dark' : '' );
 		if ( '' !== $explicit && preg_match( $sc_allow, $explicit ) ) {
-			return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $explicit ) );
+			return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $explicit, '_css_classes' => $sc_class ) );
 		}
 		if ( ! class_exists( 'PressGo' ) || ! PressGo::is_elementor_pro_active() ) {
 			// Elementor FREE: no native form widget. Fall back to a REAL form
@@ -823,7 +827,7 @@ class PressGo_Freeform_Renderer {
 			if ( class_exists( 'PressGo_AI_Builder' ) ) {
 				$site_forms = PressGo_AI_Builder::site_form_shortcodes( 1 );
 				if ( ! empty( $site_forms ) && preg_match( $sc_allow, $site_forms[0]['shortcode'] ) ) {
-					return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $site_forms[0]['shortcode'] ) );
+					return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $site_forms[0]['shortcode'], '_css_classes' => $sc_class ) );
 				}
 			}
 			return null;
