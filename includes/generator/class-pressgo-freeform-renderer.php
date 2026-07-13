@@ -807,7 +807,25 @@ class PressGo_Freeform_Renderer {
 	 * settings: fields[{label,type,required,width,options}], button, on_dark, recipient.
 	 */
 	private static function render_form( $s, $cfg ) {
+		$sc_allow = '/^\[(contact-form-7|wpforms|gravityform|ninja_form|fluentform|formidable|forminator_form|happyforms)(\s[^\[\]]*)?\]$/i';
+		// An EXPLICIT form-plugin shortcode wins on ANY tier — "use my
+		// contact form 7" must place the user's real form even when Pro's
+		// native form widget is available.
+		$explicit = ! empty( $s['shortcode'] ) && is_scalar( $s['shortcode'] ) ? trim( (string) $s['shortcode'] ) : '';
+		if ( '' !== $explicit && preg_match( $sc_allow, $explicit ) ) {
+			return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $explicit ) );
+		}
 		if ( ! class_exists( 'PressGo' ) || ! PressGo::is_elementor_pro_active() ) {
+			// Elementor FREE: no native form widget. Fall back to a REAL form
+			// from the site's form plugin (CF7/WPForms/Gravity/Ninja/Fluent)
+			// via the shortcode widget — before this the form block silently
+			// VANISHED on Free sites (users got a lead-gen page with no form).
+			if ( class_exists( 'PressGo_AI_Builder' ) ) {
+				$site_forms = PressGo_AI_Builder::site_form_shortcodes( 1 );
+				if ( ! empty( $site_forms ) && preg_match( $sc_allow, $site_forms[0]['shortcode'] ) ) {
+					return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $site_forms[0]['shortcode'] ) );
+				}
+			}
 			return null;
 		}
 		$c         = isset( $cfg['colors'] ) && is_array( $cfg['colors'] ) ? $cfg['colors'] : array();

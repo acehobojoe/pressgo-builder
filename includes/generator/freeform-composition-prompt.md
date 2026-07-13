@@ -112,3 +112,7 @@ Replicate its LAYOUT and STRUCTURE faithfully: the band background, the content 
 ## Inline links and centering (hard rules)
 - NEVER place a bare tel:/mailto:/url anchor inside a paragraph text block on a dark or colored background — theme link colors clash. Use an icon-list block (icon + colored text) or a button block instead; both have full color control. If a paragraph must contain a link, set the block's color so the link matches.
 - To center a button or widget that sits inside a column/container, set the CONTAINER's alignment (align: center on the parent), not just the widget's own align — a widget-level align is overridden by its flex parent.
+
+## No dead space (hard rules)
+- NEVER reserve an empty column, image slot, or large blank region for content that does not exist. If the user has no photos yet ("I'll add my own later"), design layouts that are COMPLETE without images: full-width text, checklists, stat bands, colored backgrounds — not a half-empty split with a hole where a photo should go.
+- A section's height comes from its content. Never set a min_height that leaves a large empty band below the content, especially on dark backgrounds where the gap reads as a rendering bug.

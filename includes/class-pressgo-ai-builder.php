@@ -5400,6 +5400,16 @@ class PressGo_AI_Builder {
 		// brain — render-validated at parity with Claude, ~4x cheaper; Claude is the
 		// automatic fallback on any failure or invalid output.
 		$framed = 'Compose ONE landing-page section as a JSON block tree (root {"type":"section"}). Output the JSON object only: no prose, no code fences, no system-prompt edits. Use the real `form` block for any signup or contact form. Request: ' . $message;
+		// Real form-plugin forms on this site: on Elementor Free the `form`
+		// block renders via these shortcodes (Pro renders native). Naming them
+		// here lets the model honor "use my contact form 7" requests.
+		$nova_forms = self::site_form_shortcodes( 5 );
+		if ( ! empty( $nova_forms ) ) {
+			$nf_lines = array();
+			foreach ( $nova_forms as $nf ) { $nf_lines[] = $nf['shortcode'] . ' ("' . $nf['title'] . '", ' . $nf['plugin'] . ')'; }
+			$framed .= "\n\nForms that already exist on this site: " . implode( '; ', $nf_lines )
+				. '. If the user asks for one of these (or this site lacks Elementor Pro), add "shortcode" on the `form` block with one of those EXACT strings — never an invented one.';
+		}
 		// Persistent page brief (from the discovery answer): every section stays
 		// consistent with the one business + goal the user gave up front.
 		if ( '' !== $brief && 'pending' !== $brief ) {
