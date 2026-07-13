@@ -27,7 +27,7 @@ Browser → admin-ajax (WordPress)
 ```
 
 ## Key Files
-- `pressgo.php` — Plugin bootstrap, constants, version (1.4.0)
+- `pressgo.php` — Plugin bootstrap, constants, version (2.5.4 as of Jul 2026 — check the file, this doc lags)
 - `includes/class-pressgo.php` — Singleton, loads dependencies
 - `includes/class-pressgo-admin.php` — Admin pages, settings (API mode toggle, PressGo key, Claude key, model)
 - `includes/class-pressgo-rest-api.php` — SSE streaming endpoint (admin-ajax), connection test (both modes)
@@ -42,7 +42,7 @@ Browser → admin-ajax (WordPress)
 - **Plugin API**: `POST /api/plugin/generate` — key auth, credit deduction, Claude streaming
 - **Credits check**: `GET /api/plugin/credits` — lightweight balance check for plugin settings page
 - **Account management**: `/api/account/credits`, `/api/account/api-keys`, `/api/account/usage`
-- **Stripe checkout**: `/api/account/purchase-credits` — micro ($1/5), small ($2.50/15), starter ($7/50), pro ($24/200)
+- **Stripe checkout**: `/api/account/purchase-credits` — $15 one-time 75-credit pack (canonical since May 2026; older pack names in code are legacy)
 
 ### Credit System
 - 3 free credits/month per account (resets monthly)
