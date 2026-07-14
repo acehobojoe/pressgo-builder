@@ -1546,6 +1546,13 @@
 		Object.keys(fields).forEach(function (k) {
 			if (fields[k] != null) fd.append(k, fields[k]);
 		});
+		if (pendingPdf) {
+			fd.append('pdf_base64', pendingPdf.base64);
+			fd.append('pdf_name', pendingPdf.name);
+			append(el('pg-msg-system', '\uD83D\uDCC4 Reading your brief (' + pendingPdf.name + ')\u2026 I\u2019ll build it one section at a time with your exact copy.'));
+			pendingPdf = null;
+			renderStrip();
+		}
 
 		// A hung request must never freeze a build run forever — abort at 5 minutes
 		// (GLM compose is capped at 4) and let the runner move on.

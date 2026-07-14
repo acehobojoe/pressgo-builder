@@ -1025,6 +1025,39 @@ class PressGo_AI_Builder {
 	 * Detect a bare revert/undo message. Long messages are left to the AI —
 	 * they usually carry specifics ("revert the hero but keep the new copy").
 	 */
+	/**
+	 * Brief PDF (BRIEF MODE): extract once via the backend (Claude reads PDFs
+	 * natively), store on the page, and from then on every turn — Ada or
+	 * Nova — builds from it section by section with exact copy. Committing
+	 * META_FREEFORM_BRIEF also marks Nova discovery as done, so a PDF user
+	 * never gets interviewed about things their brief already answers.
+	 */
+	private function maybe_ingest_brief_pdf( $post_id ) {
+		$pdf_b64 = isset( $_POST['pdf_base64'] ) ? preg_replace( '/[^A-Za-z0-9+\/=]/', '', (string) $_POST['pdf_base64'] ) : '';
+		if ( '' === $pdf_b64 || strlen( $pdf_b64 ) < 100 ) { return false; }
+		$brief_key = (string) get_option( 'pressgo_account_key', '' );
+		$base      = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$bresp     = wp_remote_post( $base . '/api/plugin/extract-brief', array(
+			'timeout' => 90,
+			'headers' => array( 'Content-Type' => 'application/json', 'X-PressGo-Key' => $brief_key ),
+			'body'    => wp_json_encode( array( 'pdf_base64' => $pdf_b64 ) ),
+		) );
+		$bbody = json_decode( wp_remote_retrieve_body( $bresp ), true );
+		if ( is_wp_error( $bresp ) || 200 !== (int) wp_remote_retrieve_response_code( $bresp ) || empty( $bbody['text'] ) ) {
+			// Non-fatal: the turn continues without the brief (the model asks
+			// for pasted text) — never a silent mid-stream failure.
+			return false;
+		}
+		update_post_meta( $post_id, '_pressgo_brief', wp_slash( (string) $bbody['text'] ) );
+		update_post_meta( $post_id, '_pressgo_brief_name', sanitize_file_name( wp_unslash( $_POST['pdf_name'] ?? 'brief.pdf' ) ) );
+		// Nova: a committed freeform brief means discovery is DONE.
+		$ff_brief = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
+		if ( '' === trim( $ff_brief ) || 'pending' === $ff_brief ) {
+			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, wp_slash( 'Build from the attached BRIEF DOCUMENT: the business, goal, sections and exact copy are all defined in it. Follow it section by section.' ) );
+		}
+		return true;
+	}
+
 	private function is_revert_request( $message ) {
 		$m = strtolower( trim( $message ) );
 		if ( '' === $m || ( function_exists( 'mb_strlen' ) ? mb_strlen( $m ) : strlen( $m ) ) > 80 ) {
@@ -4956,6 +4989,7 @@ class PressGo_AI_Builder {
 			wp_send_json_success( $this->cohesion_reorder_keys( $post_id, is_array( $keys ) ? $keys : array() ) );
 		}
 		$message = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
+		$this->maybe_ingest_brief_pdf( $post_id );
 		if ( ! $post_id || '' === trim( $message ) ) {
 			wp_send_json_error( 'Tell me what section to build.', 400 );
 		}
@@ -5429,6 +5463,21 @@ class PressGo_AI_Builder {
 			foreach ( $nova_forms as $nf ) { $nf_lines[] = $nf['shortcode'] . ' ("' . $nf['title'] . '", ' . $nf['plugin'] . ')'; }
 			$framed .= "\n\nForms that already exist on this site: " . implode( '; ', $nf_lines )
 				. '. If the user asks for one of these (or this site lacks Elementor Pro), add "shortcode" on the `form` block with one of those EXACT strings — never an invented one.';
+		}
+
+		// BRIEF MODE (Nova): the client's PDF brief rides along on every
+		// compose. One section per message is Nova's native rhythm — the
+		// instruction pins WHICH section and demands verbatim copy.
+		$brief_doc = (string) get_post_meta( $post_id, '_pressgo_brief', true );
+		if ( '' !== trim( $brief_doc ) ) {
+			$built_roles = array();
+			foreach ( (array) get_post_meta( $post_id, '_pressgo_ff_sections', true ) as $ffs ) {
+				if ( is_array( $ffs ) && ! empty( $ffs['role'] ) ) { $built_roles[] = (string) $ffs['role']; }
+			}
+			$framed .= "\n\nBRIEF DOCUMENT (the client's copy brief — copy is EXACT: same language, same wording, never paraphrase or translate):\n"
+				. mb_substr( $brief_doc, 0, 50000 ) . "\n(END OF BRIEF DOCUMENT)\n"
+				. 'Sections already built on this page: ' . ( $built_roles ? implode( ', ', $built_roles ) : 'none' )
+				. '. Unless the user names a specific section, build the NEXT section from the brief that is not yet on the page — exactly one.';
 		}
 		// Persistent page brief (from the discovery answer): every section stays
 		// consistent with the one business + goal the user gave up front.
@@ -6756,28 +6805,7 @@ class PressGo_AI_Builder {
 		}
 		$has_images = ! empty( $images );
 
-		// Brief PDF (BRIEF MODE): extract once via the backend (Claude reads
-		// PDFs natively), store on the page, and from then on every turn
-		// builds from it section by section with exact copy.
-		$pdf_b64 = isset( $_POST['pdf_base64'] ) ? preg_replace( '/[^A-Za-z0-9+\/=]/', '', (string) $_POST['pdf_base64'] ) : '';
-		if ( '' !== $pdf_b64 && strlen( $pdf_b64 ) > 100 ) {
-			$brief_key = (string) get_option( 'pressgo_account_key', '' );
-			$base      = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
-			$bresp     = wp_remote_post( $base . '/api/plugin/extract-brief', array(
-				'timeout' => 90,
-				'headers' => array( 'Content-Type' => 'application/json', 'X-PressGo-Key' => $brief_key ),
-				'body'    => wp_json_encode( array( 'pdf_base64' => $pdf_b64 ) ),
-			) );
-			$bbody = json_decode( wp_remote_retrieve_body( $bresp ), true );
-			if ( ! is_wp_error( $bresp ) && 200 === (int) wp_remote_retrieve_response_code( $bresp ) && ! empty( $bbody['text'] ) ) {
-				update_post_meta( $post_id, '_pressgo_brief', wp_slash( (string) $bbody['text'] ) );
-				update_post_meta( $post_id, '_pressgo_brief_name', sanitize_file_name( wp_unslash( $_POST['pdf_name'] ?? 'brief.pdf' ) ) );
-			}
-			// Extraction failure is non-fatal: the turn continues without the
-			// brief and the model asks for pasted text (never fails silently
-			// mid-stream). The JS already told the user the brief was read.
-		}
-		unset( $pdf_b64 );
+		$this->maybe_ingest_brief_pdf( $post_id );
 
 		// Allow image-only sends (e.g. "match this style" with just a drop).
 		if ( ! $post_id || ( $user_msg === '' && ! $has_images ) ) {
