@@ -4672,7 +4672,7 @@ class PressGo_AI_Builder {
 									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images" aria-label="Attach images">
 										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 									</button>
-									<input type="file" id="pg-attach-input" accept="image/*" multiple hidden>
+									<input type="file" id="pg-attach-input" accept="image/*,application/pdf" multiple hidden>
 									<button type="button" class="pg-icon-btn pg-mic-btn" id="pg-mic-btn" data-state="idle" title="Record voice message" aria-label="Record voice message">
 										<svg class="pg-mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 											<rect x="9" y="2" width="6" height="11" rx="3"/>
@@ -6756,6 +6756,29 @@ class PressGo_AI_Builder {
 		}
 		$has_images = ! empty( $images );
 
+		// Brief PDF (BRIEF MODE): extract once via the backend (Claude reads
+		// PDFs natively), store on the page, and from then on every turn
+		// builds from it section by section with exact copy.
+		$pdf_b64 = isset( $_POST['pdf_base64'] ) ? preg_replace( '/[^A-Za-z0-9+\/=]/', '', (string) $_POST['pdf_base64'] ) : '';
+		if ( '' !== $pdf_b64 && strlen( $pdf_b64 ) > 100 ) {
+			$brief_key = (string) get_option( 'pressgo_account_key', '' );
+			$base      = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+			$bresp     = wp_remote_post( $base . '/api/plugin/extract-brief', array(
+				'timeout' => 90,
+				'headers' => array( 'Content-Type' => 'application/json', 'X-PressGo-Key' => $brief_key ),
+				'body'    => wp_json_encode( array( 'pdf_base64' => $pdf_b64 ) ),
+			) );
+			$bbody = json_decode( wp_remote_retrieve_body( $bresp ), true );
+			if ( ! is_wp_error( $bresp ) && 200 === (int) wp_remote_retrieve_response_code( $bresp ) && ! empty( $bbody['text'] ) ) {
+				update_post_meta( $post_id, '_pressgo_brief', wp_slash( (string) $bbody['text'] ) );
+				update_post_meta( $post_id, '_pressgo_brief_name', sanitize_file_name( wp_unslash( $_POST['pdf_name'] ?? 'brief.pdf' ) ) );
+			}
+			// Extraction failure is non-fatal: the turn continues without the
+			// brief and the model asks for pasted text (never fails silently
+			// mid-stream). The JS already told the user the brief was read.
+		}
+		unset( $pdf_b64 );
+
 		// Allow image-only sends (e.g. "match this style" with just a drop).
 		if ( ! $post_id || ( $user_msg === '' && ! $has_images ) ) {
 			wp_send_json_error( 'bad request', 400 );
@@ -6911,6 +6934,15 @@ class PressGo_AI_Builder {
 				$image_note .= '- ' . $f['shortcode'] . ' — "' . $f['title'] . '" (' . $f['plugin'] . ")\n";
 			}
 			$image_note .= "The form keeps its plugin's styling and submission handling. If the user asks for a NEW form or different fields, tell them to create/edit it in their form plugin first (mention the plugin by name), then you'll place it.\n";
+		}
+
+		// BRIEF MODE context: the stored client brief rides along on every
+		// turn so "continúa" builds the next section with exact copy.
+		$brief_doc = (string) get_post_meta( $post_id, '_pressgo_brief', true );
+		if ( '' !== trim( $brief_doc ) ) {
+			$brief_name = (string) get_post_meta( $post_id, '_pressgo_brief_name', true );
+			$image_note .= "\n\nBRIEF DOCUMENT (client copy brief" . ( $brief_name ? ' from ' . $brief_name : '' ) . " — BRIEF MODE rules apply: build section by section, copy EXACT, one section per turn unless told otherwise):\n"
+				. mb_substr( $brief_doc, 0, 60000 ) . "\n(END OF BRIEF DOCUMENT)\n";
 		}
 
 		// Map THIS turn's attachments to their imported URLs. Without this the

@@ -55,6 +55,26 @@
 	var pendingImages = []; // [{ dataUrl, mediaType, base64, name, id }]
 	var MAX_IMAGES = 8;
 	var imgSeq = 0;
+	// One brief PDF at a time — a client copy doc the AI builds from,
+	// section by section (BRIEF MODE).
+	var pendingPdf = null; // { name, base64 }
+
+	function addPendingPdf(file) {
+		if (!file || file.type !== 'application/pdf') return;
+		if (file.size > 8 * 1024 * 1024) {
+			append(el('pg-msg-error', 'That PDF is too big (8MB max). Export a lighter copy or paste the text.'));
+			return;
+		}
+		var r = new FileReader();
+		r.onload = function () {
+			var b64 = String(r.result || '').split(',')[1] || '';
+			if (!b64) return;
+			pendingPdf = { name: file.name || 'brief.pdf', base64: b64 };
+			renderStrip();
+			updateSendState();
+		};
+		r.readAsDataURL(file);
+	}
 
 	function addPendingImage(file) {
 		if (!file || !/^image\//.test(file.type)) return;
@@ -169,7 +189,21 @@
 	function renderStrip() {
 		if (!attachStrip) return;
 		attachStrip.innerHTML = '';
-		if (!pendingImages.length) {
+		if (pendingPdf) {
+			var pcell = document.createElement('div');
+			pcell.className = 'pg-attach-thumb-cell';
+			pcell.style.cssText = 'display:flex;align-items:center;gap:6px;background:#f3f1ff;border:1px solid #d9d6ff;border-radius:8px;padding:6px 10px;font-size:12px;color:#4b4a63;max-width:220px;';
+			pcell.innerHTML = '<span>\uD83D\uDCC4</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(pendingPdf.name) + '</span>';
+			var px = document.createElement('button');
+			px.type = 'button';
+			px.className = 'pg-attach-thumb-x';
+			px.setAttribute('aria-label', 'Remove PDF');
+			px.innerHTML = '&times;';
+			px.addEventListener('click', function () { pendingPdf = null; renderStrip(); updateSendState(); });
+			pcell.appendChild(px);
+			attachStrip.appendChild(pcell);
+		}
+		if (!pendingImages.length && !pendingPdf) {
 			attachStrip.hidden = true;
 			if (attachCount) attachCount.hidden = true;
 			attachBtn && attachBtn.classList.remove('has-image');
@@ -202,7 +236,10 @@
 	});
 	attachInput && attachInput.addEventListener('change', function (e) {
 		var files = e.target.files || [];
-		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
+		for (var i = 0; i < files.length; i++) {
+			if (files[i] && files[i].type === 'application/pdf') { addPendingPdf(files[i]); }
+			else { addPendingImage(files[i]); }
+		}
 		attachInput.value = ''; // allow re-picking the same file
 	});
 
@@ -259,7 +296,10 @@
 		dragDepth = 0;
 		chatPanel.classList.remove('is-dragover');
 		var files = (e.dataTransfer && e.dataTransfer.files) || [];
-		for (var i = 0; i < files.length; i++) addPendingImage(files[i]);
+		for (var i = 0; i < files.length; i++) {
+			if (files[i] && files[i].type === 'application/pdf') { addPendingPdf(files[i]); }
+			else { addPendingImage(files[i]); }
+		}
 	});
 
 	// ─── Build mode selector (Ada / Iris / Nova) ────────────────────────
@@ -1110,6 +1150,13 @@
 			})));
 			// Clear immediately so a second send doesn't double-attach.
 			clearPendingImages();
+		}
+		if (pendingPdf) {
+			fd.append('pdf_base64', pendingPdf.base64);
+			fd.append('pdf_name', pendingPdf.name);
+			append(el('pg-msg-system', '\uD83D\uDCC4 Reading your brief (' + pendingPdf.name + ')\u2026 I\u2019ll propose a section plan, then build it one section at a time.'));
+			pendingPdf = null;
+			renderStrip();
 		}
 
 		// Streaming consumer state.
