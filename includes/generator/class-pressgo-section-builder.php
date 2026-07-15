@@ -469,6 +469,42 @@ class PressGo_Section_Builder {
 		return $out;
 	}
 
+	/**
+	 * Checkmark bullet list for the CENTERED hero variants. Mirrors the icon-list
+	 * block build_hero_image renders (max 5 items, fa-check-circle), returning a
+	 * width-capped + centered widget so it sits under the subheadline like the
+	 * copy above it — or null when there are no bullets. $dark selects the
+	 * on-dark palette (accent icons + near-white text) vs the on-light palette
+	 * (primary icons + dark text) so the list reads native on either background.
+	 */
+	private static function hero_bullet_list( $cfg, $bullets, $dark ) {
+		if ( empty( $bullets ) ) { return null; }
+		$c     = $cfg['colors'];
+		$items = array();
+		foreach ( array_slice( $bullets, 0, 5 ) as $b ) {
+			$items[] = array(
+				'text'          => $b,
+				'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+				'link'          => array( 'url' => '' ),
+			);
+		}
+		$blist = PressGo_Element_Factory::widget( 'icon-list', array(
+			'icon_list'                   => $items,
+			'icon_color'                  => $dark ? $c['accent'] : $c['primary'],
+			'text_color'                  => $dark ? 'rgba(255,255,255,0.92)' : $c['text_dark'],
+			'icon_size'                   => array( 'unit' => 'px', 'size' => 16, 'sizes' => array() ),
+			'text_indent'                 => array( 'unit' => 'px', 'size' => 10, 'sizes' => array() ),
+			'space_between'               => array( 'unit' => 'px', 'size' => 12, 'sizes' => array() ),
+			'icon_typography_typography'  => 'custom',
+			'icon_typography_font_family' => $cfg['fonts']['body'],
+			'icon_typography_font_size'   => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+			'icon_typography_font_weight' => '600',
+		) );
+		// Centered heroes: cap width + center the list the same way measure()
+		// treats the subheadline above it.
+		return self::measure( $blist, 560 );
+	}
+
 	/** Stars belong next to REVIEW-flavored trust lines ("4.9 on Google",
 	 * "500+ five-star reviews") — beside "Licensed & insured" or an event date
 	 * they read as a fabricated rating. */
@@ -820,6 +856,11 @@ class PressGo_Section_Builder {
 		$children[] = $h1;
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center', $c['text_light'], 18, 15 ) );
+		$bullets = self::hero_bullet_list( $cfg, self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() ), true );
+		if ( $bullets ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $bullets;
+		}
 		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.85)' );
 		if ( $hero_meta ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
@@ -1375,6 +1416,11 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			$c['text_muted'], 18, 15 ) );
+		$bullets = self::hero_bullet_list( $cfg, self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() ), false );
+		if ( $bullets ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $bullets;
+		}
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons grouped + centered.
@@ -1451,6 +1497,11 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::spacer_w( 20 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			'rgba(255,255,255,0.8)', 19, 15 ) );
+		$bullets = self::hero_bullet_list( $cfg, self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() ), true );
+		if ( $bullets ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $bullets;
+		}
 		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.9)' );
 		if ( $hero_meta ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
@@ -1537,6 +1588,11 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::spacer_w( 16 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			$c['text_muted'], 18, 15 ) );
+		$bullets = self::hero_bullet_list( $cfg, self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() ), false );
+		if ( $bullets ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $bullets;
+		}
 		$children[] = PressGo_Widget_Helpers::spacer_w( 28 );
 
 		// CTA buttons grouped + centered.
@@ -1599,6 +1655,11 @@ class PressGo_Section_Builder {
 		$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
 		$children[] = self::measure( PressGo_Widget_Helpers::text_w( $cfg, $h['subheadline'], 'center',
 			'rgba(255,255,255,0.78)', 19, 15 ) );
+		$bullets = self::hero_bullet_list( $cfg, self::bullet_texts( isset( $h['bullets'] ) ? $h['bullets'] : array() ), true );
+		if ( $bullets ) {
+			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
+			$children[] = $bullets;
+		}
 		$hero_meta = self::hero_meta_list( $cfg, $h, 'rgba(255,255,255,0.88)' );
 		if ( $hero_meta ) {
 			$children[] = PressGo_Widget_Helpers::spacer_w( 18 );
@@ -2287,7 +2348,23 @@ class PressGo_Section_Builder {
 			if ( ! empty( $it['image'] ) && self::has_real_image( $it['image'] ) ) { $has_img = true; break; }
 		}
 		if ( ! $has_img ) {
-			return self::build_features( $cfg );
+			// build_features renders only icon/title/desc — for listing/product
+			// cards that carry per-card price/meta/cta, that silently drops the
+			// most important content. Only take the icon-card fallback when the
+			// items are plain feature tiles; otherwise fall through and render
+			// this layout WITHOUT the photo band (the loop already omits the band
+			// when a card has no image, and the top padding is restored below).
+			$has_card_data = false;
+			foreach ( $f['items'] as $it ) {
+				if ( ! is_array( $it ) ) { continue; }
+				$m = isset( $it['meta'] ) && is_scalar( $it['meta'] ) && '' !== trim( (string) $it['meta'] );
+				$p = isset( $it['price'] ) && is_scalar( $it['price'] ) && '' !== trim( (string) $it['price'] );
+				$b = (bool) self::resolve_cta( isset( $it['cta'] ) ? $it['cta'] : null );
+				if ( $m || $p || $b ) { $has_card_data = true; break; }
+			}
+			if ( ! $has_card_data ) {
+				return self::build_features( $cfg );
+			}
 		}
 
 		$r = (string) $cfg['layout']['card_radius'];
@@ -2356,14 +2433,18 @@ class PressGo_Section_Builder {
 			}
 
 			// card_style() is theme-aware (frosted on dark pages); override the
-			// padding so the image band can bleed to the card edges.
+			// padding so the image band can bleed to the card edges. When a card
+			// has NO band (image-less card in the no-image fallback), restore a
+			// normal top pad so the price/title don't sit flush against the edge.
+			$pad_top   = $norm_url ? '0' : '28';
+			$pad_top_m = $norm_url ? '0' : '24';
 			$ic_style = PressGo_Style_Utils::card_style( $cfg );
 			$ic_style['padding'] = array(
-				'unit' => 'px', 'top' => '0', 'right' => '24',
+				'unit' => 'px', 'top' => $pad_top, 'right' => '24',
 				'bottom' => '28', 'left' => '24', 'isLinked' => false,
 			);
 			$ic_style['padding_mobile'] = array(
-				'unit' => 'px', 'top' => '0', 'right' => '20',
+				'unit' => 'px', 'top' => $pad_top_m, 'right' => '20',
 				'bottom' => '24', 'left' => '20', 'isLinked' => false,
 			);
 			$ic_style['overflow'] = 'hidden';
@@ -3915,19 +3996,13 @@ class PressGo_Section_Builder {
 			$cards[] = PressGo_Element_Factory::col( $widgets, $style );
 		}
 
-		// Build rows of 3.
-		$rows     = array();
-		$row_cols = array();
-		foreach ( $cards as $idx => $card ) {
-			$row_cols[] = $card;
-			if ( count( $row_cols ) === 3 || $idx === count( $cards ) - 1 ) {
-				$rows[] = PressGo_Element_Factory::row( $cfg, $row_cols, 24 );
-				if ( $idx < count( $cards ) - 1 ) {
-					$rows[] = PressGo_Widget_Helpers::spacer_w( 24 );
-				}
-				$row_cols = array();
-			}
-		}
+		// Balanced rows via card_grid: the final partial row is padded with ghost
+		// cols so a trailing card (e.g. a 4th) keeps its fractional width instead
+		// of stretching full-bleed (the orphan-card "templated" tell). 1-3 → one
+		// row, 4 = 2x2, 5+ → rows of 3 — same treatment as features/testimonials.
+		$n    = count( $cards );
+		$per  = $n <= 3 ? $n : ( 4 === $n ? 2 : 3 );
+		$rows = self::card_grid( $cfg, $cards, $per, 24 );
 
 		// CTA button.
 		$rows[] = PressGo_Widget_Helpers::spacer_w( 32 );

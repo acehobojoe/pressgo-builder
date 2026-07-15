@@ -1906,7 +1906,7 @@
 						// page with nobody sending traffic to it is the exact
 						// pain the agency solves. Reuses the card's own caps
 						// (max 3 shows ever, any click ends it).
-						if (page.status === 'publish' && cfg.handRaise && cfg.handRaise.ask && !handRaiseRendered) {
+						if (page.status === 'publish' && cfg.handRaise && cfg.handRaise.ask && !handRaiseRendered && !reviewAskRendered) {
 							setTimeout(function () {
 								append(el('pg-msg-system', 'Now the question every live page faces: who\'s sending traffic to it?'));
 								maybeAskHandRaise();
@@ -2038,7 +2038,7 @@
 	var reviewAskRendered = false;
 	function maybeAskReview() {
 		var r = cfg.review;
-		if (!r || !r.ask || reviewAskRendered) return false;
+		if (!r || !r.ask || reviewAskRendered || handRaiseRendered) return false;
 		reviewAskRendered = true;
 		// Burn a shown-credit only now that the card actually renders.
 		var seenFd = new FormData();
@@ -2086,7 +2086,7 @@
 	var handRaiseRendered = false;
 	function maybeAskHandRaise() {
 		var h = cfg.handRaise;
-		if (!h || !h.ask || handRaiseRendered) return false;
+		if (!h || !h.ask || handRaiseRendered || reviewAskRendered) return false;
 		handRaiseRendered = true;
 		var seenFd = new FormData();
 		seenFd.append('action', 'pressgo_ai_hand_raise_seen');

@@ -248,6 +248,16 @@ class PressGo_Config_Validator {
 			}
 		}
 
+		// R4-3 safety net: drop any testimonial item whose quote OR name is
+		// literal bracketed-placeholder filler ("[Real customer review goes
+		// here]", "[Customer name]"). This was the single most page-breaking
+		// defect observed (~5 of 7 builds) and is fundamentally a prompt-side
+		// bug we can't fully prevent upstream, so this is the plugin-side
+		// backstop: never render fake filler copy as if it were a real quote.
+		// If dropping items empties the section entirely, drop the section too
+		// rather than render an orphan testimonials band with nothing in it.
+		self::strip_placeholder_testimonials( $config );
+
 		// Ensure CTA objects have required keys.
 		$cta_sections = array( 'hero' => 'cta_primary', 'cta_final' => 'cta' );
 		foreach ( $cta_sections as $section => $cta_key ) {
@@ -864,6 +874,76 @@ class PressGo_Config_Validator {
 					}
 				}
 				$config[ $tk ]['items'][ $i ]['quote'] = self::trim_to_words( $q, 45 );
+			}
+		}
+	}
+
+	/**
+	 * R4-3: detect a string that is essentially just bracketed placeholder
+	 * filler rather than real copy, e.g. "[Real customer review goes here]"
+	 * or "[Customer name]". Two shapes are caught:
+	 *   - the WHOLE string is a single bracketed token (optionally with
+	 *     leading/trailing whitespace);
+	 *   - the string is DOMINATED by bracketed token(s) — stripping every
+	 *     "[...]" run leaves at most a couple of stray characters (e.g.
+	 *     punctuation), meaning there's no real content outside the brackets.
+	 * Real copy that merely happens to contain a bracket aside ("Great
+	 * service [highly recommend]") is NOT flagged, because plenty of
+	 * non-placeholder text remains after stripping.
+	 */
+	private static function is_bracketed_placeholder( $value ) {
+		if ( ! is_string( $value ) ) {
+			return false;
+		}
+		$v = trim( $value );
+		if ( '' === $v ) {
+			return false;
+		}
+		if ( preg_match( '/^\[[^\]]+\]$/', $v ) ) {
+			return true;
+		}
+		$stripped = trim( preg_replace( '/\[[^\]]+\]/', '', $v ) );
+		if ( $stripped !== $v && strlen( $stripped ) <= 3 ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * R4-3 plugin-side safety net. Walks every testimonials instance and
+	 * drops any item whose `quote` OR `name` is bracketed-placeholder filler
+	 * (see is_bracketed_placeholder above) — the AI leaving in copy like
+	 * "[Real customer review goes here]" or "[Customer name]" instead of
+	 * actually writing a testimonial. Dropping the fake item is strictly
+	 * better than shipping it to the page. If an instance ends up with zero
+	 * items after dropping, the whole section instance is removed (both its
+	 * data key and its entry in $config['sections']) rather than rendering
+	 * an empty testimonials band.
+	 */
+	private static function strip_placeholder_testimonials( &$config ) {
+		foreach ( self::keys_of_type( $config, 'testimonials' ) as $tk ) {
+			if ( ! isset( $config[ $tk ]['items'] ) || ! is_array( $config[ $tk ]['items'] ) ) {
+				continue;
+			}
+			$kept = array();
+			foreach ( $config[ $tk ]['items'] as $item ) {
+				if ( ! is_array( $item ) ) {
+					$kept[] = $item;
+					continue;
+				}
+				$quote = isset( $item['quote'] ) ? $item['quote'] : '';
+				$name  = isset( $item['name'] ) ? $item['name'] : '';
+				if ( self::is_bracketed_placeholder( $quote ) || self::is_bracketed_placeholder( $name ) ) {
+					continue; // Drop the fake item — do not render placeholder filler.
+				}
+				$kept[] = $item;
+			}
+			$config[ $tk ]['items'] = array_values( $kept );
+			if ( empty( $config[ $tk ]['items'] ) ) {
+				unset( $config[ $tk ] );
+				if ( isset( $config['sections'] ) && is_array( $config['sections'] ) ) {
+					$config['sections'] = array_values( array_diff( $config['sections'], array( $tk ) ) );
+				}
 			}
 		}
 	}

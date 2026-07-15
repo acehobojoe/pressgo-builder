@@ -5743,10 +5743,10 @@ class PressGo_AI_Builder {
 	/**
 	 * Should this turn surface the review ask? Only at PEAK moments (a whole
 	 * page just completed, a quality pass just finished) and only for users
-	 * who've genuinely gotten value (3+ successful builds), max 3 shows ever.
+	 * who've genuinely gotten value (5+ successful builds), max 3 shows ever.
 	 */
 	private function review_moment() {
-		return (int) get_option( 'pressgo_build_count', 0 ) >= 3
+		return (int) get_option( 'pressgo_build_count', 0 ) >= 5
 			&& ! get_option( 'pressgo_review_ask_done' )
 			&& (int) get_option( 'pressgo_review_ask_shown', 0 ) < 3;
 	}

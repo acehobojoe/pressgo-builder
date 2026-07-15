@@ -4,7 +4,7 @@ Tags: elementor, landing page, landing page builder, lead generation, ai page bu
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.5
+Stable tag: 2.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,14 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.6 =
+* Build from a PDF brief: drop in a project brief and PressGo builds the page section by section from it, in both quick and custom modes
+* Testimonials never ship with placeholder text: bracketed filler like "[customer review]" is dropped instead of landing on your page
+* "Why choose us" cards stay aligned: four benefits no longer leave one card stretched full-width
+* Hero checklists show up: the bullet list under your headline now renders on every hero style
+* Feature cards keep their details without a photo: price, label, and button stay put even when there is no image
+* Better-timed prompts: the review request waits until you have built a few pages, and the review and hand-raise prompts no longer appear together
 
 = 2.5.5 =
 * Paste one key, everything connects: entering your Plus license now automatically connects your account too — no more hunting for a second key
