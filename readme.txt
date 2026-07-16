@@ -1,6 +1,6 @@
-=== PressGo AI — Landing Page Builder for Elementor ===
+=== PressGo AI — Landing Page & Website Builder for Elementor ===
 Contributors: acehobojoe
-Tags: elementor, landing page, landing page builder, lead generation, ai page builder
+Tags: elementor, ai page builder, landing page, website builder, ai website builder
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
@@ -8,13 +8,13 @@ Stable tag: 2.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI landing pages for businesses that run ads. Describe your page in chat, watch it build live in native Elementor. Built by a real marketing agency.
+AI website builder for Elementor — describe your page in chat, watch it build live, refine by talking. Every element is a native Elementor widget.
 
 == Description ==
 
-PressGo builds the page that makes your ads work. It turns WordPress + Elementor into a chat-driven landing-page builder for businesses that run Google and Meta ads (or want to): tell the AI about your offer, watch it stream a lead-focused page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, wire in your real contact form. Every element is a native Elementor widget, so you can jump into the Elementor editor for hands-on tweaks anytime.
+PressGo turns WordPress + Elementor into a chat-driven website and landing page builder. Tell the AI what you want, watch it stream the page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, wire in your real contact form. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
 
-PressGo is an AI landing page builder for WordPress: describe your page in plain English through a chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page (or the ads sending traffic to it), that help is one click away.
+PressGo is an AI website builder and no-code landing page generator for WordPress: describe your page in plain English through a ChatGPT-style chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page for you, that help is one click away.
 
 **Two ways to use it:**
 
