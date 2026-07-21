@@ -775,7 +775,7 @@
 				if (m.content) append(el('pg-msg pg-msg-assistant', m.content));
 				if (m.built) {
 					var b = el('pg-msg pg-msg-built');
-					b.innerHTML = '<strong>Built:</strong> ' + escapeHtml(m.summary || '(page updated)');
+					b.innerHTML = builtChipHtml(m.summary, m.page_url);
 					append(b);
 				}
 			}
@@ -889,6 +889,17 @@
 		var url = cfg.previewBase;
 		var sep = url.indexOf('?') === -1 ? '?' : '&';
 		return url + sep + 'pg_clean=1&_t=' + (bust || Date.now()) + '&_r=' + Math.random().toString(36).slice(2, 8);
+	}
+
+	// Built chip with a real "View page" link — "where do I see it?" was a
+	// recurring support question because the chip never said.
+	function builtChipHtml(summary, pageUrl) {
+		var html = '<strong>Built:</strong> ' + escapeHtml(summary || '(page updated)');
+		var url = pageUrl || cfg.previewBase;
+		if (url) {
+			html += ' &middot; <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">View page</a>';
+		}
+		return html;
 	}
 
 	// Per-iframe load dispatch: the ACTIVE frame loading = initial load or
@@ -1097,7 +1108,7 @@
 						if (last.content) append(el('pg-msg pg-msg-assistant', last.content));
 						if (last.built) {
 							var b = el('pg-msg pg-msg-built');
-							b.innerHTML = '<strong>Built:</strong> ' + escapeHtml(last.summary || '(page updated)');
+							b.innerHTML = builtChipHtml(last.summary, last.page_url);
 							append(b);
 						}
 						reloadPreview(Date.now());
@@ -1280,7 +1291,7 @@
 					// A fresh AI change invalidates any pending redo branch.
 					if (window.__pgResetUndo) window.__pgResetUndo();
 					var built = el('pg-msg pg-msg-built');
-					built.innerHTML = '<strong>Built:</strong> ' + escapeHtml(evt.summary || '(page updated)');
+					built.innerHTML = builtChipHtml(evt.summary, evt.page_url);
 					append(built);
 					reloadPreview(evt.preview_bust);
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);

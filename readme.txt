@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.6
+Stable tag: 2.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,14 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.7 =
+* Asking "did you build it?" is now answered instantly from the page's real state, free, instead of triggering another build
+* Every "Built" confirmation includes a View page link, so you always know where your page is
+* A build is only marked "Built" after the plugin verifies the page content actually saved; if the save silently failed you get an automatic refund instead of an empty page
+* The page reviewer fails a blank page instead of passing it
+* Large custom builds no longer time out mid-stream: the builder now only gives up if the connection actually stalls
+* Reliability: fixed a telemetry heartbeat that never reached the server
 
 = 2.5.6 =
 * Build from a PDF brief: drop in a project brief and PressGo builds the page section by section from it, in both quick and custom modes

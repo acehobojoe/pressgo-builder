@@ -1069,6 +1069,44 @@ class PressGo_AI_Builder {
 		);
 	}
 
+	// Short "did you build it? / is it done? / when will you create it?" pokes,
+	// in the languages the chat logs actually show (EN/RU/PT/ES). Length-capped
+	// so a real instruction that happens to end in "done?" never matches.
+	private function is_status_check( $message ) {
+		$m   = strtolower( trim( $message ) );
+		$len = function_exists( 'mb_strlen' ) ? mb_strlen( $m ) : strlen( $m );
+		if ( '' === $m || $len > 60 ) {
+			return false;
+		}
+		$patterns = array(
+			'/^(so |ok |okay |and |well |hey )*(did (you|it)|have you|are you) *(create|creat|buil|mak|mad|finish|done)/i',
+			'/^is (it|this|the page) *(done|ready|created|built|finished|live)\b/i',
+			'/^(done|ready|created|built|finished)\?+$/i',
+			'/^when (will|are|do) you (create|build|finish|make)/i',
+			'/^(ну |так |и |а |вы |ты )*созда(л|ла|ли|но)\??/iu',
+			'/^(ну |так |и |а )*(сдела(л|ла|ли|но)|готов(о|а)?)\??$/iu',
+			'/^когда (создашь|сделаешь|будет готово)/iu',
+			'/^(criou|foi criad[ao]|est[aá] pront[ao]|terminou|ficou pronto)\b/iu',
+			'/^(la |lo |ya )*(creaste|cre[oó]|est[aá] (list[ao]|cread[ao])|termin(aste|[oó]))\b/iu',
+		);
+		foreach ( $patterns as $p ) {
+			if ( preg_match( $p, $m ) ) { return true; }
+		}
+		return false;
+	}
+
+	// Daily usage heartbeat. The builder chat is the main product path but it
+	// never heartbeated — the fleet looked dead in plugin_heartbeats while
+	// usage continued. Throttled to once a day per site; the endpoint upserts
+	// per site per day anyway.
+	private function maybe_heartbeat() {
+		if ( get_transient( 'pressgo_hb_day' ) || ! class_exists( 'PressGo_MCP_Tools' ) ) {
+			return;
+		}
+		set_transient( 'pressgo_hb_day', 1, DAY_IN_SECONDS );
+		PressGo_MCP_Tools::send_heartbeat();
+	}
+
 	public function ajax_clear_chat() {
 		$this->check_auth();
 		$post_id = absint( $_POST['post_id'] ?? 0 );
@@ -6295,8 +6333,14 @@ class PressGo_AI_Builder {
 			CURLOPT_HTTPHEADER     => $be['curl'],
 			CURLOPT_RETURNTRANSFER => false,
 			CURLOPT_HEADER         => false,
-			CURLOPT_TIMEOUT        => 240,
-			CURLOPT_CONNECTTIMEOUT => 10,
+			// Abort only when the stream STALLS (no bytes for 90s), not while
+			// bytes are flowing: a hard 240s cap killed real builds mid-stream
+			// with hundreds of KB already received, refunding work that was
+			// about to finish. 600s is the disaster ceiling, not the norm.
+			CURLOPT_TIMEOUT         => 600,
+			CURLOPT_CONNECTTIMEOUT  => 10,
+			CURLOPT_LOW_SPEED_LIMIT => 1,
+			CURLOPT_LOW_SPEED_TIME  => 90,
 			CURLOPT_WRITEFUNCTION  => function ( $ch, $chunk ) use ( &$accumulated, $keepalive ) {
 				$accumulated .= $chunk;
 				// Each SSE chunk is a keepalive signal — flush whitespace to the
@@ -6705,6 +6749,7 @@ class PressGo_AI_Builder {
 
 	public function ajax_create_page() {
 		$this->check_auth();
+		$this->maybe_heartbeat();
 		// Optional title — the next-page chips ("About", "Contact") name the
 		// page they're about to build instead of the timestamp default.
 		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
@@ -6760,6 +6805,7 @@ class PressGo_AI_Builder {
 	 */
 	public function ajax_chat() {
 		$this->check_auth();
+		$this->maybe_heartbeat();
 		// Never let a stray PHP notice/warning (e.g. an optional config key the
 		// generator reads) echo into the SSE stream — on a WP_DEBUG_DISPLAY site
 		// that would corrupt the event JSON and break the builder. Warnings still
@@ -6835,7 +6881,7 @@ class PressGo_AI_Builder {
 		while ( ob_get_level() ) ob_end_flush();
 		ob_implicit_flush( true );
 		ignore_user_abort( true );
-		@set_time_limit( 300 );
+		@set_time_limit( 660 ); // must outlive the Nova stream ceiling (600s)
 
 		$emit = function ( $type, array $data = array() ) {
 			$payload = array_merge( array( 'type' => $type ), $data );
@@ -6878,6 +6924,29 @@ class PressGo_AI_Builder {
 				$emit( 'done',  array() );
 				exit;
 			}
+		}
+
+		// Status-check intercept — "did you create it? / is it done?" answered
+		// locally from the page's REAL state. Chat logs showed the model
+		// treating every poll as a build instruction: one user burned 8 credits
+		// asking the same question overnight while the model rebuilt his page
+		// each time. Instant, free, and it can't hallucinate.
+		if ( ! $has_images && $this->is_status_check( $user_msg ) ) {
+			$raw_data  = get_post_meta( $post_id, '_elementor_data', true );
+			$tree      = is_string( $raw_data ) && '' !== $raw_data ? json_decode( $raw_data, true ) : null;
+			$sections  = is_array( $tree ) ? count( $tree ) : 0;
+			if ( $sections > 0 ) {
+				$status_msg = 'Yes, this page is built. It has ' . $sections . ' sections and the last change was at '
+					. get_post_modified_time( 'H:i', false, $post_id ) . '. View it here: ' . get_permalink( $post_id )
+					. ' (or keep editing right here). This check used no credits.';
+			} else {
+				$status_msg = 'No, nothing is built on this page yet. Tell me what you want on it and I\'ll build it. This check used no credits.';
+			}
+			$history[] = array( 'role' => 'assistant', 'content' => $status_msg );
+			update_post_meta( $post_id, self::META_AI_CHAT, $history );
+			$emit( 'text', array( 'text' => $status_msg ) );
+			$emit( 'done', array() );
+			exit;
 		}
 
 		// Build pageContext + sanitize messages for Anthropic. Prefer the stored
@@ -7160,6 +7229,7 @@ class PressGo_AI_Builder {
 					'preview_bust'      => $preview_bust,
 					'credits_remaining' => $credits_after,
 					'billing_method'    => $tool_use['billingMethod'] ?? null,
+					'page_url'          => get_permalink( $post_id ),
 				) );
 			} else {
 				$apply_error = $apply['error'] ?? 'unknown apply error';
@@ -7783,7 +7853,9 @@ class PressGo_AI_Builder {
 		$rubric = "Above are screenshots of the page you just built: the first is desktop, "
 			. ( $png_mobile ? "the second is the same page at a mobile (phone) viewport. " : "" )
 			. "Review it against the user's most recent request using this PASS/FAIL checklist. "
+			. "Grade ONLY what the screenshot shows — never from your memory of the conversation or the config you sent. "
 			. "Go through every item:\n"
+			. "0. BLANK PAGE: is the screenshot an entirely blank or near-blank page (no visible sections, headlines, or images)? Automatic FAIL — report that the page did not render and do NOT pass any other item; you cannot pass content you cannot see.\n"
 			. "1. Any empty image panel or blank card (a slot where an image/content should be but isn't)?\n"
 			. "2. Any section with a header but no content under it?\n"
 			. "3. Any headline longer than 8 words?\n"
@@ -8207,6 +8279,14 @@ class PressGo_AI_Builder {
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
 		delete_post_meta( $post_id, '_elementor_css' );
+		// Same silent-truncation risk as apply_config_to_post: confirm the
+		// meta write really landed before reporting the partial as rendered.
+		clean_post_cache( $post_id );
+		$readback = get_post_meta( $post_id, '_elementor_data', true );
+		$decoded  = is_string( $readback ) && '' !== $readback ? json_decode( $readback, true ) : null;
+		if ( ! is_array( $decoded ) || 0 === count( $decoded ) ) {
+			return false;
+		}
 		return true;
 	}
 
@@ -8357,6 +8437,18 @@ class PressGo_AI_Builder {
 			if ( $current === '' || strpos( $current, 'AI page —' ) === 0 ) {
 				wp_update_post( array( 'ID' => $post_id, 'post_title' => sanitize_text_field( $config['business_name'] ) ) );
 			}
+		}
+
+		// Verify the write actually landed before claiming success. A DB-level
+		// truncation (utf8 postmeta + a 4-byte char), max_allowed_packet, or a
+		// meta-filtering security plugin can leave _elementor_data empty while
+		// update_post_meta reports nothing — the user then sees "Built" over a
+		// blank page and never gets refunded. Failing here routes into the
+		// existing apply_error + refund path.
+		$readback = get_post_meta( $post_id, '_elementor_data', true );
+		$decoded  = is_string( $readback ) && '' !== $readback ? json_decode( $readback, true ) : null;
+		if ( ! is_array( $decoded ) || 0 === count( $decoded ) ) {
+			return array( 'ok' => false, 'error' => 'apply verification failed: _elementor_data is empty or invalid after write' );
 		}
 		return array( 'ok' => true );
 	}

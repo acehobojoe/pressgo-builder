@@ -742,8 +742,10 @@ class PressGo_MCP_Tools {
 	 * a successful create_page. Tells the backend our current count + tier so
 	 * we have real-time per-site visibility on the admin endpoint.
 	 *
-	 * Uses non-blocking wp_remote_post (timeout=0.01s) — adds ~0 latency to
-	 * the user-facing call. Failures are silently ignored.
+	 * Non-blocking wp_remote_post. Timeout must be >= 0.5s: at 0.01s the TLS
+	 * handshake never completes and NO heartbeat ever arrives (confirmed via
+	 * nginx logs 2026-07-21 — months of MCP heartbeats, zero received).
+	 * Failures are silently ignored.
 	 */
 	public static function send_heartbeat() {
 		global $wp_version;
@@ -752,7 +754,7 @@ class PressGo_MCP_Tools {
 		$count  = $is_pro ? 0 : (int) get_option( 'pressgo_free_creates_' . gmdate( 'Y-m-d' ), 0 );
 
 		wp_remote_post( 'https://pressgo.app/api/plugin/heartbeat', array(
-			'timeout'  => 0.01, // fire-and-forget
+			'timeout'  => 0.5, // fire-and-forget, but long enough for TLS to start
 			'blocking' => false,
 			'headers'  => array(
 				'Content-Type'   => 'application/json',
