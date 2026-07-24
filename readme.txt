@@ -1,74 +1,70 @@
-=== PressGo AI — Landing Page Builder for Elementor ===
+=== PressGo AI — Landing Page & Website Builder for Elementor ===
 Contributors: acehobojoe
-Tags: elementor, landing page, landing page builder, lead generation, ai page builder
+Tags: elementor, ai page builder, landing page, website builder, ai website builder
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.5
+Stable tag: 2.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI landing pages for businesses that run ads. Describe your page in chat, watch it build live in native Elementor. Built by a real marketing agency.
+AI website builder for Elementor. Describe your page in chat, watch it build live, refine by talking. Every element is a native Elementor widget.
 
 == Description ==
 
-PressGo builds the page that makes your ads work. It turns WordPress + Elementor into a chat-driven landing-page builder for businesses that run Google and Meta ads (or want to): tell the AI about your offer, watch it stream a lead-focused page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, wire in your real contact form. Every element is a native Elementor widget, so you can jump into the Elementor editor for hands-on tweaks anytime.
+Type what you want. Watch a real page get built.
 
-PressGo is an AI landing page builder for WordPress: describe your page in plain English through a chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page (or the ads sending traffic to it), that help is one click away.
+PressGo puts a chat panel next to a live preview of your page, right inside WordPress. Tell the AI about your business and it builds the page in front of you, section by section. Then ask for changes the way you'd ask a designer. "Make the hero darker." "Add my contact form." "Swap those photos." It does the work while you watch.
 
-**Two ways to use it:**
+Every element it builds is a native Elementor widget. Nothing is locked inside our tool. Open the Elementor editor anytime and tweak by hand, or just keep chatting. PressGo is built for business owners who run ads, need a landing page, or want their site done without learning a page builder first.
 
-**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. The AI **screenshots and reviews its own work** automatically on your first build — and any time you say "review my page" — then applies a correction pass if it spots a real issue. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. PressGo Agency = $49/mo for ~40 pages a day + 400 bonus credits, built for client work. $15 one-time pack = 75 extra credits anytime.
+The plugin is free. A free PressGo account includes a daily build allowance (enough for a full page every day) plus 10 bonus credits a month. No credit card.
 
-**2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
+PressGo is an AI website builder and no-code landing page generator for WordPress. Describe your page in plain English through a ChatGPT-style chat interface, powered by Claude, and it builds native, fully editable Elementor sections in seconds. No design skills and no code required.
 
-**Key Features:**
+**What it does today**
 
-* Chat-driven AI Builder with streaming responses, screenshot self-review, and viewport switching (desktop/tablet/mobile)
-* Drop, paste, or click-to-attach reference screenshots directly into the chat
-* "AI-enable" any existing Elementor page to keep iterating on it via chat
-* MCP server with OAuth 2.1 + 11 tools for power users on Claude Desktop / Cursor
-* Live Elementor editor sync — chat edits appear without reloading
-* Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
-* "Watch URL" — share a live preview link with clients while you build
-* 19 section types with 56 layout variants
-* Every element is native Elementor — fully editable
-* Embeds your existing WPForms / Contact Form 7 / Gravity / Ninja / Fluent forms as real working forms
-* Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
-* Choose your Claude model: Sonnet 4.5 (default for paid), Opus 4.6, or Haiku 4.5 (free)
-* Works with Elementor Free — no Pro required
+* Builds and edits pages by chat, streaming into a live preview as it works
+* Screenshots its own work and fixes what it finds. Say "review my page" anytime
+* Embeds your real forms: WPForms, Contact Form 7, Gravity Forms, Ninja Forms, Fluent Forms
+* Takes your photos, screenshots of sites you like, even a photographed sketch. Drop, paste, or attach them right in chat
+* Pulls real stock photos on request (Pexels and Unsplash)
+* AI-enables any existing Elementor page so you can keep improving it by chat
+* 19 section types with 56 layout variants: heroes, features, testimonials, pricing, FAQ, galleries, team, stats, maps, and more
+* Mobile responsive out of the box, with a desktop, tablet, and phone preview switcher
+* Version history. Every AI change snapshots the page first, and one click restores any earlier design. Saying "undo" in chat works too
+* Learns your brand. Colors, fonts, name, and voice carry across every new page
+* Voice input. Talk instead of typing
+* Works with Elementor Free. No Pro required
+* Advanced: an MCP server so Claude, ChatGPT, Cursor, or any MCP client can build on your site using your own AI subscription
 
-**Section Types:**
+**How it works**
 
-* Hero (6 variants: default, split, image, video, gradient, minimal)
-* Stats (3 variants: default, dark, inline)
-* Social proof (2 variants: light, dark)
-* Features (6 variants: default, alternating, minimal, image cards, grid, bento)
-* How-it-works steps (3 variants: default, compact, timeline)
-* Results / metrics (2 variants: default, bars)
-* Competitive edge (4 variants: default, image, cards, us-vs-them comparison)
-* Testimonials (4 variants: default, featured, grid, minimal)
-* Pricing (3 variants: default, compact, service/menu price list)
-* FAQ accordion
-* Team profiles (3 variants: default, compact, solo spotlight)
-* Gallery (4 variants: default, cards, before/after pairs, videos)
-* Newsletter (2 variants: default, inline)
-* Logo bar (2 variants: light, dark)
-* Google Maps embed (2 variants: default, contact card with hours)
-* Final CTA (4 variants: default, card, image, split with checklist)
-* Footer (2 variants: dark, light)
-* Blog posts grid (requires Elementor Pro)
-* Form embed (your existing form-plugin form in a styled card)
-* Legal disclaimer
+1. Install the plugin and create your free PressGo account right inside the builder (one click, no card)
+2. Click PressGo in your WordPress sidebar, then "+ New page"
+3. Tell the AI about your business. Drop in photos if you have them
+4. Watch the page build in the live preview, then keep chatting to refine it
+5. Click "Edit in Elementor" anytime for hands-on tweaks
 
-**How It Works:**
+**Want us to build it for you?**
 
-1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — every day includes **a full page of free builds**, plus 10 bonus credits a month
-2. Enter the key in PressGo &rarr; Settings
-3. Go to PressGo &rarr; AI Builder and click "+ New page" (or AI-enable an existing page)
-4. Describe the page in chat, drop in reference screenshots if you have them, and watch it build in the live preview
-5. Keep chatting to iterate — change colors, swap sections, rewrite copy. Say **"review my page"** anytime and the AI screenshots its own work and self-corrects
-6. Click "Edit in Elementor" anytime to drop into the native editor for hands-on tweaks
+PressGo is built by PressGo Digital, a working marketing agency. If you'd rather not build it yourself, we'll do it for you. Plugin users get a free professional build-out from our team. Real people, real design work, no charge. Tell us about your business at [pressgo.app/free-build](https://pressgo.app/free-build/) and we'll take it from there. And if you want us to keep running things afterward, done-for-you plans start at $99 a month. The free build is yours either way.
+
+**Where this is heading**
+
+Building pages is step one. We're working on an AI that runs your whole site: it makes the changes you ask for, keeps content fresh, watches for problems, and tells you what it did. That's PressGo Hosting, and it's in early access now. If you want your site to be one of the first, raise your hand at [pressgo.app/hosting](https://pressgo.app/hosting/).
+
+**What it costs**
+
+The plugin is free. A free account includes a daily build allowance, enough for a full page every day (resets at midnight UTC), plus 10 bonus credits a month. Chatting is always free. Edits, reorders, and color changes are free too. Credits only get used when the AI builds something new beyond your daily allowance.
+
+PressGo Plus is $12 a month. You get a bigger daily allowance (roughly 8 pages a day), 100 bonus credits, unlimited MCP builds, and a custom site-wide header and footer.
+
+Want it done for you instead? Done-for-you plans start at $99 a month.
+
+**For advanced users: the MCP server**
+
+Connect Claude, ChatGPT, Cursor, claude.ai, or any MCP client to your site and build pages by chatting with your own AI subscription. OAuth 2.1 sign-in, 11 tools, live editor sync, and a "Watch URL" you can share with clients while you build. Free accounts get 3 page builds a day over MCP. Plus removes the cap and raises the screenshot quota to 1,000 a day.
 
 == External Services ==
 
@@ -76,19 +72,19 @@ This plugin connects to external services depending on your API mode:
 
 **1. PressGo Configuration Server (`wp.pressgo.app`)**
 
-When the plugin generates a page, it first retrieves its AI instruction set from `wp.pressgo.app` over HTTPS. This request contains no user data — it only fetches the page-building instructions that tell the AI how to structure its output. The response is cached locally for 6 hours. No personal information or page content is sent to this server.
+When the plugin generates a page, it first retrieves its AI instruction set from `wp.pressgo.app` over HTTPS. This request contains no user data. It only fetches the page-building instructions that tell the AI how to structure its output. The response is cached locally for 6 hours. No personal information or page content is sent to this server.
 
 * [PressGo Privacy Policy](https://pressgo.app/privacy)
 * [PressGo Terms of Service](https://pressgo.app/terms)
 
-**2. PressGo API (`pressgo.app`) — PressGo API mode**
+**2. PressGo API (`pressgo.app`) (PressGo API mode)**
 
-When using a PressGo API key, your text prompt (and optional image) is sent to `pressgo.app` over HTTPS. PressGo validates your API key, checks your credit balance, forwards the request to Claude AI, and streams the response back. Your prompt is stored temporarily for usage tracking; no page content is retained.
+When using a PressGo API key, your text prompt (and optional image) is sent to `pressgo.app` over HTTPS. PressGo validates your API key, checks your credit balance, forwards the request to Claude AI, and streams the response back. Your prompt is stored temporarily for usage tracking. No page content is retained.
 
 * [PressGo Privacy Policy](https://pressgo.app/privacy)
 * [PressGo Terms of Service](https://pressgo.app/terms)
 
-**3. Anthropic Claude API (`api.anthropic.com`) — Own API Key mode**
+**3. Anthropic Claude API (`api.anthropic.com`) (Own API Key mode)**
 
 When using your own Anthropic API key, your text prompt (and optional image) is sent directly to `api.anthropic.com` over HTTPS. The API returns a structured page configuration, which the plugin converts into native Elementor elements entirely on your WordPress site.
 
@@ -98,7 +94,7 @@ No user data is sent to any service until you explicitly click the Generate butt
 * [Anthropic Privacy Policy](https://www.anthropic.com/policies/privacy)
 * [Anthropic API Usage Policy](https://www.anthropic.com/policies/aup)
 
-**4. OpenRouter (`openrouter.ai`) — optional, only if you add your own OpenRouter key**
+**4. OpenRouter (`openrouter.ai`) (optional, only if you add your own OpenRouter key)**
 
 Sites that configure their own OpenRouter key (an advanced option) send Nova build prompts, page screenshots for the visual quality pass, and voice recordings for transcription directly to `openrouter.ai` over HTTPS, where they are processed by the models you selected. Without an OpenRouter key these same requests go through the PressGo API (section 2) instead, which forwards them to AI models using PressGo's provider account.
 
@@ -111,9 +107,9 @@ Page thumbnails in the builder list and the AI's visual self-review ("A(eyes)", 
 
 * [PressGo Privacy Policy](https://pressgo.app/privacy)
 
-**6. Stock photo APIs (`api.pexels.com`, `images.unsplash.com`) — only when you ask for stock photos**
+**6. Stock photo APIs (`api.pexels.com`, `images.unsplash.com`) (only when you ask for stock photos)**
 
-When you ask the builder for stock photography, it searches Pexels (and loads Unsplash image URLs the AI selected) over HTTPS. Your search terms are derived from your page's industry/topic; no personal data is sent.
+When you ask the builder for stock photography, it searches Pexels (and loads Unsplash image URLs the AI selected) over HTTPS. Your search terms are derived from your page's industry and topic. No personal data is sent.
 
 * [Pexels Terms](https://www.pexels.com/terms-of-service/)
 * [Unsplash Terms](https://unsplash.com/terms)
@@ -122,13 +118,13 @@ When you ask the builder for stock photography, it searches Pexels (and loads Un
 
 If you use the microphone button, your recording is sent for transcription to the service matching your API mode (PressGo API, or OpenRouter with your own key) and is not stored after the text is returned. Nothing is recorded until you press the mic button.
 
-**8. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) — OPT-IN ONLY**
+**8. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) (opt-in only)**
 
 On first install you'll see a notice asking whether you want to share anonymous usage data. Nothing is sent until you click "Allow & continue". If you click "Skip" or simply dismiss the notice, no telemetry data is ever transmitted. The opt-in choice can be changed anytime in PressGo &rarr; MCP Server.
 
 When enabled, the plugin sends two kinds of anonymized events:
 
-* After each successful page create from the built-in generator: a hashed site identifier (MD5 of home_url — not the URL itself), the free/pro tier, plugin version, WordPress version, and the number of pages created today.
+* After each successful page create from the built-in generator: a hashed site identifier (MD5 of home_url, not the URL itself), the free/pro tier, plugin version, WordPress version, and the number of pages created today.
 * After each MCP tool call: install ID (random 16-byte token, not tied to your WP user account), plugin version, tool name, the section type and variant chosen, request duration, and ok/error status.
 
 The plugin NEVER transmits: your prompt text, the page contents, headlines, images, CTAs, site URL (in plaintext), or any user/account information. All requests are non-blocking and silently dropped on failure.
@@ -138,59 +134,85 @@ The plugin NEVER transmits: your prompt text, the page contents, headlines, imag
 
 == Installation ==
 
-1. Upload the `pressgo-builder` folder to `/wp-content/plugins/`
+1. Upload the `pressgo-builder` folder to `/wp-content/plugins/`, or install it from Plugins &rarr; Add New
 2. Activate the plugin through the "Plugins" menu in WordPress
-3. Go to PressGo &rarr; Settings and choose your API mode:
-   * **PressGo API** (recommended) — Create a free account at [pressgo.app/register](https://pressgo.app/register) and paste your API key. 10 free credits/month.
-   * **Own API Key** — Enter your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
-4. Click PressGo in the sidebar — the AI Builder list opens. Click "+ New page" to start your first chat-driven build.
+3. Click PressGo in the sidebar and create your free account right inside the builder (one click, no card). Already have a key from [pressgo.app](https://pressgo.app/register)? Paste it in PressGo &rarr; Settings. Advanced users can enter their own Anthropic key there instead
+4. Click "+ New page" and tell the AI what you want
 
 == Support ==
 
-Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.app).
+Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.app). A real person answers.
 
 == Frequently Asked Questions ==
 
-= Do I need an API key? =
+= Do I need my own API key or AI subscription? =
 
-Start free — no credit card. Create a free PressGo account at [pressgo.app/register](https://pressgo.app/register) and every day includes **enough builds for a full page** (the allowance resets at midnight UTC), plus 10 bonus credits a month for overflow. From there you have two ways to power it: (1) keep using your free PressGo account (recommended — 10 credits/month, top up anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
+No. Create a free PressGo account (the builder can do it for you in one click) and you're building. Every day includes enough builds for a full page, plus 10 bonus credits a month for overflow. No credit card and no Anthropic account needed. Advanced users have two other options: bring your own Anthropic API key for the legacy one-shot generator, or connect any MCP client and build with your own AI subscription.
 
 = How much does it cost per page? =
 
-With a **PressGo API key**: 10 free credits/month included. Beyond that, $15 one-time pack = 75 credits, or PressGo Plus = $12/mo for 100 credits + MCP unlimited + Pro features. Each build (or significant chat-driven edit) costs 1 credit; just chatting with the AI is free until it actually changes the page. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
+Chatting is free. Your daily allowance covers a full page every day before any credits get spent, and a new section build beyond that costs 1 credit. Edits, reorders, color changes, and quality passes are always free. Failed builds refund themselves. PressGo Plus is $12 a month for a bigger daily allowance (roughly 8 pages a day) plus 100 bonus credits. With your own Anthropic key on the legacy generator, you pay Anthropic directly per token: a typical Haiku page runs about $0.02 to $0.05, Sonnet about $0.10 to $0.30, and Opus is the most capable at higher cost.
+
+= Does it work with my theme? =
+
+Yes. PressGo builds standard Elementor pages, so any theme that works with Elementor works with PressGo. New pages use Elementor's canvas template by default, a clean edge-to-edge layout with no theme header or footer, which is usually what you want for a landing page. Ask for a menu and the AI builds a top bar right on the page, or switch the page to your theme's template to use your site-wide header.
 
 = Does the AI Builder chat work with my own Anthropic key? =
 
-The chat-driven AI Builder runs on a PressGo account key (`pg_...`) — it's how pages stream, get reviewed, and stay in sync. "Own API Key" mode powers the legacy one-shot generator only. A free PressGo account (10 credits/month, no card) unlocks the full chat builder.
-
-= What data is sent to external servers? =
-
-When you click Generate, your text prompt and optional image are sent to Anthropic's API (`api.anthropic.com`) over HTTPS using your API key. The response is a JSON configuration that the plugin converts to Elementor elements locally. No data is collected by PressGo.
+The chat-driven AI Builder runs on a PressGo account key (`pg_...`). That's how pages stream, get reviewed, and stay in sync. "Own API Key" mode powers the legacy one-shot generator only. A free PressGo account (no card) gets you the full chat builder.
 
 = Do I need Elementor Pro? =
 
-No. PressGo works fully with Elementor Free. The blog posts section uses the Posts widget which requires Elementor Pro — it will be skipped automatically if Pro is not installed.
+No. PressGo works fully with Elementor Free, including real embedded forms. The blog posts section uses the Posts widget, which requires Elementor Pro, and it gets skipped automatically if Pro isn't installed.
 
 = Can I edit the generated pages? =
 
-Absolutely. Every generated page uses native Elementor widgets and sections. Open it in the Elementor editor and customize anything — text, colors, images, layout.
+Yes, all of it. Every page uses native Elementor widgets and containers. Open it in the Elementor editor and change whatever you like. The AI even pauses automatically when you open the editor, so your hand edits stay safe.
+
+= What happens to my pages if I uninstall? =
+
+They stay, and they keep working. Every page PressGo builds is a normal WordPress page made of native Elementor widgets. Deactivate or delete the plugin and your pages stay published, stay editable in Elementor, and don't change at all. Uninstalling only removes the plugin's own settings and build history.
+
+= What data is sent to external servers? =
+
+Nothing until you ask for a build. When you do, your prompt (and any image you attached) goes to the AI service for your mode: the PressGo API with a PressGo key, or `api.anthropic.com` with your own key. The full list, including the screenshot service and optional stock photo searches, is in the External Services section. Usage telemetry is opt-in only and never includes your prompts or page content.
 
 = Which Claude model should I use? =
 
-Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is faster and cheaper but may produce simpler layouts. Opus 4.6 produces the most detailed results at higher cost.
+On a PressGo account key you don't pick a model, it's handled for you. In Own API Key mode, Sonnet 4.5 gives the best balance of quality and cost. Haiku 4.5 is faster and cheaper but may produce simpler layouts. Opus 4.6 produces the most detailed results at higher cost.
+
+= Do you build pages for people? =
+
+We do. PressGo is run by a working marketing agency, and plugin users get a free professional build-out from our team. Tell us about your business at [pressgo.app/free-build](https://pressgo.app/free-build/).
 
 == Screenshots ==
 
-1. The PressGo generator — describe your page in a prompt and click Generate
-2. Live streaming preview — watch the AI build sections in real time
-3. A generated landing page — hero, features, pricing, and more, all native Elementor
-4. The Elementor editor — every widget the AI builds is fully editable
-5. Settings — enter your PressGo or Claude API key and choose a model
-6. A generated page open in the Elementor editor — restyle, swap images, and rewrite anything
-7. Mobile-responsive out of the box — generated pages adapt to tablet and phone automatically
-8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
+1. The PressGo generator. Describe your page in a prompt and click Generate
+2. Live streaming preview. Watch the AI build sections in real time
+3. A generated landing page. Hero, features, pricing, and more, all native Elementor
+4. The Elementor editor. Every widget the AI builds is fully editable
+5. Settings. Enter your PressGo or Claude API key and choose a model
+6. A generated page open in the Elementor editor. Restyle, swap images, and rewrite anything
+7. Mobile responsive out of the box. Generated pages adapt to tablet and phone automatically
+8. Chat-driven live editing. Connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.7 =
+* Asking "did you build it?" is now answered instantly from the page's real state, free, instead of triggering another build
+* Every "Built" confirmation includes a View page link, so you always know where your page is
+* A build is only marked "Built" after the plugin verifies the page content actually saved; if the save silently failed you get an automatic refund instead of an empty page
+* The page reviewer fails a blank page instead of passing it
+* Large custom builds no longer time out mid-stream: the builder now only gives up if the connection actually stalls
+* Reliability: fixed a telemetry heartbeat that never reached the server
+
+= 2.5.6 =
+* Build from a PDF brief: drop in a project brief and PressGo builds the page section by section from it, in both quick and custom modes
+* Testimonials never ship with placeholder text: bracketed filler like "[customer review]" is dropped instead of landing on your page
+* "Why choose us" cards stay aligned: four benefits no longer leave one card stretched full-width
+* Hero checklists show up: the bullet list under your headline now renders on every hero style
+* Feature cards keep their details without a photo: price, label, and button stay put even when there is no image
+* Better-timed prompts: the review request waits until you have built a few pages, and the review and hand-raise prompts no longer appear together
 
 = 2.5.5 =
 * Paste one key, everything connects: entering your Plus license now automatically connects your account too — no more hunting for a second key
