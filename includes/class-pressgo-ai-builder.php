@@ -113,6 +113,7 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_freeform',     array( $this, 'ajax_freeform' ) );
 		add_action( 'wp_ajax_pressgo_ai_usage',        array( $this, 'ajax_usage' ) );
 		add_action( 'wp_ajax_pressgo_ai_subscribe',    array( $this, 'ajax_subscribe' ) );
+		add_action( 'wp_ajax_pressgo_ai_cancel',       array( $this, 'ajax_cancel' ) );
 		add_action( 'wp_ajax_pressgo_ai_billing',      array( $this, 'ajax_billing_portal' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
 		add_action( 'wp_ajax_pressgo_ai_unshackled',   array( $this, 'ajax_unshackled' ) ); // TS/HTML engine toggle
@@ -4619,23 +4620,33 @@ class PressGo_AI_Builder {
 			.pg-credits-pill{display:none!important}
 			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px;cursor:pointer;transition:background .12s}
 			.pg-usage:hover{background:#f4f5f7}
-			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:640px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
+			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:760px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
 			.pg-tiers-pop[hidden]{display:none}
 			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
 			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
-			.pg-tiers-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-			@media(max-width:760px){.pg-tiers-grid{grid-template-columns:1fr}.pg-tiers-pop{width:340px}}
-			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:11px;padding:14px}
+			.pg-tiers-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+			@media(max-width:820px){.pg-tiers-pop{width:520px}.pg-tiers-grid{grid-template-columns:1fr 1fr}}
+			@media(max-width:560px){.pg-tiers-pop{width:340px}.pg-tiers-grid{grid-template-columns:1fr}}
+			.pg-tiers-toggle{display:inline-flex;gap:2px;background:#f1f5f9;border-radius:999px;padding:2px;margin:-2px 0 10px}
+			.pg-toggle-opt{border:none;background:none;font-size:11px;font-weight:700;color:#64748b;padding:4px 12px;border-radius:999px;cursor:pointer}
+			.pg-toggle-opt.is-active{background:#fff;color:#1d2230;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+			.pg-toggle-opt span{font-size:9px;color:#16a34a;font-weight:800;margin-left:3px}
+			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:11px;padding:13px 11px}
 			.pg-tier-card.is-pop{border-color:#5b4fff;box-shadow:0 4px 16px rgba(91,79,255,.14)}
 			.pg-tier-flag{position:absolute;top:-8px;right:10px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:#5b4fff;padding:2px 7px;border-radius:999px}
 			.pg-tier-name{font-size:13.5px;font-weight:800;color:#1d2230}
 			.pg-tier-price{font-size:19px;font-weight:800;color:#1d2230;margin-top:2px}
 			.pg-tier-cap{font-size:12px;font-weight:700;color:#5b4fff;margin-top:6px}
 			.pg-tier-blurb{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.45}
+			.pg-tier-host{display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;font-weight:800;color:#5b4fff;background:#efeefe;border-radius:7px;padding:6px 8px;line-height:1.2}
+			.pg-tier-host svg{flex-shrink:0}
+			.pg-tier-card.is-pop .pg-tier-host{background:#e8e6ff}
 			.pg-tier-cta{margin-top:10px;width:100%;border:none;border-radius:8px;background:#5b4fff;color:#fff;font-size:12.5px;font-weight:700;padding:8px 0;cursor:pointer}
 			.pg-tier-cta:hover{background:#4a3fe6}
 			.pg-tier-cur{margin-top:10px;width:100%;text-align:center;font-size:12px;font-weight:700;color:#16a34a;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:8px 0}
-			.pg-tiers-credits{margin-top:10px;font-size:11.5px;color:#64748b;text-align:center}
+			.pg-tiers-hostnote{margin-top:11px;font-size:12px;color:#334155;text-align:center;line-height:1.5;background:#f8f8ff;border:1px solid #e8e6ff;border-radius:9px;padding:9px 12px}
+			.pg-tiers-hostnote b{color:#5b4fff}
+			.pg-tiers-credits{margin-top:8px;font-size:11.5px;color:#64748b;text-align:center}
 			.pg-tiers-acct{margin:-4px 0 10px;font-size:11.5px;color:#334155}
 			.pg-tiers-acct .pg-acct-plan{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 7px;border-radius:999px}
 			.pg-tier-card.is-dim{opacity:.55}
@@ -4678,31 +4689,46 @@ class PressGo_AI_Builder {
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
 					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
 					<div class="pg-tiers-acct" id="pg-tiers-acct"></div>
+					<div class="pg-tiers-toggle" id="pg-tiers-toggle">
+						<button type="button" class="pg-toggle-opt is-active" data-interval="month">Monthly</button>
+						<button type="button" class="pg-toggle-opt" data-interval="year">Annual<span>save ~20%</span></button>
+					</div>
 					<div class="pg-tiers-grid">
 						<div class="pg-tier-card" id="pg-tier-free" data-plan="free">
 							<div class="pg-tier-name">Free</div>
-							<div class="pg-tier-price">$0</div>
+							<div class="pg-tier-price" data-monthly="$0" data-annual="$0">$0</div>
 							<div class="pg-tier-cap">1 full page a day</div>
-							<div class="pg-tier-blurb">8 section builds daily + 10 bonus credits a month. Edits are always free.</div>
+							<div class="pg-tier-blurb">8 section builds daily + 10 credits a month. Edits are always free.</div>
 						</div>
-						<div class="pg-tier-card is-pop" data-plan="plus">
-							<span class="pg-tier-flag">Popular</span>
-							<div class="pg-tier-name">Plus</div>
-							<div class="pg-tier-price">$12/mo</div>
+						<div class="pg-tier-card" data-plan="pro">
+							<div class="pg-tier-name">Pro</div>
+							<div class="pg-tier-price" data-monthly="$25/mo" data-annual="$19/mo">$25/mo</div>
 							<div class="pg-tier-cap">~8 pages a day</div>
-							<div class="pg-tier-blurb">64 section builds daily + 100 bonus credits a month.</div>
-							<button type="button" class="pg-tier-cta is-pop" id="pg-plus-btn" data-plan="plus">Upgrade to Plus</button>
+							<div class="pg-tier-blurb">64 builds daily + 100 credits a month. Edits always free.</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<button type="button" class="pg-tier-cta" id="pg-pro-btn" data-plan="pro">Get Pro</button>
 						</div>
-						<div class="pg-tier-card" data-plan="agency">
-							<div class="pg-tier-name">Agency</div>
-							<div class="pg-tier-price">$49/mo</div>
+						<div class="pg-tier-card is-pop" data-plan="max">
+							<span class="pg-tier-flag">Popular</span>
+							<div class="pg-tier-name">Max</div>
+							<div class="pg-tier-price" data-monthly="$59/mo" data-annual="$49/mo">$59/mo</div>
 							<div class="pg-tier-cap">~40 pages a day</div>
-							<div class="pg-tier-blurb">400 builds daily + 400 bonus credits a month. Built for client work.</div>
-							<button type="button" class="pg-tier-cta" id="pg-agency-btn" data-plan="agency">Go Agency</button>
+							<div class="pg-tier-blurb">400 builds daily + 400 credits a month. All AI models.</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<button type="button" class="pg-tier-cta is-pop" id="pg-max-btn" data-plan="max">Get Max</button>
+						</div>
+						<div class="pg-tier-card" data-plan="ultra">
+							<div class="pg-tier-name">Ultra</div>
+							<div class="pg-tier-price" data-monthly="$149/mo" data-annual="$129/mo">$149/mo</div>
+							<div class="pg-tier-cap">Unlimited daily</div>
+							<div class="pg-tier-blurb">Unlimited daily builds + 1000 credits a month. For client volume.</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<button type="button" class="pg-tier-cta" id="pg-ultra-btn" data-plan="ultra">Get Ultra</button>
 						</div>
 					</div>
+					<div class="pg-tiers-hostnote">Every paid plan includes <b>agentic hosting</b>. We stand up and run a real WordPress site for you, and the AI builds right on it. No servers to set up, or keep the plugin on your own site. Your call.</div>
 					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
-					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Manage or cancel your plan</button>
+					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Cancel your plan</button>
 				</div>
 			<?php endif; ?>
 				<div class="pg-builder-shell">
@@ -6701,21 +6727,39 @@ class PressGo_AI_Builder {
 		wp_send_json_success( $this->usage_state( $preview ) );
 	}
 
-	/** Create a Plus subscription checkout for this site's PressGo account. */
+	/** Create a Pro/Max/Ultra subscription checkout for this site's PressGo account. */
 	public function ajax_subscribe() {
 		$this->check_auth();
 		$pg = (string) get_option( 'pressgo_account_key', '' );
 		if ( '' === $pg ) { wp_send_json_error( 'No PressGo API key configured.', 400 ); }
 		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
-		$plan = isset( $_POST['plan'] ) && 'agency' === $_POST['plan'] ? 'agency' : 'plus';
+		$allowed  = array( 'pro', 'max', 'ultra' );
+		$plan     = ( isset( $_POST['plan'] ) && in_array( $_POST['plan'], $allowed, true ) ) ? sanitize_key( wp_unslash( $_POST['plan'] ) ) : 'pro';
+		$interval = ( isset( $_POST['interval'] ) && 'year' === $_POST['interval'] ) ? 'year' : 'month';
 		$r = wp_remote_post( $base . '/api/plugin/subscribe', array(
 			'timeout' => 20,
 			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
-			'body'    => wp_json_encode( array( 'plan' => $plan ) ),
+			'body'    => wp_json_encode( array( 'plan' => $plan, 'interval' => $interval ) ),
 		) );
 		$j = json_decode( wp_remote_retrieve_body( $r ), true );
 		if ( is_array( $j ) && ! empty( $j['url'] ) ) { wp_send_json_success( array( 'url' => $j['url'], 'already' => ! empty( $j['already'] ) ) ); }
 		wp_send_json_error( 'Could not start checkout — try pressgo.app/dashboard.', 502 );
+	}
+
+	/** Cancel this site's PressGo subscription at period end. */
+	public function ajax_cancel() {
+		$this->check_auth();
+		$pg = (string) get_option( 'pressgo_account_key', '' );
+		if ( '' === $pg ) { wp_send_json_error( 'No PressGo API key configured.', 400 ); }
+		$base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
+		$r = wp_remote_post( $base . '/api/plugin/cancel', array(
+			'timeout' => 20,
+			'headers' => array( 'content-type' => 'application/json', 'X-PressGo-Key' => $pg ),
+			'body'    => '{}',
+		) );
+		$j = json_decode( wp_remote_retrieve_body( $r ), true );
+		if ( is_array( $j ) && ! empty( $j['ok'] ) ) { wp_send_json_success( array( 'endsAt' => isset( $j['endsAt'] ) ? $j['endsAt'] : null, 'note' => isset( $j['note'] ) ? $j['note'] : '' ) ); }
+		wp_send_json_error( is_array( $j ) && ! empty( $j['error'] ) ? $j['error'] : 'Could not cancel — try pressgo.app/dashboard.', 502 );
 	}
 
 	/** Open the Stripe billing portal for this site's PressGo account (cancel / card / invoices). */

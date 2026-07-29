@@ -395,13 +395,16 @@
 			acctEl.appendChild(planTag);
 		}
 		if (u.tier) {
-			var rank = { free: 0, plus: 1, pro: 1, agency: 2 };
+			// Unified ladder free/pro/max/ultra. Grandfathered plus/agency rank
+			// alongside their new-ladder equivalents so their card shows "Current
+			// plan" and isn't offered as an upsell.
+			var rank = { free: 0, free_tier: 0, pro: 1, plus: 1, max: 2, agency: 2, ultra: 3 };
 			var myRank = rank[u.tier] != null ? rank[u.tier] : 0;
 			document.querySelectorAll('.pg-tier-card[data-plan]').forEach(function (card) {
 				var cardPlan = card.getAttribute('data-plan');
 				var cardRank = rank[cardPlan] != null ? rank[cardPlan] : 0;
 				var btn = card.querySelector('.pg-tier-cta');
-				if (cardRank === myRank || (cardPlan === 'plus' && u.tier === 'pro')) {
+				if (cardRank === myRank) {
 					var curLabel = 'Current plan';
 					if (u.plan_ends) {
 						var endD = new Date(u.plan_ends);
@@ -465,7 +468,8 @@
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_subscribe');
 				fd.append('nonce', cfg.nonce);
-				fd.append('plan', btn.getAttribute('data-plan') || 'plus');
+				fd.append('plan', btn.getAttribute('data-plan') || 'pro');
+				fd.append('interval', currentInterval);
 				fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 					.then(function (r) { return r.json(); })
 					.then(function (j) {
@@ -475,22 +479,37 @@
 					.catch(function () { btn.disabled = false; btn.textContent = label; });
 			});
 		}
-		wireSubscribe(document.getElementById('pg-plus-btn'));
-		wireSubscribe(document.getElementById('pg-agency-btn'));
+		var currentInterval = 'month';
+		var tiersToggle = document.getElementById('pg-tiers-toggle');
+		if (tiersToggle) {
+			tiersToggle.querySelectorAll('.pg-toggle-opt').forEach(function (opt) {
+				opt.addEventListener('click', function (e) {
+					e.stopPropagation();
+					currentInterval = opt.getAttribute('data-interval') || 'month';
+					tiersToggle.querySelectorAll('.pg-toggle-opt').forEach(function (o) { o.classList.toggle('is-active', o === opt); });
+					document.querySelectorAll('.pg-tier-price[data-monthly]').forEach(function (p) {
+						var val = currentInterval === 'year' ? p.getAttribute('data-annual') : p.getAttribute('data-monthly');
+						if (val) p.textContent = val;
+					});
+				});
+			});
+		}
+		document.querySelectorAll('.pg-tier-cta').forEach(wireSubscribe);
 		var manageBtn = document.getElementById('pg-manage-plan');
 		if (manageBtn) manageBtn.addEventListener('click', function () {
+			if (!confirm('Cancel your plan? It stays active until the end of your billing period, then drops to Free.')) return;
 			manageBtn.disabled = true; manageBtn.textContent = 'Opening…';
 			var fd = new FormData();
-			fd.append('action', 'pressgo_ai_billing');
+			fd.append('action', 'pressgo_ai_cancel');
 			fd.append('nonce', cfg.nonce);
 			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 				.then(function (r) { return r.json(); })
 				.then(function (j) {
-					manageBtn.disabled = false; manageBtn.textContent = 'Manage or cancel your plan';
-					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
-					else if (j && j.data) alert(typeof j.data === 'string' ? j.data : 'Could not open billing.');
+					manageBtn.disabled = false; manageBtn.textContent = 'Cancel your plan';
+					if (j && j.success) { alert((j.data && j.data.note) || 'Your plan will not renew.'); refreshUsage(); }
+					else if (j && j.data) alert(typeof j.data === 'string' ? j.data : 'Could not cancel.');
 				})
-				.catch(function () { manageBtn.disabled = false; manageBtn.textContent = 'Manage or cancel your plan'; });
+				.catch(function () { manageBtn.disabled = false; manageBtn.textContent = 'Cancel your plan'; });
 		});
 	}
 

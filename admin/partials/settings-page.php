@@ -35,11 +35,18 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<?php endif; ?>
 		</ul>
 		<p>
-			<?php if ( 'free' === $pg_tier ) : ?>
-				<button type="button" class="button button-primary pressgo-plan-btn" data-plan="plus">Upgrade to Plus — $12/mo</button>
-				<button type="button" class="button pressgo-plan-btn" data-plan="agency">Go Agency — $49/mo</button>
-			<?php elseif ( 'agency' !== $pg_tier ) : ?>
-				<button type="button" class="button pressgo-plan-btn" data-plan="agency">Upgrade to Agency — $49/mo</button>
+			<?php
+			$pg_rank_map = array( 'free' => 0, 'free_tier' => 0, 'pro' => 1, 'plus' => 1, 'max' => 2, 'agency' => 2, 'ultra' => 3 );
+			$pg_my_rank  = isset( $pg_rank_map[ $pg_tier ] ) ? $pg_rank_map[ $pg_tier ] : 0;
+			?>
+			<?php if ( $pg_my_rank < 1 ) : ?>
+				<button type="button" class="button button-primary pressgo-plan-btn" data-plan="pro">Get Pro ($25/mo)</button>
+			<?php endif; ?>
+			<?php if ( $pg_my_rank < 2 ) : ?>
+				<button type="button" class="button pressgo-plan-btn" data-plan="max">Get Max ($59/mo)</button>
+			<?php endif; ?>
+			<?php if ( $pg_my_rank < 3 ) : ?>
+				<button type="button" class="button pressgo-plan-btn" data-plan="ultra">Get Ultra ($149/mo)</button>
 			<?php endif; ?>
 			<?php if ( $pg_paid ) : ?>
 				<button type="button" class="button" id="pressgo-manage-plan-btn">Manage or cancel plan</button>
