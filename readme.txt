@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.8
+Stable tag: 2.5.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,12 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.9 =
+* Smarter setup: Freeform now asks a few sharp, tailored questions about your business instead of a fixed form, and gets to building faster. Give it a rich description and it may not need to ask at all
+* On brand automatically: builds match your saved brand, your colors, fonts, and voice, and a page can't drift off-brand even on a big custom layout. No brand yet? It designs a fresh look you can save
+* Cleaner reviews: a testimonial with no real quote yet shows a clear "add a real review" prompt instead of an empty card, and a reviewer with no photo gets a tidy initials monogram
+* Sharper hero trust lines: short trust points render as neat inline check chips
 
 = 2.5.8 =
 * New plans, Pro / Max / Ultra: pick or change your plan right inside WordPress, with a monthly or annual toggle (annual saves about 20%). Every paid plan now includes agentic hosting, where we stand up and run a real WordPress site for you and the AI builds straight on it. Or keep the plugin on your own site. Your call
