@@ -760,7 +760,7 @@ class PressGo_Freeform_Renderer {
 		$icon  = self::normalize_icon( isset( $s['icon'] ) ? $s['icon'] : 'fas fa-star' );
 		$color = isset( $s['color'] ) ? $s['color'] : ( isset( $cfg['colors']['primary'] ) ? $cfg['colors']['primary'] : '#2563EB' );
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 32;
-		$size  = min( 56, $size ); // an oversized decorative icon dominates the section (repeat offender in QA)
+		$size  = max( 16, min( 56, $size ) ); // clamp both ends: oversized icons dominate, and a stray tiny value (e.g. 2) reads as broken. Floor 16 matches the mobile/star floors below.
 		$w     = PressGo_Widget_Helpers::icon_w( $icon, $color, $size, 'default' );
 		if ( isset( $s['align'] ) ) {
 			$w['settings']['align'] = $s['align'];

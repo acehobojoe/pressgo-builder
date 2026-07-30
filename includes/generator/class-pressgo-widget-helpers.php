@@ -300,7 +300,12 @@ class PressGo_Widget_Helpers {
 		$s = array(
 			'selected_icon'  => is_array( $icon_class ) ? $icon_class : array( 'value' => $icon_class, 'library' => 'fa-solid' ),
 			'primary_color'  => $color,
-			'icon_size'      => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
+			// Elementor's plain `icon` widget sizes via the `size` control
+			// (selector .elementor-icon{font-size}). `icon_size` is the icon-BOX
+			// / star-rating control and is silently ignored here — using it dropped
+			// every standalone icon to ~15px inherited on both recipe and Nova
+			// pages. This is the icon-size fix.
+			'size'           => array( 'unit' => 'px', 'size' => $size, 'sizes' => array() ),
 			'view'           => $view,
 		);
 
