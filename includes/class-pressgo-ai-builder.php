@@ -4667,6 +4667,11 @@ class PressGo_AI_Builder {
 			.pg-tier-card.is-dim{opacity:.55}
 			.pg-tiers-manage{display:block;margin:8px auto 0;border:none;background:none;font-size:11px;color:#94a3b8;text-decoration:underline;cursor:pointer}
 			.pg-tiers-manage:hover{color:#475569}
+			.pg-tiers-renewal{margin:10px 0 0;font-size:11.5px;color:#64748b;text-align:center}
+			.pg-tiers-renewal.is-canceling{color:#b45309}
+			.pg-tiers-resume{border:none;background:none;font-size:11.5px;font-weight:700;color:#5b4fff;text-decoration:underline;cursor:pointer;padding:0;margin-left:5px}
+			.pg-tiers-resume:hover{color:#4a3fe6}
+			.pg-tiers-acct.pg-tiers-acct-error{color:#b45309}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4743,7 +4748,8 @@ class PressGo_AI_Builder {
 					</div>
 					<div class="pg-tiers-hostnote">Every paid plan includes <b>agentic hosting</b>. We stand up and run a real WordPress site for you, and the AI builds right on it. No servers to set up, or keep the plugin on your own site. Your call.</div>
 					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
-					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Cancel your plan</button>
+					<div class="pg-tiers-renewal" id="pg-tiers-renewal" hidden></div>
+					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Manage billing</button>
 				</div>
 			<?php endif; ?>
 				<div class="pg-builder-shell">
@@ -4776,7 +4782,7 @@ class PressGo_AI_Builder {
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
-												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova <span class="pg-mode-tag">beta</span></span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova</span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 										</div>
@@ -6262,9 +6268,16 @@ class PressGo_AI_Builder {
 	public function compose_freeform_tree( $system, $framed, $keepalive = null, $op = 'compose' ) {
 		self::$nova_last_error = '';
 		if ( self::nova_ready() ) {
+			// Nova composes on Claude Sonnet by DEFAULT (2026-07-29). GLM-5.2 was
+			// primary and produced spacer-padded, low-quality layouts; it's now the
+			// cheap fallback if Sonnet fails. Filter-overridable (e.g. Opus on
+			// higher tiers). This is the freeform quality fix.
+			$primary = (string) apply_filters( 'pressgo_compose_model', 'anthropic/claude-sonnet-5' );
+			$tree = self::glm_compose( $system, $framed, $keepalive, $primary, $op );
+			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => $primary ); }
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: primary (' . $primary . ') returned no valid tree, trying GLM. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 			$tree = self::glm_compose( $system, $framed, $keepalive, 'z-ai/glm-5.2', $op );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: GLM returned no valid tree (falling back to Claude). Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
 		if ( '' !== $cl_key ) {

@@ -49,7 +49,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 				<button type="button" class="button pressgo-plan-btn" data-plan="ultra">Get Ultra ($149/mo)</button>
 			<?php endif; ?>
 			<?php if ( $pg_paid ) : ?>
-				<button type="button" class="button" id="pressgo-manage-plan-btn">Manage or cancel plan</button>
+				<button type="button" class="button" id="pressgo-manage-plan-btn">Manage billing</button>
 			<?php endif; ?>
 			<a class="button button-secondary" href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>
 		</p>
@@ -79,7 +79,12 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 		if (m) m.addEventListener('click', function () { post('pressgo_ai_billing', {}, m); });
 	})();
 	</script>
-	<?php endif; endif; ?>
+			<?php else : // Allowance call failed — show an explicit panel instead of silently rendering nothing. ?>
+		<div class="pressgo-settings-info" id="pressgo-account-panel" style="margin-top:16px">
+			<h3>Account &amp; plan</h3>
+			<p style="color:#b45309">We couldn't reach PressGo to load your account just now. Your key is saved and building still works. <a href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open your dashboard</a> to manage billing, or reload this page to try again.</p>
+		</div>
+		<?php endif; endif; ?>
 
 	<form method="post" action="options.php">
 		<?php

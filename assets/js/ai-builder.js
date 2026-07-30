@@ -302,11 +302,12 @@
 		}
 	});
 
-	// ─── Build mode selector (Ada / Iris / Nova) ────────────────────────
-	// One dropdown replaces the old vision + Pro-mode toggles. Modes are
-	// mutually exclusive: basic = recipe build, eyes = recipe + A(eyes)
-	// self-review pass, freeform = Nova "build anything" composer.
-	var MODE_NAMES = { basic: 'Ada', freeform: 'Nova' }; // Iris retired: the self-review runs automatically on first builds and on request
+	// ─── Build mode selector ────────────────────────────────────────────
+	// basic = Ada (recipe generator: fast, reliable, template-quality — the
+	// default). freeform = Nova (build-anything composer, the design-freedom
+	// mode). Nova now composes on Claude Sonnet, not GLM-5.2 (GLM produced
+	// spacer-padded slop) — so freeform freedom comes WITH real design quality.
+	var MODE_NAMES = { basic: 'Ada', freeform: 'Nova' };
 	var modeWrap    = document.getElementById('pg-mode');
 	var modeBtn     = document.getElementById('pg-mode-btn');
 	var modeMenu    = document.getElementById('pg-mode-menu');
@@ -362,6 +363,44 @@
 		var h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
 		return 'resets in ' + (h > 0 ? h + 'h ' + m + 'm' : (m > 0 ? m + 'm' : '<1m'));
 	}
+	function fmtDate(iso) {
+		if (!iso) return '';
+		var d = new Date(iso);
+		return isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+	}
+	// Single billing door. Both the popup "Manage billing" button and the
+	// "Resume" affordance open the Stripe billing portal (ajax_billing_portal
+	// → /api/plugin/billing-portal), matching the Settings-page manage button.
+	function openBillingPortal(btn) {
+		var label = btn.textContent;
+		btn.disabled = true; btn.textContent = 'Opening…';
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_billing');
+		fd.append('nonce', cfg.nonce);
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.json(); })
+			.then(function (j) {
+				btn.disabled = false; btn.textContent = label;
+				if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
+				else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open billing — try pressgo.app/dashboard.');
+			})
+			.catch(function () { btn.disabled = false; btn.textContent = label; });
+	}
+	// Explicit error state for the account panel in the plans popup, so a
+	// failed allowance call shows a retry instead of silently blanking out.
+	function renderUsageError() {
+		var acctEl = document.getElementById('pg-tiers-acct');
+		if (!acctEl) return;
+		acctEl.innerHTML = '';
+		acctEl.classList.add('pg-tiers-acct-error');
+		acctEl.appendChild(document.createTextNode("Couldn't load your account just now. "));
+		var retry = document.createElement('button');
+		retry.type = 'button';
+		retry.className = 'pg-tiers-resume';
+		retry.textContent = 'Retry';
+		retry.addEventListener('click', function () { acctEl.classList.remove('pg-tiers-acct-error'); refreshUsage(); });
+		acctEl.appendChild(retry);
+	}
 	function renderUsage(u) {
 		if (!usageEl || !u) return;
 		var used = u.used || 0, cap = u.cap || 0;
@@ -386,13 +425,16 @@
 		// The popup carries the plan state: paid tiers see "Current plan" instead
 		// of an upgrade button, and bonus credits (overflow) show as one quiet line.
 		var acctEl = document.getElementById('pg-tiers-acct');
-		if (acctEl && u.account) {
-			acctEl.innerHTML = '';
-			acctEl.appendChild(document.createTextNode('Connected as ' + u.account));
-			var planTag = document.createElement('span');
-			planTag.className = 'pg-acct-plan';
-			planTag.textContent = (u.tier === 'free' ? 'Free' : u.tier) + ' plan';
-			acctEl.appendChild(planTag);
+		if (acctEl) {
+			acctEl.classList.remove('pg-tiers-acct-error');
+			if (u.account) {
+				acctEl.innerHTML = '';
+				acctEl.appendChild(document.createTextNode('Connected as ' + u.account));
+				var planTag = document.createElement('span');
+				planTag.className = 'pg-acct-plan';
+				planTag.textContent = (u.tier === 'free' ? 'Free' : u.tier) + ' plan';
+				acctEl.appendChild(planTag);
+			}
 		}
 		if (u.tier) {
 			// Unified ladder free/pro/max/ultra. Grandfathered plus/agency rank
@@ -400,21 +442,22 @@
 			// plan" and isn't offered as an upsell.
 			var rank = { free: 0, free_tier: 0, pro: 1, plus: 1, max: 2, agency: 2, ultra: 3 };
 			var myRank = rank[u.tier] != null ? rank[u.tier] : 0;
+			// A scheduled cancel comes through cancel_at_period_end/cancels_at
+			// (new fields); fall back to the legacy plan_ends flag if present.
+			var isCanceling = !!u.cancel_at_period_end || !!u.plan_ends;
+			var endsWhen = fmtDate(u.cancels_at || u.current_period_end || u.plan_ends);
 			document.querySelectorAll('.pg-tier-card[data-plan]').forEach(function (card) {
 				var cardPlan = card.getAttribute('data-plan');
 				var cardRank = rank[cardPlan] != null ? rank[cardPlan] : 0;
 				var btn = card.querySelector('.pg-tier-cta');
 				if (cardRank === myRank) {
 					var curLabel = 'Current plan';
-					if (u.plan_ends) {
-						var endD = new Date(u.plan_ends);
-						if (!isNaN(endD)) curLabel = 'Ends ' + endD.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-					}
+					if (isCanceling && endsWhen) curLabel = 'Ends ' + endsWhen;
 					if (btn) {
 						var cur = document.createElement('div');
 						cur.className = 'pg-tier-cur';
 						cur.textContent = curLabel;
-						if (u.plan_ends) { cur.style.color = '#b45309'; cur.style.borderColor = '#fde68a'; cur.style.background = '#fffbeb'; cur.title = 'Your plan is canceled and stays active until this date, then drops to Free.'; }
+						if (isCanceling) { cur.style.color = '#b45309'; cur.style.borderColor = '#fde68a'; cur.style.background = '#fffbeb'; cur.title = 'Your plan is canceled and stays active until this date, then drops to Free.'; }
 						btn.replaceWith(cur);
 					} else if (!card.querySelector('.pg-tier-cur') && cardPlan === 'free' && myRank === 0) {
 						var cur2 = document.createElement('div');
@@ -426,7 +469,33 @@
 				card.classList.toggle('is-dim', cardRank < myRank);
 			});
 			var manageEl = document.getElementById('pg-manage-plan');
-			if (manageEl) manageEl.hidden = myRank === 0; // paid plans get the cancel door
+			if (manageEl) manageEl.hidden = myRank === 0; // paid plans get the manage-billing door
+			// Renewal / cancellation status. Active paid plans show the next
+			// renewal date; a scheduled cancel shows the end date plus a Resume
+			// affordance (Resume just reopens the billing portal).
+			var renewEl = document.getElementById('pg-tiers-renewal');
+			if (renewEl) {
+				renewEl.innerHTML = '';
+				renewEl.classList.remove('is-canceling');
+				if (myRank > 0 && u.cancel_at_period_end) {
+					renewEl.classList.add('is-canceling');
+					var cancelWhen = fmtDate(u.cancels_at || u.current_period_end || u.plan_ends);
+					renewEl.appendChild(document.createTextNode(cancelWhen ? 'Cancels ' + cancelWhen + '.' : 'Set to cancel at period end.'));
+					var resume = document.createElement('button');
+					resume.type = 'button';
+					resume.className = 'pg-tiers-resume';
+					resume.textContent = 'Resume';
+					resume.addEventListener('click', function () { openBillingPortal(resume); });
+					renewEl.appendChild(resume);
+					renewEl.hidden = false;
+				} else if (myRank > 0 && u.current_period_end) {
+					var renewWhen = fmtDate(u.current_period_end);
+					renewEl.textContent = renewWhen ? 'Renews ' + renewWhen : '';
+					renewEl.hidden = !renewWhen;
+				} else {
+					renewEl.hidden = true;
+				}
+			}
 		}
 		var credLine = document.getElementById('pg-tiers-credits');
 		if (credLine && typeof u.credits === 'number') {
@@ -442,8 +511,8 @@
 		fd.append('nonce', cfg.nonce);
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
 			.then(function (r) { return r.json(); })
-			.then(function (j) { if (j && j.success) renderUsage(j.data); })
-			.catch(function () {});
+			.then(function (j) { if (j && j.success) renderUsage(j.data); else renderUsageError(); })
+			.catch(function () { renderUsageError(); });
 	}
 	if (usageEl) {
 		if (cfg.usage) renderUsage(cfg.usage);
@@ -495,22 +564,11 @@
 			});
 		}
 		document.querySelectorAll('.pg-tier-cta').forEach(wireSubscribe);
+		// One door: "Manage billing" opens the Stripe portal (upgrade, change
+		// card, cancel, resume, invoices all live there). Same target as the
+		// Settings-page manage button.
 		var manageBtn = document.getElementById('pg-manage-plan');
-		if (manageBtn) manageBtn.addEventListener('click', function () {
-			if (!confirm('Cancel your plan? It stays active until the end of your billing period, then drops to Free.')) return;
-			manageBtn.disabled = true; manageBtn.textContent = 'Opening…';
-			var fd = new FormData();
-			fd.append('action', 'pressgo_ai_cancel');
-			fd.append('nonce', cfg.nonce);
-			fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
-				.then(function (r) { return r.json(); })
-				.then(function (j) {
-					manageBtn.disabled = false; manageBtn.textContent = 'Cancel your plan';
-					if (j && j.success) { alert((j.data && j.data.note) || 'Your plan will not renew.'); refreshUsage(); }
-					else if (j && j.data) alert(typeof j.data === 'string' ? j.data : 'Could not cancel.');
-				})
-				.catch(function () { manageBtn.disabled = false; manageBtn.textContent = 'Cancel your plan'; });
-		});
+		if (manageBtn) manageBtn.addEventListener('click', function () { openBillingPortal(manageBtn); });
 	}
 
 	function typingNode() {
