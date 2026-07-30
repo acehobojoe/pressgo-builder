@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.7
+Stable tag: 2.5.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,14 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.8 =
+* New plans, Pro / Max / Ultra: pick or change your plan right inside WordPress, with a monthly or annual toggle (annual saves about 20%). Every paid plan now includes agentic hosting, where we stand up and run a real WordPress site for you and the AI builds straight on it. Or keep the plugin on your own site. Your call
+* Know exactly where your plan stands: the plans panel shows when your plan renews, and if you cancel it shows the date it stays active until with one-click Resume. Manage billing opens your billing portal without leaving WordPress
+* Sharper custom builds: Freeform now composes on Claude Sonnet for real design quality, and a mid-build hiccup retries on the same strong model instead of dropping to a weaker one that padded pages with empty spacing
+* Clearer mode names: the two build modes are now simply Quick (fast, reliable page builds) and Freeform (builds anything, custom layouts). Same two modes, plainer names
+* Name your page as you create it: the New page button now has an optional name field, so a page starts with the title you want instead of a timestamp. Leave it blank and your first build still names it for you
+* Fixed: icons now render at the size intended. A sizing bug could make an icon oversized, or on some pages stop the page from building at all
 
 = 2.5.7 =
 * Asking "did you build it?" is now answered instantly from the page's real state, free, instead of triggering another build

@@ -33,6 +33,9 @@ build-zip.sh
 .claude
 .env
 .env.*
+.svn-credentials
+*.credentials
+release-email-*.md
 phpunit.xml
 phpcs.xml
 .phpcs.xml

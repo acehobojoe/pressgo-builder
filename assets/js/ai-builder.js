@@ -303,11 +303,12 @@
 	});
 
 	// ─── Build mode selector ────────────────────────────────────────────
-	// basic = Ada (recipe generator: fast, reliable, template-quality — the
-	// default). freeform = Nova (build-anything composer, the design-freedom
-	// mode). Nova now composes on Claude Sonnet, not GLM-5.2 (GLM produced
-	// spacer-padded slop) — so freeform freedom comes WITH real design quality.
-	var MODE_NAMES = { basic: 'Ada', freeform: 'Nova' };
+	// basic = "Quick" (recipe generator: fast, reliable, template-quality — the
+	// default). freeform = "Freeform" (build-anything composer, the design-
+	// freedom mode). Freeform composes on Claude Sonnet via OpenRouter — so the
+	// freedom comes WITH real design quality. (Internally still keyed basic/
+	// freeform; these are just the user-facing labels.)
+	var MODE_NAMES = { basic: 'Quick', freeform: 'Freeform' };
 	var modeWrap    = document.getElementById('pg-mode');
 	var modeBtn     = document.getElementById('pg-mode-btn');
 	var modeMenu    = document.getElementById('pg-mode-menu');

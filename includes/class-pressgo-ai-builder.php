@@ -4773,16 +4773,16 @@ class PressGo_AI_Builder {
 									<div class="pg-mode" id="pg-mode">
 										<button type="button" class="pg-mode-btn" id="pg-mode-btn" aria-haspopup="listbox" aria-expanded="false">
 											<span class="pg-mode-dot"></span>
-											<span class="pg-mode-current" id="pg-mode-current">Ada</span>
+											<span class="pg-mode-current" id="pg-mode-current">Quick</span>
 											<svg class="pg-mode-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
 										</button>
 										<div class="pg-mode-menu" id="pg-mode-menu" role="listbox" hidden>
 											<button type="button" class="pg-mode-opt" role="option" data-mode="basic">
-												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Ada</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Quick</span><span class="pg-mode-opt-desc">Fast, reliable page builds</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
-												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Nova</span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Freeform</span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 										</div>
@@ -4988,7 +4988,7 @@ class PressGo_AI_Builder {
 		if ( '' === $key ) { return ''; }
 		$sys = "You are an elite conversion web designer and front-end engineer. Output a COMPLETE, self-contained, production-quality responsive HTML landing page as a SINGLE document (<!doctype html> ... </html>). Modern CSS in one <style> block (flexbox/grid, CSS variables, tasteful gradients, hover states, subtle reveal animations); NO frameworks, NO Elementor, NO WordPress. Use real placeholder photos from https://images.unsplash.com with queries that fit the business. Match the depth and polish of a top agency landing page: sticky nav, a hero with an inline lead-form card, a services/features grid with real photos, a them-vs-us comparison, a team/credibility section, numbered how-it-works steps, testimonials with stars, an FAQ, a strong final CTA, and a rich footer. Mobile-perfect, cohesive palette, confident type. Preserve any real names, numbers, and details from the brief EXACTLY. Zero em dashes. Output ONLY the HTML, no prose, no code fences.";
 		$body = wp_json_encode( array(
-			'model'       => (string) apply_filters( 'pressgo_unshackled_model', 'z-ai/glm-5.2' ),
+			'model'       => (string) apply_filters( 'pressgo_unshackled_model', 'anthropic/claude-sonnet-5' ),
 			'max_tokens'  => 20000,
 			'temperature' => 0.6,
 			'messages'    => array(
@@ -6170,12 +6170,13 @@ class PressGo_AI_Builder {
 	}
 
 	/**
-	 * GLM-5.2 chat (not compose) via OpenRouter streaming. Returns plain text.
-	 * Uses the same keepalive mechanism as glm_compose to prevent Cloudflare 524.
+	 * Conversational chat (not compose) via OpenRouter streaming, on Claude
+	 * Sonnet. Returns plain text. Uses the same keepalive mechanism as
+	 * glm_compose to prevent Cloudflare 524. Filter-overridable.
 	 */
 	private static function glm_chat( $system, $user, $keepalive = null ) {
 		$body = wp_json_encode( array(
-			'model'      => 'z-ai/glm-5.2',
+			'model'      => (string) apply_filters( 'pressgo_chat_model', 'anthropic/claude-sonnet-5' ),
 			'max_tokens' => 1000,
 			'stream'     => true,
 			'messages'   => array(
@@ -6268,16 +6269,18 @@ class PressGo_AI_Builder {
 	public function compose_freeform_tree( $system, $framed, $keepalive = null, $op = 'compose' ) {
 		self::$nova_last_error = '';
 		if ( self::nova_ready() ) {
-			// Nova composes on Claude Sonnet by DEFAULT (2026-07-29). GLM-5.2 was
-			// primary and produced spacer-padded, low-quality layouts; it's now the
-			// cheap fallback if Sonnet fails. Filter-overridable (e.g. Opus on
-			// higher tiers). This is the freeform quality fix.
+			// Freeform composes on Claude Sonnet, all via OpenRouter (own key or
+			// the pressgo.app Nova proxy). Filter-overridable (e.g. Opus on higher
+			// tiers). GLM-5.2 was the old fallback but produced spacer-padded,
+			// low-quality layouts, so it's gone: a transient Sonnet failure just
+			// retries Sonnet once rather than dropping to a worse model.
 			$primary = (string) apply_filters( 'pressgo_compose_model', 'anthropic/claude-sonnet-5' );
 			$tree = self::glm_compose( $system, $framed, $keepalive, $primary, $op );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => $primary ); }
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: primary (' . $primary . ') returned no valid tree, trying GLM. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
-			$tree = self::glm_compose( $system, $framed, $keepalive, 'z-ai/glm-5.2', $op );
-			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'glm-5.2' ); }
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo compose: primary (' . $primary . ') returned no valid tree, retrying once. Prompt head: ' . mb_substr( preg_replace( '/\s+/', ' ', $framed ), 0, 160 ) ); // phpcs:ignore
+			if ( is_callable( $keepalive ) ) { $keepalive(); }
+			$tree = self::glm_compose( $system, $framed, $keepalive, $primary, $op );
+			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => $primary ); }
 		}
 		$cl_key = (string) get_option( 'pressgo_freeform_key', '' );
 		if ( '' !== $cl_key ) {
@@ -6288,7 +6291,7 @@ class PressGo_AI_Builder {
 			// No own Anthropic key: the Claude fallback rides the same backend
 			// (OpenRouter hosts the Anthropic models under anthropic/*).
 			if ( is_callable( $keepalive ) ) { $keepalive(); }
-			$tree = self::glm_compose( $system, $framed, $keepalive, 'anthropic/claude-sonnet-4.5', $op );
+			$tree = self::glm_compose( $system, $framed, $keepalive, 'anthropic/claude-sonnet-5', $op );
 			if ( is_array( $tree ) ) { return array( 'tree' => $tree, 'model' => 'claude' ); }
 		}
 		if ( 'credits' === self::$nova_last_error ) {
@@ -6335,7 +6338,7 @@ class PressGo_AI_Builder {
 	 * (prevents Cloudflare 524 at 100s of silence). Without $keepalive, falls
 	 * back to a simple wp_remote_post (CLI / harness paths).
 	 */
-	private static function glm_compose( $system, $framed, $keepalive = null, $model = 'z-ai/glm-5.2', $op = 'compose' ) {
+	private static function glm_compose( $system, $framed, $keepalive = null, $model = 'anthropic/claude-sonnet-5', $op = 'compose' ) {
 		$body = wp_json_encode( array(
 			'model'           => $model,
 			'max_tokens'      => 12000,
