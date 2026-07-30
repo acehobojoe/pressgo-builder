@@ -246,8 +246,15 @@ class PressGo_Freeform_Renderer {
 		$kids[] = array( 'type' => 'spacer', 'height' => 10 );
 		if ( ! empty( $s['quote'] ) ) {
 			$q = trim( $s['quote'] );
-			if ( '"' !== substr( $q, 0, 1 ) ) { $q = '"' . $q . '"'; }
-			$kids[] = array( 'type' => 'text', 'html' => $q, 'size' => 16, 'line_height' => 1.6, 'align' => $align );
+			// A bracketed placeholder ("[Paste a real review here]") is an
+			// instruction to the owner, not a quote — render it plainly (brackets
+			// unwrapped at strip_dashes) without fake quotation marks.
+			if ( '[' === substr( $q, 0, 1 ) ) {
+				$kids[] = array( 'type' => 'text', 'html' => $q, 'size' => 15, 'line_height' => 1.6, 'align' => $align );
+			} else {
+				if ( '"' !== substr( $q, 0, 1 ) ) { $q = '"' . $q . '"'; }
+				$kids[] = array( 'type' => 'text', 'html' => $q, 'size' => 16, 'line_height' => 1.6, 'align' => $align );
+			}
 		}
 		$by = trim( ( isset( $s['name'] ) ? $s['name'] : '' ) . ( ! empty( $s['role'] ) ? ' · ' . $s['role'] : '' ) );
 		if ( '' !== $by ) {
@@ -1105,9 +1112,12 @@ class PressGo_Freeform_Renderer {
 		$text = str_replace( array( " \xe2\x80\x94 ", " \xe2\x80\x93 " ), ', ', $text );
 		// Any remaining bare em/en dash -> hyphen.
 		$text = str_replace( array( "\xe2\x80\x94", "\xe2\x80\x93" ), '-', $text );
-		// Strip bracketed placeholders ("[Name]", "[Client Name]") that the
-		// composer sometimes leaves in generated copy.
-		$text = preg_replace( '/\[[A-Za-z][^\]]*\]/', '', $text );
+		// Unwrap bracketed placeholders ("[Paste a real review here]", "[Client
+		// Name]") to their inner text so they render as a VISIBLE, editable prompt
+		// the owner replaces. Deleting them (the old behavior) left husks — an
+		// empty "" quote, a lone "·" byline — that read as broken. Genuinely empty
+		// leaves are still skipped by render_heading / render_text.
+		$text = preg_replace( '/\[([A-Za-z][^\]]*)\]/', '$1', $text );
 		// Strip bare "..." placeholders the composer sometimes emits instead of
 		// real copy (leaves orphaned dots that read as broken UI in screenshots).
 		$text = preg_replace( '/^\s*\.{2,}\s*$/', '', $text );
