@@ -1500,6 +1500,87 @@ class PressGo_AI_Builder {
 		return implode( "\n", $parts );
 	}
 
+	/**
+	 * Compact context for the adaptive interviewer: what we already know or can
+	 * infer, plus site signals, so the model never asks what it can already read.
+	 */
+	private function discovery_context( $post_id, $state ) {
+		$c = array();
+		if ( ! empty( $state['business'] ) )       { $c[] = 'Business (in the user\'s words): ' . trim( (string) $state['business'] ); }
+		if ( ! empty( $state['page_intent'] ) )    { $c[] = 'This page is for: ' . trim( (string) $state['page_intent'] ); }
+		if ( ! empty( $state['industry_guess'] ) ) { $c[] = 'Likely industry: ' . $this->industry_label( $state['industry_guess'] ); }
+		if ( ! empty( $state['location'] ) )       { $c[] = 'Location: ' . $state['location']; }
+		if ( ! empty( $state['audience'] ) )       { $c[] = 'Audience: ' . $state['audience']; }
+		if ( ! empty( $state['voice'] ) )          { $c[] = 'Brand voice: ' . $state['voice']; }
+		if ( ! empty( $state['site_headline'] ) )  { $c[] = 'Site tagline: ' . $state['site_headline']; }
+		if ( ! empty( $state['answers'] ) && is_array( $state['answers'] ) ) {
+			foreach ( $state['answers'] as $k => $v ) {
+				if ( 'goal_label' === $k || '' === (string) $v ) { continue; }
+				$c[] = ucfirst( str_replace( '_', ' ', $k ) ) . ': ' . $v;
+			}
+		}
+		$name = get_bloginfo( 'name' ); $tag = get_bloginfo( 'description' );
+		if ( $name ) { $c[] = 'Site name: ' . $name; }
+		if ( $tag )  { $c[] = 'Site description: ' . $tag; }
+		$pages  = get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 'numberposts' => 5, 'exclude' => array( (int) $post_id ), 'orderby' => 'modified', 'order' => 'DESC' ) );
+		$titles = array();
+		foreach ( (array) $pages as $p ) {
+			$t  = get_the_title( $p );
+			$ex = wp_trim_words( wp_strip_all_tags( (string) $p->post_content ), 24, '' );
+			if ( $t ) { $titles[] = $ex ? ( $t . ' — ' . $ex ) : $t; }
+		}
+		if ( $titles ) { $c[] = "Existing pages on this site:\n- " . implode( "\n- ", $titles ); }
+		return implode( "\n", $c );
+	}
+
+	/**
+	 * Adaptive discovery: ONE OpenRouter (Sonnet) turn that either asks the single
+	 * best next question (with business-specific tap chips) or says done and hands
+	 * back a ready-to-build brief. Free op ('chat' = 0 units). Returns
+	 * array{done,question,chips,brief} or null on any failure, so the caller can
+	 * fall back to the preset stage machine. $force_done ends the interview now.
+	 */
+	private function discovery_ask( $post_id, $state, $force_done = false ) {
+		$context = $this->discovery_context( $post_id, $state );
+		$qa      = ( isset( $state['qa'] ) && is_array( $state['qa'] ) ) ? $state['qa'] : array();
+		$asked   = count( $qa );
+		$transcript = '';
+		foreach ( $qa as $turn ) {
+			$transcript .= 'Q: ' . $turn['q'] . "\nA: " . $turn['a'] . "\n";
+		}
+		$system = 'You are a sharp brand and conversion designer interviewing a small-business owner before you build their landing page. '
+			. 'Given what is already known plus the site context, decide the ONE most useful next question, or say you have enough. '
+			. 'Rules: adapt to the vertical (a plumber and a SaaS need different questions). NEVER ask anything already known or inferable from the context. '
+			. 'Focus on what makes a page convert: the primary goal, the specific offer, the target customer, one real proof point, and the CTA. '
+			. 'Prefer building over interrogating: the moment you have the business, the goal, the audience, one proof point, and a CTA, say done. '
+			. 'You have already asked ' . $asked . ' of at most 3 questions. Keep each question short and human, exactly one question. '
+			. 'Chips: give 2 to 5 short, tappable answer options tailored to THIS business (never generic); free text is always allowed too. '
+			. ( $force_done ? 'You have reached the question limit: you MUST return done=true with a brief now, do NOT ask another question. ' : '' )
+			. 'Respond with STRICT JSON only, no prose: '
+			. '{"done": false, "question": "<one short question>", "chips": ["<option>", "<option>"]} '
+			. 'OR {"done": true, "brief": "<a tight paragraph the page composer can build from: business, primary goal, audience, the offer, one proof point, the CTA, and tone>"}.';
+		$user = "CONTEXT (already known, do NOT re-ask):\n" . $context
+			. ( '' !== $transcript ? ( "\n\nINTERVIEW SO FAR:\n" . $transcript ) : '' )
+			. "\n\nReturn the JSON for the next step now.";
+
+		$out = self::glm_json( $system, $user, 700 );
+		if ( ! is_array( $out ) ) { return null; }
+		if ( isset( $out['chips'] ) && is_array( $out['chips'] ) ) {
+			$chips = array();
+			foreach ( $out['chips'] as $ch ) {
+				if ( is_string( $ch ) && '' !== trim( $ch ) ) {
+					$lbl = sanitize_text_field( $ch );
+					$chips[] = array( 'label' => $lbl, 'value' => $lbl ); // value = label so a tap sends the answer
+				} elseif ( is_array( $ch ) && ! empty( $ch['label'] ) ) {
+					$lbl = sanitize_text_field( $ch['label'] );
+					$chips[] = array( 'label' => $lbl, 'value' => $lbl );
+				}
+			}
+			$out['chips'] = $chips;
+		}
+		return $out;
+	}
+
 	/** Map a goal enum to the CTA phrase used in the brief. */
 	private function goal_cta_phrase( $goal ) {
 		$map = array(
@@ -5403,22 +5484,69 @@ class PressGo_AI_Builder {
 				$state = $reuse ? $this->init_reuse_state( $message, $master ) : $this->init_discovery_state( $message );
 				$this->save_discovery_state( $post_id, $state );
 			}
-			// An answer just came in (a chip tap, or typed text routed to a stage).
-			if ( '' !== $discovery_stage ) {
+			// An answer just came in (a chip tap, or typed text). Preset stages go
+			// through the stage recorder; adaptive answers are recorded below.
+			if ( '' !== $discovery_stage && 'adaptive' !== $discovery_stage ) {
 				$state = $this->run_discovery_step( $post_id, $state, $discovery_stage, $discovery_value, $message );
 			}
-			// Still owe a question? Ask the next one and stop (build nothing yet).
-			$next = $this->next_discovery_stage( $state );
-			if ( '' !== $next ) {
-				wp_send_json_success( $this->discovery_envelope( $next, $state ) );
+
+			// ADAPTIVE DISCOVERY (primary): an LLM interviewer picks the single
+			// best next question or hands back a finished brief. Filterable, and
+			// fails SAFE — on any model failure we fall through to the preset stage
+			// machine below, so the interview can never break.
+			$adaptive_done = false;
+			if ( self::nova_ready() && apply_filters( 'pressgo_adaptive_discovery', true ) ) {
+				if ( ! isset( $state['qa'] ) || ! is_array( $state['qa'] ) ) { $state['qa'] = array(); }
+				$incoming = trim( '' !== (string) $discovery_value ? (string) $discovery_value : (string) $message );
+				// Pair the incoming answer with the question we last asked.
+				if ( ! empty( $state['last_q'] ) && '' !== $incoming ) {
+					$state['qa'][]   = array( 'q' => (string) $state['last_q'], 'a' => sanitize_text_field( $incoming ) );
+					$state['last_q'] = '';
+					$this->save_discovery_state( $post_id, $state );
+				}
+				$qcount = isset( $state['q_count'] ) ? (int) $state['q_count'] : 0;
+				$ask    = $this->discovery_ask( $post_id, $state, $qcount >= 3 );
+				if ( is_array( $ask ) ) {
+					if ( empty( $ask['done'] ) && ! empty( $ask['question'] ) && $qcount < 3 ) {
+						$state['last_q']  = (string) $ask['question'];
+						$state['q_count'] = $qcount + 1;
+						$this->save_discovery_state( $post_id, $state );
+						wp_send_json_success( array(
+							'needs_discovery' => true,
+							'mode'            => 'discovery',
+							'stage'           => 'adaptive',
+							'allow_freetext'  => true,
+							'freetext_hint'   => '…or just type it',
+							'question'        => (string) $ask['question'],
+							'chips'           => ( isset( $ask['chips'] ) && is_array( $ask['chips'] ) ) ? $ask['chips'] : array(),
+						) );
+					}
+					if ( ! empty( $ask['brief'] ) ) {
+						update_post_meta( $post_id, self::META_FREEFORM_BRIEF, wp_slash( (string) $ask['brief'] ) );
+						$state['hero_built'] = true;
+						$this->save_discovery_state( $post_id, $state );
+						if ( ! empty( $state['business'] ) ) { $message = $state['business']; }
+						$adaptive_done = true;
+					}
+				}
+				// $ask === null (model unreachable) -> fall through to the preset machine.
 			}
-			// Every essential is known — commit the brief and build the hero from
-			// the business description (not the last chip label the POST carried).
-			$brief = $this->compose_brief_from_state( $state );
-			update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $brief );
-			$state['hero_built'] = true;
-			$this->save_discovery_state( $post_id, $state );
-			if ( ! empty( $state['business'] ) ) { $message = $state['business']; }
+
+			if ( ! $adaptive_done ) {
+				// PRESET FALLBACK (unchanged fixed stage machine).
+				// Still owe a question? Ask the next one and stop (build nothing yet).
+				$next = $this->next_discovery_stage( $state );
+				if ( '' !== $next ) {
+					wp_send_json_success( $this->discovery_envelope( $next, $state ) );
+				}
+				// Every essential is known — commit the brief and build the hero from
+				// the business description (not the last chip label the POST carried).
+				$brief = $this->compose_brief_from_state( $state );
+				update_post_meta( $post_id, self::META_FREEFORM_BRIEF, $brief );
+				$state['hero_built'] = true;
+				$this->save_discovery_state( $post_id, $state );
+				if ( ! empty( $state['business'] ) ) { $message = $state['business']; }
+			}
 		}
 
 		if ( ! self::nova_ready() && '' === (string) get_option( 'pressgo_freeform_key', '' ) ) {
@@ -6167,6 +6295,34 @@ class PressGo_AI_Builder {
 		}
 		$suggest = ! empty( $chips ) ? array( 'note' => null, 'suggested' => true, 'chips' => $chips ) : null;
 		return array( 'text' => $text, 'suggest' => $suggest );
+	}
+
+	/**
+	 * Blocking OpenRouter chat call that returns a DECODED JSON object, or null.
+	 * Same free 'chat' op + transport as glm_chat, with response_format json.
+	 * Used by the adaptive interviewer. Never throws; null = fall back.
+	 */
+	private static function glm_json( $system, $user, $max_tokens = 700 ) {
+		$be = self::nova_backend( 'chat' );
+		if ( ! $be ) { return null; }
+		$resp = wp_remote_post( $be['url'], array(
+			'timeout' => 60,
+			'headers' => $be['wp'],
+			'body'    => wp_json_encode( array(
+				'model'           => (string) apply_filters( 'pressgo_chat_model', 'anthropic/claude-sonnet-5' ),
+				'max_tokens'      => (int) $max_tokens,
+				'response_format' => array( 'type' => 'json_object' ),
+				'messages'        => array(
+					array( 'role' => 'system', 'content' => (string) $system ),
+					array( 'role' => 'user',   'content' => (string) $user ),
+				),
+			) ),
+		) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) { return null; }
+		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
+		$text = self::openrouter_message_text( isset( $data['choices'][0]['message']['content'] ) ? $data['choices'][0]['message']['content'] : '' );
+		$obj  = json_decode( trim( (string) $text ), true );
+		return is_array( $obj ) ? $obj : null;
 	}
 
 	/**
