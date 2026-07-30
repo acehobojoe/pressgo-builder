@@ -516,6 +516,58 @@ class PressGo_Section_Builder {
 	}
 
 	/**
+	 * Trust line renderer. Separator-delimited lines ("Licensed & Insured •
+	 * Free Estimates • Financing Available") become an inline check icon-list
+	 * so the hero's proof reads as structured chips instead of a flat gray
+	 * sentence. Single-phrase lines (and 5+ segment walls) keep the plain
+	 * text treatment — a lone checkmark next to "Austin Chronicle Best
+	 * Italian" reads as noise, and the stars-for-ratings logic upstream is
+	 * unchanged either way.
+	 */
+	private static function trust_line_widget( $cfg, $text, $align, $text_color, $align_mobile = null ) {
+		$parts = array();
+		if ( is_scalar( $text ) ) {
+			foreach ( preg_split( '/\s*[\x{2022}|\x{00b7}]\s*/u', (string) $text ) as $p ) {
+				$p = trim( $p );
+				if ( '' !== $p ) {
+					$parts[] = $p;
+				}
+			}
+		}
+		if ( count( $parts ) < 2 || count( $parts ) > 4 ) {
+			return PressGo_Widget_Helpers::text_w( $cfg, $text, $align, $text_color, 13,
+				null, 1.7, $align_mobile );
+		}
+		$c     = $cfg['colors'];
+		$fonts = $cfg['fonts'];
+		$items = array();
+		foreach ( $parts as $p ) {
+			$items[] = array(
+				'text'          => sanitize_text_field( $p ),
+				'selected_icon' => array( 'value' => 'fas fa-check-circle', 'library' => 'fa-solid' ),
+				'link'          => array( 'url' => '' ),
+			);
+		}
+		$s = array(
+			'icon_list'                   => $items,
+			'view'                        => 'inline',
+			'icon_color'                  => $c['accent'],
+			'text_color'                  => $text_color,
+			'icon_size'                   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+			'text_indent'                 => array( 'unit' => 'px', 'size' => 6, 'sizes' => array() ),
+			'icon_align'                  => $align,
+			'icon_typography_typography'  => 'custom',
+			'icon_typography_font_family' => $fonts['body'],
+			'icon_typography_font_size'   => array( 'unit' => 'px', 'size' => 13, 'sizes' => array() ),
+			'icon_typography_font_weight' => '600',
+		);
+		if ( $align_mobile ) {
+			$s['icon_align_mobile'] = $align_mobile;
+		}
+		return PressGo_Element_Factory::widget( 'icon-list', $s );
+	}
+
+	/**
 	 * Inline hero meta line — 1-3 {icon, text} facts (date/venue, beds/baths,
 	 * hours) rendered as a single centered icon-list under the subheadline.
 	 * Returns null when no usable items.
@@ -891,8 +943,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					'rgba(255,255,255,0.55)', 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'center', 'rgba(255,255,255,0.55)' ),
 			) ), 'center', 10 );
 		}
 
@@ -985,8 +1036,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-					$c['text_muted'], 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'left', $c['text_muted'] ),
 			) ), 'left', 10 );
 		}
 
@@ -1133,8 +1183,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'left' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'left',
-					$faint, 13, null, null, 'center' ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'left', $faint, 'center' ),
 			) ), 'left', 10 );
 		}
 
@@ -1302,8 +1351,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], $align ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], $align,
-					'rgba(255,255,255,0.6)', 13, null, null, $align_m ),
+				self::trust_line_widget( $cfg, $h['trust_line'], $align, 'rgba(255,255,255,0.6)', $align_m ),
 			) ), $align, 10 );
 		}
 
@@ -1444,8 +1492,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					$c['text_muted'], 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'center', $c['text_muted'] ),
 			) ), 'center', 10 );
 		}
 
@@ -1532,8 +1579,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					'rgba(255,255,255,0.55)', 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'center', 'rgba(255,255,255,0.55)' ),
 			) ), 'center', 10 );
 		}
 
@@ -1617,8 +1663,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					$c['text_muted'], 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'center', $c['text_muted'] ),
 			) ), 'center', 10 );
 		}
 
@@ -1688,8 +1733,7 @@ class PressGo_Section_Builder {
 				PressGo_Widget_Helpers::star_rating_w( 5, 14, $c['gold'], 'center' ),
 				) : array(),
 				array(
-				PressGo_Widget_Helpers::text_w( $cfg, $h['trust_line'], 'center',
-					'rgba(255,255,255,0.55)', 13 ),
+				self::trust_line_widget( $cfg, $h['trust_line'], 'center', 'rgba(255,255,255,0.55)' ),
 			) ), 'center', 10 );
 		}
 

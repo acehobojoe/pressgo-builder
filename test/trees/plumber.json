@@ -1,0 +1,120 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#0a1f3d",
+    "content_align": "center",
+    "max_width": 1100,
+    "padding": {
+      "top": 100,
+      "right": 40,
+      "bottom": 100,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "MESA'S 24/7 PLUMBING EXPERTS",
+        "tag": "h6",
+        "size": 13,
+        "weight": "700",
+        "color": "#ff6b35",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 2
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Plumbing Emergency? We're On Our Way.",
+        "tag": "h1",
+        "size": 62,
+        "size_mobile": 38,
+        "weight": "800",
+        "color": "#ffffff",
+        "align": "center",
+        "line_height": 1.1,
+        "letter_spacing": -1.2,
+        "max_text_width": 820
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 22
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Family-owned, locally trusted. Fast response, upfront pricing, and service you can count on—day or night.",
+        "size": 19,
+        "color": "rgba(255,255,255,0.8)",
+        "align": "center",
+        "line_height": 1.6,
+        "max_text_width": 600
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 44
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "(480) 637-1234",
+        "tag": "h2",
+        "size": 52,
+        "size_mobile": 34,
+        "weight": "800",
+        "color": "#ff6b35",
+        "align": "center",
+        "line_height": 1.2,
+        "letter_spacing": 0
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 24
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Call Now for Same-Day Service",
+        "url": "tel:4806371234",
+        "bg": "#ff6b35",
+        "color": "#ffffff",
+        "align": "center",
+        "icon": "fas fa-phone"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 16
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Available 24/7 • No overtime charges • Free estimates",
+        "size": 15,
+        "color": "rgba(255,255,255,0.65)",
+        "align": "center",
+        "line_height": 1.5
+      }
+    }
+  ]
+}

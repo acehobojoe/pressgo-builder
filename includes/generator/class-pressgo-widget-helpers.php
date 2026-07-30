@@ -708,13 +708,44 @@ class PressGo_Widget_Helpers {
 		if ( $image_url ) {
 			$s['testimonial_image'] = array( 'url' => $image_url, 'id' => '', 'alt' => $name );
 			$s['image_size']        = array( 'unit' => 'px', 'size' => 60, 'sizes' => array() );
+			return PressGo_Element_Factory::widget( 'testimonial', $s );
 		}
-		// No avatar supplied: leave testimonial_image unset. Elementor's native
-		// testimonial widget rejects data-URI images (renders a broken thumb), so
-		// we fall back to its neutral placeholder. A real initials monogram needs
-		// a custom card and is tracked as a follow-up.
 
-		return PressGo_Element_Factory::widget( 'testimonial', $s );
+		// No avatar supplied. The native testimonial widget shows a gray
+		// placeholder head when testimonial_image is unset (and rejects
+		// data-URI monograms — renders a broken thumb), so build the card
+		// footer ourselves: quote as a normal text widget + an inline-styled
+		// initials circle beside the name/role — the same monogram treatment
+		// the team builder uses for photo-less members.
+		$quote_w = self::text_w( $cfg, '<em>' . esc_html( $quote ) . '</em>', $align,
+			PressGo_Style_Utils::card_text(), 16, 14 );
+
+		$initials = self::name_initials( $name );
+		$tint     = PressGo_Style_Utils::light_tint( $c['primary'] );
+		$justify  = ( 'center' === $align ) ? 'center' : 'flex-start';
+
+		$footer_html = '<div style="display:flex;align-items:center;justify-content:' . $justify . ';gap:12px;">'
+			. '<div style="width:44px;height:44px;flex:0 0 44px;border-radius:9999px;'
+			. 'display:flex;align-items:center;justify-content:center;'
+			. 'background:' . $tint . ';color:' . $c['primary'] . ';'
+			. 'font-family:' . $fonts['heading'] . ', sans-serif;'
+			. 'font-size:16px;font-weight:700;line-height:1;">' . esc_html( $initials ) . '</div>'
+			. '<div style="text-align:left;">'
+			. '<div style="font-family:' . $fonts['heading'] . ', sans-serif;font-weight:700;font-size:15px;'
+			. 'color:' . PressGo_Style_Utils::card_text() . ';">' . esc_html( $name ) . '</div>'
+			. ( '' !== trim( (string) $role )
+				? '<div style="font-size:13px;color:' . PressGo_Style_Utils::card_text_muted() . ';">'
+					. esc_html( $role ) . '</div>'
+				: '' )
+			. '</div></div>';
+
+		$footer_w = self::text_w( $cfg, $footer_html, $align, null, 15 );
+
+		return PressGo_Element_Factory::col( array(
+			$quote_w,
+			self::spacer_w( 14 ),
+			$footer_w,
+		) );
 	}
 
 	/**

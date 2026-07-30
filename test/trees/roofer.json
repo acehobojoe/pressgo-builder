@@ -1,0 +1,100 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#1e293b",
+    "content_align": "left",
+    "max_width": 1100,
+    "padding": {
+      "top": 120,
+      "right": 40,
+      "bottom": 120,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "STORM DAMAGE EMERGENCY",
+        "tag": "h6",
+        "size": 13,
+        "weight": "700",
+        "color": "#fbbf24",
+        "align": "left",
+        "transform": "uppercase",
+        "letter_spacing": 2.5
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 16
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Free Storm Inspection Within 24 Hours — We Handle Your Insurance Claim",
+        "tag": "h1",
+        "size": 62,
+        "size_mobile": 38,
+        "weight": "800",
+        "color": "#ffffff",
+        "align": "left",
+        "line_height": 1.1,
+        "letter_spacing": -1.2,
+        "max_text_width": 780
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Oklahoma City's storm specialists. GAF-certified roofers who document damage, meet your adjuster, and get you approved — then finish the job right.",
+        "size": 18,
+        "color": "rgba(255,255,255,0.82)",
+        "align": "left",
+        "line_height": 1.65,
+        "max_text_width": 560
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 36
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Call for Urgent Inspection: (405) 555-7663",
+        "url": "tel:4055557663",
+        "bg": "#fbbf24",
+        "color": "#1e293b",
+        "align": "left"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 14
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Or text photos of your roof to the number above — we respond in under 2 hours, 7 days a week.",
+        "size": 15,
+        "color": "rgba(255,255,255,0.6)",
+        "align": "left",
+        "line_height": 1.5,
+        "max_text_width": 520
+      }
+    }
+  ]
+}

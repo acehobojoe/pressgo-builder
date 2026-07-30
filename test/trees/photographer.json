@@ -1,0 +1,69 @@
+{
+  "type": "section",
+  "settings": {
+    "background_image_query": "bride and groom at sunset, romantic outdoor wedding, soft golden light",
+    "overlay": "rgba(24,20,18,0.35)",
+    "content_align": "center",
+    "max_width": 900,
+    "padding": {
+      "top": 180,
+      "right": 40,
+      "bottom": 180,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "text": "ASHEVILLE WEDDING PHOTOGRAPHY",
+      "tag": "h6",
+      "size": 12,
+      "weight": "600",
+      "color": "rgba(255,255,255,0.75)",
+      "align": "center",
+      "transform": "uppercase",
+      "letter_spacing": 3
+    },
+    {
+      "type": "spacer",
+      "height": 22
+    },
+    {
+      "type": "heading",
+      "text": "Romantic, editorial imagery for your wedding day",
+      "tag": "h1",
+      "size": 68,
+      "size_mobile": 38,
+      "weight": "400",
+      "color": "#ffffff",
+      "align": "center",
+      "line_height": 1.15,
+      "letter_spacing": -0.5
+    },
+    {
+      "type": "spacer",
+      "height": 24
+    },
+    {
+      "type": "text",
+      "html": "Timeless photographs that feel like art, capturing the intimacy and beauty of your celebration in the Blue Ridge Mountains.",
+      "size": 19,
+      "color": "rgba(255,255,255,0.85)",
+      "align": "center",
+      "line_height": 1.65,
+      "max_text_width": 640
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "button",
+      "text": "Inquire About Your Date",
+      "url": "#inquiry",
+      "bg": "#C4958C",
+      "color": "#FBF7F4",
+      "align": "center"
+    }
+  ]
+}
