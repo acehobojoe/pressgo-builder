@@ -4384,6 +4384,9 @@ class PressGo_AI_Builder {
 		?>
 		<div class="wrap pressgo-ai-list">
 			<h1 class="wp-heading-inline">AI Builder</h1>
+			<input type="text" id="pressgo-ai-new-title" class="pg-new-title" maxlength="120"
+				placeholder="Name your page (optional)" aria-label="Name your new page"
+				style="height:30px;line-height:28px;margin:0 6px 0 8px;padding:0 8px;min-width:230px;vertical-align:top;border-radius:4px;">
 			<button type="button" class="page-title-action" id="pressgo-ai-new-page">+ New page</button>
 			<p class="description" style="margin-top:8px;max-width:720px;">
 				Chat-driven Elementor page builder. Open any page to chat with the AI and
@@ -4493,11 +4496,17 @@ class PressGo_AI_Builder {
 			});
 
 			var newPageBtn = document.getElementById('pressgo-ai-new-page');
+			var newTitleInput = document.getElementById('pressgo-ai-new-title');
 			function createPage(){
 				newPageBtn.disabled = true; newPageBtn.textContent = 'Creating…';
 				var fd = new FormData();
 				fd.append('action', 'pressgo_ai_create_page');
 				fd.append('nonce', nonce);
+				// Optional user-chosen name. Left blank, the server falls back to
+				// the timestamp default (and a build later renames it to the
+				// business name), so naming here is a nicety, not a requirement.
+				var title = newTitleInput && newTitleInput.value ? newTitleInput.value.trim() : '';
+				if (title) fd.append('title', title);
 				fetch(ajaxUrl, { method:'POST', credentials:'same-origin', body: fd })
 					.then(function(r){ return r.json(); })
 					.then(function(j){
@@ -4510,6 +4519,12 @@ class PressGo_AI_Builder {
 					.catch(function(){ alert('Could not create page'); newPageBtn.disabled = false; newPageBtn.textContent = '+ New page'; });
 			}
 			newPageBtn.addEventListener('click', createPage);
+			// Enter in the name field creates the page too.
+			if (newTitleInput) {
+				newTitleInput.addEventListener('keydown', function(e){
+					if (e.key === 'Enter') { e.preventDefault(); createPage(); }
+				});
+			}
 			if (isFirstRun) createPage();
 
 			// Thumbnail backfill: uncached thumbs return a 1x1 placeholder when the
