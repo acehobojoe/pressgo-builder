@@ -5795,7 +5795,19 @@ class PressGo_AI_Builder {
 		// Unique key per section so it carries a locatable marker — the cohesion
 		// engine reorders/recolors by this key without index-fragility.
 		$pg_key  = $this->new_pg_key( $post_id );
-		$section = PressGo_Freeform_Renderer::render( $tree, $cfg, $pg_key );
+		// Snap colors to brand roles at RENDER when a site brand is active, so a
+		// branded page can't ship off-brand even if the composer drifted from the
+		// injected palette. Only the rendered copy is snapped — the ORIGINAL $tree
+		// is kept (stored via store_ff_record below) so future repaints re-derive
+		// cleanly. When no brand is active (toggle off, page opted out, or a fresh
+		// build that chose its own vibe), the composer's own colors render
+		// untouched — off-brand by choice still works.
+		$render_tree = $tree;
+		if ( $this->brand_active_for( $post_id ) ) {
+			$snap_role   = $this->bg_role_from_tree( $tree, $cfg );
+			$render_tree = $this->apply_role_overlay( $tree, $snap_role, $cfg, true );
+		}
+		$section = PressGo_Freeform_Renderer::render( $render_tree, $cfg, $pg_key );
 		if ( null === $section ) {
 			self::nova_refund( self::$nova_last_gen, 'nova: nothing usable landed' ); // charged, but nothing usable landed
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) error_log( 'PressGo render REJECT tree head: ' . mb_substr( wp_json_encode( $tree ), 0, 400 ) ); // phpcs:ignore
