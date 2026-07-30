@@ -3778,16 +3778,41 @@ class PressGo_AI_Builder {
 		if ( ! $this->brand_active_for( $post_id ) ) { return ''; }
 		$f = PressGo_MCP_Tools::brand_foundation();
 		$c = isset( $f['colors'] ) && is_array( $f['colors'] ) ? $f['colors'] : array();
+		$m = $this->master_profile();
+
+		$name = ! empty( $f['brand_name'] ) ? $f['brand_name'] : ( ! empty( $m['business'] ) ? $m['business'] : '' );
+		$L = array( '=== SITE BRAND' . ( '' !== $name ? ' — ' . $name : '' ) . ' (this site has a saved brand; compose every section ON it) ===' );
+
+		// Full palette WITH ROLES + usage rules, so the AI composes on-brand
+		// instead of inventing hex. The render snaps colors to these same roles.
+		$roles = array(
+			'primary'      => 'primary brand color',
+			'primary_dark' => 'darker primary (hovers, depth)',
+			'accent'       => 'accent, for CTAs / icons / emphasis ONLY',
+			'dark_bg'      => 'dark section background',
+			'light_bg'     => 'light section background',
+			'text_dark'    => 'heading / body text on light',
+			'text_muted'   => 'muted / secondary text',
+		);
 		$pal = array();
-		if ( ! empty( $c['light_bg'] ) )  { $pal[] = 'light background ' . $c['light_bg']; }
-		if ( ! empty( $c['dark_bg'] ) )   { $pal[] = 'dark background ' . $c['dark_bg']; }
-		if ( ! empty( $c['accent'] ) )    { $pal[] = 'accent (CTAs, icons) ' . $c['accent']; }
-		if ( ! empty( $c['text_dark'] ) ) { $pal[] = 'dark text ' . $c['text_dark']; }
-		$L = array( '=== SITE BRAND (this site has a locked brand — every section MUST match it) ===' );
-		if ( $pal ) { $L[] = 'LOCKED PALETTE — use ONLY these colors: ' . implode( ', ', $pal ) . '. Introduce NO other dark, light, or accent color.'; }
-		if ( ! empty( $f['fonts']['heading'] ) ) { $L[] = 'BRAND FONTS — headings in ' . $f['fonts']['heading'] . ', body in ' . ( $f['fonts']['body'] ?? 'a clean sans' ) . '.'; }
-		if ( ! empty( $f['voice'] ) )   { $L[] = 'BRAND VOICE — write copy that is ' . $f['voice'] . '.'; }
-		if ( ! empty( $f['brand_name'] ) ) { $L[] = 'BUSINESS NAME — ' . $f['brand_name'] . '.'; }
+		foreach ( $roles as $k => $desc ) {
+			if ( ! empty( $c[ $k ] ) ) { $pal[] = $c[ $k ] . ' = ' . $desc; }
+		}
+		if ( $pal ) { $L[] = 'PALETTE (authoritative — use ONLY these, introduce no other brand or accent color): ' . implode( '; ', $pal ) . '.'; }
+		if ( ! empty( $f['fonts']['heading'] ) ) { $L[] = 'FONTS — headings in ' . $f['fonts']['heading'] . ', body in ' . ( ! empty( $f['fonts']['body'] ) ? $f['fonts']['body'] : 'a clean sans' ) . '.'; }
+		if ( ! empty( $f['voice'] ) ) { $L[] = 'VOICE — write copy that is ' . $f['voice'] . '.'; }
+
+		// Identity: WHO the brand is, so copy and layout fit, not just the colors.
+		$id  = array();
+		if ( '' !== $name ) { $id[] = 'name ' . $name; }
+		$ind = ! empty( $f['industry'] ) ? $f['industry'] : ( ! empty( $m['industry'] ) ? $m['industry'] : '' );
+		if ( '' !== $ind ) { $id[] = 'industry ' . $ind; }
+		if ( ! empty( $m['site_headline'] ) ) { $id[] = 'positioning "' . $m['site_headline'] . '"'; }
+		if ( ! empty( $m['audience'] ) )      { $id[] = 'audience ' . $m['audience']; }
+		if ( ! empty( $m['location'] ) )      { $id[] = 'location ' . $m['location']; }
+		if ( $id ) { $L[] = 'IDENTITY — ' . implode( ', ', $id ) . '.'; }
+		if ( ! empty( $f['logo_url'] ) ) { $L[] = 'LOGO — use this exact logo in the header/footer: ' . $f['logo_url'] . '.'; }
+
 		$L[] = '=== END SITE BRAND ===';
 		return implode( "\n", $L ) . "\n\n";
 	}
