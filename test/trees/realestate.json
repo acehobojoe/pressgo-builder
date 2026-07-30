@@ -1,0 +1,99 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#1a1a1a",
+    "content_align": "center",
+    "max_width": 1140,
+    "padding": {
+      "top": 160,
+      "right": 40,
+      "bottom": 160,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "TAMPA LUXURY REAL ESTATE",
+        "tag": "h6",
+        "size": 13,
+        "weight": "600",
+        "color": "#d4af37",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 2.5
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Sell Your Home for the Price It Deserves",
+        "tag": "h1",
+        "size": 68,
+        "size_mobile": 38,
+        "weight": "700",
+        "color": "#faf9f6",
+        "align": "center",
+        "line_height": 1.1,
+        "letter_spacing": -1.2,
+        "max_text_width": 860
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 24
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "A listing strategy built on editorial presentation, strategic pricing, and direct access to the buyers who will pay what your property is worth.",
+        "size": 19,
+        "color": "rgba(250,249,246,0.75)",
+        "align": "center",
+        "line_height": 1.65,
+        "max_text_width": 640
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 40
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Get Your Home Valuation",
+        "url": "#valuation",
+        "bg": "#d4af37",
+        "color": "#1a1a1a",
+        "align": "center"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 18
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "No obligation. Confidential analysis. Response within 24 hours.",
+        "size": 14,
+        "color": "rgba(250,249,246,0.5)",
+        "align": "center",
+        "line_height": 1.5
+      }
+    }
+  ]
+}

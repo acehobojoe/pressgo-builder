@@ -1,0 +1,154 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#0a1628",
+    "content_align": "left",
+    "max_width": 1100,
+    "padding": {
+      "top": 100,
+      "right": 40,
+      "bottom": 100,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "row",
+      "settings": {
+        "vertical_align": "middle"
+      },
+      "children": [
+        {
+          "type": "col",
+          "settings": {
+            "width": 58
+          },
+          "children": [
+            {
+              "type": "heading",
+              "settings": {
+                "text": "AC DOWN? WE'RE ON THE WAY",
+                "tag": "h6",
+                "size": 13,
+                "weight": "700",
+                "color": "#7dd3fc",
+                "align": "left",
+                "transform": "uppercase",
+                "letter_spacing": 2.5
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 16
+              }
+            },
+            {
+              "type": "heading",
+              "settings": {
+                "text": "Same-Day AC Repair in Las Vegas",
+                "tag": "h1",
+                "size": 68,
+                "size_mobile": 38,
+                "weight": "800",
+                "color": "#ffffff",
+                "align": "left",
+                "line_height": 1.08,
+                "letter_spacing": -1.8
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 20
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "html": "Your AC just quit in 110° heat. We answer fast, arrive faster, and fix it right the first time—most repairs completed the same day you call.",
+                "size": 18,
+                "color": "rgba(255,255,255,0.75)",
+                "align": "left",
+                "line_height": 1.65,
+                "max_text_width": 520
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 36
+              }
+            },
+            {
+              "type": "button",
+              "settings": {
+                "text": "Call Now: (702) 555-0199",
+                "url": "tel:7025550199",
+                "bg": "#7dd3fc",
+                "color": "#0a1628",
+                "align": "left",
+                "icon": "fas fa-phone"
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 14
+              }
+            },
+            {
+              "type": "row",
+              "children": [
+                {
+                  "type": "col",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "settings": {
+                        "icon": "fas fa-clock",
+                        "color": "#7dd3fc",
+                        "size": 20
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "col",
+                  "children": [
+                    {
+                      "type": "text",
+                      "settings": {
+                        "html": "<strong>Available 24/7</strong> · Same-day service 7 days a week",
+                        "size": 15,
+                        "color": "rgba(255,255,255,0.8)",
+                        "line_height": 1.5
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "col",
+          "settings": {
+            "width": 42
+          },
+          "children": [
+            {
+              "type": "image",
+              "settings": {
+                "query": "HVAC technician repairing air conditioner, professional service",
+                "alt": "Arctic Air technician repairing AC unit",
+                "radius": 12,
+                "shadow": "0 20px 60px rgba(0,0,0,0.4)"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

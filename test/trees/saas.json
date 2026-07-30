@@ -1,0 +1,114 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#0a0a0f",
+    "content_align": "center",
+    "max_width": 1200,
+    "padding": {
+      "top": 120,
+      "right": 40,
+      "bottom": 120,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "SUPPORT, SHIPPED",
+        "tag": "h6",
+        "size": 13,
+        "weight": "600",
+        "color": "rgba(255,255,255,0.5)",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 2
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Turn Slack threads into support tickets",
+        "tag": "h1",
+        "size": 68,
+        "size_mobile": 38,
+        "weight": "800",
+        "color": "#ffffff",
+        "align": "center",
+        "line_height": 1.1,
+        "letter_spacing": -1.5,
+        "max_text_width": 820
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 22
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Relay captures customer issues from your Slack channels and routes them to the right team. Zero context switching, full audit trail.",
+        "size": 18,
+        "color": "rgba(255,255,255,0.7)",
+        "align": "center",
+        "line_height": 1.6,
+        "max_text_width": 580
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 36
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Start Free Trial",
+        "url": "#",
+        "bg": "#7c3aed",
+        "color": "#ffffff",
+        "align": "center"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 12
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "14-day trial · No credit card · Setup in 2 minutes",
+        "size": 14,
+        "color": "rgba(255,255,255,0.45)",
+        "align": "center",
+        "line_height": 1.5
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 60
+      }
+    },
+    {
+      "type": "image",
+      "settings": {
+        "query": "modern dashboard interface on dark screen showing ticket queue",
+        "alt": "Relay product dashboard",
+        "radius": 12,
+        "shadow": "0 20px 60px rgba(124,58,237,0.15)"
+      }
+    }
+  ]
+}

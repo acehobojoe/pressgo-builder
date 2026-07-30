@@ -1,0 +1,1 @@
+Landing page for Ember & Oak, a wood-fired steakhouse in Franklin TN. Dark, moody, candlelit feel. Hero with reservation CTA, sample menu highlights in three columns (starters, mains, dessert), chef story split section, private dining promo, hours and location with map mention, reservation CTA again. Charcoal, cream, deep ember red.
