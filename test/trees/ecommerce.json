@@ -1,0 +1,98 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#F5F0EB",
+    "content_align": "center",
+    "max_width": 1200,
+    "padding": {
+      "top": 100,
+      "right": 40,
+      "bottom": 100,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "row",
+      "settings": {
+        "vertical_align": "middle"
+      },
+      "children": [
+        {
+          "type": "col",
+          "settings": {
+            "width": 45
+          },
+          "children": [
+            {
+              "type": "heading",
+              "text": "FALL COLLECTION",
+              "tag": "h6",
+              "size": 13,
+              "weight": "600",
+              "color": "#A67C52",
+              "align": "left",
+              "transform": "uppercase",
+              "letter_spacing": 2.5
+            },
+            {
+              "type": "spacer",
+              "height": 16
+            },
+            {
+              "type": "heading",
+              "text": "Small-batch candles that bring the coast home",
+              "tag": "h1",
+              "size": 58,
+              "size_mobile": 36,
+              "weight": "400",
+              "color": "#2C2420",
+              "align": "left",
+              "line_height": 1.15,
+              "letter_spacing": -0.5
+            },
+            {
+              "type": "spacer",
+              "height": 20
+            },
+            {
+              "type": "text",
+              "html": "Hand-poured in Maine with clean ingredients and coastal-inspired scents. This season: warm amber, sea salt, and driftwood.",
+              "size": 17,
+              "color": "#6B5D54",
+              "align": "left",
+              "line_height": 1.65,
+              "max_text_width": 480
+            },
+            {
+              "type": "spacer",
+              "height": 36
+            },
+            {
+              "type": "button",
+              "text": "Shop Fall Collection",
+              "url": "#shop",
+              "bg": "#A67C52",
+              "color": "#FFFFFF",
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "type": "col",
+          "settings": {
+            "width": 55
+          },
+          "children": [
+            {
+              "type": "image",
+              "query": "artisan candle on driftwood with coastal autumn leaves and warm lighting",
+              "radius": 8,
+              "shadow": "0 8px 24px rgba(0,0,0,0.08)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

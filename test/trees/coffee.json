@@ -1,0 +1,111 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#2d1810",
+    "content_align": "left",
+    "max_width": 1100,
+    "padding": {
+      "top": 120,
+      "right": 40,
+      "bottom": 120,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "row",
+      "settings": {
+        "vertical_align": "middle"
+      },
+      "children": [
+        {
+          "type": "col",
+          "settings": {
+            "width": 58
+          },
+          "children": [
+            {
+              "type": "heading",
+              "text": "NEIGHBORHOOD ROASTERY",
+              "tag": "h6",
+              "size": 13,
+              "weight": "600",
+              "color": "#e8773d",
+              "align": "left",
+              "transform": "uppercase",
+              "letter_spacing": 2
+            },
+            {
+              "type": "spacer",
+              "height": 18
+            },
+            {
+              "type": "heading",
+              "text": "Coffee roasted by hand, brewed with care",
+              "tag": "h1",
+              "size": 58,
+              "size_mobile": 36,
+              "weight": "800",
+              "color": "#f5f0e8",
+              "align": "left",
+              "line_height": 1.1,
+              "letter_spacing": -1.2
+            },
+            {
+              "type": "spacer",
+              "height": 20
+            },
+            {
+              "type": "text",
+              "html": "Northloop Coffee is Minneapolis' gathering spot for thoughtfully sourced beans and espresso drinks that feel like home.",
+              "size": 18,
+              "color": "rgba(245,240,232,0.75)",
+              "align": "left",
+              "line_height": 1.6,
+              "max_text_width": 520
+            },
+            {
+              "type": "spacer",
+              "height": 28
+            },
+            {
+              "type": "text",
+              "html": "<strong style='color:#f5f0e8;'>Open Daily:</strong> Mon–Fri 7am–6pm • Sat–Sun 8am–5pm",
+              "size": 16,
+              "color": "rgba(245,240,232,0.7)",
+              "align": "left",
+              "line_height": 1.6
+            },
+            {
+              "type": "spacer",
+              "height": 32
+            },
+            {
+              "type": "button",
+              "text": "Visit Us Today",
+              "url": "#location",
+              "bg": "#e8773d",
+              "color": "#f5f0e8",
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "type": "col",
+          "settings": {
+            "width": 42
+          },
+          "children": [
+            {
+              "type": "image",
+              "query": "artisan coffee shop interior with espresso machine, warm lighting, indie cafe",
+              "alt": "Northloop Coffee interior",
+              "radius": 8,
+              "shadow": "0 12px 40px rgba(0,0,0,0.25)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#0a0a0a",
+    "content_align": "left",
+    "max_width": 1140,
+    "padding": {
+      "top": 160,
+      "right": 40,
+      "bottom": 160,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "BOISE STRENGTH TRAINING",
+        "tag": "h6",
+        "size": 13,
+        "weight": "700",
+        "color": "#dc2626",
+        "align": "left",
+        "transform": "uppercase",
+        "letter_spacing": 2.5
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "BUILD REAL STRENGTH",
+        "tag": "h1",
+        "size": 82,
+        "size_mobile": 42,
+        "weight": "900",
+        "color": "#ffffff",
+        "align": "left",
+        "line_height": 0.95,
+        "letter_spacing": -2,
+        "max_text_width": 800,
+        "transform": "uppercase"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 24
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "No mirrors. No machines. Just barbells, coaching, and a community that pushes you harder than you'd push yourself.",
+        "size": 19,
+        "color": "rgba(255,255,255,0.75)",
+        "align": "left",
+        "line_height": 1.6,
+        "max_text_width": 580
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 40
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "CLAIM YOUR 7-DAY FREE PASS",
+        "url": "#join",
+        "bg": "#dc2626",
+        "color": "#ffffff",
+        "align": "left"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 16
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "No credit card. Walk in, train hard, decide if we're your place.",
+        "size": 15,
+        "color": "rgba(255,255,255,0.5)",
+        "align": "left",
+        "line_height": 1.5
+      }
+    }
+  ]
+}

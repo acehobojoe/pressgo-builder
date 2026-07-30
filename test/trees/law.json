@@ -1,0 +1,132 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#0f1e3d",
+    "content_align": "left",
+    "max_width": 1100,
+    "padding": {
+      "top": 120,
+      "right": 40,
+      "bottom": 120,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "row",
+      "settings": {
+        "vertical_align": "middle"
+      },
+      "children": [
+        {
+          "type": "col",
+          "settings": {
+            "width": 58
+          },
+          "children": [
+            {
+              "type": "heading",
+              "settings": {
+                "text": "SERIOUS INJURY. SERIOUS REPRESENTATION.",
+                "tag": "h6",
+                "size": 13,
+                "weight": "600",
+                "color": "#c89968",
+                "align": "left",
+                "transform": "uppercase",
+                "letter_spacing": 2
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 18
+              }
+            },
+            {
+              "type": "heading",
+              "settings": {
+                "text": "Columbus Personal Injury Lawyers Who Fight for Maximum Compensation",
+                "tag": "h1",
+                "size": 58,
+                "size_mobile": 36,
+                "weight": "800",
+                "color": "#ffffff",
+                "align": "left",
+                "line_height": 1.1,
+                "letter_spacing": -1.2,
+                "max_text_width": 640
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 22
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "html": "If someone else's negligence injured you or a family member, you deserve an advocate who treats your case with the gravity it demands. Free case review. No fees unless we win.",
+                "size": 18,
+                "color": "rgba(255,255,255,0.8)",
+                "align": "left",
+                "line_height": 1.65,
+                "max_text_width": 560
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 36
+              }
+            },
+            {
+              "type": "button",
+              "settings": {
+                "text": "Get Your Free Case Review",
+                "url": "#case-review",
+                "bg": "#c89968",
+                "color": "#0f1e3d",
+                "align": "left"
+              }
+            },
+            {
+              "type": "spacer",
+              "settings": {
+                "height": 24
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "html": "<strong>Or call us now: (614) 555-0187</strong><br>Available 24/7. Confidential consultation.",
+                "size": 16,
+                "color": "rgba(255,255,255,0.7)",
+                "align": "left",
+                "line_height": 1.6
+              }
+            }
+          ]
+        },
+        {
+          "type": "col",
+          "settings": {
+            "width": 42
+          },
+          "children": [
+            {
+              "type": "image",
+              "settings": {
+                "query": "professional attorney in office, confident, natural light",
+                "alt": "Hartwell Injury Law team",
+                "radius": 8,
+                "shadow": "0 12px 40px rgba(0,0,0,0.3)"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

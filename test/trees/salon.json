@@ -1,0 +1,83 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#181a1c",
+    "content_align": "center",
+    "max_width": 1100,
+    "padding": {
+      "top": 160,
+      "right": 40,
+      "bottom": 160,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "VELVET & VINE SALON",
+        "tag": "h6",
+        "size": 12,
+        "weight": "600",
+        "color": "#9ca896",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 3
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Where Editorial Meets Everyday",
+        "tag": "h1",
+        "size": 72,
+        "size_mobile": 38,
+        "weight": "400",
+        "color": "#ffffff",
+        "align": "center",
+        "line_height": 1.1,
+        "letter_spacing": -1,
+        "max_text_width": 860
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 24
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Savannah's fashion-forward hair studio for those who know their style is more than just a look—it's a statement.",
+        "size": 18,
+        "color": "rgba(255,255,255,0.75)",
+        "align": "center",
+        "line_height": 1.65,
+        "max_text_width": 560
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 36
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Book Your Appointment",
+        "url": "#booking",
+        "bg": "#9ca896",
+        "color": "#181a1c",
+        "align": "center"
+      }
+    }
+  ]
+}

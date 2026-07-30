@@ -1,0 +1,1 @@
+Landing page for Relay, a B2B SaaS that turns Slack threads into support tickets. Modern dark-mode product page: dark hero with a product screenshot placeholder, logo bar, three feature blocks alternating text and image, a metrics band (2,400 teams, 38% faster resolution, 4.8 G2), pricing with two tiers, developer-flavored final CTA. Electric violet accent on near-black.

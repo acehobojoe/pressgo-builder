@@ -1,0 +1,85 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#1a1614",
+    "background_image_query": "dark wood-fired steakhouse interior, candlelit ambiance, dramatic shadows",
+    "overlay": "rgba(26, 22, 20, 0.65)",
+    "content_align": "center",
+    "max_width": 1100,
+    "padding": {
+      "top": 160,
+      "right": 40,
+      "bottom": 160,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "WOOD-FIRED STEAKHOUSE • FRANKLIN, TN",
+        "tag": "h6",
+        "size": 13,
+        "weight": "600",
+        "color": "#C84B3D",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 2.5
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "Ember & Oak",
+        "tag": "h1",
+        "size": 72,
+        "size_mobile": 42,
+        "weight": "800",
+        "color": "#F5F1E8",
+        "align": "center",
+        "line_height": 1.05,
+        "letter_spacing": -1.8
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 22
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Prime cuts, live fire, and the warmth of our open hearth. Reserve your table tonight.",
+        "size": 18,
+        "color": "rgba(245, 241, 232, 0.75)",
+        "align": "center",
+        "line_height": 1.6,
+        "max_text_width": 540
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 36
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Reserve Your Table",
+        "url": "#reserve",
+        "bg": "#C84B3D",
+        "color": "#F5F1E8",
+        "align": "center",
+        "icon": "fas fa-arrow-right"
+      }
+    }
+  ]
+}

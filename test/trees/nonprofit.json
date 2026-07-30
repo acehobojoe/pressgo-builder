@@ -1,0 +1,99 @@
+{
+  "type": "section",
+  "settings": {
+    "background": "#1a4d2e",
+    "content_align": "center",
+    "max_width": 1100,
+    "padding": {
+      "top": 120,
+      "right": 40,
+      "bottom": 120,
+      "left": 40
+    }
+  },
+  "children": [
+    {
+      "type": "heading",
+      "settings": {
+        "text": "FEEDING OUR COMMUNITY",
+        "tag": "h6",
+        "size": 13,
+        "weight": "600",
+        "color": "rgba(255,255,255,0.65)",
+        "align": "center",
+        "transform": "uppercase",
+        "letter_spacing": 2
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 18
+      }
+    },
+    {
+      "type": "heading",
+      "settings": {
+        "text": "One in Five Kids in Riverside Faces Hunger",
+        "tag": "h1",
+        "size": 62,
+        "size_mobile": 38,
+        "weight": "800",
+        "color": "#ffffff",
+        "align": "center",
+        "line_height": 1.1,
+        "letter_spacing": -1.2,
+        "max_text_width": 780
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 20
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Your donation today puts nutritious meals on tables for neighbors who need them most.",
+        "size": 19,
+        "color": "rgba(255,255,255,0.8)",
+        "align": "center",
+        "line_height": 1.6,
+        "max_text_width": 560
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 36
+      }
+    },
+    {
+      "type": "button",
+      "settings": {
+        "text": "Donate Now",
+        "url": "#donate",
+        "bg": "#d97025",
+        "color": "#ffffff",
+        "align": "center",
+        "icon": "fas fa-heart"
+      }
+    },
+    {
+      "type": "spacer",
+      "settings": {
+        "height": 12
+      }
+    },
+    {
+      "type": "text",
+      "settings": {
+        "html": "Every dollar provides 4 meals • Tax-deductible • Secure",
+        "size": 14,
+        "color": "rgba(255,255,255,0.6)",
+        "align": "center"
+      }
+    }
+  ]
+}
