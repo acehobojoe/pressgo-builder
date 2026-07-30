@@ -36,6 +36,7 @@ build-zip.sh
 .svn-credentials
 *.credentials
 release-email-*.md
+docs
 phpunit.xml
 phpcs.xml
 .phpcs.xml
