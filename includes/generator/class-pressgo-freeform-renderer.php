@@ -816,6 +816,22 @@ class PressGo_Freeform_Renderer {
 		$border = isset( $s['border_color'] ) ? $s['border_color'] : null;
 		$icon   = isset( $s['icon'] ) ? self::normalize_icon( $s['icon'] ) : null;
 		$align  = isset( $s['align'] ) ? $s['align'] : '';
+		// Button text contrast guard: white-on-amber CTAs measure ~3.7:1, under
+		// the 4.5:1 small-text bar (16px/600 is not WCAG "large" text). When the
+		// effective pairing fails, keep whichever of white / near-black reads
+		// better on this background; explicit pairings that already pass are
+		// untouched. btn_w defaults the text to white when $tcolor is null.
+		$bg_rgb = self::parse_color_rgb( (string) $bg );
+		if ( is_array( $bg_rgb ) ) {
+			$eff     = null !== $tcolor ? (string) $tcolor : '#FFFFFF';
+			$eff_rgb = self::parse_color_rgb( $eff, $bg_rgb );
+			if ( null === $eff_rgb || self::contrast_ratio( $eff_rgb, $bg_rgb ) < 4.5 ) {
+				$white  = array( 255, 255, 255 );
+				$dark   = array( 26, 26, 26 );
+				$tcolor = self::contrast_ratio( $white, $bg_rgb ) >= self::contrast_ratio( $dark, $bg_rgb )
+					? '#FFFFFF' : '#1A1A1A';
+			}
+		}
 		return PressGo_Widget_Helpers::btn_w( $cfg, $text, $url, $bg, $tcolor, $border, $icon, $align );
 	}
 
