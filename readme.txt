@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.9
+Stable tag: 2.5.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,15 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.10 =
+* Add your own content, your way: type your own answer to any setup question, paste in as much copy as you want, or drop in a text file and the builder builds from it. The prompt box is bigger and makes it obvious
+* Cleaner service and feature cards: when a card has a photo, the small icon no longer floats between the photo and the title
+* Never an empty lead form: on Elementor Free with no form plugin, a form now falls back to a working call or contact button so the page can still capture leads
+* Swap images without leaving the builder: a new Upload button opens your media library right in the image picker
+* More accessible pages out of the box: stronger text contrast, bigger tap targets on phones, larger mobile body text, and tidier headings
+* Faster pages: hero images load right away, unused fonts are dropped, and section background images stick on re-renders
+* Clearer plans: the account panel now shows that every paid plan includes hosting, and running low on builds points you to the right upgrade in one click
 
 = 2.5.9 =
 * Smarter setup: Freeform now asks a few sharp, tailored questions about your business instead of a fixed form, and gets to building faster. Give it a rich description and it may not need to ask at all
