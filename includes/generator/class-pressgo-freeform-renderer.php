@@ -723,6 +723,15 @@ class PressGo_Freeform_Renderer {
 		if ( ! in_array( $tagl, $valid_tags, true ) ) {
 			$tagl = 'h2';
 		}
+		// Eyebrow labels are not headings. The composer emits the kicker above
+		// the H1 as an <h6>, so every page's document outline opened at H6 and
+		// jumped to H1 (measured: 15/15 corpus pages) — a broken heading order
+		// for screen readers and crawlers. A short h6 is always that label, so
+		// render it as a <div>: identical typography, honest semantics.
+		$plain_len = function_exists( 'mb_strlen' ) ? mb_strlen( trim( $text ) ) : strlen( trim( $text ) );
+		if ( 'h6' === $tagl && $plain_len < 60 ) {
+			$tagl = 'div';
+		}
 		$tag = $tagl;
 		// Real typographic hierarchy by default. Without this, a composer that omits
 		// `size`/`weight` collapses every heading to the theme's single default —
