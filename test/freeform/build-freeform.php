@@ -76,6 +76,12 @@ update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
 update_post_meta( $post_id, '_elementor_version', defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : '3.0.0' );
 
+// Mirror the production page-creator: freeform pages get the shared typography
+// polish CSS via page settings, so sandbox renders match what users ship.
+update_post_meta( $post_id, '_elementor_page_settings', array(
+	'custom_css' => PressGo_Style_Utils::typography_polish_css(),
+) );
+
 if ( class_exists( '\Elementor\Plugin' ) ) {
 	\Elementor\Plugin::$instance->files_manager->clear_cache();
 }

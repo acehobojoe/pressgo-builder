@@ -12,6 +12,21 @@ class PressGo_Style_Utils {
 	/**
 	 * Convert hex color to rgba string.
 	 */
+	/**
+	 * Typography polish CSS shared by every render path (page creator +
+	 * freeform). `text-wrap: balance` stops the composer's headlines from
+	 * dropping a single orphan word onto its own line (QA: coffee "care",
+	 * medspa "treatment", hvac "7 days a week"); `pretty` does the same for
+	 * body paragraphs without full balancing. Unsupported browsers ignore
+	 * both and wrap normally, so no fallback is needed. Never pair with a
+	 * manual <br> in a heading — they fight.
+	 */
+	public static function typography_polish_css() {
+		return "\n/* Headline orphan control */\n"
+			. "h1, h2, h3, h4, .elementor-heading-title {\n    text-wrap: balance;\n}\n"
+			. ".elementor-widget-text-editor p {\n    text-wrap: pretty;\n}\n";
+	}
+
 	public static function hex_to_rgba( $hex_color, $alpha = 0.1 ) {
 		$hex = ltrim( $hex_color, '#' );
 		$r   = hexdec( substr( $hex, 0, 2 ) );

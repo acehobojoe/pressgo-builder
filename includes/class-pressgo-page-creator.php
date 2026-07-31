@@ -520,6 +520,8 @@ html {
 }";
 		}
 
+		$css .= PressGo_Style_Utils::typography_polish_css();
+
 		return $css;
 	}
 
