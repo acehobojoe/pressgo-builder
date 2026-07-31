@@ -173,9 +173,13 @@ class PressGo_Widget_Helpers {
 				'unit' => 'px', 'top' => '14', 'right' => '32',
 				'bottom' => '14', 'left' => '32', 'isLinked' => false,
 			),
+			// Tap target: 12px vertical padding rendered a 39px-tall button on
+			// mobile — under the 44px Apple HIG / 48px Material minimum, on the
+			// viewport where most local traffic converts. 17px clears 48px at
+			// the 15px mobile font size.
 			'text_padding_mobile'      => array(
-				'unit' => 'px', 'top' => '12', 'right' => '24',
-				'bottom' => '12', 'left' => '24', 'isLinked' => false,
+				'unit' => 'px', 'top' => '17', 'right' => '24',
+				'bottom' => '17', 'left' => '24', 'isLinked' => false,
 			),
 			'typography_font_size_mobile' => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
 		);
