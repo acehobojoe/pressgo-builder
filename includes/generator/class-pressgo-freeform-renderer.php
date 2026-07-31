@@ -709,7 +709,15 @@ class PressGo_Freeform_Renderer {
 			$link_color = esc_attr( $color ? $color : $pal_link );
 			$html = preg_replace( '/<a(\s)(?![^>]*style=)/i', '<a style="color:' . $link_color . '"$1', $html );
 		}
-		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, null, $lh, null, $weight );
+		// Mobile legibility floor. Composed body copy carries no mobile override,
+		// so a 13-14px desktop size renders at 13-14px on a phone too (measured:
+		// 10 of 35 corpus body blocks under 16px). Lift real prose to a 16px
+		// mobile minimum; short labels, eyebrows and fine-print tags keep their
+		// size, so the type hierarchy is preserved.
+		$plain       = trim( wp_strip_all_tags( (string) $html ) );
+		$plain_len   = function_exists( 'mb_strlen' ) ? mb_strlen( $plain ) : strlen( $plain );
+		$size_mobile = ( $plain_len >= 60 && $size < 16 ) ? 16 : null;
+		$w = PressGo_Widget_Helpers::text_w( $cfg, $html, $align, $color, $size, $size_mobile, $lh, null, $weight );
 		// text_w doesn't expose transform/letter-spacing; plumb them directly so
 		// freeform labels honor uppercase + tracking the way the heading widget does.
 		if ( isset( $s['transform'] ) && in_array( $s['transform'], array( 'uppercase', 'lowercase', 'capitalize', 'none' ), true ) ) {
