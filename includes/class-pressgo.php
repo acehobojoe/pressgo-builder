@@ -109,11 +109,48 @@ class PressGo {
 		// Ensure tables exist (idempotent: dbDelta no-ops when current).
 		add_action( 'plugins_loaded', array( 'PressGo_MCP_Storage', 'maybe_install' ), 20 );
 
+		// The first image on a generated page is the hero, above the fold and
+		// often the LCP element itself — measured 1.9s on a throttled corpus
+		// page. Elementor ships every image with loading="lazy", which defers
+		// exactly the image the page is judged on. Make the first one eager and
+		// high priority; everything below the fold keeps lazy loading.
+		add_filter( 'elementor/widget/render_content', array( __CLASS__, 'eager_first_image' ), 10, 2 );
+
 		// Register WP-CLI commands.
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-cli.php';
 			WP_CLI::add_command( 'pressgo', 'PressGo_CLI' );
 		}
+	}
+
+	/**
+	 * Promote the first image widget on a page from lazy to eager loading.
+	 *
+	 * Runs once per request (static guard). Only touches an <img> that
+	 * actually carries loading="lazy", and only adds fetchpriority when the
+	 * markup does not already set one, so a hand-tuned page is left alone.
+	 *
+	 * @param string $content Rendered widget HTML.
+	 * @param object $widget  Elementor widget instance.
+	 * @return string
+	 */
+	public static function eager_first_image( $content, $widget ) {
+		static $done = false;
+		if ( $done || is_admin() ) {
+			return $content;
+		}
+		if ( ! is_object( $widget ) || ! method_exists( $widget, 'get_name' ) || 'image' !== $widget->get_name() ) {
+			return $content;
+		}
+		if ( false === strpos( $content, 'loading="lazy"' ) ) {
+			return $content;
+		}
+		$done        = true;
+		$replacement = false === strpos( $content, 'fetchpriority' )
+			? 'loading="eager" fetchpriority="high"'
+			: 'loading="eager"';
+		$pos = strpos( $content, 'loading="lazy"' );
+		return substr_replace( $content, $replacement, $pos, strlen( 'loading="lazy"' ) );
 	}
 
 	/**
