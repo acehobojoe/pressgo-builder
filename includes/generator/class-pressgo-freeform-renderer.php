@@ -225,7 +225,11 @@ class PressGo_Freeform_Renderer {
 			$kids[] = array( 'type' => 'image', 'query' => $s['image'], 'radius' => 10 );
 			$kids[] = array( 'type' => 'spacer', 'height' => 16 );
 		}
-		if ( ! empty( $s['icon'] ) ) {
+		// Show the icon ONLY when there's no photo. A card already carrying a photo
+		// doesn't need a second small icon floating between the image and the
+		// title — that reads as orphaned/redundant. Photo = the visual; icon-only
+		// cards (no image) still get the icon as their visual.
+		if ( ! empty( $s['icon'] ) && empty( $s['image'] ) ) {
 			$kids[] = array( 'type' => 'icon', 'icon' => $s['icon'], 'size' => 30, 'color' => isset( $s['accent'] ) ? $s['accent'] : null, 'align' => $align );
 			$kids[] = array( 'type' => 'spacer', 'height' => 12 );
 		}
