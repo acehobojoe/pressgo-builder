@@ -458,6 +458,31 @@ class PressGo_Freeform_Renderer {
 			}
 		}
 
+		// Icon-caption pair: a 2-col row where one col holds ONLY a lone icon
+		// (plus/minus spacers) and the other holds text. Equal 50/50 widths park
+		// the icon ~300px away from its own caption (QA: hvac "Available 24/7"
+		// clock orphaned mid-hero). The icon col should hug (~44px) with the
+		// caption beside it, and the pair must stay horizontal on mobile — a
+		// stacked lone icon above text is the same orphan again.
+		$icon_pair_idx = -1;
+		if ( 2 === count( $child_blocks ) && ! $is_rating_row ) {
+			foreach ( $child_blocks as $pi => $pb ) {
+				if ( ! is_array( $pb ) || ( isset( $pb['type'] ) ? $pb['type'] : '' ) !== 'col' ) { continue; }
+				if ( isset( $pb['settings']['width'] ) ) { continue; }
+				$pk = array_values( array_filter( isset( $pb['children'] ) && is_array( $pb['children'] ) ? $pb['children'] : array(), function ( $k ) {
+					return is_array( $k ) && ( isset( $k['type'] ) ? $k['type'] : '' ) !== 'spacer';
+				} ) );
+				if ( 1 === count( $pk ) && 'icon' === ( isset( $pk[0]['type'] ) ? $pk[0]['type'] : '' ) ) {
+					$other = $child_blocks[ 1 - $pi ];
+					$ok    = array_values( array_filter( isset( $other['children'] ) && is_array( $other['children'] ) ? $other['children'] : array(), function ( $k ) {
+						return is_array( $k ) && in_array( isset( $k['type'] ) ? $k['type'] : '', array( 'text', 'heading' ), true );
+					} ) );
+					if ( ! empty( $ok ) ) { $icon_pair_idx = $pi; }
+					break;
+				}
+			}
+		}
+
 		// Render children first; remember each child's requested width % (col blocks).
 		$rendered = array();
 		$widths   = array();
@@ -500,6 +525,20 @@ class PressGo_Freeform_Renderer {
 		// until the grid columns control is pinned down. Don't promise 2-up.
 		$equal = $n > 0 ? round( 100 / $n, 3 ) : 100;
 		foreach ( $rendered as $i => &$col ) {
+			if ( $icon_pair_idx >= 0 && count( $rendered ) === 2 ) {
+				// Icon col hugs; caption col takes the rest (nowrap + shrink keeps
+				// it inside the row). Same widths at mobile — the pair stays inline.
+				if ( $i === $icon_pair_idx ) {
+					$col['settings']['width']        = array( 'unit' => 'px', 'size' => 44, 'sizes' => array() );
+					$col['settings']['width_mobile'] = array( 'unit' => 'px', 'size' => 44, 'sizes' => array() );
+				} else {
+					if ( ! isset( $col['settings']['width'] ) ) {
+						$col['settings']['width'] = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+					}
+					$col['settings']['width_mobile'] = array( 'unit' => '%', 'size' => 100, 'sizes' => array() );
+				}
+				continue;
+			}
 			$w = null !== $widths[ $i ] ? $widths[ $i ] : $equal;
 			if ( ! isset( $col['settings']['width'] ) ) {
 				$col['settings']['width'] = array( 'unit' => '%', 'size' => $w, 'sizes' => array() );
@@ -518,11 +557,11 @@ class PressGo_Freeform_Renderer {
 			'container_type'        => 'flex',
 			'content_width'         => 'full',
 			'flex_direction'        => 'row',
-			'flex_direction_mobile' => $is_rating_row ? 'row' : 'column',
+			'flex_direction_mobile' => ( $is_rating_row || $icon_pair_idx >= 0 ) ? 'row' : 'column',
 			'flex_wrap'             => 'nowrap',
 			// D2: default to stretch so cards in a row share equal height (ragged
 			// card grids were a recurring QA flag). Explicit vertical_align still wins.
-			'flex_align_items'      => isset( $s['vertical_align'] ) ? self::map_vertical_align( $s['vertical_align'] ) : 'stretch',
+			'flex_align_items'      => isset( $s['vertical_align'] ) ? self::map_vertical_align( $s['vertical_align'] ) : ( $icon_pair_idx >= 0 ? 'center' : 'stretch' ),
 			'flex_gap'              => array(
 				'unit' => 'px', 'column' => (string) $gap, 'row' => (string) $gap, 'isLinked' => true,
 			),
