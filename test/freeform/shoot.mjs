@@ -16,18 +16,37 @@ const VIEWPORTS = [{ name: '1440', width: 1440, height: 900 }, { name: '375', wi
 
 const b = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
 const p = await b.newPage();
+let failures = 0;
 for (const slug of slugs) {
   for (const v of VIEWPORTS) {
     await p.setViewport({ width: v.width, height: v.height, deviceScaleFactor: 1 });
-    await p.goto(`${SITE}/${slug}/?shoot=${Date.now() % 100000}`, { waitUntil: 'networkidle0', timeout: 60000 });
+    const resp = await p.goto(`${SITE}/${slug}/?shoot=${Date.now() % 100000}`, { waitUntil: 'networkidle0', timeout: 60000 });
     const m = await p.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
       bodyHeight: Math.min(document.body.scrollHeight, 6000),
+      // A rendered freeform page always has an Elementor container. A 404 or a
+      // fatal leaves the theme's error template, which screenshots perfectly
+      // happily and measures as "fits" — that false-clean reading is exactly
+      // how a destroyed corpus once passed verification.
+      hasElementor: !!document.querySelector('[data-elementor-type], .elementor-element'),
+      is404: document.body.className.includes('error404'),
+      title: document.title,
     }));
+    const status = resp ? resp.status() : 0;
+    if (status >= 400 || m.is404 || !m.hasElementor) {
+      const why = status >= 400 ? `HTTP ${status}` : (m.is404 ? '404 template' : 'no Elementor content');
+      console.error(`FAIL ${slug} @${v.name}: ${why} — "${m.title}". NOT a valid render; screenshot not written.`);
+      failures++;
+      continue;
+    }
     await p.screenshot({ path: `${outdir}/${slug}-${v.name}.png`, fullPage: true, captureBeyondViewport: true });
     const overflow = m.scrollWidth > m.innerWidth ? ` OVERFLOW +${m.scrollWidth - m.innerWidth}px` : ' fits';
     console.log(`${slug} @${v.name}: scrollWidth=${m.scrollWidth}/${m.innerWidth}${overflow} height=${m.bodyHeight}`);
   }
 }
 await b.close();
+if (failures > 0) {
+  console.error(`\n${failures} render(s) FAILED verification — fix the build before trusting any screenshot from this run.`);
+  process.exit(1);
+}

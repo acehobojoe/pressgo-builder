@@ -44,14 +44,17 @@ $cfg = array(
 	'layout' => array( 'boxed_width' => 1200, 'button_radius' => 10, 'section_padding' => 100 ),
 );
 
+// Render FIRST. A fatal or a null render must never leave the sandbox with the
+// previous page already deleted — a missing page still screenshots (as a 404)
+// and silently reads as a clean verification.
 $section = PressGo_Freeform_Renderer::render( $tree, $cfg, 'freeform' );
 if ( null === $section ) {
-	WP_CLI::error( 'renderer returned null (invalid tree root)' );
+	WP_CLI::error( 'renderer returned null (invalid tree root) — existing page left intact' );
 }
 
 $elements = array( $section );
 
-// Fresh draft page each run (delete prior with same slug).
+// Render succeeded: now replace the prior page with the same slug.
 $existing = get_page_by_path( $slug, OBJECT, 'page' );
 if ( $existing ) {
 	wp_delete_post( $existing->ID, true );
