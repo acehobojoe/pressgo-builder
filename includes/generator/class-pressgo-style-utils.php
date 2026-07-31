@@ -24,7 +24,32 @@ class PressGo_Style_Utils {
 	public static function typography_polish_css() {
 		return "\n/* Headline orphan control */\n"
 			. "h1, h2, h3, h4, .elementor-heading-title {\n    text-wrap: balance;\n}\n"
-			. ".elementor-widget-text-editor p {\n    text-wrap: pretty;\n}\n";
+			. ".elementor-widget-text-editor p {\n    text-wrap: pretty;\n}\n"
+			. self::image_column_fill_css();
+	}
+
+	/**
+	 * Split-hero image columns fill their row height. A column holding nothing
+	 * but a photo keeps the photo at its natural height, so beside a tall text
+	 * stack it floats undersized with dead space above and below (measured on
+	 * the law corpus page: 578px text column vs a 303px image column, a 275px
+	 * gap). The column already stretches; only the image needs to follow.
+	 * Desktop only — stacked mobile columns have no sibling to match.
+	 */
+	public static function image_column_fill_css() {
+		return "\n/* Split-hero image columns fill their row */\n"
+			. "@media (min-width: 768px) {\n"
+			. "    .e-con > .e-con:has(> .elementor-widget-image:only-child) {\n"
+			. "        align-self: stretch;\n    }\n"
+			. "    .e-con > .e-con > .elementor-widget-image:only-child,\n"
+			. "    .e-con > .e-con > .elementor-widget-image:only-child > .elementor-widget-container,\n"
+			. "    .e-con > .e-con > .elementor-widget-image:only-child figure,\n"
+			. "    .e-con > .e-con > .elementor-widget-image:only-child a {\n"
+			. "        height: 100%;\n"
+			. "    }\n"
+			. "    .e-con > .e-con > .elementor-widget-image:only-child img {\n"
+			. "        height: 100%;\n        object-fit: cover;\n    }\n"
+			. "}\n";
 	}
 
 	public static function hex_to_rgba( $hex_color, $alpha = 0.1 ) {
