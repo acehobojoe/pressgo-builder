@@ -265,7 +265,22 @@ class PressGo_AI_Builder {
 			wp_send_json_error( array( 'message' => 'Could not send right now — email joe@pressgodigital.com directly.' ) );
 		}
 		update_option( 'pressgo_hand_raise_done', 'raised', false );
-		wp_send_json_success();
+		// Forward the scheduling link the backend returns so the success card can
+		// offer a "book a time now" button inline. The proxy used to swallow the
+		// response body, so the link never reached the browser.
+		$body     = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
+		$calendly = '';
+		$link_keys = array( 'calendly', 'calendly_url', 'booking_url', 'scheduling_url', 'schedule_url', 'book_url' );
+		if ( is_array( $body ) ) {
+			$sources = array( $body );
+			if ( ! empty( $body['data'] ) && is_array( $body['data'] ) ) { $sources[] = $body['data']; }
+			foreach ( $sources as $src ) {
+				foreach ( $link_keys as $k ) {
+					if ( ! empty( $src[ $k ] ) && is_string( $src[ $k ] ) ) { $calendly = $src[ $k ]; break 2; }
+				}
+			}
+		}
+		wp_send_json_success( array( 'calendly' => esc_url_raw( $calendly ) ) );
 	}
 
 	/** Hand-raise card actually rendered — burn a shown-credit. */
@@ -4813,7 +4828,7 @@ class PressGo_AI_Builder {
 			</header>
 			<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
-					<div class="pg-tiers-pop-head"><span>Daily builds, reset every day at midnight UTC</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
+					<div class="pg-tiers-pop-head"><span>Plans include hosting. We build and run your whole site.</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
 					<div class="pg-tiers-acct" id="pg-tiers-acct"></div>
 					<div class="pg-tiers-toggle" id="pg-tiers-toggle">
 						<button type="button" class="pg-toggle-opt is-active" data-interval="month">Monthly</button>
@@ -4866,8 +4881,9 @@ class PressGo_AI_Builder {
 							<div class="pg-attach-row" id="pg-attach-strip" hidden></div>
 							<textarea
 								id="pg-chat-text"
-								rows="1"
-								placeholder="Describe your page, or drop a screenshot…"
+								rows="2"
+								style="min-height:58px;"
+								placeholder="Describe your page, paste your copy, or drop in a PDF brief"
 								required></textarea>
 							<div class="pg-voice-bar" id="pg-voice-bar" hidden>
 								<span class="pg-voice-timer" id="pg-voice-timer">0:00</span>
@@ -4893,10 +4909,10 @@ class PressGo_AI_Builder {
 											</button>
 										</div>
 									</div>
-									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images" aria-label="Attach images">
+									<button type="button" class="pg-icon-btn pg-attach-btn" id="pg-attach-btn" title="Attach images or a PDF brief" aria-label="Attach images or a PDF brief">
 										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 									</button>
-									<input type="file" id="pg-attach-input" accept="image/*,application/pdf" multiple hidden>
+									<input type="file" id="pg-attach-input" accept="image/*,application/pdf,text/plain,text/markdown,.txt,.md,.markdown" multiple hidden>
 									<button type="button" class="pg-icon-btn pg-mic-btn" id="pg-mic-btn" data-state="idle" title="Record voice message" aria-label="Record voice message">
 										<svg class="pg-mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 											<rect x="9" y="2" width="6" height="11" rx="3"/>
@@ -4928,7 +4944,7 @@ class PressGo_AI_Builder {
 					<div class="pg-drop-overlay" id="pg-drop-overlay">
 						<div class="pg-drop-message">
 							<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-							<div>Drop a screenshot to attach</div>
+							<div>Drop a screenshot or a PDF brief</div>
 						</div>
 					</div>
 				</aside>

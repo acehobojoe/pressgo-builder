@@ -76,6 +76,46 @@
 		r.readAsDataURL(file);
 	}
 
+	// A dropped/attached plain-text or markdown brief. Read it STRAIGHT into the
+	// composer as the copy to build from — text files used to be a silent no-op.
+	function isTextBrief(file) {
+		if (!file) return false;
+		var t = (file.type || '').toLowerCase();
+		if (t === 'text/plain' || t === 'text/markdown' || t === 'text/x-markdown') return true;
+		return /\.(txt|md|markdown|text)$/i.test(file.name || '');
+	}
+	function pasteHint() {
+		append(el('pg-msg-error', "That's a text file. Paste its contents into the box and I'll build from it."));
+	}
+	function addPendingText(file) {
+		if (file.size > 512 * 1024) {
+			append(el('pg-msg-error', 'That text file is big (512KB max). Paste the part you want into the box instead.'));
+			return;
+		}
+		var r = new FileReader();
+		r.onload = function () {
+			var txt = String(r.result || '').trim();
+			if (!txt) { pasteHint(); return; }
+			var cur = (input.value || '').trim();
+			input.value = cur ? (cur + '\n\n' + txt) : txt;
+			autoGrow();
+			updateSendState();
+			input.focus();
+		};
+		r.onerror = pasteHint;
+		try { r.readAsText(file); } catch (e) { pasteHint(); }
+	}
+
+	// Route an incoming file (picker, drop) to the right handler: PDF brief,
+	// text/markdown brief, or image. Anything else falls through as an image
+	// attempt (addPendingImage ignores non-images).
+	function handleIncomingFile(file) {
+		if (!file) return;
+		if (file.type === 'application/pdf') { addPendingPdf(file); return; }
+		if (isTextBrief(file)) { addPendingText(file); return; }
+		addPendingImage(file);
+	}
+
 	function addPendingImage(file) {
 		if (!file || !/^image\//.test(file.type)) return;
 		if (pendingImages.length >= MAX_IMAGES) {
@@ -236,10 +276,7 @@
 	});
 	attachInput && attachInput.addEventListener('change', function (e) {
 		var files = e.target.files || [];
-		for (var i = 0; i < files.length; i++) {
-			if (files[i] && files[i].type === 'application/pdf') { addPendingPdf(files[i]); }
-			else { addPendingImage(files[i]); }
-		}
+		for (var i = 0; i < files.length; i++) { handleIncomingFile(files[i]); }
 		attachInput.value = ''; // allow re-picking the same file
 	});
 
@@ -296,10 +333,7 @@
 		dragDepth = 0;
 		chatPanel.classList.remove('is-dragover');
 		var files = (e.dataTransfer && e.dataTransfer.files) || [];
-		for (var i = 0; i < files.length; i++) {
-			if (files[i] && files[i].type === 'application/pdf') { addPendingPdf(files[i]); }
-			else { addPendingImage(files[i]); }
-		}
+		for (var i = 0; i < files.length; i++) { handleIncomingFile(files[i]); }
 	});
 
 	// ─── Build mode selector ────────────────────────────────────────────
@@ -384,6 +418,25 @@
 				btn.disabled = false; btn.textContent = label;
 				if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
 				else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open billing — try pressgo.app/dashboard.');
+			})
+			.catch(function () { btn.disabled = false; btn.textContent = label; });
+	}
+	// One-click plan checkout — the SAME in-plugin endpoint the plans popup uses
+	// (pressgo_ai_subscribe → Stripe). Reused by the credit wall so the highest-
+	// intent moment gets a one-click Pro checkout, not a web login wall.
+	function startPlanCheckout(plan, btn, interval) {
+		var label = btn.textContent;
+		btn.disabled = true; btn.textContent = 'Opening checkout…';
+		var fd = new FormData();
+		fd.append('action', 'pressgo_ai_subscribe');
+		fd.append('nonce', cfg.nonce);
+		fd.append('plan', plan || 'pro');
+		fd.append('interval', interval || 'month');
+		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+			.then(function (r) { return r.json(); })
+			.then(function (j) {
+				btn.disabled = false; btn.textContent = label;
+				if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
 			})
 			.catch(function () { btn.disabled = false; btn.textContent = label; });
 	}
@@ -582,6 +635,7 @@
 
 	var lowCreditNudged = false;
 	var brandHintShown = false;
+	var publishHintShown = false;
 	function flashCredits(newTotal) {
 		if (typeof newTotal !== 'number') return;
 		credPill.textContent = newTotal + ' credits';
@@ -683,6 +737,11 @@
 			chips.appendChild(b);
 		});
 		append(chips);
+		// One quiet line so it's obvious the chips aren't the only option: you can
+		// type your own idea or drop in a real brief, at any length.
+		var frSummary = el('pg-msg-caption', 'Tap a starter, type your own, or drop in a PDF or doc. Go into as much detail as you like.');
+		frSummary.style.cssText = 'font-size:12px;color:#8a86a8;margin:6px 0 2px;';
+		append(frSummary);
 		// Leave the box blank — the placeholder + starter chips carry the
 		// first run. Tapping a chip fills the box (and enables Send); we never
 		// auto-drop text the user then has to delete.
@@ -736,6 +795,23 @@
 			row.appendChild(b);
 		});
 		card.appendChild(row);
+		// Quiet one-liner tying the multi-page moment to hosting: paid plans host
+		// AND build the whole site, so they don't do this one page at a time
+		// forever. One line, tied to this event, never a standing banner.
+		var hostFoot = document.createElement('div');
+		hostFoot.style.cssText = 'margin-top:10px;font-size:12px;color:#8a86a8;';
+		hostFoot.appendChild(document.createTextNode('Building a whole site? '));
+		var hostLink = document.createElement('a');
+		hostLink.href = 'https://pressgo.app/dashboard';
+		hostLink.textContent = 'Your paid plan can host and build the entire thing.';
+		hostLink.style.cssText = 'color:#5b4fff;font-weight:600;text-decoration:none;cursor:pointer;';
+		hostLink.addEventListener('click', function (e) {
+			// Prefer the in-plugin plans popup (it names hosting); fall back to web.
+			if (tiersPop) { e.preventDefault(); tiersPop.hidden = false; }
+		});
+		if (!tiersPop) { hostLink.target = '_blank'; hostLink.rel = 'noopener'; }
+		hostFoot.appendChild(hostLink);
+		card.appendChild(hostFoot);
 		append(card);
 	}
 
@@ -1371,6 +1447,26 @@
 					var built = el('pg-msg pg-msg-built');
 					built.innerHTML = builtChipHtml(evt.summary, evt.page_url);
 					append(built);
+					// After the first successful build this session, one dismissible
+					// reminder that the page is a private draft until Publish. Gated
+					// like the hand-raise/review cards: once per session, never a
+					// standing banner, and only while the page is still a draft.
+					if (!publishHintShown && cfg.page && cfg.page.status !== 'publish') {
+						publishHintShown = true;
+						var pubNote = el('pg-msg pg-msg-note');
+						pubNote.style.cssText = 'display:flex;align-items:flex-start;gap:8px;';
+						var pubTxt = document.createElement('span');
+						pubTxt.textContent = "This page is a draft only you can see. Hit Publish up top when you're ready to go live.";
+						pubNote.appendChild(pubTxt);
+						var pubX = document.createElement('button');
+						pubX.type = 'button';
+						pubX.setAttribute('aria-label', 'Dismiss');
+						pubX.innerHTML = '&times;';
+						pubX.style.cssText = 'margin-left:auto;background:transparent;border:0;color:#8a86a8;font-size:16px;line-height:1;cursor:pointer;padding:0 2px;';
+						pubX.addEventListener('click', function () { pubNote.remove(); });
+						pubNote.appendChild(pubX);
+						append(pubNote);
+					}
 					reloadPreview(evt.preview_bust);
 					if (typeof evt.credits_remaining === 'number') flashCredits(evt.credits_remaining);
 					// Stagger: when the review ask renders this turn, hold the
@@ -1424,19 +1520,47 @@
 					dismissTypingOnce();
 					resetAssistantBubble();
 					streamFailed = true;
+					// Credit wall — the highest-intent moment. Make the PRIMARY path
+					// the one-click in-plugin Pro checkout (same pressgo_ai_subscribe
+					// endpoint as the plans popup), not a web login wall most users
+					// can't pass. The $15 credit pack stays as a small secondary.
+					if (evt.code === 'INSUFFICIENT_CREDITS') {
+						var wall = el('pg-msg-error');
+						var buildsN = (cfg.review && cfg.review.builds) || 0;
+						var lead = document.createElement('div');
+						lead.textContent = buildsN > 0
+							? 'You’re ' + buildsN + ' page' + (buildsN === 1 ? '' : 's') + ' into this site and out of builds for now.'
+							: 'You’re out of builds for now.';
+						wall.appendChild(lead);
+						var proLine = document.createElement('div');
+						proLine.style.cssText = 'margin-top:6px;';
+						proLine.textContent = 'Pro ($25/mo) refills your builds and includes a hosted site the AI builds for you.';
+						wall.appendChild(proLine);
+						var creditActions = document.createElement('div');
+						creditActions.className = 'pg-error-actions';
+						var proBtn = document.createElement('button');
+						proBtn.type = 'button';
+						proBtn.className = 'pg-error-btn is-primary';
+						proBtn.textContent = 'Get Pro';
+						proBtn.addEventListener('click', function () { startPlanCheckout('pro', proBtn, 'month'); });
+						creditActions.appendChild(proBtn);
+						var pack = document.createElement('a');
+						pack.href = 'https://pressgo.app/dashboard?buy=credits';
+						pack.target = '_blank';
+						pack.rel = 'noopener';
+						pack.className = 'pg-error-btn';
+						pack.textContent = '$15 credit pack';
+						creditActions.appendChild(pack);
+						wall.appendChild(creditActions);
+						append(wall);
+						break;
+					}
 					var errBubble = el('pg-msg-error');
 					var msgText = evt.message || evt.error || 'Chat error';
-					// Project-aware credit wall: "out of credits" lands harder when
-					// it names the work in progress instead of reading like a meter.
-					if (evt.code === 'INSUFFICIENT_CREDITS' && cfg.review && cfg.review.builds > 0) {
-						msgText = 'You’re ' + cfg.review.builds + ' page' + (cfg.review.builds === 1 ? '' : 's') +
-							' into this site and out of credits. A $15 pack (75 credits) finishes it.';
-					}
 					var msgDiv = document.createElement('div');
 					msgDiv.textContent = msgText;
 					errBubble.appendChild(msgDiv);
-					// Render action buttons if backend supplied them (e.g.
-					// INSUFFICIENT_CREDITS → Buy credits / Pay as you go).
+					// Render action buttons if backend supplied them.
 					if (Array.isArray(evt.actions) && evt.actions.length) {
 						var row = document.createElement('div');
 						row.className = 'pg-error-actions';
@@ -1778,6 +1902,11 @@
 			wrap.appendChild(b);
 		});
 		append(wrap);
+		// The chips are shortcuts, not the only way to answer. Say so plainly —
+		// the placeholder alone doesn't make it obvious you can type your own.
+		var freeCap = el('pg-msg-caption', 'Or just type your own answer below, as much as you want.');
+		freeCap.style.cssText = 'font-size:12px;color:#8a86a8;margin:2px 0 2px;';
+		append(freeCap);
 		currentDiscoveryStage = data.stage || null;
 		if (input && data.freetext_hint) input.placeholder = data.freetext_hint;
 		setBusy(false); // keep the box live so the free-text fallback works
@@ -2203,7 +2332,20 @@
 				.then(function (j) {
 					card.remove();
 					if (j && j.success) {
-						append(el('pg-msg-system', 'Done. A real person from PressGo Digital will email you within a business day with a review of your site.'));
+						// Offer the booking link inline so they can grab a time right
+						// now instead of waiting for the email. The proxy forwards the
+						// backend's Calendly link; fall back to the known one.
+						var hrOk = el('pg-msg-system');
+						hrOk.appendChild(document.createTextNode("Thanks! I'll email you shortly. Want to grab a time now? "));
+						var cal = (j.data && j.data.calendly) ? j.data.calendly : 'https://calendly.com/pressgodigital/marketing-consultation';
+						var calA = document.createElement('a');
+						calA.href = cal;
+						calA.target = '_blank';
+						calA.rel = 'noopener';
+						calA.textContent = 'Book a time';
+						calA.style.cssText = 'color:#5b4fff;font-weight:600;';
+						hrOk.appendChild(calA);
+						append(hrOk);
 					} else {
 						var m = (j && j.data && j.data.message) ? j.data.message : 'Could not send. Email joe@pressgodigital.com directly.';
 						append(el('pg-msg-system', m));
@@ -5350,6 +5492,31 @@
 			pi.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); useUrl(); } });
 			row.appendChild(pi);
 			row.appendChild(use);
+			// Upload button — opens the WordPress media library (same wp.media
+			// pattern as the logo picker) so users can bring in their OWN image,
+			// not just pick an existing one or paste a URL. On select, pick() swaps
+			// it into the page like any other choice.
+			var up = document.createElement('button');
+			up.type = 'button';
+			up.textContent = 'Upload';
+			up.addEventListener('click', function () {
+				if (typeof wp === 'undefined' || !wp.media) {
+					alert('Media library not available. Make sure you are logged in as admin.');
+					return;
+				}
+				var frame = wp.media({
+					title: 'Select or upload an image',
+					button: { text: 'Use this image' },
+					library: { type: 'image' },
+					multiple: false,
+				});
+				frame.on('select', function () {
+					var attachment = frame.state().get('selection').first().toJSON();
+					if (attachment && attachment.url) pick(attachment.url);
+				});
+				frame.open();
+			});
+			row.appendChild(up);
 			imgPicker.appendChild(row);
 
 			var body = document.createElement('div');

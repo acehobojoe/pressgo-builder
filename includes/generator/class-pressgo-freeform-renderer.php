@@ -941,7 +941,32 @@ class PressGo_Freeform_Renderer {
 					return PressGo_Element_Factory::widget( 'shortcode', array( 'shortcode' => $site_forms[0]['shortcode'], '_css_classes' => $sc_class ) );
 				}
 			}
-			return null;
+			// No Pro form widget AND no site form plugin — but our audience runs
+			// ADS on free Elementor. Returning null here made the lead form
+			// silently VANISH, shipping a polished page that can't capture a
+			// lead. Instead drop a REAL working CTA in the form's place: tel: a
+			// phone from the brief/config if one exists, else mailto: the site
+			// admin. render_button() reuses this section's accent color + the
+			// text-contrast guard so the button stays on-brand. The section is
+			// never empty.
+			$tel = self::phone_tel_url( $s );
+			if ( '' === $tel ) { $tel = self::phone_tel_url( $cfg ); }
+			if ( '' !== $tel ) {
+				$cta_url = $tel;
+			} else {
+				$email = isset( $s['recipient'] ) && is_scalar( $s['recipient'] ) && is_email( trim( (string) $s['recipient'] ) )
+					? trim( (string) $s['recipient'] )
+					: (string) get_option( 'admin_email' );
+				if ( '' === $email || ! is_email( $email ) ) {
+					return null; // no phone and no valid admin email — nothing safe to wire.
+				}
+				$cta_url = 'mailto:' . $email;
+			}
+			$label = isset( $s['button'] ) && is_scalar( $s['button'] ) ? trim( (string) $s['button'] ) : '';
+			if ( '' === $label || 0 === strcasecmp( $label, 'submit' ) ) {
+				$label = '' !== $tel ? 'Call Now' : 'Contact Us';
+			}
+			return self::render_button( array( 'text' => $label, 'url' => $cta_url ), $cfg );
 		}
 		$c         = isset( $cfg['colors'] ) && is_array( $cfg['colors'] ) ? $cfg['colors'] : array();
 		$accent    = isset( $c['accent'] ) ? $c['accent'] : '#2563EB';
@@ -1026,6 +1051,32 @@ class PressGo_Freeform_Renderer {
 		}
 
 		return PressGo_Element_Factory::widget( 'form', $form_settings );
+	}
+
+	/**
+	 * Find the first real phone number anywhere in a settings/config array and
+	 * return it as a tel: URL, or '' if none. Mirrors the recipe generator's
+	 * phone scan (class-pressgo-generator.php) so the free-Elementor form
+	 * fallback can wire a call CTA instead of an empty section.
+	 *
+	 * @param mixed $node Settings/config array (recurses into nested arrays).
+	 * @return string tel: URL, or '' when no phone is present.
+	 */
+	private static function phone_tel_url( $node ) {
+		if ( ! is_array( $node ) ) {
+			return '';
+		}
+		foreach ( $node as $k => $v ) {
+			if ( 'phone' === $k && is_scalar( $v )
+				&& preg_match( '/\d{7,}/', preg_replace( '/[^0-9]/', '', (string) $v ) ) ) {
+				return 'tel:' . preg_replace( '/[^0-9+]/', '', (string) $v );
+			}
+			$r = self::phone_tel_url( $v );
+			if ( '' !== $r ) {
+				return $r;
+			}
+		}
+		return '';
 	}
 
 	// ───────────────────────────────────────────────────────────────────

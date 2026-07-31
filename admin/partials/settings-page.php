@@ -53,6 +53,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<?php endif; ?>
 			<a class="button button-secondary" href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>
 		</p>
+		<p style="margin:4px 0 0;color:#646970;font-size:12px">Every paid plan also includes agentic hosting. We stand up a real WordPress site and the AI builds your whole site on it. No servers to set up.</p>
 	</div>
 	<script>
 	(function () {
@@ -111,7 +112,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<li><strong>Plugin Version:</strong> <?php echo esc_html( PRESSGO_VERSION ); ?></li>
 			<li><strong>Section Types:</strong> 19 types, 48 layout variants</li>
 			<li><strong>Support:</strong> <a href="mailto:joe@pressgo.app">joe@pressgo.app</a></li>
-			<li><strong>Rather have humans handle it?</strong> PressGo is built by a working marketing agency — hosting, page upkeep, and ads management from $99/mo. <a href="https://pressgo.app/done-for-you" target="_blank" rel="noopener">Done-For-You</a></li>
+			<li><strong>Want a human to run it for you instead?</strong> Hosting, page upkeep, and ads from $99/mo. <a href="https://pressgo.app/done-for-you" target="_blank" rel="noopener">Done-For-You</a></li>
 		</ul>
 	</div>
 </div>
