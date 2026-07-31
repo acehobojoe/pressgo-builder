@@ -56,6 +56,14 @@ class PressGo_Freeform_Renderer {
 	private static $section_is_dark = false;
 
 	/**
+	 * Effective section background as [r,g,b] for the contrast floor
+	 * (null = unknown, e.g. photo/gradient backgrounds — guard disabled).
+	 *
+	 * @var array|null
+	 */
+	private static $section_bg_rgb = array( 255, 255, 255 );
+
+	/**
 	 * Render a freeform blocks tree to an Elementor section element (one
 	 * top-level container, ready to drop into the _elementor_data array).
 	 *
@@ -381,6 +389,19 @@ class PressGo_Freeform_Renderer {
 		// is nearly invisible on a #0F1115 section. When the section is dark,
 		// render_col() will inject a visible hairline border on card cols.
 		self::$section_is_dark = self::is_dark_color( isset( $s['background'] ) ? $s['background'] : '' );
+		// Contrast floor context: solid backgrounds parse to [r,g,b]; empty /
+		// transparent means the white page default; photo or gradient sections
+		// disable the guard (effective tone unknowable).
+		if ( ! empty( $s['background_image'] ) || ! empty( $s['background_image_query'] ) ) {
+			self::$section_bg_rgb = null;
+		} else {
+			$bg = isset( $s['background'] ) ? trim( (string) $s['background'] ) : '';
+			if ( '' === $bg || 'transparent' === $bg ) {
+				self::$section_bg_rgb = array( 255, 255, 255 );
+			} else {
+				self::$section_bg_rgb = self::parse_color_rgb( $bg );
+			}
+		}
 
 		$children = self::render_children( $block, $cfg );
 
@@ -689,8 +710,8 @@ class PressGo_Freeform_Renderer {
 		if ( '' === trim( $text ) ) { return null; } // skip empty (e.g. stripped "..." placeholders)
 		$tag  = isset( $s['tag'] ) ? $s['tag'] : 'h2';
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
-		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : null;
+		$color = self::readable_on_section( isset( $s['color'] ) ? $s['color'] : null, $size );
 		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : null;
 		$ls    = isset( $s['letter_spacing'] ) && is_numeric( $s['letter_spacing'] ) ? (float) $s['letter_spacing'] : null;
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : null;
@@ -734,8 +755,15 @@ class PressGo_Freeform_Renderer {
 		$html  = isset( $s['html'] ) ? self::strip_dashes( $s['html'] ) : ( isset( $s['text'] ) ? self::strip_dashes( $s['text'] ) : '' );
 		if ( '' === trim( wp_strip_all_tags( $html ) ) ) { return null; } // skip empty (stripped placeholders)
 		$align = isset( $s['align'] ) ? $s['align'] : 'left';
-		$color = isset( $s['color'] ) ? $s['color'] : null;
 		$size  = isset( $s['size'] ) && is_numeric( $s['size'] ) ? (int) $s['size'] : 16;
+		$color = isset( $s['color'] ) ? $s['color'] : null;
+		if ( null === $color && is_array( self::$section_bg_rgb )
+			&& self::rel_luminance( self::$section_bg_rgb ) < 0.5 ) {
+			// No composed color on a dark section: the kit's inherited default is a
+			// dim mid-gray that fails small-text contrast (QA: gym fine print).
+			$color = 'rgba(255,255,255,0.78)';
+		}
+		$color = self::readable_on_section( $color, $size );
 		$lh    = isset( $s['line_height'] ) && is_numeric( $s['line_height'] ) ? (float) $s['line_height'] : 1.7;
 		$weight = isset( $s['weight'] ) ? (string) $s['weight'] : '400'; // honor bold/light body copy
 		// Inline links should take the widget's text color, not the theme's link
@@ -1125,6 +1153,82 @@ class PressGo_Freeform_Renderer {
 	 * @param string $color Hex (#RRGGBB) or rgba(r,g,b,a) string.
 	 * @return bool True if the color is dark.
 	 */
+	/**
+	 * Parse a hex or rgb(a) color to [r,g,b]; rgba composites over $under
+	 * (defaults to white). Returns null when unparseable (gradients, keywords).
+	 */
+	private static function parse_color_rgb( $color, $under = null ) {
+		$color = trim( (string) $color );
+		if ( '' === $color ) { return null; }
+		if ( '#' === $color[0] ) {
+			$hex = substr( $color, 1 );
+			if ( 3 === strlen( $hex ) ) {
+				$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+			}
+			if ( 6 !== strlen( $hex ) ) { return null; }
+			return array( hexdec( substr( $hex, 0, 2 ) ), hexdec( substr( $hex, 2, 2 ) ), hexdec( substr( $hex, 4, 2 ) ) );
+		}
+		if ( 0 === strpos( $color, 'rgb' ) ) {
+			if ( ! preg_match( '/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?/', $color, $m ) ) { return null; }
+			$rgb = array( (int) $m[1], (int) $m[2], (int) $m[3] );
+			$a   = isset( $m[4] ) && '' !== $m[4] ? (float) $m[4] : 1.0;
+			if ( $a < 1.0 ) {
+				$u = is_array( $under ) ? $under : array( 255, 255, 255 );
+				foreach ( $rgb as $i => $c ) {
+					$rgb[ $i ] = (int) round( $c * $a + $u[ $i ] * ( 1 - $a ) );
+				}
+			}
+			return $rgb;
+		}
+		return null;
+	}
+
+	/** WCAG relative luminance of an [r,g,b]. */
+	private static function rel_luminance( $rgb ) {
+		$out = array();
+		foreach ( $rgb as $c ) {
+			$c     = $c / 255;
+			$out[] = $c <= 0.03928 ? $c / 12.92 : pow( ( $c + 0.055 ) / 1.055, 2.4 );
+		}
+		return 0.2126 * $out[0] + 0.7152 * $out[1] + 0.0722 * $out[2];
+	}
+
+	/** WCAG contrast ratio between two [r,g,b] colors. */
+	private static function contrast_ratio( $a, $b ) {
+		$l1 = self::rel_luminance( $a );
+		$l2 = self::rel_luminance( $b );
+		if ( $l1 < $l2 ) { $t = $l1; $l1 = $l2; $l2 = $t; }
+		return ( $l1 + 0.05 ) / ( $l2 + 0.05 );
+	}
+
+	/**
+	 * Contrast floor: a composed text color under 3:1 against the section
+	 * background is illegible (QA: dim gray fine print on near-black gym hero,
+	 * pale microcopy on white). Blend it toward white (dark section) or black
+	 * (light section) in 10% steps until it clears 4.5:1, preserving hue.
+	 * Colors at or above 3:1 pass through untouched — muted-by-design survives.
+	 */
+	private static function readable_on_section( $color, $size = null ) {
+		if ( null === $color || ! is_array( self::$section_bg_rgb ) ) { return $color; }
+		$rgb = self::parse_color_rgb( (string) $color, self::$section_bg_rgb );
+		if ( null === $rgb ) { return $color; }
+		// WCAG split: small text (under ~18px) needs 4.5:1; large text 3:1.
+		// The composer's dim-gray fine print typically lands ~4.1:1 on dark
+		// heroes — legal at display sizes, illegible at 13-14px.
+		$min = ( null !== $size && is_numeric( $size ) && (int) $size < 18 ) ? 4.5 : 3.0;
+		if ( self::contrast_ratio( $rgb, self::$section_bg_rgb ) >= $min ) { return $color; }
+		$target = self::rel_luminance( self::$section_bg_rgb ) < 0.5 ? array( 255, 255, 255 ) : array( 17, 17, 17 );
+		for ( $i = 0; $i < 12; $i++ ) {
+			foreach ( $rgb as $k => $c ) {
+				$rgb[ $k ] = (int) round( $c + ( $target[ $k ] - $c ) * 0.15 );
+			}
+			if ( self::contrast_ratio( $rgb, self::$section_bg_rgb ) >= 4.5 ) { break; }
+		}
+		// Final guarantee: if blending stalled short of 4.5, snap to the target.
+		if ( self::contrast_ratio( $rgb, self::$section_bg_rgb ) < 4.5 ) { $rgb = $target; }
+		return sprintf( '#%02X%02X%02X', $rgb[0], $rgb[1], $rgb[2] );
+	}
+
 	private static function is_dark_color( $color ) {
 		$color = trim( (string) $color );
 		if ( '' === $color ) { return false; }
