@@ -981,6 +981,26 @@ class PressGo_Freeform_Renderer {
 	 * background_image with optional overlay.
 	 */
 	private static function apply_background( &$settings, $s ) {
+		// Composed trees may carry an unresolved background_image_query — stored-tree
+		// re-renders never go through the compose-time pre-render pass, so resolve
+		// here, exactly as render_image() does for widget photos. A section
+		// background must not silently drop (the composition prompt promises
+		// "the system fills a real photo").
+		if ( ( ! isset( $s['background_image'] ) || '' === $s['background_image'] )
+			&& ! empty( $s['background_image_query'] ) && is_callable( self::$resolve_image ) ) {
+			$url = call_user_func( self::$resolve_image, (string) $s['background_image_query'], 'landscape' );
+			if ( is_string( $url ) && '' !== $url ) {
+				$s['background_image'] = $url;
+			}
+		}
+		// Resolver miss or unavailable: keep the section's intended tone by painting
+		// the overlay color as a solid background instead of leaving stark white.
+		if ( ( ! isset( $s['background_image'] ) || '' === $s['background_image'] )
+			&& ! empty( $s['background_image_query'] )
+			&& ( ! isset( $s['background'] ) || '' === $s['background'] )
+			&& isset( $s['overlay'] ) && '' !== $s['overlay'] ) {
+			$s['background'] = $s['overlay'];
+		}
 		if ( isset( $s['background_image'] ) && '' !== $s['background_image'] ) {
 			$settings['background_background'] = 'classic';
 			$settings['background_image']      = array( 'url' => $s['background_image'], 'id' => '', 'alt' => '' );
