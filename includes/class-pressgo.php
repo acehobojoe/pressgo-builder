@@ -109,11 +109,91 @@ class PressGo {
 		// Ensure tables exist (idempotent: dbDelta no-ops when current).
 		add_action( 'plugins_loaded', array( 'PressGo_MCP_Storage', 'maybe_install' ), 20 );
 
+		// Elementor requests a Google Fonts stylesheet for its default-kit
+		// families (Roboto, Roboto Slab) on every page, even when the page's own
+		// typography never uses them — measured: 4 render-blocking font requests
+		// per generated page, 2 of them dead. Drop the dead ones.
+		add_filter( 'style_loader_tag', array( __CLASS__, 'drop_unused_google_fonts' ), 10, 3 );
+
 		// Register WP-CLI commands.
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-cli.php';
 			WP_CLI::add_command( 'pressgo', 'PressGo_CLI' );
 		}
+	}
+
+	/**
+	 * Families this page's Elementor data actually references.
+	 *
+	 * @return array|null Lowercased family names, or null when not a PressGo page.
+	 */
+	private static function page_font_families() {
+		static $cache = null;
+		if ( null !== $cache ) {
+			return is_array( $cache ) ? $cache : null;
+		}
+		$cache = false;
+		if ( ! is_singular() ) {
+			return null;
+		}
+		$post_id = get_queried_object_id();
+		if ( ! $post_id || ! get_post_meta( $post_id, '_pressgo_freeform', true ) ) {
+			return null; // Only pages this plugin generated; never touch normal pages.
+		}
+		$data = get_post_meta( $post_id, '_elementor_data', true );
+		if ( ! is_string( $data ) || '' === $data ) {
+			return null;
+		}
+		$families = array();
+		if ( preg_match_all( '/"typography_font_family"\s*:\s*"([^"]+)"/', $data, $m ) ) {
+			foreach ( $m[1] as $f ) {
+				$families[ strtolower( trim( $f ) ) ] = true;
+			}
+		}
+		if ( empty( $families ) ) {
+			return null; // Nothing detected: leave every stylesheet alone.
+		}
+		$cache = array_keys( $families );
+		return $cache;
+	}
+
+	/**
+	 * Drop Google Fonts stylesheets for families the page never renders.
+	 *
+	 * Only runs on PressGo-generated pages, and only when the page's own
+	 * typography could be read — otherwise every stylesheet is left untouched.
+	 *
+	 * @param string $tag    Full <link> tag.
+	 * @param string $handle Style handle.
+	 * @param string $href   Stylesheet URL.
+	 * @return string
+	 */
+	public static function drop_unused_google_fonts( $tag, $handle, $href ) {
+		if ( is_admin() || false === strpos( (string) $href, 'fonts.googleapis.com' ) ) {
+			return $tag;
+		}
+		$families = self::page_font_families();
+		if ( empty( $families ) ) {
+			return $tag;
+		}
+		$query = wp_parse_url( $href, PHP_URL_QUERY );
+		if ( ! $query ) {
+			return $tag;
+		}
+		parse_str( $query, $args );
+		if ( empty( $args['family'] ) ) {
+			return $tag;
+		}
+		// A stylesheet may bundle several families (| separated); keep the tag
+		// when ANY of them is used on this page.
+		foreach ( explode( '|', (string) $args['family'] ) as $spec ) {
+			$parts = explode( ':', $spec );
+			$name  = strtolower( trim( str_replace( '+', ' ', $parts[0] ) ) );
+			if ( '' !== $name && in_array( $name, $families, true ) ) {
+				return $tag;
+			}
+		}
+		return '';
 	}
 
 	/**
