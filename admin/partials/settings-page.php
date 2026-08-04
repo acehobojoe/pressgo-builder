@@ -11,13 +11,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 	// ── Account & plan (PressGo API mode with a key) ──
 	$pg_acct_key = (string) get_option( 'pressgo_account_key', '' );
 	if ( 'pressgo' === $api_mode && '' !== $pg_acct_key ) :
-		$pg_allow = get_transient( 'pressgo_settings_allowance' );
-		if ( ! is_array( $pg_allow ) ) {
-			$pg_base = (string) apply_filters( 'pressgo_api_base', 'https://pressgo.app' );
-			$pg_resp = wp_remote_get( $pg_base . '/api/plugin/allowance', array( 'timeout' => 8, 'headers' => array( 'X-PressGo-Key' => $pg_acct_key ) ) );
-			$pg_allow = json_decode( wp_remote_retrieve_body( $pg_resp ), true );
-			if ( is_array( $pg_allow ) && isset( $pg_allow['cap'] ) ) { set_transient( 'pressgo_settings_allowance', $pg_allow, MINUTE_IN_SECONDS ); }
-		}
+		$pg_allow = PressGo_License::allowance();
 		if ( is_array( $pg_allow ) && isset( $pg_allow['cap'] ) ) :
 			$pg_tier  = (string) ( $pg_allow['tier'] ?? 'free' );
 			$pg_paid  = 'free' !== $pg_tier;

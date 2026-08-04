@@ -239,7 +239,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide header (logo + nav + primary CTA) for every PressGo page on this site. " .
 					"Pass `items` as ordered nav links and a `cta` for the primary button. The header gets injected " .
-					"as the first section on every PressGo-built page. Requires PressGo Plus ($12/mo).",
+					"as the first section on every PressGo-built page. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -256,7 +256,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide footer for every PressGo page on this site. Pass `brand`, `columns` " .
 					"(link sections), and optional `social`. The footer gets injected as the last section on every " .
-					"PressGo-built page. Requires PressGo Plus ($12/mo).",
+					"PressGo-built page. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -271,12 +271,12 @@ class PressGo_MCP_Tools {
 			),
 			array(
 				'name'        => 'get_header',
-				'description' => "Pro: read the current site-wide header template. Requires PressGo Plus ($12/mo).",
+				'description' => "Pro: read the current site-wide header template. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 			array(
 				'name'        => 'get_footer',
-				'description' => "Pro: read the current site-wide footer template. Requires PressGo Plus ($12/mo).",
+				'description' => "Pro: read the current site-wide footer template. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 
@@ -1265,8 +1265,8 @@ class PressGo_MCP_Tools {
 		if ( ! $license->is_pro() ) {
 			$upgrade_url = PressGo_License::upgrade_url();
 			return new WP_Error( 'mcp_pro_required',
-				"`{$name}` requires PressGo Plus ($12/mo). The user can upgrade at {$upgrade_url} — " .
-				"once they enter their license key in PressGo > MCP Server, this tool unlocks immediately."
+				"`{$name}` requires a paid PressGo plan (Pro $25/mo and up). The user can upgrade at {$upgrade_url} — " .
+				"once their pressgo.app account is on a paid plan (or they enter a license key in PressGo > MCP Server), this tool unlocks immediately."
 			);
 		}
 		switch ( $name ) {
