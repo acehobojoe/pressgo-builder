@@ -8,19 +8,19 @@ Stable tag: 2.5.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI website builder for Elementor — describe your page in chat, watch it build live, refine by talking. Every element is a native Elementor widget.
+AI website builder for Elementor. The agent already knows WordPress: describe a page in chat, watch it build live, keep talking to refine.
 
 == Description ==
 
-PressGo turns WordPress + Elementor into a chat-driven website and landing page builder. Tell the AI what you want, watch it stream the page into a live preview, then keep chatting to refine — change colors, swap sections, rewrite copy, wire in your real contact form. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
+PressGo is the agent that already knows WordPress and Elementor. Nothing to set up, nothing to teach: tell it what you want in plain English, watch it stream the page into a live preview, then keep talking to refine. Change colors, swap sections, rewrite copy, wire in your real contact form. Every element it builds is a native Elementor widget, so you can also jump into the Elementor editor for hands-on tweaks anytime.
 
-PressGo is an AI website builder and no-code landing page generator for WordPress: describe your page in plain English through a ChatGPT-style chat interface (powered by Claude) and it builds native, fully editable Elementor sections in seconds — no design skills and no code required. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page for you, that help is one click away.
+PressGo is an AI website builder and no-code landing page generator for WordPress. You don't need a Claude account, design skills, or any AI setup to learn, and everything it builds is yours: native widgets, no lock-in, nothing you can't edit. It is built and run by PressGo Digital, a working marketing agency; when you want humans to handle the page for you, that help is one click away.
 
 **Two ways to use it:**
 
-**1. AI Builder (the headline feature, default in 2.2)** — Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word-by-word. Drop screenshot references right into the chat. The AI **screenshots and reviews its own work** automatically on your first build — and any time you say "review my page" — then applies a correction pass if it spots a real issue. Free PressGo account = a full page of AI builds included every day (resets at midnight UTC) + 10 bonus credits/month. PressGo Plus = $12/mo for ~8 pages a day + 100 bonus credits + unlimited MCP. PressGo Agency = $49/mo for ~40 pages a day + 400 bonus credits, built for client work. $15 one-time pack = 75 extra credits anytime.
+**1. The agent in your wp-admin (default)** - Go to PressGo &rarr; AI Builder in WordPress. New page or any existing Elementor page can be AI-enabled. Click into the fullscreen builder: chat on the left, live preview on the right. Tokens stream in word by word. Drop screenshot references right into the chat. The agent **screenshots and reviews its own work** automatically on your first build, and any time you say "review my page", then applies a correction pass if it spots a real issue. Free: 10 builds a month, no card needed. Pro $25/mo, Max $59/mo, Ultra $149/mo (annual saves about 20%). Every paid plan includes hosting: the agent stands up a real WordPress site and hosts and runs the whole thing for you, or you can keep the plugin on your own site. $15 one-time pack = 75 extra credits anytime.
 
-**2. MCP Server (advanced — for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** — Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. PressGo Plus lifts the cap, adds custom site-wide header/footer, and unlocks 1,000 screenshots/day.
+**2. Bring your own chat client (MCP, for Claude, ChatGPT, Cursor, claude.ai, or any MCP client)** - Connect any Model Context Protocol (MCP) client to your WordPress site and build pages by chatting with your own AI subscription. No per-page cost from us; you bring your own AI. Free tier: 3 page builds per day. Paid plans lift the cap, add custom site-wide header/footer, and unlock 1,000 screenshots/day.
 
 **Key Features:**
 
@@ -28,15 +28,15 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 * Drop, paste, or click-to-attach reference screenshots directly into the chat
 * "AI-enable" any existing Elementor page to keep iterating on it via chat
 * MCP server with OAuth 2.1 + 11 tools for power users on Claude Desktop / Cursor
-* Live Elementor editor sync — chat edits appear without reloading
-* Pause-and-resume — open the Elementor editor mid-build and the AI pauses automatically so your drag-and-drop edits stay safe
-* "Watch URL" — share a live preview link with clients while you build
+* Live Elementor editor sync: chat edits appear without reloading
+* Pause-and-resume: open the Elementor editor mid-build and the agent pauses automatically so your drag-and-drop edits stay safe
+* "Watch URL": share a live preview link with clients while you build
 * 19 section types with 56 layout variants
-* Every element is native Elementor — fully editable
+* Every element is native Elementor, fully editable
 * Embeds your existing WPForms / Contact Form 7 / Gravity / Ninja / Fluent forms as real working forms
 * Mobile-responsive out of the box (auto-calculated tablet and mobile sizes)
-* Choose your Claude model: Sonnet 4.5 (default for paid), Opus 4.6, or Haiku 4.5 (free)
-* Works with Elementor Free — no Pro required
+* Runs on current Claude models, matched to each job; bring your own Anthropic key and pick a model (Sonnet, Opus, or Haiku) if you prefer
+* Works with Elementor Free, no Pro required
 
 **Section Types:**
 
@@ -63,11 +63,11 @@ PressGo is an AI website builder and no-code landing page generator for WordPres
 
 **How It Works:**
 
-1. Create a free account at [pressgo.app](https://pressgo.app/register) and get your API key — every day includes **a full page of free builds**, plus 10 bonus credits a month
-2. Enter the key in PressGo &rarr; Settings
+1. Install the plugin and create your free account right inside the builder: enter your email, click once, done. **10 free builds a month**, no card needed
+2. Your key saves itself on that one click. Signed up on the web instead? Paste the key from your welcome email into PressGo &rarr; Settings, once
 3. Go to PressGo &rarr; AI Builder and click "+ New page" (or AI-enable an existing page)
 4. Describe the page in chat, drop in reference screenshots if you have them, and watch it build in the live preview
-5. Keep chatting to iterate — change colors, swap sections, rewrite copy. Say **"review my page"** anytime and the AI screenshots its own work and self-corrects
+5. Keep chatting to iterate: change colors, swap sections, rewrite copy. Say **"review my page"** anytime and the agent screenshots its own work and self-corrects
 6. Click "Edit in Elementor" anytime to drop into the native editor for hands-on tweaks
 
 == External Services ==
@@ -153,15 +153,19 @@ Need help? Email us at joe@pressgo.app or visit [pressgo.app](https://pressgo.ap
 
 = Do I need an API key? =
 
-Start free — no credit card. Create a free PressGo account at [pressgo.app/register](https://pressgo.app/register) and every day includes **enough builds for a full page** (the allowance resets at midnight UTC), plus 10 bonus credits a month for overflow. From there you have two ways to power it: (1) keep using your free PressGo account (recommended — 10 credits/month, top up anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
+Start free, no credit card. Create your free PressGo account with one click inside the builder (or at [pressgo.app/register](https://pressgo.app/register)) and you get **10 free builds a month**. From there you have two ways to power it: (1) keep using your free PressGo account (recommended; top up or upgrade anytime), or (2) bring your own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/) and pay per token directly.
 
 = How much does it cost per page? =
 
-With a **PressGo API key**: 10 free credits/month included. Beyond that, $15 one-time pack = 75 credits, or PressGo Plus = $12/mo for 100 credits + MCP unlimited + Pro features. Each build (or significant chat-driven edit) costs 1 credit; just chatting with the AI is free until it actually changes the page. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
+With a **PressGo account**: 10 free builds a month included. Beyond that, a $15 one-time pack adds 75 credits, or upgrade: Pro $25/mo, Max $59/mo, Ultra $149/mo (annual saves about 20%). Every paid plan includes hosting, where the agent hosts and runs your whole site. A build (or a significant chat-driven edit) costs one build or credit; just chatting is free until the page actually changes. With your **own Anthropic key**, a typical Haiku page costs ~$0.02-0.05, Sonnet ~$0.10-0.30, and Opus is the most capable at higher cost.
+
+= Do paid plans include hosting? =
+
+Yes. Every paid plan (Pro, Max, and Ultra) includes hosting: the agent stands up a real WordPress site, then hosts and runs the whole thing for you. You keep your own wp-admin password and SSH access, everything is native Elementor, and you can export anytime. Prefer your own hosting? Keep the plugin on your own site. Your call.
 
 = Does the AI Builder chat work with my own Anthropic key? =
 
-The chat-driven AI Builder runs on a PressGo account key (`pg_...`) — it's how pages stream, get reviewed, and stay in sync. "Own API Key" mode powers the legacy one-shot generator only. A free PressGo account (10 credits/month, no card) unlocks the full chat builder.
+The chat-driven AI Builder runs on a PressGo account key (`pg_...`); it's how pages stream, get reviewed, and stay in sync. "Own API Key" mode powers the legacy one-shot generator only. A free PressGo account (10 free builds a month, no card) unlocks the full chat builder.
 
 = What data is sent to external servers? =
 
@@ -169,15 +173,15 @@ When you click Generate, your text prompt and optional image are sent to Anthrop
 
 = Do I need Elementor Pro? =
 
-No. PressGo works fully with Elementor Free. The blog posts section uses the Posts widget which requires Elementor Pro — it will be skipped automatically if Pro is not installed.
+No. PressGo works fully with Elementor Free. The blog posts section uses the Posts widget which requires Elementor Pro; it will be skipped automatically if Pro is not installed.
 
 = Can I edit the generated pages? =
 
-Absolutely. Every generated page uses native Elementor widgets and sections. Open it in the Elementor editor and customize anything — text, colors, images, layout.
+Absolutely. Every generated page uses native Elementor widgets and sections. Open it in the Elementor editor and customize anything: text, colors, images, layout.
 
 = Which Claude model should I use? =
 
-Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is faster and cheaper but may produce simpler layouts. Opus 4.6 produces the most detailed results at higher cost.
+On a PressGo account key you don't pick a model. The agent runs on current Claude models and matches the model to the job. With your own Anthropic key, Sonnet gives the best balance of quality and cost, Haiku is faster and cheaper but may produce simpler layouts, and Opus produces the most detailed results at higher cost.
 
 == Screenshots ==
 

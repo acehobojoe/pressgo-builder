@@ -417,7 +417,7 @@
 			.then(function (j) {
 				btn.disabled = false; btn.textContent = label;
 				if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
-				else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open billing — try pressgo.app/dashboard.');
+				else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open billing. Try pressgo.app/dashboard.');
 			})
 			.catch(function () { btn.disabled = false; btn.textContent = label; });
 	}
@@ -554,7 +554,7 @@
 		var credLine = document.getElementById('pg-tiers-credits');
 		if (credLine && typeof u.credits === 'number') {
 			credLine.textContent = u.credits > 0
-				? '+ ' + u.credits + ' bonus credit' + (u.credits === 1 ? '' : 's') + ' — used automatically after your daily builds'
+				? '+ ' + u.credits + ' bonus credit' + (u.credits === 1 ? '' : 's') + ', used automatically after your daily builds'
 				: '';
 		}
 		if (typeof u.credits === 'number') lastCreditValue = u.credits;
@@ -653,7 +653,7 @@
 		// the hard zero instead of after it.
 		if (newTotal <= 3) {
 			credPill.classList.add('is-low');
-			credPill.title = 'Running low — click to top up';
+			credPill.title = 'Running low. Click to top up';
 			credPill.style.cursor = 'pointer';
 			credPill.onclick = function () {
 				window.open('https://pressgo.app/dashboard?buy=credits', '_blank');
@@ -662,11 +662,11 @@
 				lowCreditNudged = true;
 				var nudge = el('pg-msg pg-msg-note');
 				nudge.appendChild(document.createTextNode(
-					newTotal + (newTotal === 1 ? ' credit' : ' credits') + ' left this month. A $15 pack adds 75 so you can keep building — '));
+					newTotal + (newTotal === 1 ? ' credit' : ' credits') + ' left this month. A $15 pack adds 75 so you can keep building. '));
 				var a = document.createElement('a');
 				a.href = 'https://pressgo.app/dashboard?buy=credits';
 				a.target = '_blank';
-				a.textContent = 'top up here';
+				a.textContent = 'Top up here';
 				nudge.appendChild(a);
 				nudge.appendChild(document.createTextNode('.'));
 				append(nudge);
@@ -803,7 +803,7 @@
 		hostFoot.appendChild(document.createTextNode('Building a whole site? '));
 		var hostLink = document.createElement('a');
 		hostLink.href = 'https://pressgo.app/dashboard';
-		hostLink.textContent = 'Your paid plan can host and build the entire thing.';
+		hostLink.textContent = 'On a paid plan, the agent hosts and runs the whole thing.';
 		hostLink.style.cssText = 'color:#2563eb;font-weight:600;text-decoration:none;cursor:pointer;';
 		hostLink.addEventListener('click', function (e) {
 			// Prefer the in-plugin plans popup (it names hosting); fall back to web.
@@ -2282,7 +2282,7 @@
 		yes.href = r.url;
 		yes.target = '_blank';
 		yes.rel = 'noopener';
-		yes.textContent = '⭐ Leave a review';
+		yes.textContent = 'Leave a review';
 		yes.style.cssText = 'background:#2563eb;color:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none;';
 		yes.addEventListener('click', function () { done('reviewed'); });
 		var no = document.createElement('button');
@@ -2319,7 +2319,7 @@
 		rowEl.style.cssText = 'margin-top:10px;display:flex;gap:8px;';
 		var yes = document.createElement('button');
 		yes.type = 'button';
-		yes.textContent = '🙋 Yes, review my site';
+		yes.textContent = 'Yes, review my site';
 		yes.style.cssText = 'background:#10b981;color:#fff;border:0;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
 		yes.addEventListener('click', function () {
 			yes.disabled = true;
@@ -2336,7 +2336,7 @@
 						// now instead of waiting for the email. The proxy forwards the
 						// backend's Calendly link; fall back to the known one.
 						var hrOk = el('pg-msg-system');
-						hrOk.appendChild(document.createTextNode("Thanks! I'll email you shortly. Want to grab a time now? "));
+						hrOk.appendChild(document.createTextNode("Thanks. I'll email you shortly. Want to grab a time now? "));
 						var cal = (j.data && j.data.calendly) ? j.data.calendly : 'https://calendly.com/pressgodigital/marketing-consultation';
 						var calA = document.createElement('a');
 						calA.href = cal;

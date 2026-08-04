@@ -47,7 +47,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<?php endif; ?>
 			<a class="button button-secondary" href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>
 		</p>
-		<p style="margin:4px 0 0;color:#8a8a82;font-size:12px">Every paid plan also includes agentic hosting. We stand up a real WordPress site and the AI builds your whole site on it. No servers to set up.</p>
+		<p style="margin:4px 0 0;color:#8a8a82;font-size:12px">Every paid plan includes hosting. The agent stands up a real WordPress site, then hosts and runs your whole site for you. No servers to set up.</p>
 	</div>
 	<script>
 	(function () {
@@ -98,7 +98,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 
 	<div class="pressgo-settings-info">
 		<h3>About PressGo</h3>
-		<p>PressGo uses Claude AI to generate professional Elementor landing pages from text descriptions or screenshots.</p>
+		<p>PressGo is the agent that already knows WordPress. Describe a page in chat and it builds real, fully editable Elementor. On paid plans it hosts and runs your whole site.</p>
 		<ul>
 			<li><strong>Elementor:</strong> <?php echo PressGo::is_elementor_active() ? '<span class="pressgo-status-ok">Active</span>' : '<span class="pressgo-status-error">Not detected</span>'; ?></li>
 			<li><strong>Elementor Pro:</strong> <?php echo PressGo::is_elementor_pro_active() ? '<span class="pressgo-status-ok">Active</span>' : '<span class="pressgo-status-warn">Not installed (blog section will be skipped)</span>'; ?></li>

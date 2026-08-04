@@ -4914,7 +4914,7 @@ class PressGo_AI_Builder {
 			</header>
 			<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
 				<div class="pg-tiers-pop" id="pg-tiers-pop" hidden>
-					<div class="pg-tiers-pop-head"><span>Plans include hosting. We build and run your whole site.</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
+					<div class="pg-tiers-pop-head"><span>Every paid plan includes hosting. The agent runs your whole site.</span><button type="button" class="pg-tiers-pop-x" id="pg-tiers-pop-x" aria-label="Close">&times;</button></div>
 					<div class="pg-tiers-acct" id="pg-tiers-acct"></div>
 					<div class="pg-tiers-toggle" id="pg-tiers-toggle">
 						<button type="button" class="pg-toggle-opt is-active" data-interval="month">Monthly</button>
@@ -4932,7 +4932,7 @@ class PressGo_AI_Builder {
 							<div class="pg-tier-price" data-monthly="$25/mo" data-annual="$19/mo">$25/mo</div>
 							<div class="pg-tier-cap">~8 pages a day</div>
 							<div class="pg-tier-blurb">64 builds daily + 100 credits a month. Edits always free.</div>
-							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Hosting included</div>
 							<button type="button" class="pg-tier-cta" id="pg-pro-btn" data-plan="pro">Get Pro</button>
 						</div>
 						<div class="pg-tier-card is-pop" data-plan="max">
@@ -4941,7 +4941,7 @@ class PressGo_AI_Builder {
 							<div class="pg-tier-price" data-monthly="$59/mo" data-annual="$49/mo">$59/mo</div>
 							<div class="pg-tier-cap">~40 pages a day</div>
 							<div class="pg-tier-blurb">400 builds daily + 400 credits a month. All AI models.</div>
-							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Hosting included</div>
 							<button type="button" class="pg-tier-cta is-pop" id="pg-max-btn" data-plan="max">Get Max</button>
 						</div>
 						<div class="pg-tier-card" data-plan="ultra">
@@ -4949,11 +4949,11 @@ class PressGo_AI_Builder {
 							<div class="pg-tier-price" data-monthly="$149/mo" data-annual="$129/mo">$149/mo</div>
 							<div class="pg-tier-cap">Unlimited daily</div>
 							<div class="pg-tier-blurb">Unlimited daily builds + 1000 credits a month. For client volume.</div>
-							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Agentic hosting included</div>
+							<div class="pg-tier-host"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Hosting included</div>
 							<button type="button" class="pg-tier-cta" id="pg-ultra-btn" data-plan="ultra">Get Ultra</button>
 						</div>
 					</div>
-					<div class="pg-tiers-hostnote">Every paid plan includes <b>agentic hosting</b>. We stand up and run a real WordPress site for you, and the AI builds right on it. No servers to set up, or keep the plugin on your own site. Your call.</div>
+					<div class="pg-tiers-hostnote">Every paid plan includes <b>hosting</b>. The agent stands up a real WordPress site, then hosts and runs the whole thing for you. Nothing to set up. Or keep the plugin on your own site. Your call.</div>
 					<div class="pg-tiers-credits" id="pg-tiers-credits"></div>
 					<div class="pg-tiers-renewal" id="pg-tiers-renewal" hidden></div>
 					<button type="button" class="pg-tiers-manage" id="pg-manage-plan" hidden>Manage billing</button>
