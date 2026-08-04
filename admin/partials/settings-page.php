@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 ?>
 <div class="wrap pressgo-settings">
-	<h1>PressGo Settings</h1>
+	<h1>PressGo settings</h1>
 
 	<?php
 	// ── Account & plan (PressGo API mode with a key) ──
@@ -21,9 +21,9 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 		<h3>Account &amp; plan</h3>
 		<ul>
 			<li><strong>Connected as:</strong> <?php echo esc_html( (string) ( $pg_allow['account'] ?? '' ) ); ?>
-				<span style="display:inline-block;margin-left:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 8px;border-radius:999px"><?php echo esc_html( ucfirst( $pg_tier ) ); ?> plan</span></li>
+				<span style="display:inline-block;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.02em;color:#1d4ed8;background:rgba(37,99,235,0.10);padding:1px 8px;border-radius:9999px"><?php echo esc_html( ucfirst( $pg_tier ) ); ?> plan</span></li>
 			<li><strong>Today's builds:</strong> <?php echo (int) $pg_allow['used']; ?> of <?php echo (int) $pg_allow['cap']; ?> used (resets at midnight UTC). Edits, reorders and palette changes are always free.</li>
-			<li><strong>Bonus credits:</strong> <?php echo (int) ( $pg_allow['credits'] ?? 0 ); ?> — used automatically after the daily builds run out.</li>
+			<li><strong>Bonus credits:</strong> <?php echo (int) ( $pg_allow['credits'] ?? 0 ); ?>, used automatically after the daily builds run out.</li>
 			<?php if ( ! empty( $pg_allow['plan_ends'] ) ) : ?>
 				<li style="color:#b45309"><strong>Plan canceled:</strong> stays active until <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $pg_allow['plan_ends'] ) ) ); ?>, then drops to Free.</li>
 			<?php endif; ?>
@@ -47,7 +47,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 			<?php endif; ?>
 			<a class="button button-secondary" href="https://pressgo.app/dashboard" target="_blank" rel="noopener">Open dashboard</a>
 		</p>
-		<p style="margin:4px 0 0;color:#646970;font-size:12px">Every paid plan also includes agentic hosting. We stand up a real WordPress site and the AI builds your whole site on it. No servers to set up.</p>
+		<p style="margin:4px 0 0;color:#8a8a82;font-size:12px">Every paid plan also includes agentic hosting. We stand up a real WordPress site and the AI builds your whole site on it. No servers to set up.</p>
 	</div>
 	<script>
 	(function () {
@@ -63,7 +63,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 				.then(function (j) {
 					btn.disabled = false; btn.textContent = label;
 					if (j && j.success && j.data && j.data.url) window.open(j.data.url, '_blank');
-					else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open — try pressgo.app/dashboard.');
+					else alert((j && j.data && typeof j.data === 'string') ? j.data : 'Could not open. Try pressgo.app/dashboard.');
 				})
 				.catch(function () { btn.disabled = false; btn.textContent = label; });
 		}
@@ -90,7 +90,7 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 	</form>
 
 	<div class="pressgo-settings-test">
-		<h3>Connection Test</h3>
+		<h3>Connection test</h3>
 		<p>Verify your API key and server connectivity.</p>
 		<button type="button" id="pressgo-test-connection" class="button button-secondary">Test Connection</button>
 		<span id="pressgo-test-result" class="pressgo-test-result"></span>
@@ -102,11 +102,11 @@ $api_mode = get_option( 'pressgo_api_mode', 'pressgo' );
 		<ul>
 			<li><strong>Elementor:</strong> <?php echo PressGo::is_elementor_active() ? '<span class="pressgo-status-ok">Active</span>' : '<span class="pressgo-status-error">Not detected</span>'; ?></li>
 			<li><strong>Elementor Pro:</strong> <?php echo PressGo::is_elementor_pro_active() ? '<span class="pressgo-status-ok">Active</span>' : '<span class="pressgo-status-warn">Not installed (blog section will be skipped)</span>'; ?></li>
-			<li><strong>PHP Version:</strong> <?php echo esc_html( PHP_VERSION ); ?></li>
-			<li><strong>Plugin Version:</strong> <?php echo esc_html( PRESSGO_VERSION ); ?></li>
-			<li><strong>Section Types:</strong> 19 types, 48 layout variants</li>
+			<li><strong>PHP version:</strong> <?php echo esc_html( PHP_VERSION ); ?></li>
+			<li><strong>Plugin version:</strong> <?php echo esc_html( PRESSGO_VERSION ); ?></li>
+			<li><strong>Section types:</strong> 19 types, 48 layout variants</li>
 			<li><strong>Support:</strong> <a href="mailto:joe@pressgo.app">joe@pressgo.app</a></li>
-			<li><strong>Want a human to run it for you instead?</strong> Hosting, page upkeep, and ads from $99/mo. <a href="https://pressgo.app/done-for-you" target="_blank" rel="noopener">Done-For-You</a></li>
+			<li><strong>Want a human to run it for you instead?</strong> Hosting, page upkeep, and ads from $99/mo. <a href="https://pressgo.app/done-for-you" target="_blank" rel="noopener">Done for you</a></li>
 		</ul>
 	</div>
 </div>

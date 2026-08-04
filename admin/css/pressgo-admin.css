@@ -17,13 +17,13 @@
 .pressgo-header h1 {
 	font-size: 28px;
 	font-weight: 700;
-	color: #1d2327;
+	color: #1a1a1a;
 	margin: 0;
 }
 
 .pressgo-subtitle {
 	font-weight: 400;
-	color: #646970;
+	color: #8a8a82;
 	font-size: 18px;
 	margin-left: 4px;
 }
@@ -31,11 +31,12 @@
 .pressgo-model-badge {
 	display: inline-block;
 	padding: 4px 12px;
-	background: #f0f0f1;
-	border: 1px solid #c3c4c7;
-	border-radius: 12px;
+	background: #f2efe6;
+	border: none;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+	border-radius: 9999px;
 	font-size: 12px;
-	color: #646970;
+	color: #8a8a82;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -43,8 +44,8 @@
 
 .pressgo-mode-tabs {
 	display: flex;
-	gap: 0;
-	margin-bottom: -1px;
+	gap: 8px;
+	margin-bottom: 12px;
 	position: relative;
 	z-index: 1;
 }
@@ -54,27 +55,27 @@
 	align-items: center;
 	gap: 6px;
 	padding: 10px 20px;
-	border: 1px solid #c3c4c7;
-	border-bottom: 1px solid #c3c4c7;
-	border-radius: 6px 6px 0 0;
-	background: #f6f7f7;
+	border: none;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 9999px;
+	background: transparent;
 	font-size: 14px;
 	font-weight: 500;
-	color: #646970;
+	color: #8a8a82;
 	cursor: pointer;
-	transition: all 0.15s;
+	transition: background 0.15s, color 0.15s;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .pressgo-mode-tab:hover {
-	background: #f0f0f1;
-	color: #1d2327;
+	background: #f2efe6;
+	color: #1a1a1a;
 }
 
 .pressgo-mode-tab.active {
 	background: #fff;
-	border-bottom-color: #fff;
-	color: #1d2327;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	color: #1a1a1a;
 	font-weight: 600;
 }
 
@@ -88,8 +89,8 @@
 
 .pressgo-input-panel {
 	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 8px;
+	border: none;
+	border-radius: 16px;
 	padding: 24px;
 	margin-bottom: 24px;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -105,16 +106,17 @@
 	padding: 12px 16px;
 	font-size: 15px;
 	line-height: 1.6;
-	border: 1px solid #c3c4c7;
-	border-radius: 6px;
+	border: none;
+	background: #faf8f3;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 12px;
 	resize: vertical;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
-	transition: border-color 0.2s, box-shadow 0.2s;
+	transition: box-shadow 0.15s;
 }
 
 #pressgo-prompt:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 0 0 2px rgba(37, 99, 235, 0.35);
 	outline: none;
 }
 
@@ -140,24 +142,24 @@
 	align-items: center;
 	gap: 4px;
 	padding: 6px 14px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	background: #f6f7f7;
+	border: none;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 9999px;
+	background: #f2efe6;
 	cursor: pointer;
 	font-size: 13px;
-	color: #50575e;
-	transition: all 0.15s;
+	color: #3a3a36;
+	transition: background 0.15s, color 0.15s;
 }
 
 .pressgo-upload-btn:hover {
-	background: #f0f0f1;
-	border-color: #8c8f94;
-	color: #1d2327;
+	background: #ece8dc;
+	color: #1a1a1a;
 }
 
 .pressgo-image-name {
 	font-size: 13px;
-	color: #646970;
+	color: #8a8a82;
 	max-width: 200px;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -167,7 +169,7 @@
 .pressgo-image-clear {
 	background: none;
 	border: none;
-	color: #d63638;
+	color: #b91c1c;
 	cursor: pointer;
 	font-size: 18px;
 	padding: 2px 6px;
@@ -176,8 +178,10 @@
 
 #pressgo-page-title {
 	padding: 6px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
+	border: none;
+	background: #faf8f3;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 12px;
 	font-size: 14px;
 	width: 280px;
 }
@@ -189,15 +193,16 @@
 	padding: 12px 16px;
 	font-size: 15px;
 	line-height: 1.6;
-	border: 1px solid #c3c4c7;
-	border-radius: 6px;
+	border: none;
+	background: #faf8f3;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 12px;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
-	transition: border-color 0.2s, box-shadow 0.2s;
+	transition: box-shadow 0.15s;
 }
 
 #pressgo-import-url:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 0 0 2px rgba(37, 99, 235, 0.35);
 	outline: none;
 }
 
@@ -206,7 +211,7 @@
 	align-items: center;
 	gap: 8px;
 	font-size: 13px;
-	color: #50575e;
+	color: #3a3a36;
 	cursor: pointer;
 	user-select: none;
 }
@@ -217,8 +222,10 @@
 
 #pressgo-import-page-title {
 	padding: 6px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
+	border: none;
+	background: #faf8f3;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	border-radius: 12px;
 	font-size: 14px;
 	width: 280px;
 }
@@ -244,10 +251,11 @@
 
 .pressgo-shortcut-hint {
 	font-size: 11px;
-	color: #a7aaad;
-	background: #f6f7f7;
-	border: 1px solid #dcdcde;
-	border-radius: 3px;
+	color: #b6b3aa;
+	background: #f2efe6;
+	border: none;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+	border-radius: 6px;
 	padding: 2px 8px;
 	font-family: -apple-system, monospace;
 }
@@ -292,16 +300,16 @@
 
 .pressgo-empty-card {
 	background: #fff;
-	border: 1px solid #e0e0e0;
-	border-radius: 8px;
+	border: none;
+	border-radius: 16px;
 	padding: 28px 24px;
 	text-align: center;
-	transition: border-color 0.2s, box-shadow 0.2s;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+	transition: box-shadow 0.15s;
 }
 
 .pressgo-empty-card:hover {
-	border-color: #2271b1;
-	box-shadow: 0 2px 8px rgba(34, 113, 177, 0.08);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(37, 99, 235, 0.10);
 }
 
 .pressgo-empty-card-icon {
@@ -312,29 +320,30 @@
 	font-size: 32px;
 	width: 32px;
 	height: 32px;
-	color: #2271b1;
+	color: #2563eb;
 }
 
 .pressgo-empty-card h4 {
 	margin: 0 0 8px;
 	font-size: 15px;
 	font-weight: 600;
-	color: #1d2327;
+	color: #1a1a1a;
 }
 
 .pressgo-empty-card p {
 	margin: 0;
 	font-size: 13px;
 	line-height: 1.5;
-	color: #646970;
+	color: #8a8a82;
 }
 
 /* ─── Example Prompts ─── */
 
 .pressgo-examples {
 	background: #fff;
-	border: 1px solid #e0e0e0;
-	border-radius: 8px;
+	border: none;
+	border-radius: 16px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 	padding: 20px 24px;
 }
 
@@ -342,9 +351,7 @@
 	margin: 0 0 12px;
 	font-size: 13px;
 	font-weight: 600;
-	color: #646970;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
+	color: #8a8a82;
 }
 
 .pressgo-example-chips {
@@ -356,31 +363,30 @@
 .pressgo-example-chip {
 	display: inline-block;
 	padding: 8px 16px;
-	background: #f0f6fc;
-	border: 1px solid #c5d9ed;
-	border-radius: 20px;
+	background: rgba(37, 99, 235, 0.10);
+	border: none;
+	border-radius: 9999px;
 	font-size: 13px;
-	color: #2271b1;
+	color: #1d4ed8;
 	cursor: pointer;
-	transition: all 0.15s;
+	transition: background 0.15s, color 0.15s;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .pressgo-example-chip:hover {
-	background: #2271b1;
-	border-color: #2271b1;
-	color: #fff;
+	background: rgba(37, 99, 235, 0.15);
+	color: #1d4ed8;
 }
 
 .pressgo-example-chip:active {
-	transform: scale(0.97);
+	transform: scale(0.98);
 }
 
 /* ─── Workspace (split panel) ─── */
 
 .pressgo-workspace {
-	border: 1px solid #c3c4c7;
-	border-radius: 8px;
+	border: none;
+	border-radius: 16px;
 	overflow: hidden;
 	background: #fff;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -401,19 +407,19 @@
 /* ─── Activity Panel (left) ─── */
 
 .pressgo-activity-panel {
-	border-right: 1px solid #e0e0e0;
+	border-right: 1px solid rgba(0, 0, 0, 0.05);
 	display: flex;
 	flex-direction: column;
-	background: #fafafa;
+	background: #faf8f3;
 }
 
 .pressgo-activity-panel h3 {
 	padding: 16px 20px;
 	margin: 0;
-	border-bottom: 1px solid #e0e0e0;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 	font-size: 14px;
 	font-weight: 600;
-	color: #1d2327;
+	color: #1a1a1a;
 	background: #fff;
 }
 
@@ -442,35 +448,35 @@
 }
 
 .pressgo-activity-thinking .pressgo-activity-icon {
-	color: #2271b1;
+	color: #2563eb;
 	animation: pressgo-pulse 1.5s ease-in-out infinite;
 }
 
 .pressgo-activity-progress .pressgo-activity-icon {
-	color: #dba617;
+	color: #f59e0b;
 }
 
 .pressgo-activity-success .pressgo-activity-icon,
 .pressgo-activity-done .pressgo-activity-icon {
-	color: #00a32a;
+	color: #15803d;
 }
 
 .pressgo-activity-error .pressgo-activity-icon {
-	color: #d63638;
+	color: #b91c1c;
 }
 
 .pressgo-activity-text {
-	color: #50575e;
+	color: #3a3a36;
 	word-break: break-word;
 }
 
 .pressgo-activity-done .pressgo-activity-text {
 	font-weight: 600;
-	color: #00a32a;
+	color: #15803d;
 }
 
 .pressgo-activity-error .pressgo-activity-text {
-	color: #d63638;
+	color: #b91c1c;
 }
 
 /* ─── Preview Panel (right) ─── */
@@ -483,10 +489,10 @@
 .pressgo-preview-panel h3 {
 	padding: 16px 20px;
 	margin: 0;
-	border-bottom: 1px solid #e0e0e0;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 	font-size: 14px;
 	font-weight: 600;
-	color: #1d2327;
+	color: #1a1a1a;
 }
 
 .pressgo-section-preview {
@@ -500,8 +506,9 @@
 
 .pressgo-section-block {
 	padding: 20px 24px;
-	border-radius: 6px;
-	border: 1px solid rgba(0, 0, 0, 0.06);
+	border-radius: 12px;
+	border: none;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
 	transition: all 0.4s ease;
 	position: relative;
 	overflow: hidden;
@@ -533,8 +540,8 @@
 	display: flex;
 	gap: 12px;
 	padding: 20px;
-	border-top: 1px solid #e0e0e0;
-	background: #f9f9f9;
+	border-top: 1px solid rgba(0, 0, 0, 0.05);
+	background: #faf8f3;
 	flex-wrap: wrap;
 	align-items: center;
 }
@@ -543,8 +550,7 @@
 	width: 100%;
 	margin: 0 0 4px;
 	font-size: 13px;
-	color: #666;
-	font-style: italic;
+	color: #8a8a82;
 }
 
 .pressgo-result-actions .button {
@@ -570,23 +576,24 @@
 }
 
 .pressgo-status-ok {
-	color: #00a32a;
+	color: #15803d;
 }
 
 .pressgo-status-error {
-	color: #d63638;
+	color: #b91c1c;
 }
 
 .pressgo-status-warn {
-	color: #b26200;
+	color: #b45309;
 }
 
 .pressgo-settings-info {
 	margin-top: 30px;
 	padding: 20px 24px;
 	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 8px;
+	border: none;
+	border-radius: 16px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .pressgo-settings-info h3 {
@@ -603,7 +610,7 @@
 .pressgo-settings-info li {
 	margin-bottom: 8px;
 	padding: 6px 0;
-	border-bottom: 1px solid #f0f0f1;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 	font-size: 13px;
 }
 
@@ -689,39 +696,89 @@
 	display: inline-block;
 	font-size: 11px;
 	font-weight: 700;
-	letter-spacing: 0.5px;
-	padding: 3px 8px;
-	border-radius: 4px;
+	letter-spacing: 0.02em;
+	padding: 3px 10px;
+	border-radius: 9999px;
 	margin-left: 8px;
 	vertical-align: middle;
 }
 .pressgo-tier--pro {
-	background: linear-gradient(135deg, #f8bb18 0%, #f59e0b 100%);
-	color: #1a1a2e;
+	background: rgba(37, 99, 235, 0.10);
+	color: #1d4ed8;
 }
 .pressgo-tier--free {
-	background: rgba(0, 0, 0, 0.06);
-	color: #6b7280;
+	background: rgba(0, 0, 0, 0.05);
+	color: #8a8a82;
 }
 .pressgo-pro-promo {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 18px;
-	background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4a 100%);
+	background: #1a1a1a;
 	color: #fff;
-	border-color: #1a1a2e !important;
+	border-color: #1a1a1a !important;
 }
 .pressgo-pro-promo-text { flex: 1; }
-.pressgo-pro-promo-text strong { color: #f8bb18; }
+.pressgo-pro-promo-text strong { color: #fff; }
 .pressgo-pro-cta {
-	background: linear-gradient(135deg, #f8bb18 0%, #f59e0b 100%) !important;
-	color: #1a1a2e !important;
+	background: #2563eb !important;
+	color: #fff !important;
 	border-color: transparent !important;
+	border-radius: 9999px !important;
 	font-weight: 700 !important;
-	box-shadow: 0 2px 12px rgba(248, 187, 24, 0.35);
+	box-shadow: 0 1px 2px rgba(37, 99, 235, 0.35), 0 4px 12px -2px rgba(37, 99, 235, 0.3);
+	transition: background 0.15s, box-shadow 0.15s;
 }
 .pressgo-pro-cta:hover {
-	transform: translateY(-1px);
-	box-shadow: 0 4px 16px rgba(248, 187, 24, 0.5);
+	background: #1d4ed8 !important;
+	box-shadow: 0 2px 4px rgba(37, 99, 235, 0.35), 0 6px 16px -2px rgba(37, 99, 235, 0.38);
+}
+.pressgo-pro-cta:active {
+	transform: scale(0.98);
+}
+
+/* ─── Design-system conform: settings + list pages (warm paper, one blue, pills) ─── */
+.pressgo-settings .button,
+.pressgo-ai-list .button,
+.pressgo-wrap .button {
+	border-radius: 9999px;
+}
+.pressgo-settings .button-primary,
+.pressgo-wrap .button-primary {
+	background: #2563eb;
+	border-color: #2563eb;
+	transition: background 0.15s;
+}
+.pressgo-settings .button-primary:hover,
+.pressgo-settings .button-primary:focus,
+.pressgo-wrap .button-primary:hover,
+.pressgo-wrap .button-primary:focus {
+	background: #1d4ed8;
+	border-color: #1d4ed8;
+}
+.pressgo-settings .button:active,
+.pressgo-wrap .button:active {
+	transform: scale(0.98);
+}
+.pressgo-settings .button:focus-visible,
+.pressgo-ai-list .button:focus-visible,
+.pressgo-wrap .button:focus-visible,
+.pressgo-example-chip:focus-visible,
+.pressgo-mode-tab:focus-visible,
+.pressgo-upload-btn:focus-visible {
+	outline: 2px solid rgba(37, 99, 235, 0.35);
+	outline-offset: 2px;
+}
+.pressgo-settings h1,
+.pressgo-settings h3 {
+	color: #1a1a1a;
+}
+.pressgo-settings a,
+.pressgo-ai-list a {
+	color: #2563eb;
+}
+.pressgo-settings a:hover,
+.pressgo-ai-list a:hover {
+	color: #1d4ed8;
 }

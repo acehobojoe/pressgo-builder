@@ -4608,7 +4608,7 @@ class PressGo_AI_Builder {
 				</thead>
 				<tbody>
 				<?php if ( empty( $pages ) ) : ?>
-					<tr><td colspan="5" style="text-align:center;color:#888;padding:24px;">No pages yet. Click "New page" to start.</td></tr>
+					<tr><td colspan="5" style="text-align:center;color:#8a8a82;padding:24px;">No pages yet. Click "New page" to start.</td></tr>
 				<?php else : foreach ( $pages as $p ) :
 					$is_elem  = (bool) get_post_meta( $p->ID, '_elementor_edit_mode', true );
 					$edit_url = admin_url( 'admin.php?page=' . self::MENU_SLUG . '&action=edit&post_id=' . $p->ID );
@@ -4631,7 +4631,7 @@ class PressGo_AI_Builder {
 							// Badge the page with its ACTUAL builder, not a blanket "Elementor".
 							$row_target = (string) get_post_meta( $p->ID, '_pressgo_target_builder', true );
 							if ( '' === $row_target && $is_elem ) { $row_target = 'elementor'; }
-							if ( $row_target ) : ?><br><span style="color:#5b4fff;font-size:11px;font-weight:500;"><?php echo esc_html( ucfirst( $row_target ) ); ?></span><?php endif; ?>
+							if ( $row_target ) : ?><br><span style="color:#2563eb;font-size:11px;font-weight:500;"><?php echo esc_html( ucfirst( $row_target ) ); ?></span><?php endif; ?>
 						</td>
 						<td><?php echo esc_html( ucfirst( $p->post_status ) ); ?></td>
 						<?php
@@ -4649,7 +4649,7 @@ class PressGo_AI_Builder {
 							<a href="<?php echo esc_url( $edit_url ); ?>" class="button">Open builder</a>
 							<a href="<?php echo esc_url( $view_url ); ?>" target="_blank" class="button-link">View</a>
 							<button type="button" class="button-link pg-row-duplicate" data-id="<?php echo (int) $p->ID; ?>">Duplicate</button>
-							<button type="button" class="button-link pg-row-trash" data-id="<?php echo (int) $p->ID; ?>" style="color:#b32d2e;">Trash</button>
+							<button type="button" class="button-link pg-row-trash" data-id="<?php echo (int) $p->ID; ?>" style="color:#b91c1c;">Trash</button>
 						</td>
 					</tr>
 				<?php endforeach; endif; ?>
@@ -4805,75 +4805,80 @@ class PressGo_AI_Builder {
 			<link rel="stylesheet" href="<?php echo esc_url( PRESSGO_PLUGIN_URL . 'assets/css/ai-builder-fullscreen.css?v=' . $css_v ); ?>">
 			<style id="pg-usage-styles">
 			.pg-usage{display:flex;align-items:center;gap:7px;margin:0 4px}
-			.pg-usage-label{font-size:11px;color:#64748b;white-space:nowrap}
-			.pg-usage-reset{font-size:11px;color:#94a3b8;white-space:nowrap}
-			.pg-usage-track{width:84px;height:6px;border-radius:999px;background:#e8ebf2;overflow:hidden;flex-shrink:0}
-			.pg-usage-fill{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#5b50e6,#6366f1);transition:width .35s ease}
-			.pg-usage.is-warn .pg-usage-fill{background:linear-gradient(90deg,#f59e0b,#f5b301)}
-			.pg-usage.is-full .pg-usage-fill{background:linear-gradient(90deg,#dc2626,#ef4444)}
+			.pg-usage-label{font-size:11px;color:#8a8a82;white-space:nowrap}
+			.pg-usage-reset{font-size:11px;color:#b6b3aa;white-space:nowrap;font-variant-numeric:tabular-nums}
+			.pg-usage-track{width:84px;height:6px;border-radius:9999px;background:rgba(0,0,0,0.05);overflow:hidden;flex-shrink:0}
+			.pg-usage-fill{display:block;height:100%;width:0;border-radius:9999px;background:#2563eb;transition:width .5s ease}
+			.pg-usage.is-warn .pg-usage-fill{background:#f59e0b}
+			.pg-usage.is-full .pg-usage-fill{background:#ef4444}
 			.pg-usage.is-warn .pg-usage-text strong{color:#b45309}
 			.pg-usage.is-full .pg-usage-text strong{color:#b91c1c}
 			.pg-usage-upgrade{display:none}
-			.pg-usage-upgrade.is-show{display:inline-flex!important;border-color:#f0b429;color:#92400e;background:#fef6e7}
-			.pg-usage-upgrade.is-full{border-color:#ef4444;color:#fff;background:#dc2626}
+			.pg-usage-upgrade.is-show{display:inline-flex!important;border-color:#f59e0b;color:#92400e;background:#fef6e7}
+			.pg-usage-upgrade.is-full{border-color:#ef4444;color:#fff;background:#ef4444}
 			/* mode selector (Ada / Iris / Nova) */
 			.pg-mode{position:relative;flex-shrink:0}
-			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 10px;border:1px solid #e5e5e5;border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#2b2f36;transition:background .12s,border-color .12s}
-			.pg-mode-btn:hover{background:#fafaf8;border-color:#d4d7dd}
-			.pg-mode-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a8;flex-shrink:0}
-			.pg-mode.is-eyes .pg-mode-dot{background:#5b4fff}
-			.pg-mode.is-freeform .pg-mode-dot{background:linear-gradient(135deg,#5b4fff,#b893ff)}
-			.pg-mode-caret{color:#9aa0a8}
-			.pg-mode-menu{position:absolute;bottom:calc(100% + 8px);left:0;z-index:200;width:296px;max-width:78vw;background:#fff;border:1px solid #e6e8ec;border-radius:12px;box-shadow:0 14px 36px rgba(15,23,42,.17);padding:6px}
+			.pg-mode-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.05);border-radius:9999px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#3a3a36;transition:background .15s,color .15s}
+			.pg-mode-btn:hover{background:#f2efe6;color:#1a1a1a}
+			.pg-mode-btn:active{transform:scale(0.98)}
+			.pg-mode-dot{width:8px;height:8px;border-radius:50%;background:#b6b3aa;flex-shrink:0}
+			.pg-mode.is-eyes .pg-mode-dot{background:#2563eb}
+			.pg-mode.is-freeform .pg-mode-dot{background:#2563eb}
+			.pg-mode-caret{color:#b6b3aa}
+			.pg-mode-menu{position:absolute;bottom:calc(100% + 8px);left:0;z-index:200;width:296px;max-width:78vw;background:#fff;border:none;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 14px 36px rgba(0,0,0,0.14);padding:6px}
 			.pg-mode-menu[hidden]{display:none}
-			.pg-mode-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;background:none;cursor:pointer;padding:9px 10px;border-radius:8px}
-			.pg-mode-opt:hover{background:#f4f5f7}
-			.pg-mode-opt-name{display:block;font-size:13.5px;font-weight:700;color:#1d2230}
-			.pg-mode-opt-desc{display:block;font-size:11.5px;color:#757b85;margin-top:1px;line-height:1.3}
-			.pg-mode-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:5px}
-			.pg-mode-check{color:#5b4fff;opacity:0;flex-shrink:0}
+			.pg-mode-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;background:none;cursor:pointer;padding:9px 10px;border-radius:12px;transition:background .15s}
+			.pg-mode-opt:hover{background:#f2efe6}
+			.pg-mode-opt-name{display:block;font-size:13.5px;font-weight:700;color:#1a1a1a}
+			.pg-mode-opt-desc{display:block;font-size:11.5px;color:#8a8a82;margin-top:1px;line-height:1.3}
+			.pg-mode-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:rgba(37,99,235,0.10);padding:1px 5px;border-radius:9999px;vertical-align:middle;margin-left:5px}
+			.pg-mode-check{color:#2563eb;opacity:0;flex-shrink:0}
 			.pg-mode-opt.is-active .pg-mode-check{opacity:1}
 			/* one meter: the usage bar. Bonus credits surface inside the plans popup. */
 			.pg-credits-pill{display:none!important}
-			.pg-usage{border-radius:7px;padding:3px 6px;margin:0 2px;cursor:pointer;transition:background .12s}
-			.pg-usage:hover{background:#f4f5f7}
-			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:760px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.22);padding:14px}
+			.pg-usage{border-radius:9999px;padding:3px 8px;margin:0 2px;cursor:pointer;transition:background .15s}
+			.pg-usage:hover{background:#f2efe6}
+			.pg-tiers-pop{position:fixed;top:54px;right:16px;z-index:99999;width:760px;max-width:calc(100vw - 32px);background:#fff;border:none;border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 18px 50px rgba(0,0,0,0.16);padding:16px}
 			.pg-tiers-pop[hidden]{display:none}
-			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
-			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#94a3b8}
+			.pg-tiers-pop-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#8a8a82;margin-bottom:10px}
+			.pg-tiers-pop-x{border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#b6b3aa;transition:color .15s}
+			.pg-tiers-pop-x:hover{color:#1a1a1a}
 			.pg-tiers-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 			@media(max-width:820px){.pg-tiers-pop{width:520px}.pg-tiers-grid{grid-template-columns:1fr 1fr}}
 			@media(max-width:560px){.pg-tiers-pop{width:340px}.pg-tiers-grid{grid-template-columns:1fr}}
-			.pg-tiers-toggle{display:inline-flex;gap:2px;background:#f1f5f9;border-radius:999px;padding:2px;margin:-2px 0 10px}
-			.pg-toggle-opt{border:none;background:none;font-size:11px;font-weight:700;color:#64748b;padding:4px 12px;border-radius:999px;cursor:pointer}
-			.pg-toggle-opt.is-active{background:#fff;color:#1d2230;box-shadow:0 1px 3px rgba(15,23,42,.12)}
-			.pg-toggle-opt span{font-size:9px;color:#16a34a;font-weight:800;margin-left:3px}
-			.pg-tier-card{position:relative;border:1px solid #e2e8f0;border-radius:11px;padding:13px 11px}
-			.pg-tier-card.is-pop{border-color:#5b4fff;box-shadow:0 4px 16px rgba(91,79,255,.14)}
-			.pg-tier-flag{position:absolute;top:-8px;right:10px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:#5b4fff;padding:2px 7px;border-radius:999px}
-			.pg-tier-name{font-size:13.5px;font-weight:800;color:#1d2230}
-			.pg-tier-price{font-size:19px;font-weight:800;color:#1d2230;margin-top:2px}
-			.pg-tier-cap{font-size:12px;font-weight:700;color:#5b4fff;margin-top:6px}
-			.pg-tier-blurb{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.45}
-			.pg-tier-host{display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;font-weight:800;color:#5b4fff;background:#efeefe;border-radius:7px;padding:6px 8px;line-height:1.2}
+			.pg-tiers-toggle{display:inline-flex;gap:2px;background:#f2efe6;border-radius:9999px;padding:2px;margin:-2px 0 10px}
+			.pg-toggle-opt{border:none;background:none;font-size:11px;font-weight:700;color:#8a8a82;padding:4px 12px;border-radius:9999px;cursor:pointer;transition:background .15s,color .15s}
+			.pg-toggle-opt.is-active{background:#fff;color:#1a1a1a;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+			.pg-toggle-opt span{font-size:9px;color:#15803d;font-weight:700;margin-left:3px}
+			.pg-tier-card{position:relative;border:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.05);border-radius:16px;padding:13px 12px}
+			.pg-tier-card.is-pop{box-shadow:inset 0 0 0 1px #2563eb,0 4px 16px rgba(37,99,235,0.14)}
+			.pg-tier-flag{position:absolute;top:-8px;right:10px;font-size:9.5px;font-weight:700;letter-spacing:.02em;color:#fff;background:#2563eb;padding:2px 8px;border-radius:9999px}
+			.pg-tier-name{font-size:13.5px;font-weight:700;color:#1a1a1a}
+			.pg-tier-price{font-size:19px;font-weight:700;color:#1a1a1a;margin-top:2px;font-variant-numeric:tabular-nums}
+			.pg-tier-cap{font-size:12px;font-weight:700;color:#2563eb;margin-top:6px}
+			.pg-tier-blurb{font-size:11.5px;color:#8a8a82;margin-top:4px;line-height:1.45}
+			.pg-tier-host{display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;font-weight:700;color:#1d4ed8;background:rgba(37,99,235,0.10);border-radius:9999px;padding:6px 10px;line-height:1.2}
 			.pg-tier-host svg{flex-shrink:0}
-			.pg-tier-card.is-pop .pg-tier-host{background:#e8e6ff}
-			.pg-tier-cta{margin-top:10px;width:100%;border:none;border-radius:8px;background:#5b4fff;color:#fff;font-size:12.5px;font-weight:700;padding:8px 0;cursor:pointer}
-			.pg-tier-cta:hover{background:#4a3fe6}
-			.pg-tier-cur{margin-top:10px;width:100%;text-align:center;font-size:12px;font-weight:700;color:#16a34a;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:8px 0}
-			.pg-tiers-hostnote{margin-top:11px;font-size:12px;color:#334155;text-align:center;line-height:1.5;background:#f8f8ff;border:1px solid #e8e6ff;border-radius:9px;padding:9px 12px}
-			.pg-tiers-hostnote b{color:#5b4fff}
-			.pg-tiers-credits{margin-top:8px;font-size:11.5px;color:#64748b;text-align:center}
-			.pg-tiers-acct{margin:-4px 0 10px;font-size:11.5px;color:#334155}
-			.pg-tiers-acct .pg-acct-plan{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5b4fff;background:#efeefe;padding:1px 7px;border-radius:999px}
+			.pg-tier-card.is-pop .pg-tier-host{background:rgba(37,99,235,0.15)}
+			.pg-tier-cta{margin-top:10px;width:100%;border:none;border-radius:9999px;background:#2563eb;color:#fff;font-size:12.5px;font-weight:700;padding:8px 0;cursor:pointer;transition:background .15s}
+			.pg-tier-cta:hover{background:#1d4ed8}
+			.pg-tier-cta:active{transform:scale(0.98)}
+			.pg-tier-cur{margin-top:10px;width:100%;text-align:center;font-size:12px;font-weight:700;color:#15803d;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:9999px;padding:8px 0}
+			.pg-tiers-hostnote{margin-top:11px;font-size:12px;color:#3a3a36;text-align:center;line-height:1.5;background:#faf8f3;border:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);border-radius:12px;padding:9px 12px}
+			.pg-tiers-hostnote b{color:#1d4ed8}
+			.pg-tiers-credits{margin-top:8px;font-size:11.5px;color:#8a8a82;text-align:center;font-variant-numeric:tabular-nums}
+			.pg-tiers-acct{margin:-4px 0 10px;font-size:11.5px;color:#3a3a36}
+			.pg-tiers-acct .pg-acct-plan{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.02em;color:#1d4ed8;background:rgba(37,99,235,0.10);padding:1px 8px;border-radius:9999px}
+			.pg-tiers-acct .pg-acct-plan::first-letter{text-transform:uppercase}
 			.pg-tier-card.is-dim{opacity:.55}
-			.pg-tiers-manage{display:block;margin:8px auto 0;border:none;background:none;font-size:11px;color:#94a3b8;text-decoration:underline;cursor:pointer}
-			.pg-tiers-manage:hover{color:#475569}
-			.pg-tiers-renewal{margin:10px 0 0;font-size:11.5px;color:#64748b;text-align:center}
+			.pg-tiers-manage{display:block;margin:8px auto 0;border:none;background:none;font-size:11px;color:#8a8a82;text-decoration:underline;cursor:pointer;transition:color .15s}
+			.pg-tiers-manage:hover{color:#1a1a1a}
+			.pg-tiers-renewal{margin:10px 0 0;font-size:11.5px;color:#8a8a82;text-align:center}
 			.pg-tiers-renewal.is-canceling{color:#b45309}
-			.pg-tiers-resume{border:none;background:none;font-size:11.5px;font-weight:700;color:#5b4fff;text-decoration:underline;cursor:pointer;padding:0;margin-left:5px}
-			.pg-tiers-resume:hover{color:#4a3fe6}
+			.pg-tiers-resume{border:none;background:none;font-size:11.5px;font-weight:700;color:#2563eb;text-decoration:underline;cursor:pointer;padding:0;margin-left:5px;transition:color .15s}
+			.pg-tiers-resume:hover{color:#1d4ed8}
 			.pg-tiers-acct.pg-tiers-acct-error{color:#b45309}
+			.pg-mode-btn:focus-visible,.pg-mode-opt:focus-visible,.pg-toggle-opt:focus-visible,.pg-tier-cta:focus-visible,.pg-tiers-resume:focus-visible,.pg-tiers-manage:focus-visible,.pg-tiers-pop-x:focus-visible,.pg-usage:focus-visible{outline:2px solid rgba(37,99,235,0.35);outline-offset:2px}
 			</style>
 		</head>
 		<body class="pg-builder-body">
@@ -4985,7 +4990,7 @@ class PressGo_AI_Builder {
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 											<button type="button" class="pg-mode-opt" role="option" data-mode="freeform">
-												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Freeform</span><span class="pg-mode-opt-desc">Builds anything &mdash; custom freeform layouts</span></span>
+												<span class="pg-mode-opt-main"><span class="pg-mode-opt-name">Freeform</span><span class="pg-mode-opt-desc">Builds anything, custom freeform layouts</span></span>
 												<svg class="pg-mode-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 											</button>
 										</div>
