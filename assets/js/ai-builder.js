@@ -232,7 +232,7 @@
 		if (pendingPdf) {
 			var pcell = document.createElement('div');
 			pcell.className = 'pg-attach-thumb-cell';
-			pcell.style.cssText = 'display:flex;align-items:center;gap:6px;background:#f3f1ff;border:1px solid #d9d6ff;border-radius:8px;padding:6px 10px;font-size:12px;color:#4b4a63;max-width:220px;';
+			pcell.style.cssText = 'display:flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:6px 10px;font-size:12px;color:#3a3a36;max-width:220px;';
 			pcell.innerHTML = '<span>\uD83D\uDCC4</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(pendingPdf.name) + '</span>';
 			var px = document.createElement('button');
 			px.type = 'button';
@@ -727,7 +727,7 @@
 			b.type = 'button';
 			b.textContent = s.chip;
 			b.className = 'pg-starter-chip';
-			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
+			b.style.cssText = 'border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
 			b.addEventListener('click', function () {
 				input.value = s.text;
 				autoGrow();        // grow to fit the filled-in text
@@ -740,7 +740,7 @@
 		// One quiet line so it's obvious the chips aren't the only option: you can
 		// type your own idea or drop in a real brief, at any length.
 		var frSummary = el('pg-msg-caption', 'Tap a starter, type your own, or drop in a PDF or doc. Go into as much detail as you like.');
-		frSummary.style.cssText = 'font-size:12px;color:#8a86a8;margin:6px 0 2px;';
+		frSummary.style.cssText = 'font-size:12px;color:#8a8a82;margin:6px 0 2px;';
 		append(frSummary);
 		// Leave the box blank — the placeholder + starter chips carry the
 		// first run. Tapping a chip fills the box (and enables Send); we never
@@ -772,7 +772,7 @@
 			b.type = 'button';
 			b.textContent = p.chip;
 			b.className = 'pg-starter-chip';
-			b.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
+			b.style.cssText = 'border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;line-height:1.2;';
 			b.addEventListener('click', function () {
 				b.disabled = true;
 				b.textContent = 'Creating…';
@@ -799,12 +799,12 @@
 		// AND build the whole site, so they don't do this one page at a time
 		// forever. One line, tied to this event, never a standing banner.
 		var hostFoot = document.createElement('div');
-		hostFoot.style.cssText = 'margin-top:10px;font-size:12px;color:#8a86a8;';
+		hostFoot.style.cssText = 'margin-top:10px;font-size:12px;color:#8a8a82;';
 		hostFoot.appendChild(document.createTextNode('Building a whole site? '));
 		var hostLink = document.createElement('a');
 		hostLink.href = 'https://pressgo.app/dashboard';
 		hostLink.textContent = 'Your paid plan can host and build the entire thing.';
-		hostLink.style.cssText = 'color:#5b4fff;font-weight:600;text-decoration:none;cursor:pointer;';
+		hostLink.style.cssText = 'color:#2563eb;font-weight:600;text-decoration:none;cursor:pointer;';
 		hostLink.addEventListener('click', function (e) {
 			// Prefer the in-plugin plans popup (it names hosting); fall back to web.
 			if (tiersPop) { e.preventDefault(); tiersPop.hidden = false; }
@@ -825,14 +825,14 @@
 		var existing = document.getElementById('pg-connect-card');
 		if (existing) {
 			existing.style.transition = 'box-shadow .15s';
-			existing.style.boxShadow = '0 0 0 3px rgba(91,79,255,.25)';
+			existing.style.boxShadow = '0 0 0 3px rgba(37,99,235,.25)';
 			setTimeout(function () { existing.style.boxShadow = ''; }, 600);
 			existing.scrollIntoView({ block: 'nearest' });
 			return;
 		}
 		var card = el('pg-msg pg-msg-built');
 		card.id = 'pg-connect-card';
-		card.style.borderColor = '#5b4fff';
+		card.style.borderColor = '#2563eb';
 		var txt = document.createElement('div');
 		txt.innerHTML = '<strong>One quick step before your first build.</strong><div style="margin-top:4px">Create a free PressGo account. 10 free page builds every month, no card needed.</div>';
 		card.appendChild(txt);
@@ -842,11 +842,11 @@
 		em.type = 'email';
 		em.value = connectState.adminEmail || '';
 		em.placeholder = 'you@example.com';
-		em.style.cssText = 'flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e0f4;border-radius:8px;font-size:13px;';
+		em.style.cssText = 'flex:1;min-width:200px;padding:8px 12px;border:1px solid #d4d0c8;border-radius:8px;font-size:13px;';
 		var btn = document.createElement('button');
 		btn.type = 'button';
 		btn.textContent = 'Create my free account';
-		btn.style.cssText = 'background:#5b4fff;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
+		btn.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
 		var helpWrap = document.createElement('label');
 		helpWrap.style.cssText = 'display:flex;align-items:flex-start;gap:7px;margin-top:10px;font-size:12px;color:#4b5563;cursor:pointer;width:100%';
 		var helpCb = document.createElement('input');
@@ -1462,7 +1462,7 @@
 						pubX.type = 'button';
 						pubX.setAttribute('aria-label', 'Dismiss');
 						pubX.innerHTML = '&times;';
-						pubX.style.cssText = 'margin-left:auto;background:transparent;border:0;color:#8a86a8;font-size:16px;line-height:1;cursor:pointer;padding:0 2px;';
+						pubX.style.cssText = 'margin-left:auto;background:transparent;border:0;color:#8a8a82;font-size:16px;line-height:1;cursor:pointer;padding:0 2px;';
 						pubX.addEventListener('click', function () { pubNote.remove(); });
 						pubNote.appendChild(pubX);
 						append(pubNote);
@@ -1895,8 +1895,8 @@
 			b.type = 'button';
 			b.textContent = chip.label;
 			b.className = 'pg-discovery-chip' + (chip.selected ? ' pg-chip-selected' : '');
-			b.style.cssText = 'border:1px solid #d9d6ff;background:' + (chip.selected ? '#e7e3ff' : '#f3f1ff') +
-				';color:#5b4fff;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:' +
+			b.style.cssText = 'border:1px solid #bfdbfe;background:' + (chip.selected ? '#dbeafe' : '#eff6ff') +
+				';color:#2563eb;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:' +
 				(chip.selected ? '600' : '500') + ';';
 			b.addEventListener('click', function () { onDiscoveryChip(wrap, chip); });
 			wrap.appendChild(b);
@@ -1905,7 +1905,7 @@
 		// The chips are shortcuts, not the only way to answer. Say so plainly —
 		// the placeholder alone doesn't make it obvious you can type your own.
 		var freeCap = el('pg-msg-caption', 'Or just type your own answer below, as much as you want.');
-		freeCap.style.cssText = 'font-size:12px;color:#8a86a8;margin:2px 0 2px;';
+		freeCap.style.cssText = 'font-size:12px;color:#8a8a82;margin:2px 0 2px;';
 		append(freeCap);
 		currentDiscoveryStage = data.stage || null;
 		if (input && data.freetext_hint) input.placeholder = data.freetext_hint;
@@ -1989,12 +1989,12 @@
 			// Flow = accent gradient; no-op = dashed ghost; a chat SUGGESTED answer =
 			// accent-outlined "reply" pill (tap to confirm/act); default = soft add chip.
 			b.style.cssText = isFlow
-				? 'border:none;background:linear-gradient(135deg,#5b4fff,#8b5cf6);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:700;box-shadow:0 2px 10px rgba(91,79,255,0.4);margin-right:2px;'
+				? 'border:none;background:#2563eb;color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:700;box-shadow:0 2px 10px rgba(37,99,235,0.4);margin-right:2px;'
 				: isNoop
 					? 'border:1px dashed #cbd5e1;background:#fff;color:#64748b;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;'
 					: s.suggested
-						? 'border:1.5px solid #5b4fff;background:#fff;color:#5b4fff;border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:600;'
-						: 'border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
+						? 'border:1.5px solid #2563eb;background:#fff;color:#2563eb;border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:600;'
+						: 'border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;line-height:1.2;font-weight:500;';
 			b.addEventListener('click', function () {
 				// "Go deeper": run the extended tier through the same whole-page runner
 				// (stop button, drip suppression, per-step usage all included).
@@ -2011,7 +2011,7 @@
 					x.disabled = true; x.style.cursor = 'default';
 					if (x !== b) x.style.opacity = '0.4';
 				});
-				if (!isFlow) { b.style.background = '#4338ca'; b.style.color = '#fff'; b.style.borderColor = '#4338ca'; }
+				if (!isFlow) { b.style.background = '#1d4ed8'; b.style.color = '#fff'; b.style.borderColor = '#1d4ed8'; }
 				var chipFields = { message: c.request, section_key: c.key };
 				if (c.section) chipFields.selected_section = c.section; // model-targeted chip -> scoped edit on that exact section
 				postFreeform(chipFields, c.label, isFlow ? 'cohesion' : (c.section ? 'edit' : 'section'));
@@ -2028,7 +2028,7 @@
 			btn.disabled = true;
 			btn.style.cursor = 'default';
 			if (btn.textContent === chip.label) {
-				btn.style.background = '#5b4fff'; btn.style.color = '#fff'; btn.style.borderColor = '#5b4fff';
+				btn.style.background = '#2563eb'; btn.style.color = '#fff'; btn.style.borderColor = '#2563eb';
 			} else {
 				btn.style.opacity = '0.4';
 			}
@@ -2264,7 +2264,7 @@
 		seenFd.append('nonce', cfg.nonce);
 		fetch(cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: seenFd });
 		var card = el('pg-msg pg-msg-built');
-		card.style.borderColor = '#F59E0B';
+		card.style.borderColor = '#2563eb';
 		var txt = document.createElement('div');
 		txt.innerHTML = '<strong>That’s ' + (r.builds || 5) + ' builds with PressGo.</strong> If it’s been useful, a quick review genuinely keeps this thing going.';
 		card.appendChild(txt);
@@ -2283,12 +2283,12 @@
 		yes.target = '_blank';
 		yes.rel = 'noopener';
 		yes.textContent = '⭐ Leave a review';
-		yes.style.cssText = 'background:#F59E0B;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none;';
+		yes.style.cssText = 'background:#2563eb;color:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;text-decoration:none;';
 		yes.addEventListener('click', function () { done('reviewed'); });
 		var no = document.createElement('button');
 		no.type = 'button';
 		no.textContent = 'No thanks';
-		no.style.cssText = 'background:transparent;border:1px solid #e2e0f4;color:#6b7280;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;';
+		no.style.cssText = 'background:transparent;border:1px solid #d4d0c8;color:#6b7280;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;';
 		no.addEventListener('click', function () { done('dismissed'); });
 		rowEl.appendChild(yes);
 		rowEl.appendChild(no);
@@ -2320,7 +2320,7 @@
 		var yes = document.createElement('button');
 		yes.type = 'button';
 		yes.textContent = '🙋 Yes, review my site';
-		yes.style.cssText = 'background:#10b981;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
+		yes.style.cssText = 'background:#10b981;color:#fff;border:0;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;';
 		yes.addEventListener('click', function () {
 			yes.disabled = true;
 			yes.textContent = 'Sending…';
@@ -2343,7 +2343,7 @@
 						calA.target = '_blank';
 						calA.rel = 'noopener';
 						calA.textContent = 'Book a time';
-						calA.style.cssText = 'color:#5b4fff;font-weight:600;';
+						calA.style.cssText = 'color:#2563eb;font-weight:600;';
 						hrOk.appendChild(calA);
 						append(hrOk);
 					} else {
@@ -2359,7 +2359,7 @@
 		var no = document.createElement('button');
 		no.type = 'button';
 		no.textContent = 'No thanks';
-		no.style.cssText = 'background:transparent;border:1px solid #e2e0f4;color:#6b7280;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;';
+		no.style.cssText = 'background:transparent;border:1px solid #d4d0c8;color:#6b7280;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;';
 		no.addEventListener('click', function () {
 			var fd = new FormData();
 			fd.append('action', 'pressgo_ai_hand_raise_done');
@@ -2860,7 +2860,7 @@
 			if (panel) { close(); return; }
 			panel = document.createElement('div');
 			panel.id = 'pg-history-panel';
-			panel.style.cssText = 'position:fixed;top:52px;right:16px;width:340px;max-height:70vh;overflow:auto;background:#fff;border:1px solid #e2e0f4;border-radius:10px;box-shadow:0 12px 32px rgba(20,16,60,0.18);z-index:99999;padding:10px 12px;font-size:13px;color:#1f2937;';
+			panel.style.cssText = 'position:fixed;top:52px;right:16px;width:340px;max-height:70vh;overflow:auto;background:#fff;border:1px solid #d4d0c8;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.15);z-index:99999;padding:10px 12px;font-size:13px;color:#1f2937;';
 			var head = document.createElement('div');
 			head.style.cssText = 'margin-bottom:8px;';
 			head.innerHTML = '<strong>Page history</strong><div style="color:#6b7280;font-size:12px;margin-top:2px;">A version is saved before every AI change. Restoring saves the current design too, so nothing is ever lost.</div>';
@@ -2891,7 +2891,7 @@
 					list.style.color = '';
 					versions.forEach(function (ver) {
 						var item = document.createElement('div');
-						item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid #f0effa;';
+						item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid rgba(0,0,0,0.05);';
 						var info = document.createElement('div');
 						info.style.cssText = 'flex:1;min-width:0;';
 						var line1 = document.createElement('div');
@@ -2906,7 +2906,7 @@
 						var rbtn = document.createElement('button');
 						rbtn.type = 'button';
 						rbtn.textContent = 'Restore';
-						rbtn.style.cssText = 'border:1px solid #d9d6ff;background:#f3f1ff;color:#5b4fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;flex-shrink:0;';
+						rbtn.style.cssText = 'border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;flex-shrink:0;';
 						rbtn.addEventListener('click', function () { restore(ver, rbtn); });
 						item.appendChild(info);
 						item.appendChild(rbtn);
@@ -3175,24 +3175,24 @@
 			style.id = 'pg-select-style';
 			style.textContent = [
 				'.pg-sec { cursor: pointer !important; }',
-				'.pg-sec.pg-ed-hover { outline: 2px dashed rgba(91,79,255,0.65) !important; outline-offset: -2px; }',
-				'.pg-sec.pg-ed-selected { outline: 3px solid #5b4fff !important; outline-offset: -3px; }',
-				'#pg-select-chip { position: fixed; z-index: 2147483646; background: #5b4fff; color: #fff;' +
+				'.pg-sec.pg-ed-hover { outline: 2px dashed rgba(37,99,235,0.65) !important; outline-offset: -2px; }',
+				'.pg-sec.pg-ed-selected { outline: 3px solid #2563eb !important; outline-offset: -3px; }',
+				'#pg-select-chip { position: fixed; z-index: 2147483646; background: #2563eb; color: #fff;' +
 					'font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
 					'padding: 3px 9px; border-radius: 0 0 6px 0; pointer-events: none; display: none;' +
-					'box-shadow: 0 2px 8px rgba(91,79,255,0.35); letter-spacing: 0.02em; }',
+					'box-shadow: 0 2px 8px rgba(37,99,235,0.35); letter-spacing: 0.02em; }',
 				// Inline text editing: discoverability (I-beam + dotted underline
 				// shimmer on editable text inside the SELECTED section), the
 				// hairline outline while editing, and the tiny floating hint.
-				'@keyframes pg-ed-shimmer { 0%,100% { text-decoration-color: rgba(91,79,255,0.25); } 50% { text-decoration-color: rgba(91,79,255,0.8); } }',
+				'@keyframes pg-ed-shimmer { 0%,100% { text-decoration-color: rgba(37,99,235,0.25); } 50% { text-decoration-color: rgba(37,99,235,0.8); } }',
 				'.pg-sec.pg-ed-selected .pg-ed-text { cursor: text !important; }',
 				'.pg-sec.pg-ed-selected .pg-ed-text:hover { text-decoration-line: underline !important; text-decoration-style: dotted !important;' +
-					'text-decoration-color: rgba(91,79,255,0.55) !important; text-underline-offset: 3px;' +
+					'text-decoration-color: rgba(37,99,235,0.55) !important; text-underline-offset: 3px;' +
 					'animation: pg-ed-shimmer 1.6s ease-in-out infinite; }',
-				'.pg-inline-editing { outline: 1px solid rgba(91,79,255,0.95) !important; outline-offset: 3px !important;' +
-					'box-shadow: 0 0 0 5px rgba(91,79,255,0.10); cursor: text !important; border-radius: 2px;' +
-					'text-decoration: none !important; animation: none !important; caret-color: #5b4fff; }',
-				'#pg-inline-hint { position: absolute; z-index: 2147483646; background: rgba(17,17,26,0.92); color: #fff;' +
+				'.pg-inline-editing { outline: 1px solid rgba(37,99,235,0.95) !important; outline-offset: 3px !important;' +
+					'box-shadow: 0 0 0 5px rgba(37,99,235,0.10); cursor: text !important; border-radius: 2px;' +
+					'text-decoration: none !important; animation: none !important; caret-color: #2563eb; }',
+				'#pg-inline-hint { position: absolute; z-index: 2147483646; background: rgba(26,26,26,0.92); color: #fff;' +
 					'font: 500 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
 					'padding: 5px 8px; border-radius: 5px; pointer-events: none; display: none;' +
 					'letter-spacing: 0.04em; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }',
@@ -3200,20 +3200,20 @@
 				// section), the translucent ghost pill that follows the pointer,
 				// the insert line between sections, and the lifted source state.
 				'#pg-drag-handle { position: fixed; z-index: 2147483645; width: 28px; height: 28px; display: none;' +
-					'align-items: center; justify-content: center; background: #fff; color: #5b4fff;' +
-					'border: 1px solid #d9d6ff; border-radius: 7px; cursor: grab;' +
-					'box-shadow: 0 2px 8px rgba(20,16,60,0.18); touch-action: none; user-select: none; }',
-				'#pg-drag-handle:hover { background: #5b4fff; color: #fff; }',
+					'align-items: center; justify-content: center; background: #fff; color: #2563eb;' +
+					'border: 1px solid #bfdbfe; border-radius: 7px; cursor: grab;' +
+					'box-shadow: 0 2px 8px rgba(0,0,0,0.15); touch-action: none; user-select: none; }',
+				'#pg-drag-handle:hover { background: #2563eb; color: #fff; }',
 				'#pg-drag-handle.is-dragging { cursor: grabbing; }',
 				'#pg-drag-ghost { position: fixed; z-index: 2147483646; pointer-events: none; display: none;' +
-					'background: rgba(91,79,255,0.92); color: #fff; border-radius: 999px; padding: 6px 14px;' +
+					'background: rgba(37,99,235,0.92); color: #fff; border-radius: 999px; padding: 6px 14px;' +
 					'font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;' +
-					'box-shadow: 0 8px 24px rgba(91,79,255,0.45); white-space: nowrap; }',
+					'box-shadow: 0 8px 24px rgba(37,99,235,0.45); white-space: nowrap; }',
 				'#pg-drop-line { position: fixed; z-index: 2147483645; pointer-events: none; display: none;' +
-					'left: 0; right: 0; height: 0; border-top: 3px solid #5b4fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 10px rgba(91,79,255,0.5); }',
+					'left: 0; right: 0; height: 0; border-top: 3px solid #2563eb; box-shadow: 0 0 0 1px rgba(255,255,255,0.7), 0 2px 10px rgba(37,99,235,0.5); }',
 				'#pg-drop-line::before { content: ""; position: absolute; left: 10px; top: -7px; width: 11px; height: 11px;' +
-					'border-radius: 50%; background: #5b4fff; box-shadow: 0 0 0 2px #fff; }',
-				'.pg-drag-source { opacity: 0.35 !important; outline: 2px dashed rgba(91,79,255,0.6) !important; outline-offset: -2px; }',
+					'border-radius: 50%; background: #2563eb; box-shadow: 0 0 0 2px #fff; }',
+				'.pg-drag-source { opacity: 0.35 !important; outline: 2px dashed rgba(37,99,235,0.6) !important; outline-offset: -2px; }',
 				'body.pg-dragging, body.pg-dragging * { cursor: grabbing !important; user-select: none !important; }'
 			].join('\n');
 			(doc.head || doc.body).appendChild(style);
@@ -5735,8 +5735,8 @@
 		// auto-stops and transcribes what we have. Mirrors the server guard.
 		var MAX_SECONDS = 60;
 
-		// Accent color for the trace (matches --pg-accent: #5b4fff).
-		var ACCENT = '91, 79, 255';
+		// Accent color for the trace (matches --pg-accent: #2563eb).
+		var ACCENT = '37, 99, 235';
 
 		// Scrolling amplitude trace: `levels` holds recent mic amplitudes
 		// (0–1, oldest → newest); `displayed` are the eased heights we draw, so

@@ -44,9 +44,9 @@
 	transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .pg-thumb-link:hover {
-	border-color: #5b4fff;
+	border-color: #2563eb;
 	/* No transform — would reflow row baselines on some browsers. */
-	box-shadow: 0 2px 8px rgba(91, 79, 255, 0.18);
+	box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18);
 }
 .pg-thumb {
 	width: 110px; height: 70px; display: block;
@@ -98,5 +98,5 @@
 	transition: transform 0.15s ease;
 	box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
-.pg-toggle input:checked + .pg-toggle-slider { background: #5b4fff; }
+.pg-toggle input:checked + .pg-toggle-slider { background: #2563eb; }
 .pg-toggle input:checked + .pg-toggle-slider::before { transform: translateX(16px); }
