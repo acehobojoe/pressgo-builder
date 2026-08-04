@@ -35,8 +35,8 @@
 .pg-thumb-link {
 	display: inline-block;
 	width: 110px; height: 70px;
-	background: #f6f7f7;
-	border: 1px solid #dcdcde;
+	background: #f2efe6;
+	border: 1px solid #d4d0c8;
 	border-radius: 6px;
 	overflow: hidden;
 	position: relative;
@@ -60,7 +60,7 @@
 .pg-thumb-link::before {
 	content: '';
 	position: absolute; inset: 0;
-	background: linear-gradient(90deg, #f6f7f7 0%, #ececef 50%, #f6f7f7 100%);
+	background: linear-gradient(90deg, #f2efe6 0%, #ececef 50%, #f2efe6 100%);
 	background-size: 200% 100%;
 	animation: pg-thumb-shimmer 1.6s ease-in-out infinite;
 	z-index: 0;

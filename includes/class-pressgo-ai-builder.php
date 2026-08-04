@@ -7164,7 +7164,7 @@ class PressGo_AI_Builder {
 		$post_id = wp_insert_post( array(
 			'post_type'    => 'page',
 			'post_status'  => 'draft',
-			'post_title'   => '' !== $title ? $title : 'AI page — ' . gmdate( 'M j H:i' ),
+			'post_title'   => '' !== $title ? $title : 'AI page · ' . gmdate( 'M j H:i' ),
 			'post_content' => '',
 		) );
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
