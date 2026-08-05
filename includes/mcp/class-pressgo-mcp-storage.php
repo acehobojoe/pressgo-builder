@@ -395,6 +395,12 @@ class PressGo_MCP_Storage {
 		return $rows;
 	}
 
+	public static function count_clients() {
+		global $wpdb;
+		$tables = self::tables();
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tables['clients']}" );
+	}
+
 	public static function delete_client( $client_id ) {
 		global $wpdb;
 		$tables = self::tables();

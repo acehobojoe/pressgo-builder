@@ -92,8 +92,9 @@ class PressGo {
 		( new PressGo_Icons() )->init();
 
 		// MCP server — REST routes on the front-end, admin UI in wp-admin.
-		// The enabled flag short-circuits the JSON-RPC handler but discovery
-		// + admin UI always run so users can re-enable.
+		// The enabled flag gates the editor UI and new OAuth client
+		// registration; existing tokens and the JSON-RPC endpoint keep working
+		// so live sessions don't break mid-flight.
 		( new PressGo_MCP_Server() )->init();
 		( new PressGo_MCP_OAuth() )->init();
 		( new PressGo_MCP_Telemetry() )->init();
