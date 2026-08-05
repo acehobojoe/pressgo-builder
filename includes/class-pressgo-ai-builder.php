@@ -8663,11 +8663,13 @@ class PressGo_AI_Builder {
 			if ( ! $skip_snapshot ) {
 				$this->snapshot_revision( $post_id );
 			}
-			update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
 			$applied = PressGo_Render_Targets::apply( $render_target, $config, $post_id );
 			if ( empty( $applied['ok'] ) ) {
 				return $applied;
 			}
+			// Store the source config only AFTER a verified apply, so a failed
+			// render never leaves a stored config claiming the page matches it.
+			update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
 			return array( 'ok' => true, 'sections' => count( $config['sections'] ?? array() ), 'target' => $render_target );
 		}
 

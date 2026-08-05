@@ -116,10 +116,23 @@ class PressGo_Render_Targets {
 
 		// wp_update_post expects SLASHED data (it unslashes internally) — raw
 		// content would lose literal backslashes (JSON-escaped block attrs).
-		wp_update_post( wp_slash( array(
+		$updated = wp_update_post( wp_slash( array(
 			'ID'           => $post_id,
 			'post_content' => $out['post_content'],
-		) ) );
+		) ), true );
+		if ( is_wp_error( $updated ) ) {
+			return array( 'ok' => false, 'error' => 'post update failed: ' . $updated->get_error_message() );
+		}
+		if ( 0 === (int) $updated ) {
+			return array( 'ok' => false, 'error' => 'post update failed (wp_update_post returned 0)' );
+		}
+		// Readback-verify (same pattern as the _elementor_data verify in render_partial /
+		// apply_config_to_post): confirm the content actually landed.
+		clean_post_cache( $post_id );
+		$readback = get_post( $post_id );
+		if ( ! $readback || '' === trim( (string) $readback->post_content ) ) {
+			return array( 'ok' => false, 'error' => 'post content readback empty after update' );
+		}
 
 		// Strip every OTHER builder's claim on this page (Elementor's
 		// the_content filter, Divi's use_builder flag, Bricks' editor mode all
