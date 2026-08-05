@@ -116,7 +116,9 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_cancel',       array( $this, 'ajax_cancel' ) );
 		add_action( 'wp_ajax_pressgo_ai_billing',      array( $this, 'ajax_billing_portal' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
-		add_action( 'wp_ajax_pressgo_ai_unshackled',   array( $this, 'ajax_unshackled' ) ); // TS/HTML engine toggle
+		if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) || defined( 'PRESSGO_UNSHACKLED' ) ) {
+			add_action( 'wp_ajax_pressgo_ai_unshackled', array( $this, 'ajax_unshackled' ) ); // dark: armed only by key or dev constant
+		}
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
 		add_action( 'wp_head',                         array( $this, 'freeform_page_css' ), 20 );
 	}
@@ -5146,12 +5148,48 @@ class PressGo_AI_Builder {
 		if ( '' === trim( $brief ) ) { $brief = (string) get_the_title( $post_id ); }
 		$html = $this->generate_unshackled_html( $brief );
 		if ( '' === $html ) { return ''; }
+		// Sanitize ONCE here, before either sink (the static file and the post
+		// meta), so both stored copies are stripped of active content.
+		$html = $this->sanitize_unshackled_html( $html );
 		$up  = wp_upload_dir();
 		$dir = trailingslashit( $up['basedir'] ) . 'pg-unshackled';
 		if ( ! is_dir( $dir ) ) { wp_mkdir_p( $dir ); }
+		// Directory listing deny stub (same pattern WP uses for uploads).
+		if ( ! file_exists( $dir . '/index.php' ) ) {
+			file_put_contents( $dir . '/index.php', "<?php // Silence is golden." );
+		}
 		file_put_contents( $dir . '/' . absint( $post_id ) . '.html', $html );
 		update_post_meta( $post_id, '_pressgo_unshackled_html', $html );
 		return trailingslashit( $up['baseurl'] ) . 'pg-unshackled/' . absint( $post_id ) . '.html?v=' . time();
+	}
+
+	/**
+	 * Strip active content from a model-generated full-document preview.
+	 *
+	 * This is a DELIBERATE lightweight regex strip, not wp_kses with a full
+	 * allowlist: the unshackled path is an experimental, admin-gated preview
+	 * artifact whose whole point is to show what modern CSS/HTML the model can
+	 * produce. wp_kses would flatten the page's own <style> block, custom
+	 * elements, and modern attributes, defeating the comparison. So we remove
+	 * only the dangerous active vectors (scripts, iframes, forms, plugin
+	 * embeds, inline event handlers, javascript: URLs) and leave the layout /
+	 * styling intact.
+	 */
+	private function sanitize_unshackled_html( $html ) {
+		$html = (string) $html;
+		// Paired active/embed tags (content included): script, iframe, form, object.
+		$html = preg_replace( '#<(script|iframe|form|object)\b[^>]*>.*?</\1>#is', '', $html );
+		// Any orphan/self-closing or unclosed opening tags of the same set + embed.
+		$html = preg_replace( '#</?(script|iframe|form|object|embed)\b[^>]*>#is', '', $html );
+		// Inline event handlers: on*="..."  on*='...'  on*=unquoted.
+		$html = preg_replace( '#\son[a-z]+\s*=\s*"[^"]*"#i', '', $html );
+		$html = preg_replace( "#\son[a-z]+\s*=\s*'[^']*'#i", '', $html );
+		$html = preg_replace( '#\son[a-z]+\s*=\s*[^\s>]+#i', '', $html );
+		// javascript: URLs in href/src (quoted and unquoted).
+		$html = preg_replace( '#\b(href|src)\s*=\s*"(?:\s*javascript:)[^"]*"#i', '$1="#"', $html );
+		$html = preg_replace( "#\b(href|src)\s*=\s*'(?:\s*javascript:)[^']*'#i", '$1=\'#\'', $html );
+		$html = preg_replace( '#\b(href|src)\s*=\s*(?:javascript:)[^\s>]*#i', '$1="#"', $html );
+		return (string) $html;
 	}
 
 	/** AJAX: build the unshackled version and return its preview URL. */
