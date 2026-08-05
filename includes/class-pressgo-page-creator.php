@@ -37,6 +37,8 @@ class PressGo_Page_Creator {
 
 		// Store Elementor data. Must be stored as JSON string, not serialized.
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		// F1: stamp the manual-edit guard against this initial PressGo write.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 
 		// Page settings: hide title + custom CSS.
 		$page_settings = array( 'hide_title' => 'yes' );

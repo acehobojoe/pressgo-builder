@@ -83,6 +83,7 @@ $pressgo_meta_keys = array(
 	'_pressgo_chat_log',
 	'_pressgo_cohesion_autosig',
 	'_pressgo_cohesion_undo',
+	'_pressgo_data_hash',
 	'_pressgo_discovery_state',
 	'_pressgo_ff_sections',
 	'_pressgo_freeform',

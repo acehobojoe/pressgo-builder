@@ -1085,9 +1085,11 @@ class PressGo_MCP_Tools {
 		self::set_page_globals( $post_id, $globals );
 
 		// Re-render existing sections with new globals so the live page reflects the change.
-		self::rerender_all_sections( $post_id, $globals );
-
-		return self::page_summary( $post_id, "Globals updated. Existing sections were re-rendered with the new palette/fonts/layout." );
+		$rerendered = self::rerender_all_sections( $post_id, $globals );
+		$note = $rerendered
+			? 'Globals updated. Existing sections were re-rendered with the new palette/fonts/layout.'
+			: 'Globals updated and saved, but existing sections were NOT re-rendered: this page has manual Elementor edits since PressGo last wrote it, and a positional re-render could overwrite the wrong section. New sections will use the new globals. To re-render existing sections, restore a PressGo version from the page History first.';
+		return self::page_summary( $post_id, $note );
 	}
 
 	private static function list_pages( $args, $user ) {
@@ -2729,6 +2731,8 @@ class PressGo_MCP_Tools {
 		if ( isset( $snap['page_settings'] ) ) {
 			update_post_meta( $post_id, '_elementor_page_settings', wp_slash( $snap['page_settings'] ?: array() ) );
 		}
+		// F1: re-arm the manual-edit guard against the restored state.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 		// Bust caches so the next read/render is fresh.
 		clean_post_cache( $post_id );
 		if ( function_exists( 'rocket_clean_post' ) ) {
@@ -2773,6 +2777,9 @@ class PressGo_MCP_Tools {
 		if ( get_post_meta( $post_id, '_wp_page_template', true ) !== 'elementor_canvas' ) {
 			update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
 		}
+
+		// F1: re-stamp the manual-edit guard so this PressGo write is canonical.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 
 		// Bust the WP object cache for this post.
 		clean_post_cache( $post_id );
@@ -2960,7 +2967,10 @@ class PressGo_MCP_Tools {
 	 */
 	private static function rerender_all_sections( $post_id, $globals ) {
 		$records = get_post_meta( $post_id, '_pressgo_sections', true );
-		if ( ! is_array( $records ) ) { return; }
+		if ( ! is_array( $records ) ) { return false; }
+		if ( class_exists( 'PressGo_AI_Builder' ) && PressGo_AI_Builder::is_manually_modified( $post_id ) ) {
+			return false; // F1: positional re-render would clobber manual reorders/edits
+		}
 		$elements = self::read_elementor_data( $post_id );
 		$generator = new PressGo_Generator();
 		foreach ( $records as $i => $rec ) {
@@ -2983,6 +2993,7 @@ class PressGo_MCP_Tools {
 			}
 		}
 		self::write_elementor_data( $post_id, $elements );
+		return true;
 	}
 
 	private static function stamp_pressgo_meta( $post_id, $config ) {

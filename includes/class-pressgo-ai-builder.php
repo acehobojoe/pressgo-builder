@@ -31,6 +31,32 @@ class PressGo_AI_Builder {
 	const META_FF_SECTIONS  = '_pressgo_ff_sections';        // ordered records of every freeform section (source tree + roles) for the cohesion engine
 	const META_COHESION_UNDO = '_pressgo_cohesion_undo';     // one-step snapshot so "undo" restores a reorganize
 	const META_BRAND_VERSION = '_pressgo_brand_version';     // foundation 'updated' stamp the page was last repainted to (lazy site-wide repaint)
+	const META_DATA_HASH = '_pressgo_data_hash';             // md5 of _elementor_data as PressGo last wrote it (F1 manual-edit guard)
+
+	/**
+	 * Stamp the F1 manual-edit guard: record md5 of _elementor_data exactly as
+	 * stored (read back post-write, so the hash always matches what a later
+	 * get_post_meta returns). Call after EVERY PressGo write of _elementor_data.
+	 */
+	public static function stamp_data_hash( $post_id ) {
+		$raw = (string) get_post_meta( $post_id, '_elementor_data', true );
+		if ( '' === $raw ) {
+			delete_post_meta( $post_id, self::META_DATA_HASH );
+			return;
+		}
+		update_post_meta( $post_id, self::META_DATA_HASH, md5( $raw ) );
+	}
+
+	/**
+	 * True when a PressGo-written hash exists AND live _elementor_data no longer
+	 * matches it (the page was edited outside PressGo, e.g. in Elementor).
+	 * Pages with no hash (built before this guard) always return false.
+	 */
+	public static function is_manually_modified( $post_id ) {
+		$hash = (string) get_post_meta( $post_id, self::META_DATA_HASH, true );
+		if ( '' === $hash ) { return false; }
+		return md5( (string) get_post_meta( $post_id, '_elementor_data', true ) ) !== $hash;
+	}
 
 	/**
 	 * Decode JSON stored in postmeta. get_post_meta() returns UNSLASHED data,
@@ -574,12 +600,13 @@ class PressGo_AI_Builder {
 
 		if ( empty( $new ) ) {
 			// Nothing rendered — restore the original and drop the dead snapshot.
-			if ( '' !== $backup ) { update_post_meta( $post_id, '_elementor_data', wp_slash( $backup ) ); }
+			if ( '' !== $backup ) { update_post_meta( $post_id, '_elementor_data', wp_slash( $backup ) ); self::stamp_data_hash( $post_id ); }
 			delete_post_meta( $post_id, self::META_COHESION_UNDO );
 			return false;
 		}
 
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+		self::stamp_data_hash( $post_id );
 		$this->save_ff_sections( $post_id, $records );
 		update_post_meta( $post_id, self::META_BRAND_VERSION, $this->brand_version() );
 		$this->cohesion_flush( $post_id );
@@ -606,6 +633,12 @@ class PressGo_AI_Builder {
 		if ( $stamped === $current ) { return; }
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { return; } // only freeform pages repaint
+		if ( self::is_manually_modified( $post_id ) ) {
+			// F1: the page was edited in Elementor since PressGo last wrote it.
+			// Never silently repaint over manual edits on builder open. The page
+			// simply stays on its old brand version and is re-checked next open.
+			return;
+		}
 		$this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
 	}
 
@@ -1014,6 +1047,9 @@ class PressGo_AI_Builder {
 			// path) instead of editing a config that no longer matches reality.
 			delete_post_meta( $post_id, self::META_AI_CONFIG );
 		}
+		// The restored state re-blesses the page: re-arm the F1 guard so a later
+		// builder open / patch treats this PressGo-restored version as canonical.
+		self::stamp_data_hash( $post_id );
 	}
 
 	/**
@@ -2430,6 +2466,7 @@ class PressGo_AI_Builder {
 
 	private function cohesion_write_elements( $post_id, $elements, $plan ) {
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
+		self::stamp_data_hash( $post_id );
 		$this->save_ff_sections( $post_id, $plan );
 		$this->cohesion_flush( $post_id );
 	}
@@ -2974,6 +3011,7 @@ class PressGo_AI_Builder {
 			return array( 'note' => "Nothing to undo — I haven't reorganized this page yet." );
 		}
 		update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
+		self::stamp_data_hash( $post_id );
 		$this->save_ff_sections( $post_id, isset( $snap['records'] ) ? $snap['records'] : array() );
 		if ( array_key_exists( 'brand_foundation', $snap ) ) {
 			if ( is_array( $snap['brand_foundation'] ) ) {
@@ -3056,6 +3094,7 @@ class PressGo_AI_Builder {
 			return array( 'note' => "I couldn't reorder safely — left the page exactly as it was." );
 		}
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new_elements ) ) ) );
+		self::stamp_data_hash( $post_id );
 		$this->save_ff_sections( $post_id, $new_records );
 		$this->cohesion_flush( $post_id );
 		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Reordered. Say "undo" to put it back.' );
@@ -3205,6 +3244,9 @@ class PressGo_AI_Builder {
 		if ( empty( $tree ) ) {
 			return array( 'note' => "I can't edit that section in place yet (it was built before this feature). Tell me what to add or remove instead." );
 		}
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'note' => "You've edited this page in Elementor since my last change, so my stored copy of that section is out of date and editing from it could overwrite your work. Make the change in Elementor, or restore one of my versions from History and ask me again." );
+		}
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
 		// Anchor the edit to THIS page's premise — without it, "make the services
@@ -3262,6 +3304,7 @@ class PressGo_AI_Builder {
 			return array( 'note' => "I couldn't find that section on the page to update — nothing changed." );
 		}
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
+		self::stamp_data_hash( $post_id );
 		foreach ( $records as $i => $r ) {
 			if ( ( $r['pg_key'] ?? '' ) === $rec['pg_key'] ) {
 				$records[ $i ]['source_tree'] = $newtree;
@@ -3441,6 +3484,7 @@ class PressGo_AI_Builder {
 		}
 		array_splice( $records, $idx, 1 );
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
+		self::stamp_data_hash( $post_id );
 		$this->save_ff_sections( $post_id, $records );
 		$this->cohesion_flush( $post_id );
 
@@ -4120,6 +4164,7 @@ class PressGo_AI_Builder {
 		$elements = $this->read_elements( $post_id );
 		if ( ! empty( $elements ) ) { $elements[ count( $elements ) - 1 ] = $section; } else { $elements[] = $section; }
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		self::stamp_data_hash( $post_id );
 		if ( class_exists( '\Elementor\Plugin' ) ) { \Elementor\Plugin::$instance->files_manager->clear_cache(); }
 
 		$palette                = $this->extract_hero_palette( $tree, $cfg );
@@ -5893,6 +5938,7 @@ class PressGo_AI_Builder {
 		$elements[] = $section;
 
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		self::stamp_data_hash( $post_id );
 		update_post_meta( $post_id, self::META_FREEFORM, 1 );
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
@@ -5917,6 +5963,7 @@ class PressGo_AI_Builder {
 			if ( count( $els_tb ) > 1 ) {
 				array_unshift( $els_tb, array_pop( $els_tb ) );
 				update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $els_tb ) ) ) );
+				self::stamp_data_hash( $post_id );
 			}
 			if ( count( $recs_tb ) > 1 ) {
 				array_unshift( $recs_tb, array_pop( $recs_tb ) );
@@ -7292,7 +7339,11 @@ class PressGo_AI_Builder {
 		$page_context = null;
 		$stored_config = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 		$elementor_raw = get_post_meta( $post_id, '_elementor_data', true );
-		if ( $stored_config ) {
+		// F1: when the page was edited in Elementor since PressGo last wrote it,
+		// the stored config is stale. Fall through to the live-summary branch so
+		// the model reads the real page instead of the diverged config.
+		$is_diverged = self::is_manually_modified( $post_id );
+		if ( $stored_config && ! $is_diverged ) {
 			$mode = 'edit';
 			$cfg_decoded = self::decode_meta_json( $stored_config );
 			$page_context = array( 'config' => is_array( $cfg_decoded ) ? $cfg_decoded : null );
@@ -7530,10 +7581,15 @@ class PressGo_AI_Builder {
 		$is_foreign_layout    = ( ! $stored_config && ! empty( $elementor_raw ) ) || get_post_meta( $post_id, self::META_FREEFORM, true );
 		$wants_full_overwrite = $tool_use && ! $is_patch && ! empty( $tool_use['config'] ) && ! empty( $tool_use['config']['sections'] );
 
-		if ( $is_foreign_layout && $wants_full_overwrite ) {
+		if ( ( $is_foreign_layout || $is_diverged ) && $wants_full_overwrite ) {
+			// F1: a diverged page (manual Elementor edits since PressGo last wrote
+			// it) is protected the same way a foreign layout is, with its own message.
+			$overwrite_error = $is_foreign_layout
+				? "This page has a custom layout I didn't build from a PressGo design, so editing it through chat would rewrite the whole page and lose your work. Duplicate it as a new PressGo page first, or start a fresh page and I'll build there."
+				: "You've made manual edits to this page in Elementor since my last change, and rebuilding it from chat would erase them. Your edits are safe. Keep editing in Elementor, or open History and restore one of my earlier versions if you want me to take over again.";
 			$apply = array(
 				'ok'    => false,
-				'error' => "This page has a custom layout I didn't build from a PressGo design, so editing it through chat would rewrite the whole page and lose your work. Duplicate it as a new PressGo page first, or start a fresh page and I'll build there.",
+				'error' => $overwrite_error,
 			);
 		} elseif ( $tool_use && $is_patch && ! empty( $tool_use['changes'] ) ) {
 			$apply = $this->apply_patch_to_post( $post_id, $tool_use['changes'] );
@@ -8373,6 +8429,12 @@ class PressGo_AI_Builder {
 		if ( empty( $changes ) || ! is_array( $changes ) ) {
 			return array( 'ok' => false, 'error' => 'empty patch' );
 		}
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array(
+				'ok'    => false,
+				'error' => "You've made manual edits to this page in Elementor since my last change. Applying this from my stored design would overwrite them, so I stopped. Keep editing in Elementor, or open History and restore one of my earlier versions if you want me to take over again.",
+			);
+		}
 		$stored = get_post_meta( $post_id, self::META_AI_CONFIG, true );
 		$base   = $stored ? self::decode_meta_json( $stored ) : null;
 		if ( ! is_array( $base ) || empty( $base ) ) {
@@ -8610,6 +8672,7 @@ class PressGo_AI_Builder {
 		$elements  = $generator->generate( $config );
 		if ( empty( $elements ) ) return false;
 		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		self::stamp_data_hash( $post_id );
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
@@ -8721,6 +8784,7 @@ class PressGo_AI_Builder {
 		// Use page-creator's writer if available; otherwise raw write + cache clear.
 		$encoded = wp_json_encode( $elements );
 		update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
+		self::stamp_data_hash( $post_id );
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
