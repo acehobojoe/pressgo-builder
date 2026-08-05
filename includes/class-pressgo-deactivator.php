@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PressGo_Deactivator {
 
 	public static function deactivate() {
-		// Nothing to clean up on deactivation.
-		// Full cleanup happens in uninstall.php.
+		// Clear the daily MCP maintenance cron; full cleanup happens in uninstall.php.
+		wp_clear_scheduled_hook( 'pressgo_mcp_prune' );
 	}
 }

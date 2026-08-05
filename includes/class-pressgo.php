@@ -109,6 +109,10 @@ class PressGo {
 		// Ensure tables exist (idempotent: dbDelta no-ops when current).
 		add_action( 'plugins_loaded', array( 'PressGo_MCP_Storage', 'maybe_install' ), 20 );
 
+		// Daily MCP maintenance: prune old events, expired codes, abandoned clients.
+		add_action( 'pressgo_mcp_prune', array( 'PressGo_MCP_Storage', 'prune' ) );
+		add_action( 'init', array( __CLASS__, 'schedule_mcp_prune' ) );
+
 		// The first image on a generated page is the hero, above the fold and
 		// often the LCP element itself — measured 1.9s on a throttled corpus
 		// page. Elementor ships every image with loading="lazy", which defers
@@ -120,6 +124,12 @@ class PressGo {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			require_once PRESSGO_PLUGIN_DIR . 'includes/class-pressgo-cli.php';
 			WP_CLI::add_command( 'pressgo', 'PressGo_CLI' );
+		}
+	}
+
+	public static function schedule_mcp_prune() {
+		if ( ! wp_next_scheduled( 'pressgo_mcp_prune' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'pressgo_mcp_prune' );
 		}
 	}
 

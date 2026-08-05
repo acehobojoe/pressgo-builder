@@ -11,6 +11,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+// ── Scheduled events ──
+wp_clear_scheduled_hook( 'pressgo_mcp_prune' );
+
 // ── Options ──
 $pressgo_options = array(
 	'pressgo_account_key',

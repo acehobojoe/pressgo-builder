@@ -1148,7 +1148,6 @@ iframe#f{position:relative;z-index:0}
 			'post_id'       => $post_id,
 			'user_id'       => $user ? $user->ID : null,
 			'summary'       => $summary,
-			'args_json'     => wp_json_encode( $args ),
 			'result_status' => is_wp_error( $res ) ? 'error' : 'ok',
 			'duration_ms'   => $ms,
 		) );

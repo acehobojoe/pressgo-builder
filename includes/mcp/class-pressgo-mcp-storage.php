@@ -138,7 +138,7 @@ class PressGo_MCP_Storage {
 			'user_id'       => isset( $args['user_id'] ) ? (int) $args['user_id'] : null,
 			'client_id'     => isset( $args['client_id'] ) ? substr( (string) $args['client_id'], 0, 64 ) : null,
 			'summary'       => isset( $args['summary'] ) ? substr( (string) $args['summary'], 0, 1024 ) : null,
-			'args_json'     => isset( $args['args_json'] ) ? (string) $args['args_json'] : null,
+			'args_json'     => isset( $args['args_json'] ) ? substr( (string) $args['args_json'], 0, 2048 ) : null,
 			'result_status' => isset( $args['result_status'] ) ? substr( (string) $args['result_status'], 0, 16 ) : 'ok',
 			'duration_ms'   => isset( $args['duration_ms'] ) ? (int) $args['duration_ms'] : null,
 		) );
@@ -455,5 +455,26 @@ class PressGo_MCP_Storage {
 		$tables = self::tables();
 		$now    = self::now();
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['codes']} WHERE expires_at < %s OR used_at IS NOT NULL", $now ) );
+	}
+
+	/** Daily maintenance: expired codes, old events, abandoned OAuth clients. */
+	public static function prune() {
+		global $wpdb;
+		$tables = self::tables();
+		self::purge_expired(); // codes: expired or used
+		// Events: 30-day retention (ts is indexed).
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
+		$wpdb->query( $wpdb->prepare(
+			"DELETE FROM {$tables['events']} WHERE ts < %s LIMIT 5000", $cutoff
+		) );
+		// Clients >24h old that never obtained a token and have no live code.
+		$day_ago = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
+		$wpdb->query( $wpdb->prepare(
+			"DELETE c FROM {$tables['clients']} c
+			 LEFT JOIN {$tables['tokens']} t ON t.client_id = c.client_id
+			 LEFT JOIN {$tables['codes']}  d ON d.client_id = c.client_id
+			 WHERE c.created_at < %s AND t.id IS NULL AND d.id IS NULL",
+			$day_ago
+		) );
 	}
 }
