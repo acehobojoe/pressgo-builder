@@ -32,6 +32,41 @@ class PressGo_AI_Builder {
 	const META_COHESION_UNDO = '_pressgo_cohesion_undo';     // one-step snapshot so "undo" restores a reorganize
 	const META_BRAND_VERSION = '_pressgo_brand_version';     // foundation 'updated' stamp the page was last repainted to (lazy site-wide repaint)
 	const META_DATA_HASH = '_pressgo_data_hash';             // md5 of _elementor_data as PressGo last wrote it (F1 manual-edit guard)
+	const CHAT_IMAGE_MAX_BYTES   = 5 * 1024 * 1024;
+	const CHAT_IMAGES_MAX_BYTES  = 12 * 1024 * 1024;
+
+	/** Human-facing explanation shared by Builder and MCP write guards. */
+	public static function manual_edit_notice() {
+		return "This page's live Elementor data no longer matches PressGo's saved source. I stopped before writing so your Elementor edits stay intact. Restore a PressGo version from History to let PressGo take over again, or keep editing this version in Elementor.";
+	}
+
+	/**
+	 * Persist Elementor JSON and prove the exact intended bytes landed before
+	 * blessing them as PressGo-owned. This is the only safe place to stamp the
+	 * manual-edit hash: stamping after an unchecked update can accidentally mark
+	 * the old value canonical when a database/security plugin rejects the write.
+	 *
+	 * @param int          $post_id Post ID.
+	 * @param array|string $data    Elementor element array or encoded JSON.
+	 * @return bool True only when exact readback verification succeeds.
+	 */
+	public static function persist_elementor_data( $post_id, $data ) {
+		$encoded = is_array( $data ) ? wp_json_encode( $data ) : (string) $data;
+		if ( false === $encoded || '' === $encoded ) {
+			return false;
+		}
+
+		update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
+		clean_post_cache( $post_id );
+		$readback = get_post_meta( $post_id, '_elementor_data', true );
+		if ( ! is_string( $readback )
+			|| ! hash_equals( hash( 'sha256', $encoded ), hash( 'sha256', $readback ) ) ) {
+			return false;
+		}
+
+		update_post_meta( $post_id, self::META_DATA_HASH, md5( $readback ) );
+		return true;
+	}
 
 	/**
 	 * Stamp the F1 manual-edit guard: record md5 of _elementor_data exactly as
@@ -45,17 +80,34 @@ class PressGo_AI_Builder {
 			return;
 		}
 		update_post_meta( $post_id, self::META_DATA_HASH, md5( $raw ) );
+		return true;
 	}
 
 	/**
 	 * True when a PressGo-written hash exists AND live _elementor_data no longer
 	 * matches it (the page was edited outside PressGo, e.g. in Elementor).
-	 * Pages with no hash (built before this guard) always return false.
+	 * A populated legacy PressGo page with no hash fails closed: there is no
+	 * evidence that its saved source still matches live Elementor data. A full
+	 * PressGo rebuild/history restore can deliberately re-bless it.
 	 */
 	public static function is_manually_modified( $post_id ) {
 		$hash = (string) get_post_meta( $post_id, self::META_DATA_HASH, true );
-		if ( '' === $hash ) { return false; }
-		return md5( (string) get_post_meta( $post_id, '_elementor_data', true ) ) !== $hash;
+		$raw  = (string) get_post_meta( $post_id, '_elementor_data', true );
+		if ( '' !== $hash ) {
+			return md5( $raw ) !== $hash;
+		}
+		if ( '' === $raw || '[]' === trim( $raw ) ) {
+			return false;
+		}
+
+		// Upgrade safety: old pages have no trustworthy write hash. Only fail
+		// closed when this is recognizably a PressGo-owned populated document.
+		foreach ( array( self::META_AI_CONFIG, self::META_FF_SECTIONS, '_pressgo_sections', '_pressgo_built' ) as $key ) {
+			if ( get_post_meta( $post_id, $key, true ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -142,8 +194,8 @@ class PressGo_AI_Builder {
 		add_action( 'wp_ajax_pressgo_ai_cancel',       array( $this, 'ajax_cancel' ) );
 		add_action( 'wp_ajax_pressgo_ai_billing',      array( $this, 'ajax_billing_portal' ) );
 		add_action( 'wp_ajax_pressgo_ai_transcribe',   array( $this, 'ajax_transcribe' ) );
-		if ( '' !== (string) get_option( 'pressgo_openrouter_key', '' ) || defined( 'PRESSGO_UNSHACKLED' ) ) {
-			add_action( 'wp_ajax_pressgo_ai_unshackled', array( $this, 'ajax_unshackled' ) ); // dark: armed only by key or dev constant
+		if ( $this->unshackled_enabled() ) {
+			add_action( 'wp_ajax_pressgo_ai_unshackled', array( $this, 'ajax_unshackled' ) ); // explicit developer-only experiment
 		}
 		add_action( 'wp_head',                         array( $this, 'enqueue_brand_fonts' ) );
 		add_action( 'wp_head',                         array( $this, 'freeform_page_css' ), 20 );
@@ -516,6 +568,9 @@ class PressGo_AI_Builder {
 		$this->check_auth();
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) wp_send_json_error( 'missing post_id', 400 );
+		if ( self::is_manually_modified( $post_id ) ) {
+			wp_send_json_error( self::manual_edit_notice(), 409 );
+		}
 
 		$res = $this->repaint_page_to_brand( $post_id, $this->cfg_from_foundation() );
 		if ( false === $res ) {
@@ -539,6 +594,7 @@ class PressGo_AI_Builder {
 	 * array(sections, rendered, kept) or false when there's nothing to repaint.
 	 */
 	private function repaint_page_to_brand( $post_id, $cfg ) {
+		if ( self::is_manually_modified( $post_id ) ) { return false; }
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
 		if ( empty( $records ) ) { return false; }
@@ -600,13 +656,16 @@ class PressGo_AI_Builder {
 
 		if ( empty( $new ) ) {
 			// Nothing rendered — restore the original and drop the dead snapshot.
-			if ( '' !== $backup ) { update_post_meta( $post_id, '_elementor_data', wp_slash( $backup ) ); self::stamp_data_hash( $post_id ); }
+			if ( '' !== $backup ) { self::persist_elementor_data( $post_id, $backup ); }
 			delete_post_meta( $post_id, self::META_COHESION_UNDO );
 			return false;
 		}
 
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, array_values( $new ) ) ) {
+			if ( '' !== $backup ) { self::persist_elementor_data( $post_id, $backup ); }
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return false;
+		}
 		$this->save_ff_sections( $post_id, $records );
 		update_post_meta( $post_id, self::META_BRAND_VERSION, $this->brand_version() );
 		$this->cohesion_flush( $post_id );
@@ -1003,7 +1062,9 @@ class PressGo_AI_Builder {
 		$this->turn_label = 'Before restoring the ' . ( $ts ? wp_date( 'M j, H:i', $ts ) : '#' . $rev_id ) . ' version';
 		$this->snapshot_revision( $post_id );
 
-		$this->apply_revision_restore( $post_id, $rev, $is_snap );
+		if ( ! $this->apply_revision_restore( $post_id, $rev, $is_snap ) ) {
+			wp_send_json_error( 'The selected version could not be restored exactly, so PressGo stopped.', 500 );
+		}
 
 		$this->purge_post_caches( $post_id );
 		wp_send_json_success( array(
@@ -1021,13 +1082,32 @@ class PressGo_AI_Builder {
 	 */
 	private function apply_revision_restore( $post_id, $rev, $is_snap ) {
 		$rev_id = (int) $rev->ID;
-		wp_update_post( wp_slash( array(
+		$before = get_post( $post_id );
+		if ( ! $before ) { return false; }
+		$updated = wp_update_post( wp_slash( array(
 			'ID'           => $post_id,
 			'post_content' => (string) $rev->post_content,
-		) ) );
+		) ), true );
+		if ( is_wp_error( $updated ) || 0 === (int) $updated ) { return false; }
+		clean_post_cache( $post_id );
+		$readback = get_post( $post_id );
+		if ( ! $readback || ! hash_equals(
+			hash( 'sha256', (string) $rev->post_content ),
+			hash( 'sha256', (string) $readback->post_content )
+		) ) {
+			wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => (string) $before->post_content ) ) );
+			return false;
+		}
 		foreach ( self::target_state_metas() as $mk ) {
 			$mv = get_metadata( 'post', $rev_id, $mk, true );
 			if ( '' !== $mv && null !== $mv && false !== $mv ) {
+				if ( '_elementor_data' === $mk ) {
+					if ( ! self::persist_elementor_data( $post_id, $mv ) ) {
+						wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => (string) $before->post_content ) ) );
+						return false;
+					}
+					continue;
+				}
 				update_post_meta( $post_id, $mk, is_string( $mv ) ? wp_slash( $mv ) : $mv );
 			} elseif ( $is_snap ) {
 				// Only marker-era snapshots carry COMPLETE state — for those,
@@ -1035,6 +1115,7 @@ class PressGo_AI_Builder {
 				// Legacy (pre-multi-builder) snapshots only stored Elementor
 				// keys; deleting the rest would strip e.g. the canvas template.
 				delete_post_meta( $post_id, $mk );
+				if ( '_elementor_data' === $mk ) { delete_post_meta( $post_id, self::META_DATA_HASH ); }
 			}
 		}
 
@@ -1047,9 +1128,7 @@ class PressGo_AI_Builder {
 			// path) instead of editing a config that no longer matches reality.
 			delete_post_meta( $post_id, self::META_AI_CONFIG );
 		}
-		// The restored state re-blesses the page: re-arm the F1 guard so a later
-		// builder open / patch treats this PressGo-restored version as canonical.
-		self::stamp_data_hash( $post_id );
+		return true;
 	}
 
 	/**
@@ -1068,7 +1147,7 @@ class PressGo_AI_Builder {
 			// Snapshot the live state first so the revert is itself revertable.
 			$this->turn_label = 'Before reverting (chat)';
 			$this->snapshot_revision( $post_id );
-			$this->apply_revision_restore( $post_id, $rev, $is_snap );
+			if ( ! $this->apply_revision_restore( $post_id, $rev, $is_snap ) ) { return ''; }
 			$this->purge_post_caches( $post_id );
 			return $label;
 		}
@@ -2339,6 +2418,9 @@ class PressGo_AI_Builder {
 
 	/** Reorganize the page: smart order + dark/light/accent rhythm + contrast-safe recolor. */
 	private function cohesion_reorganize( $post_id, $with_vision = true ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'note' => self::manual_edit_notice() );
+		}
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
 		if ( count( $records ) < 3 ) {
@@ -2369,7 +2451,10 @@ class PressGo_AI_Builder {
 			delete_post_meta( $post_id, self::META_COHESION_UNDO );
 			return array( 'note' => "I couldn't safely reorganize this page — left it exactly as it was." );
 		}
-		$this->cohesion_write_elements( $post_id, $new, $plan );
+		if ( ! $this->cohesion_write_elements( $post_id, $new, $plan ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't verify the page write, so I stopped without claiming the reorganization succeeded." );
+		}
 
 		// Vision critic (C3): screenshot the reorganized page and let a vision model
 		// catch any contrast/rhythm miss the deterministic pass made. Non-blocking —
@@ -2465,10 +2550,10 @@ class PressGo_AI_Builder {
 	}
 
 	private function cohesion_write_elements( $post_id, $elements, $plan ) {
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, array_values( $elements ) ) ) { return false; }
 		$this->save_ff_sections( $post_id, $plan );
 		$this->cohesion_flush( $post_id );
+		return true;
 	}
 
 	/** The vision critic's instruction set. */
@@ -2751,6 +2836,9 @@ class PressGo_AI_Builder {
 	 * rounds, max 3 fixes per round, keepalive between every network call.
 	 */
 	private function vision_qa_loop( $post_id, $keepalive = null, $max_rounds = 2 ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'error' => self::manual_edit_notice() );
+		}
 		@set_time_limit( 600 ); // phpcs:ignore WordPress.PHP.IniSet
 		if ( ! self::nova_ready() ) { return array( 'note' => 'The quality pass needs the vision service configured.' ); }
 		$ping = function () use ( $keepalive ) { if ( is_callable( $keepalive ) ) { $keepalive(); } };
@@ -2996,7 +3084,7 @@ class PressGo_AI_Builder {
 
 		$new = $this->cohesion_apply_plan( $post_id, $plan );
 		if ( count( $new ) < count( $plan ) ) { return ''; } // safety: a render failed
-		$this->cohesion_write_elements( $post_id, $new, $plan );
+		if ( ! $this->cohesion_write_elements( $post_id, $new, $plan ) ) { return ''; }
 
 		$parts = array();
 		if ( $removed > 0 ) { $parts[] = ( 1 === $removed ) ? 'merged a duplicate section' : 'merged ' . $removed . ' duplicate sections'; }
@@ -3010,8 +3098,9 @@ class PressGo_AI_Builder {
 		if ( ! is_array( $snap ) || ! isset( $snap['elementor_data'] ) || '' === $snap['elementor_data'] ) {
 			return array( 'note' => "Nothing to undo — I haven't reorganized this page yet." );
 		}
-		update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, $snap['elementor_data'] ) ) {
+			return array( 'note' => "I couldn't verify the undo write, so I left the saved undo available and stopped." );
+		}
 		$this->save_ff_sections( $post_id, isset( $snap['records'] ) ? $snap['records'] : array() );
 		if ( array_key_exists( 'brand_foundation', $snap ) ) {
 			if ( is_array( $snap['brand_foundation'] ) ) {
@@ -3062,6 +3151,9 @@ class PressGo_AI_Builder {
 	 *  Reorders both _elementor_data and the records, never drops a section,
 	 *  snapshot-protected ("undo"). */
 	private function cohesion_reorder_keys( $post_id, $keys ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'note' => self::manual_edit_notice() );
+		}
 		$keys = array_values( array_filter( array_map( 'sanitize_text_field', $keys ) ) );
 		if ( count( $keys ) < 2 ) { return array( 'note' => 'Nothing to reorder.' ); }
 		$records = $this->ff_sections( $post_id );
@@ -3093,8 +3185,10 @@ class PressGo_AI_Builder {
 			delete_post_meta( $post_id, self::META_COHESION_UNDO );
 			return array( 'note' => "I couldn't reorder safely — left the page exactly as it was." );
 		}
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new_elements ) ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, array_values( $new_elements ) ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't verify the reordered page write, so I stopped." );
+		}
 		$this->save_ff_sections( $post_id, $new_records );
 		$this->cohesion_flush( $post_id );
 		return array( 'preview_bust' => time(), 'cohesion' => true, 'note' => 'Reordered. Say "undo" to put it back.' );
@@ -3202,6 +3296,9 @@ class PressGo_AI_Builder {
 
 	/** Apply a deterministic color/font change to the site brand and repaint the page. */
 	private function handle_brand_change( $post_id, $message ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'note' => self::manual_edit_notice() );
+		}
 		$change = $this->brand_change_from_message( $message );
 		if ( null === $change ) {
 			return array( 'note' => "Tell me a color (a name or a #hex) or a font and I'll repaint the whole page — e.g. \"make the accent navy\" or \"use a serif font\"." );
@@ -3303,8 +3400,10 @@ class PressGo_AI_Builder {
 			delete_post_meta( $post_id, self::META_COHESION_UNDO );
 			return array( 'note' => "I couldn't find that section on the page to update — nothing changed." );
 		}
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $elements ) ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, array_values( $elements ) ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't verify the section update, so I stopped." );
+		}
 		foreach ( $records as $i => $r ) {
 			if ( ( $r['pg_key'] ?? '' ) === $rec['pg_key'] ) {
 				$records[ $i ]['source_tree'] = $newtree;
@@ -3425,6 +3524,9 @@ class PressGo_AI_Builder {
 
 	/** Delete a section the user asked to remove (snapshot first so "undo" restores it). */
 	private function cohesion_delete_section( $post_id, $message, $selected_key = '' ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'note' => self::manual_edit_notice() );
+		}
 		$records = $this->ff_sections( $post_id );
 		if ( empty( $records ) ) { $records = $this->ff_backfill_records( $post_id ); }
 		if ( count( $records ) <= 1 ) {
@@ -3483,8 +3585,10 @@ class PressGo_AI_Builder {
 			return array( 'note' => "I couldn't safely find that section to remove — left the page as it is." );
 		}
 		array_splice( $records, $idx, 1 );
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $new ) ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, array_values( $new ) ) ) {
+			delete_post_meta( $post_id, self::META_COHESION_UNDO );
+			return array( 'note' => "I couldn't verify the section removal, so I stopped." );
+		}
 		$this->save_ff_sections( $post_id, $records );
 		$this->cohesion_flush( $post_id );
 
@@ -4134,6 +4238,10 @@ class PressGo_AI_Builder {
 
 	/** Recompose the hero with a tweak, replace the last section, return a fresh confirm. */
 	private function rebuild_hero( $post_id, $state, $nudge, $font_override = null ) {
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'chat_mode' => true, 'note' => self::manual_edit_notice() );
+		}
+
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
 		$brief       = (string) get_post_meta( $post_id, self::META_FREEFORM_BRIEF, true );
@@ -4163,8 +4271,9 @@ class PressGo_AI_Builder {
 
 		$elements = $this->read_elements( $post_id );
 		if ( ! empty( $elements ) ) { $elements[ count( $elements ) - 1 ] = $section; } else { $elements[] = $section; }
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, $elements ) ) {
+			return array( 'note' => "I couldn't verify the hero update, so I stopped." );
+		}
 		if ( class_exists( '\Elementor\Plugin' ) ) { \Elementor\Plugin::$instance->files_manager->clear_cache(); }
 
 		$palette                = $this->extract_hero_palette( $tree, $cfg );
@@ -5190,6 +5299,13 @@ class PressGo_AI_Builder {
 	//    self-contained modern landing page with NO Elementor widget constraints,
 	//    so we can compare the ceiling against the Elementor path. ──
 
+	/** Explicit developer-only opt-in. A configured provider key is not consent. */
+	private function unshackled_enabled() {
+		return defined( 'PRESSGO_UNSHACKLED' )
+			&& true === PRESSGO_UNSHACKLED
+			&& '' !== (string) get_option( 'pressgo_openrouter_key', '' );
+	}
+
 	/** Generate a complete self-contained HTML landing page from a brief, or ''. */
 	private function generate_unshackled_html( $brief ) {
 		$key = (string) get_option( 'pressgo_openrouter_key', '' );
@@ -5273,12 +5389,26 @@ class PressGo_AI_Builder {
 		$html = preg_replace( '#\b(href|src)\s*=\s*"(?:\s*javascript:)[^"]*"#i', '$1="#"', $html );
 		$html = preg_replace( "#\b(href|src)\s*=\s*'(?:\s*javascript:)[^']*'#i", '$1=\'#\'', $html );
 		$html = preg_replace( '#\b(href|src)\s*=\s*(?:javascript:)[^\s>]*#i', '$1="#"', $html );
+		// Remove document-level navigation/base controls and external stylesheets.
+		$html = preg_replace( '#<meta\b[^>]*http-equiv\s*=\s*["\']?(refresh|content-security-policy)["\']?[^>]*>#i', '', $html );
+		$html = preg_replace( '#<base\b[^>]*>|<link\b[^>]*rel\s*=\s*["\']?stylesheet["\']?[^>]*>#i', '', $html );
+		// Defense in depth for the explicit developer-only preview: no scripts,
+		// frames, forms, network calls, or external CSS can execute/load.
+		$csp = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src https: data:; style-src \'unsafe-inline\'; font-src https: data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\'">';
+		if ( preg_match( '#<head\b[^>]*>#i', $html ) ) {
+			$html = preg_replace( '#(<head\b[^>]*>)#i', '$1' . $csp, $html, 1 );
+		} else {
+			$html = $csp . $html;
+		}
 		return (string) $html;
 	}
 
 	/** AJAX: build the unshackled version and return its preview URL. */
 	public function ajax_unshackled() {
 		$this->check_auth();
+		if ( ! $this->unshackled_enabled() ) {
+			wp_send_json_error( 'Unshackled previews are disabled on this site.', 404 );
+		}
 		@set_time_limit( 300 ); // phpcs:ignore WordPress.PHP.IniSet
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) { wp_send_json_error( 'No post.', 400 ); }
@@ -5820,6 +5950,13 @@ class PressGo_AI_Builder {
 			// 'build_high' falls through to compose a new section.
 		}
 
+		// A new section append would otherwise re-stamp the whole live page and
+		// accidentally bless stale Freeform/MCP records after an Elementor edit.
+		// Chat and clarification paths above remain available without taking over.
+		if ( ! $page_empty && self::is_manually_modified( $post_id ) ) {
+			wp_send_json_success( array( 'chat_mode' => true, 'note' => self::manual_edit_notice() ) );
+		}
+
 		$prompt_path = PRESSGO_PLUGIN_DIR . 'includes/generator/freeform-composition-prompt.md';
 		$system      = is_readable( $prompt_path ) ? (string) file_get_contents( $prompt_path ) : '';
 		if ( '' === $system ) {
@@ -5963,8 +6100,10 @@ class PressGo_AI_Builder {
 		}
 		$elements[] = $section;
 
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, $elements ) ) {
+			self::nova_refund( self::$nova_last_gen, 'nova: Elementor write verification failed' );
+			wp_send_json_error( 'The section was generated but the page write could not be verified, so I stopped and refunded it.', 500 );
+		}
 		update_post_meta( $post_id, self::META_FREEFORM, 1 );
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
@@ -5988,8 +6127,7 @@ class PressGo_AI_Builder {
 			$recs_tb = $this->ff_sections( $post_id );
 			if ( count( $els_tb ) > 1 ) {
 				array_unshift( $els_tb, array_pop( $els_tb ) );
-				update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( array_values( $els_tb ) ) ) );
-				self::stamp_data_hash( $post_id );
+				self::persist_elementor_data( $post_id, array_values( $els_tb ) );
 			}
 			if ( count( $recs_tb ) > 1 ) {
 				array_unshift( $recs_tb, array_pop( $recs_tb ) );
@@ -7235,27 +7373,59 @@ class PressGo_AI_Builder {
 		// Optional inline images (drag/drop, paste, or file picker). Supports a
 		// JSON `images` array [{base64, mediaType}] for multi-select, and falls
 		// back to the legacy single image_base64/image_media_type fields.
-		$images = array();
+		$images            = array();
+		$total_image_bytes = 0;
+		$image_error       = '';
+		$max_image_bytes   = max( 1, (int) apply_filters( 'pressgo_chat_image_max_bytes', self::CHAT_IMAGE_MAX_BYTES ) );
+		$max_images_bytes  = max( $max_image_bytes, (int) apply_filters( 'pressgo_chat_images_max_bytes', self::CHAT_IMAGES_MAX_BYTES ) );
+		$accept_image = function ( $raw, $mime ) use ( &$images, &$total_image_bytes, &$image_error, $max_image_bytes, $max_images_bytes ) {
+			$b64  = preg_replace( '/\s+/', '', (string) $raw );
+			$mime = sanitize_text_field( (string) $mime );
+			if ( '' === $b64 ) { return; }
+			if ( ! preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
+				$image_error = 'Unsupported chat image type. Use PNG, JPEG, GIF, or WebP.';
+				return;
+			}
+			if ( ! preg_match( '#^[A-Za-z0-9+/]*={0,2}$#D', $b64 ) || 0 !== strlen( $b64 ) % 4 ) {
+				$image_error = 'A chat image contained invalid base64 data.';
+				return;
+			}
+			$padding = substr( $b64, -2 );
+			$bytes   = (int) ( strlen( $b64 ) * 3 / 4 ) - substr_count( $padding, '=' );
+			if ( $bytes > $max_image_bytes ) {
+				$image_error = sprintf( 'Each chat image must be %dMB or smaller.', (int) ceil( $max_image_bytes / MB_IN_BYTES ) );
+				return;
+			}
+			if ( $total_image_bytes + $bytes > $max_images_bytes ) {
+				$image_error = sprintf( 'Chat images must total %dMB or less.', (int) ceil( $max_images_bytes / MB_IN_BYTES ) );
+				return;
+			}
+			$total_image_bytes += $bytes;
+			$images[] = array( 'base64' => $b64, 'mime' => $mime );
+		};
 		if ( ! empty( $_POST['images'] ) ) {
-			$decoded_imgs = json_decode( wp_unslash( (string) $_POST['images'] ), true );
-			if ( is_array( $decoded_imgs ) ) {
+			$raw_images     = wp_unslash( (string) $_POST['images'] );
+			$max_json_bytes = (int) ceil( $max_images_bytes * 4 / 3 ) + 65536;
+			if ( strlen( $raw_images ) > $max_json_bytes ) {
+				wp_send_json_error( 'Chat images payload is too large.', 413 );
+			}
+			$decoded_imgs = json_decode( $raw_images, true );
+			if ( ! is_array( $decoded_imgs ) ) {
+				$image_error = 'Chat images payload must be a JSON array.';
+			} else {
 				foreach ( $decoded_imgs as $im ) {
 					if ( count( $images ) >= 8 ) break; // sane cap
 					if ( ! is_array( $im ) || empty( $im['base64'] ) ) continue;
-					$b64  = preg_replace( '/\s+/', '', (string) $im['base64'] );
-					$mime = isset( $im['mediaType'] ) ? sanitize_text_field( (string) $im['mediaType'] ) : '';
-					if ( $b64 && preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
-						$images[] = array( 'base64' => $b64, 'mime' => $mime );
-					}
+					$accept_image( $im['base64'], isset( $im['mediaType'] ) ? $im['mediaType'] : '' );
+					if ( '' !== $image_error ) break;
 				}
 			}
 		}
-		if ( empty( $images ) ) {
-			$b64  = isset( $_POST['image_base64'] ) ? preg_replace( '/\s+/', '', (string) $_POST['image_base64'] ) : '';
-			$mime = isset( $_POST['image_media_type'] ) ? sanitize_text_field( (string) $_POST['image_media_type'] ) : '';
-			if ( $b64 && preg_match( '#^image/(png|jpe?g|gif|webp)$#', $mime ) ) {
-				$images[] = array( 'base64' => $b64, 'mime' => $mime );
-			}
+		if ( empty( $images ) && '' === $image_error && ! empty( $_POST['image_base64'] ) ) {
+			$accept_image( $_POST['image_base64'], isset( $_POST['image_media_type'] ) ? $_POST['image_media_type'] : '' );
+		}
+		if ( '' !== $image_error ) {
+			wp_send_json_error( $image_error, 413 );
 		}
 		$has_images = ! empty( $images );
 
@@ -8688,6 +8858,7 @@ class PressGo_AI_Builder {
 	 */
 	private function render_partial( $post_id, $config ) {
 		if ( empty( $config['sections'] ) ) return false;
+		if ( self::is_manually_modified( $post_id ) ) return false;
 		if ( class_exists( 'PressGo_Config_Validator' ) ) {
 			$validated = PressGo_Config_Validator::validate( $config );
 			if ( is_wp_error( $validated ) ) return false;
@@ -8697,8 +8868,7 @@ class PressGo_AI_Builder {
 		$generator = new PressGo_Generator();
 		$elements  = $generator->generate( $config );
 		if ( empty( $elements ) ) return false;
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
-		self::stamp_data_hash( $post_id );
+		if ( ! self::persist_elementor_data( $post_id, $elements ) ) return false;
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
@@ -8723,6 +8893,9 @@ class PressGo_AI_Builder {
 	public function apply_config_to_post( $post_id, $config, $skip_snapshot = false ) {
 		if ( empty( $config ) || ! is_array( $config ) ) {
 			return array( 'ok' => false, 'error' => 'empty config' );
+		}
+		if ( self::is_manually_modified( $post_id ) ) {
+			return array( 'ok' => false, 'error' => self::manual_edit_notice() );
 		}
 
 		// The AI emits sections either as type-name strings or as objects with
@@ -8794,10 +8967,14 @@ class PressGo_AI_Builder {
 			$this->snapshot_revision( $post_id );
 		}
 
-		// Store the source config so future EDITS get a clean, readable config
-		// (not the verbose rendered Elementor JSON). This is what lets the AI know
-		// it's editing an existing page — business, sections, colors are all
-		// right there — instead of interrogating from scratch.
+		// Write and exact-readback verify BEFORE updating the source config or
+		// switching builder ownership. A rejected meta write must leave the old
+		// source/target relationship intact.
+		if ( ! self::persist_elementor_data( $post_id, $elements ) ) {
+			return array( 'ok' => false, 'error' => 'apply verification failed: intended _elementor_data did not persist exactly' );
+		}
+
+		// Store the source config only after the rendered output is durable.
 		update_post_meta( $post_id, self::META_AI_CONFIG, wp_slash( wp_json_encode( $config ) ) );
 
 		// Elementor apply: stamp the target + strip other builders' claims (a
@@ -8806,11 +8983,6 @@ class PressGo_AI_Builder {
 			PressGo_Render_Targets::neutralize_other_targets( $post_id, 'elementor' );
 			update_post_meta( $post_id, '_pressgo_target_builder', 'elementor' );
 		}
-
-		// Use page-creator's writer if available; otherwise raw write + cache clear.
-		$encoded = wp_json_encode( $elements );
-		update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
-		self::stamp_data_hash( $post_id );
 		update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 		update_post_meta( $post_id, '_elementor_template_type', 'wp-page' );
 		update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
@@ -8866,17 +9038,6 @@ class PressGo_AI_Builder {
 			}
 		}
 
-		// Verify the write actually landed before claiming success. A DB-level
-		// truncation (utf8 postmeta + a 4-byte char), max_allowed_packet, or a
-		// meta-filtering security plugin can leave _elementor_data empty while
-		// update_post_meta reports nothing — the user then sees "Built" over a
-		// blank page and never gets refunded. Failing here routes into the
-		// existing apply_error + refund path.
-		$readback = get_post_meta( $post_id, '_elementor_data', true );
-		$decoded  = is_string( $readback ) && '' !== $readback ? json_decode( $readback, true ) : null;
-		if ( ! is_array( $decoded ) || 0 === count( $decoded ) ) {
-			return array( 'ok' => false, 'error' => 'apply verification failed: _elementor_data is empty or invalid after write' );
-		}
 		return array( 'ok' => true );
 	}
 }

@@ -35,10 +35,18 @@ class PressGo_Page_Creator {
 			return $post_id;
 		}
 
-		// Store Elementor data. Must be stored as JSON string, not serialized.
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
-		// F1: stamp the manual-edit guard against this initial PressGo write.
-		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
+		// Store and exact-readback verify Elementor data before reporting a page.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) {
+			$stored = PressGo_AI_Builder::persist_elementor_data( $post_id, $elements );
+		} else {
+			$encoded = wp_json_encode( $elements );
+			update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
+			clean_post_cache( $post_id );
+			$stored = hash_equals( hash( 'sha256', $encoded ), hash( 'sha256', (string) get_post_meta( $post_id, '_elementor_data', true ) ) );
+		}
+		if ( ! $stored ) {
+			return new WP_Error( 'pressgo_write_failed', 'The page draft was created, but its Elementor data could not be verified.', array( 'post_id' => $post_id ) );
+		}
 
 		// Page settings: hide title + custom CSS.
 		$page_settings = array( 'hide_title' => 'yes' );

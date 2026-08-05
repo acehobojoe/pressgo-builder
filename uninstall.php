@@ -26,6 +26,20 @@ foreach ( array( 'pressgo_mcp_tokens', 'pressgo_mcp_clients', 'pressgo_mcp_codes
 }
 
 // ── Options ──
+$pressgo_site_icon_backup  = get_option( 'pressgo_site_icon_backup', null );
+$pressgo_site_icon_applied = (int) get_option( 'pressgo_site_icon_applied', 0 );
+if ( is_array( $pressgo_site_icon_backup )
+	&& $pressgo_site_icon_applied > 0
+	&& (int) get_option( 'site_icon', 0 ) === $pressgo_site_icon_applied ) {
+	// Restore only when the icon is still the value PressGo applied. If the
+	// owner changed it afterward, their newer choice wins.
+	if ( ! empty( $pressgo_site_icon_backup['had_value'] ) ) {
+		update_option( 'site_icon', $pressgo_site_icon_backup['value'] );
+	} else {
+		delete_option( 'site_icon' );
+	}
+}
+
 $pressgo_options = array(
 	'pressgo_account_key',
 	'pressgo_api_key',
@@ -36,19 +50,27 @@ $pressgo_options = array(
 	'pressgo_daily_usage',
 	'pressgo_freeform_key',
 	'pressgo_globals_locked',
+	'pressgo_global_footer',
+	'pressgo_global_header',
 	'pressgo_hand_raise_done',
 	'pressgo_hand_raise_shown',
 	'pressgo_mcp_db_version',
 	'pressgo_mcp_enabled',
+	'pressgo_master_profile',
 	'pressgo_model',
 	'pressgo_openrouter_key',
 	'pressgo_pexels_key',
+	'pressgo_pro_key',
 	'pressgo_review_ask_done',
 	'pressgo_review_ask_shown',
 	'pressgo_screenshot_url',
 	'pressgo_share_telemetry',
+	'pressgo_install_id',
+	'pressgo_site_icon_applied',
+	'pressgo_site_icon_backup',
 	'pressgo_target_builder',
 	'pressgo_thumb_cache_v2',
+	'pressgo_telemetry_decision',
 	'pressgo_usage_tier',
 	'pressgo_use_site_brand',
 	'pressgo_version',
@@ -57,8 +79,12 @@ foreach ( $pressgo_options as $pressgo_opt ) {
 	delete_option( $pressgo_opt );
 }
 
-// Prefixed options (per-user free-create counters).
-$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'pressgo\\_free\\_creates\\_%'" );
+// Prefixed options (per-user free-create counters + uploads URL probes).
+$wpdb->query(
+	"DELETE FROM {$wpdb->options}
+	 WHERE option_name LIKE 'pressgo\\_free\\_creates\\_%'
+	    OR option_name LIKE 'pressgo\\_thumb\\_url\\_ok\\_%'"
+);
 
 // ── Transients (value + timeout rows) ──
 $wpdb->query(
@@ -78,6 +104,8 @@ $pressgo_meta_keys = array(
 	'_pressgo_ai_label',
 	'_pressgo_brand_optout',
 	'_pressgo_brand_version',
+	'_pressgo_brief',
+	'_pressgo_brief_name',
 	'_pressgo_built',
 	'_pressgo_chat_import',
 	'_pressgo_chat_log',

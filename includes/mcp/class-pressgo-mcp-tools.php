@@ -806,7 +806,7 @@ class PressGo_MCP_Tools {
 
 		$err = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
-		$pause = self::check_pause( $post_id, $args );
+		$pause = self::guard_write_state( $post_id, $args );
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! in_array( $type, self::VALID_SECTION_TYPES, true ) ) {
 			return new WP_Error( 'mcp_bad_args', "Unknown section type: {$type}" );
@@ -851,7 +851,10 @@ class PressGo_MCP_Tools {
 		// Append to existing _elementor_data.
 		$existing = self::read_elementor_data( $post_id );
 		$existing[] = $elements[0];
-		self::write_elementor_data( $post_id, $existing );
+		if ( ! self::write_elementor_data( $post_id, $existing ) ) {
+			self::discard_last_undo( $post_id );
+			return new WP_Error( 'mcp_write_failed', 'The Elementor write could not be verified. Nothing was reported as built.' );
+		}
 
 		// Track the original config so update_section can re-render later.
 		self::append_section_record( $post_id, $type, $variant, $data );
@@ -863,7 +866,7 @@ class PressGo_MCP_Tools {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
-		$pause = self::check_pause( $post_id, $args );
+		$pause = self::guard_write_state( $post_id, $args );
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! isset( $args['sections'] ) || ! is_array( $args['sections'] ) || ! $args['sections'] ) {
 			return new WP_Error( 'mcp_bad_args', '`sections` must be a non-empty array.' );
@@ -932,7 +935,10 @@ class PressGo_MCP_Tools {
 		self::push_undo( $post_id, 'add_sections (' . count( $built ) . ')' );
 
 		// Single DB write for the entire batch.
-		self::write_elementor_data( $post_id, $existing );
+		if ( ! self::write_elementor_data( $post_id, $existing ) ) {
+			self::discard_last_undo( $post_id );
+			return new WP_Error( 'mcp_write_failed', 'The Elementor batch write could not be verified. Nothing was reported as built.' );
+		}
 		update_post_meta( $post_id, '_pressgo_sections', $records );
 
 		$note = 'Built ' . count( $built ) . ' section(s): ' . implode( ', ', $built );
@@ -960,7 +966,7 @@ class PressGo_MCP_Tools {
 
 		$err = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
-		$pause = self::check_pause( $post_id, $args );
+		$pause = self::guard_write_state( $post_id, $args );
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		if ( ! in_array( $type, self::VALID_SECTION_TYPES, true ) ) {
 			return new WP_Error( 'mcp_bad_args', "Unknown section type: {$type}" );
@@ -1022,7 +1028,10 @@ class PressGo_MCP_Tools {
 		self::push_undo( $post_id, "update_section {$index} → {$type}" . ( $variant ? "/{$variant}" : '' ) );
 
 		$existing[ $index ] = $elements[0];
-		self::write_elementor_data( $post_id, $existing );
+		if ( ! self::write_elementor_data( $post_id, $existing ) ) {
+			self::discard_last_undo( $post_id );
+			return new WP_Error( 'mcp_write_failed', 'The Elementor section update could not be verified. Nothing was reported as changed.' );
+		}
 
 		self::replace_section_record( $post_id, $index, $type, $variant, $data );
 
@@ -1056,7 +1065,7 @@ class PressGo_MCP_Tools {
 		$post_id = (int) ( $args['post_id'] ?? 0 );
 		$err     = self::guard_post( $post_id, $user );
 		if ( is_wp_error( $err ) ) { return $err; }
-		$pause = self::check_pause( $post_id, $args );
+		$pause = self::guard_write_state( $post_id, $args );
 		if ( is_wp_error( $pause ) ) { return $pause; }
 		$lock = self::check_globals_lock( $args );
 		if ( is_wp_error( $lock ) ) { return $lock; }
@@ -1389,6 +1398,7 @@ class PressGo_MCP_Tools {
 		$skipped = 0;
 		foreach ( $pages as $pid ) {
 			if ( ! user_can( $user, 'edit_post', $pid ) ) { $skipped++; continue; }
+			if ( class_exists( 'PressGo_AI_Builder' ) && PressGo_AI_Builder::is_manually_modified( $pid ) ) { $skipped++; continue; }
 			if ( self::apply_global_section( $pid, $kind, $tpl ) ) {
 				$count++;
 			}
@@ -1425,8 +1435,7 @@ class PressGo_MCP_Tools {
 			$elements[] = $built;
 		}
 
-		self::write_elementor_data( $post_id, $elements );
-		return true;
+		return self::write_elementor_data( $post_id, $elements );
 	}
 
 	/**
@@ -2587,6 +2596,22 @@ class PressGo_MCP_Tools {
 		) );
 	}
 
+	/** Block every incremental Elementor mutation when live data has diverged. */
+	private static function guard_write_state( $post_id, $args = array() ) {
+		$pause = self::check_pause( $post_id, $args );
+		if ( is_wp_error( $pause ) || ! empty( $args['force'] ) ) {
+			return $pause;
+		}
+		if ( class_exists( 'PressGo_AI_Builder' ) && PressGo_AI_Builder::is_manually_modified( $post_id ) ) {
+			return new WP_Error(
+				'mcp_manual_edits',
+				PressGo_AI_Builder::manual_edit_notice() . ' If the user explicitly accepts replacing those edits, retry with force=true.',
+				array( 'status' => 409 )
+			);
+		}
+		return null;
+	}
+
 	public static function read_elementor_data( $post_id ) {
 		$raw = get_post_meta( $post_id, '_elementor_data', true );
 		if ( empty( $raw ) ) {
@@ -2701,13 +2726,26 @@ class PressGo_MCP_Tools {
 			foreach ( self::undo_target_meta_keys() as $mk ) {
 				if ( array_key_exists( $mk, $snap['target_metas'] ) ) {
 					$v = $snap['target_metas'][ $mk ];
+					if ( '_elementor_data' === $mk ) {
+						if ( ! self::write_elementor_data( $post_id, $v ) ) {
+							$stack[] = $snap;
+							update_post_meta( $post_id, self::UNDO_STACK_KEY, wp_slash( $stack ) );
+							return new WP_Error( 'mcp_write_failed', 'The undo Elementor write could not be verified; the undo level was preserved.' );
+						}
+						continue;
+					}
 					update_post_meta( $post_id, $mk, ( is_string( $v ) || is_array( $v ) ) ? wp_slash( $v ) : $v );
 				} else {
 					delete_post_meta( $post_id, $mk );
+					if ( '_elementor_data' === $mk ) { delete_post_meta( $post_id, '_pressgo_data_hash' ); }
 				}
 			}
 		} elseif ( isset( $snap['elementor_data'] ) ) {
-			update_post_meta( $post_id, '_elementor_data', wp_slash( $snap['elementor_data'] ) );
+			if ( ! self::write_elementor_data( $post_id, $snap['elementor_data'] ) ) {
+				$stack[] = $snap;
+				update_post_meta( $post_id, self::UNDO_STACK_KEY, wp_slash( $stack ) );
+				return new WP_Error( 'mcp_write_failed', 'The undo Elementor write could not be verified; the undo level was preserved.' );
+			}
 		}
 		if ( array_key_exists( 'config', $snap ) ) {
 			if ( '' === $snap['config'] || null === $snap['config'] ) {
@@ -2731,8 +2769,6 @@ class PressGo_MCP_Tools {
 		if ( isset( $snap['page_settings'] ) ) {
 			update_post_meta( $post_id, '_elementor_page_settings', wp_slash( $snap['page_settings'] ?: array() ) );
 		}
-		// F1: re-arm the manual-edit guard against the restored state.
-		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 		// Bust caches so the next read/render is fresh.
 		clean_post_cache( $post_id );
 		if ( function_exists( 'rocket_clean_post' ) ) {
@@ -2751,7 +2787,20 @@ class PressGo_MCP_Tools {
 	}
 
 	public static function write_elementor_data( $post_id, $elements ) {
-		update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
+		if ( class_exists( 'PressGo_AI_Builder' ) ) {
+			if ( ! PressGo_AI_Builder::persist_elementor_data( $post_id, $elements ) ) {
+				return false;
+			}
+		} else {
+			$encoded = is_array( $elements ) ? wp_json_encode( $elements ) : (string) $elements;
+			if ( false === $encoded || '' === $encoded ) { return false; }
+			update_post_meta( $post_id, '_elementor_data', wp_slash( $encoded ) );
+			clean_post_cache( $post_id );
+			$readback = get_post_meta( $post_id, '_elementor_data', true );
+			if ( ! is_string( $readback ) || ! hash_equals( hash( 'sha256', $encoded ), hash( 'sha256', $readback ) ) ) {
+				return false;
+			}
+		}
 
 		// Bump post_modified so caches downstream (object cache, CDN, page
 		// cache plugins) see a new version. Without this WP serves stale
@@ -2777,9 +2826,6 @@ class PressGo_MCP_Tools {
 		if ( get_post_meta( $post_id, '_wp_page_template', true ) !== 'elementor_canvas' ) {
 			update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
 		}
-
-		// F1: re-stamp the manual-edit guard so this PressGo write is canonical.
-		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 
 		// Bust the WP object cache for this post.
 		clean_post_cache( $post_id );
@@ -2820,9 +2866,12 @@ class PressGo_MCP_Tools {
 			rocket_clean_post( $post_id );
 		}
 		do_action( 'clean_post_cache', $post_id, get_post( $post_id ) );
+		return true;
 	}
 
 	const BRAND_FOUNDATION_OPTION = 'pressgo_brand_foundation';
+	const SITE_ICON_BACKUP_OPTION = 'pressgo_site_icon_backup';
+	const SITE_ICON_APPLIED_OPTION = 'pressgo_site_icon_applied';
 
 	/** The site's saved brand foundation (design system), or empty array. */
 	public static function brand_foundation() {
@@ -2882,7 +2931,15 @@ class PressGo_MCP_Tools {
 		update_option( self::BRAND_FOUNDATION_OPTION, $f );
 		// A favicon is only "applied" when WordPress knows it as the site icon.
 		if ( ! empty( $f['favicon_url_id'] ) && get_post( (int) $f['favicon_url_id'] ) ) {
-			update_option( 'site_icon', (int) $f['favicon_url_id'] );
+			$backup = get_option( self::SITE_ICON_BACKUP_OPTION, null );
+			if ( ! is_array( $backup ) ) {
+				$prior = get_option( 'site_icon', null );
+				$backup = array( 'had_value' => null !== $prior, 'value' => $prior );
+				update_option( self::SITE_ICON_BACKUP_OPTION, $backup, false );
+			}
+			$applied = (int) $f['favicon_url_id'];
+			update_option( 'site_icon', $applied );
+			update_option( self::SITE_ICON_APPLIED_OPTION, $applied, false );
 		}
 		return $f;
 	}
@@ -2992,8 +3049,7 @@ class PressGo_MCP_Tools {
 				$elements[ $i ] = $built[0];
 			}
 		}
-		self::write_elementor_data( $post_id, $elements );
-		return true;
+		return self::write_elementor_data( $post_id, $elements );
 	}
 
 	private static function stamp_pressgo_meta( $post_id, $config ) {
