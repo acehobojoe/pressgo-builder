@@ -2,9 +2,10 @@
 /**
  * Fired when the plugin is uninstalled.
  *
- * Removes every option, transient, and post-meta key the plugin writes.
- * Generated pages themselves are left intact — they are the user's content
- * and render through Elementor without this plugin.
+ * Removes every option, transient, post-meta key, and user-meta key the plugin
+ * writes, drops the four MCP tables, and deletes the plugin-created uploads
+ * directories. Generated pages themselves are left intact — they are the user's
+ * content and render through Elementor without this plugin.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -14,16 +15,30 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 // ── Scheduled events ──
 wp_clear_scheduled_hook( 'pressgo_mcp_prune' );
 
+global $wpdb;
+
+// ── MCP tables ──
+// The storage class is not loaded during uninstall, so the table names are
+// inlined here (schema source: includes/mcp/class-pressgo-mcp-storage.php).
+// Dropped before the options cleanup so pressgo_mcp_db_version goes with them.
+foreach ( array( 'pressgo_mcp_tokens', 'pressgo_mcp_clients', 'pressgo_mcp_codes', 'pressgo_mcp_events' ) as $pressgo_table ) {
+	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}{$pressgo_table}" ); // phpcs:ignore WordPress.DB
+}
+
 // ── Options ──
 $pressgo_options = array(
 	'pressgo_account_key',
 	'pressgo_api_key',
 	'pressgo_api_mode',
+	'pressgo_brand_foundation',
 	'pressgo_brand_light_hero',
 	'pressgo_build_count',
 	'pressgo_daily_usage',
 	'pressgo_freeform_key',
 	'pressgo_globals_locked',
+	'pressgo_hand_raise_done',
+	'pressgo_hand_raise_shown',
+	'pressgo_mcp_db_version',
 	'pressgo_mcp_enabled',
 	'pressgo_model',
 	'pressgo_openrouter_key',
@@ -33,7 +48,7 @@ $pressgo_options = array(
 	'pressgo_screenshot_url',
 	'pressgo_share_telemetry',
 	'pressgo_target_builder',
-	'pressgo_thumb_cache_v',
+	'pressgo_thumb_cache_v2',
 	'pressgo_usage_tier',
 	'pressgo_use_site_brand',
 	'pressgo_version',
@@ -41,8 +56,6 @@ $pressgo_options = array(
 foreach ( $pressgo_options as $pressgo_opt ) {
 	delete_option( $pressgo_opt );
 }
-
-global $wpdb;
 
 // Prefixed options (per-user free-create counters).
 $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'pressgo\\_free\\_creates\\_%'" );
@@ -87,4 +100,49 @@ $pressgo_meta_keys = array(
 );
 foreach ( $pressgo_meta_keys as $pressgo_key ) {
 	delete_post_meta_by_key( $pressgo_key );
+}
+
+// ── User meta ──
+delete_metadata( 'user', 0, 'pressgo_user_profile', '', true );
+delete_metadata( 'user', 0, 'pressgo_byom_notice_dismissed', '', true );
+
+// ── Plugin-created uploads directories ──
+/**
+ * Recursively delete a directory, but only when it genuinely sits under the
+ * uploads basedir (realpath check defeats symlink/traversal surprises).
+ * Self-contained (no WP_Filesystem), PHP 7.4-safe; per-file failures are
+ * silenced so a stray unreadable file can't abort the uninstall.
+ */
+function pressgo_uninstall_rrmdir( $target, $base ) {
+	$real_base = realpath( $base );
+	$real_dir  = realpath( $target );
+	if ( ! $real_base || ! $real_dir || ! is_dir( $real_dir ) ) {
+		return;
+	}
+	if ( 0 !== strpos( $real_dir . DIRECTORY_SEPARATOR, rtrim( $real_base, DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR ) ) {
+		return; // not under uploads basedir — refuse to touch it
+	}
+	$items = scandir( $real_dir );
+	if ( is_array( $items ) ) {
+		foreach ( $items as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$path = $real_dir . DIRECTORY_SEPARATOR . $item;
+			if ( is_dir( $path ) ) {
+				pressgo_uninstall_rrmdir( $path, $real_base );
+			} else {
+				@unlink( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+			}
+		}
+	}
+	@rmdir( $real_dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+}
+
+$pressgo_upload    = wp_upload_dir();
+$pressgo_basedir   = isset( $pressgo_upload['basedir'] ) ? $pressgo_upload['basedir'] : '';
+if ( $pressgo_basedir ) {
+	foreach ( array( '.pressgo-uploads', 'pressgo-thumbs', 'pg-unshackled' ) as $pressgo_dir ) {
+		pressgo_uninstall_rrmdir( trailingslashit( $pressgo_basedir ) . $pressgo_dir, $pressgo_basedir );
+	}
 }
