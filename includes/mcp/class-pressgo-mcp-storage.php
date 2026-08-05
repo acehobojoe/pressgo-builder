@@ -274,7 +274,7 @@ class PressGo_MCP_Storage {
 	}
 
 	/**
-	 * Rotate an OAuth refresh token. On success deletes the old record and
+	 * Rotate an OAuth refresh token. On success revokes the old record and
 	 * issues a new pair, returning it. Returns null on invalid/expired.
 	 */
 	public static function rotate_refresh_token( $refresh ) {
@@ -290,13 +290,15 @@ class PressGo_MCP_Storage {
 		if ( ! empty( $row['refresh_expires_at'] ) && strtotime( $row['refresh_expires_at'] . ' UTC' ) < time() ) {
 			return null;
 		}
-		// Issue a new pair, then revoke the old.
-		$new = self::create_oauth_token( $row['user_id'], $row['client_id'], $row['scope'] );
-		$wpdb->update( $tables['tokens'],
-			array( 'revoked_at' => self::now() ),
-			array( 'id' => $row['id'] )
-		);
-		return $new;
+		// Atomically claim the old token; only the winner mints a new pair.
+		$affected = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$tables['tokens']} SET revoked_at = %s WHERE id = %d AND revoked_at IS NULL",
+			self::now(), (int) $row['id']
+		) );
+		if ( 1 !== $affected ) {
+			return null;
+		}
+		return self::create_oauth_token( $row['user_id'], $row['client_id'], $row['scope'] );
 	}
 
 	public static function list_tokens( $user_id = null, $type = null ) {
@@ -449,10 +451,13 @@ class PressGo_MCP_Storage {
 		if ( strtotime( $row['expires_at'] . ' UTC' ) < time() ) {
 			return null;
 		}
-		$wpdb->update( $tables['codes'],
-			array( 'used_at' => self::now() ),
-			array( 'id' => $row['id'] )
-		);
+		$affected = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$tables['codes']} SET used_at = %s WHERE id = %d AND used_at IS NULL",
+			self::now(), (int) $row['id']
+		) );
+		if ( 1 !== $affected ) {
+			return null; // Lost the race: another request already consumed it.
+		}
 		return $row;
 	}
 

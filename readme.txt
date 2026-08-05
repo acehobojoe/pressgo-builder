@@ -194,6 +194,7 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 = 2.5.11 =
 * Fixed: paid PressGo plans (Pro/Max/Ultra and legacy Plus/Agency) are now recognized by the MCP tools and daily build meter; previously some paid accounts were limited as free.
+* Security hardening for the MCP server: tool-call logs no longer store full arguments and are pruned after 30 days, OAuth client registration is rate-limited, and authorization codes and refresh tokens are strictly single-use
 
 = 2.5.10 =
 * Add your own content, your way: type your own answer to any setup question, paste in as much copy as you want, or drop in a text file and the builder builds from it. The prompt box is bigger and makes it obvious
