@@ -38,14 +38,14 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 		<!-- Pro upgrade card -->
 		<div class="pressgo-card pressgo-pro-promo">
 			<div class="pressgo-pro-promo-text">
-				<strong style="display:block;font-size:15px;margin-bottom:4px;">Unlock PressGo Plus &mdash; $12/mo</strong>
+				<strong style="display:block;font-size:15px;margin-bottom:4px;">Unlock PressGo Pro &mdash; from $25/mo</strong>
 				<span style="opacity:0.9;font-size:13px;">
 					Site-wide header &amp; footer editing across every page. Set them once via Claude,
 					they apply to your whole PressGo site. More Pro features rolling out.
 				</span>
 			</div>
 			<a class="button button-hero pressgo-pro-cta" href="<?php echo esc_url( $upgrade_url ); ?>" target="_blank" rel="noopener">
-				Start Pro Trial &rarr;
+				Upgrade &rarr;
 			</a>
 		</div>
 	<?php endif; ?>

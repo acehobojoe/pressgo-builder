@@ -7,7 +7,8 @@
  * tools/call response, or a WP_Error.
  *
  * All tools require an authenticated WP user with edit_pages capability.
- * Capability checks live in PressGo_MCP_Server::dispatch_tool().
+ * Capability checks live in PressGo_MCP_Tools::call() (the site-wide tool
+ * capability matrix) and guard_post() (per-post edit checks).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -239,7 +240,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide header (logo + nav + primary CTA) for every PressGo page on this site. " .
 					"Pass `items` as ordered nav links and a `cta` for the primary button. The header gets injected " .
-					"as the first section on every PressGo-built page. Requires PressGo Plus ($12/mo).",
+					"as the first section on every PressGo-built page. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard). Requires an administrator-level connection.",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -256,7 +257,7 @@ class PressGo_MCP_Tools {
 				'description' =>
 					"Pro: set the site-wide footer for every PressGo page on this site. Pass `brand`, `columns` " .
 					"(link sections), and optional `social`. The footer gets injected as the last section on every " .
-					"PressGo-built page. Requires PressGo Plus ($12/mo).",
+					"PressGo-built page. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard). Requires an administrator-level connection.",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -271,12 +272,12 @@ class PressGo_MCP_Tools {
 			),
 			array(
 				'name'        => 'get_header',
-				'description' => "Pro: read the current site-wide header template. Requires PressGo Plus ($12/mo).",
+				'description' => "Pro: read the current site-wide header template. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 			array(
 				'name'        => 'get_footer',
-				'description' => "Pro: read the current site-wide footer template. Requires PressGo Plus ($12/mo).",
+				'description' => "Pro: read the current site-wide footer template. Requires a paid PressGo plan (Pro $25/mo and up — pressgo.app/dashboard).",
 				'inputSchema' => array( 'type' => 'object', 'properties' => new stdClass() ),
 			),
 
@@ -426,7 +427,7 @@ class PressGo_MCP_Tools {
 					"reference), and update it whenever the brand changes. It persists across all chats and is " .
 					"auto-injected into your initialize instructions, so future sessions start from the same design " .
 					"system instead of re-deriving colors and fonts from scratch. New pages inherit these tokens by " .
-					"default. All fields optional — pass only what you've established.",
+					"default. All fields optional — pass only what you've established. Requires an administrator-level connection.",
 				'inputSchema' => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -514,6 +515,19 @@ class PressGo_MCP_Tools {
 		if ( ! is_array( $args ) ) {
 			$args = (array) $args;
 		}
+
+		// F4: site-wide tools need more than the base edit_pages gate.
+		$tool_caps = array(
+			'set_brand_foundation' => 'manage_options',
+			'set_header'           => 'manage_options',
+			'set_footer'           => 'manage_options',
+			'list_recent_media'    => 'upload_files',
+		);
+		if ( isset( $tool_caps[ $name ] ) && ! user_can( $user, $tool_caps[ $name ] ) ) {
+			return new WP_Error( 'mcp_forbidden',
+				"`{$name}` changes site-wide settings and requires an administrator-level connection ({$tool_caps[$name]}). Ask the site owner to run this, or reconnect with an administrator account." );
+		}
+
 		switch ( $name ) {
 			case 'create_page':     return self::create_page( $args, $user );
 			case 'add_section':     return self::add_section( $args, $user );
@@ -1071,15 +1085,18 @@ class PressGo_MCP_Tools {
 		self::set_page_globals( $post_id, $globals );
 
 		// Re-render existing sections with new globals so the live page reflects the change.
-		self::rerender_all_sections( $post_id, $globals );
-
-		return self::page_summary( $post_id, "Globals updated. Existing sections were re-rendered with the new palette/fonts/layout." );
+		$rerendered = self::rerender_all_sections( $post_id, $globals );
+		$note = $rerendered
+			? 'Globals updated. Existing sections were re-rendered with the new palette/fonts/layout.'
+			: 'Globals updated and saved, but existing sections were NOT re-rendered: this page has manual Elementor edits since PressGo last wrote it, and a positional re-render could overwrite the wrong section. New sections will use the new globals. To re-render existing sections, restore a PressGo version from the page History first.';
+		return self::page_summary( $post_id, $note );
 	}
 
 	private static function list_pages( $args, $user ) {
-		$limit  = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
-		$status = isset( $args['status'] ) ? sanitize_key( $args['status'] ) : 'any';
-		$states = ( 'any' === $status ) ? array( 'draft', 'publish' ) : array( $status );
+		$limit   = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
+		$status  = isset( $args['status'] ) ? sanitize_key( $args['status'] ) : 'any';
+		$allowed = array( 'draft', 'publish', 'pending', 'private' );
+		$states  = in_array( $status, $allowed, true ) ? array( $status ) : array( 'draft', 'publish' );
 
 		$query  = new WP_Query( array(
 			'post_type'      => 'page',
@@ -1094,6 +1111,7 @@ class PressGo_MCP_Tools {
 
 		$out = array();
 		foreach ( $query->posts as $p ) {
+			if ( ! user_can( $user, 'edit_post', $p->ID ) ) { continue; }
 			$out[] = array(
 				'post_id'     => (int) $p->ID,
 				'title'       => $p->post_title,
@@ -1265,8 +1283,8 @@ class PressGo_MCP_Tools {
 		if ( ! $license->is_pro() ) {
 			$upgrade_url = PressGo_License::upgrade_url();
 			return new WP_Error( 'mcp_pro_required',
-				"`{$name}` requires PressGo Plus ($12/mo). The user can upgrade at {$upgrade_url} — " .
-				"once they enter their license key in PressGo > MCP Server, this tool unlocks immediately."
+				"`{$name}` requires a paid PressGo plan (Pro $25/mo and up). The user can upgrade at {$upgrade_url} — " .
+				"once their pressgo.app account is on a paid plan (or they enter a license key in PressGo > MCP Server), this tool unlocks immediately."
 			);
 		}
 		switch ( $name ) {
@@ -1291,11 +1309,17 @@ class PressGo_MCP_Tools {
 		);
 		update_option( self::HEADER_OPTION, $tpl );
 		// Re-apply to every PressGo-built page.
-		$count = self::sync_global_section( 'header', $tpl );
+		$result  = self::sync_global_section( 'header', $tpl, $user );
+		$count   = $result['updated'];
+		$skipped = $result['skipped'];
+		$text    = "Header updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)";
+		if ( $skipped > 0 ) {
+			$text .= " ({$skipped} page(s) skipped: no edit permission.)";
+		}
 		return array(
 			'content' => array( array(
 				'type' => 'text',
-				'text' => "Header updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)",
+				'text' => $text,
 			) ),
 			'structuredContent' => array( 'header' => $tpl, 'pages_updated' => $count ),
 		);
@@ -1311,11 +1335,17 @@ class PressGo_MCP_Tools {
 			'updated'   => time(),
 		);
 		update_option( self::FOOTER_OPTION, $tpl );
-		$count = self::sync_global_section( 'footer', $tpl );
+		$result  = self::sync_global_section( 'footer', $tpl, $user );
+		$count   = $result['updated'];
+		$skipped = $result['skipped'];
+		$text    = "Footer updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)";
+		if ( $skipped > 0 ) {
+			$text .= " ({$skipped} page(s) skipped: no edit permission.)";
+		}
 		return array(
 			'content' => array( array(
 				'type' => 'text',
-				'text' => "Footer updated and applied to {$count} PressGo page(s). (Elementor pages only — pages rendering through gutenberg/divi/bricks are skipped.)",
+				'text' => $text,
 			) ),
 			'structuredContent' => array( 'footer' => $tpl, 'pages_updated' => $count ),
 		);
@@ -1346,7 +1376,7 @@ class PressGo_MCP_Tools {
 	 * Storage convention: we tag injected sections with `_pressgo_global` in
 	 * the section settings so we can find + replace them on next sync.
 	 */
-	private static function sync_global_section( $kind, $tpl ) {
+	private static function sync_global_section( $kind, $tpl, $user ) {
 		$pages = get_posts( array(
 			'post_type'      => 'page',
 			'post_status'    => array( 'draft', 'publish', 'pending', 'private' ),
@@ -1355,13 +1385,15 @@ class PressGo_MCP_Tools {
 			'meta_value'     => '1',
 			'fields'         => 'ids',
 		) );
-		$count = 0;
+		$count   = 0;
+		$skipped = 0;
 		foreach ( $pages as $pid ) {
+			if ( ! user_can( $user, 'edit_post', $pid ) ) { $skipped++; continue; }
 			if ( self::apply_global_section( $pid, $kind, $tpl ) ) {
 				$count++;
 			}
 		}
-		return $count;
+		return array( 'updated' => $count, 'skipped' => $skipped );
 	}
 
 	/**
@@ -1893,14 +1925,18 @@ class PressGo_MCP_Tools {
 
 		$after = gmdate( 'Y-m-d H:i:s', time() - ( $since_minutes * 60 ) );
 
-		$attachments = get_posts( array(
+		$query_args = array(
 			'post_type'      => 'attachment',
 			'post_status'    => 'inherit',
 			'posts_per_page' => $limit,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 			'date_query'     => array( array( 'column' => 'post_date_gmt', 'after' => $after ) ),
-		) );
+		);
+		if ( ! user_can( $user, 'edit_others_posts' ) ) {
+			$query_args['author'] = (int) $user->ID;
+		}
+		$attachments = get_posts( $query_args );
 
 		$out = array();
 		foreach ( $attachments as $att ) {
@@ -2695,6 +2731,8 @@ class PressGo_MCP_Tools {
 		if ( isset( $snap['page_settings'] ) ) {
 			update_post_meta( $post_id, '_elementor_page_settings', wp_slash( $snap['page_settings'] ?: array() ) );
 		}
+		// F1: re-arm the manual-edit guard against the restored state.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 		// Bust caches so the next read/render is fresh.
 		clean_post_cache( $post_id );
 		if ( function_exists( 'rocket_clean_post' ) ) {
@@ -2739,6 +2777,9 @@ class PressGo_MCP_Tools {
 		if ( get_post_meta( $post_id, '_wp_page_template', true ) !== 'elementor_canvas' ) {
 			update_post_meta( $post_id, '_wp_page_template', 'elementor_canvas' );
 		}
+
+		// F1: re-stamp the manual-edit guard so this PressGo write is canonical.
+		if ( class_exists( 'PressGo_AI_Builder' ) ) { PressGo_AI_Builder::stamp_data_hash( $post_id ); }
 
 		// Bust the WP object cache for this post.
 		clean_post_cache( $post_id );
@@ -2926,7 +2967,10 @@ class PressGo_MCP_Tools {
 	 */
 	private static function rerender_all_sections( $post_id, $globals ) {
 		$records = get_post_meta( $post_id, '_pressgo_sections', true );
-		if ( ! is_array( $records ) ) { return; }
+		if ( ! is_array( $records ) ) { return false; }
+		if ( class_exists( 'PressGo_AI_Builder' ) && PressGo_AI_Builder::is_manually_modified( $post_id ) ) {
+			return false; // F1: positional re-render would clobber manual reorders/edits
+		}
 		$elements = self::read_elementor_data( $post_id );
 		$generator = new PressGo_Generator();
 		foreach ( $records as $i => $rec ) {
@@ -2949,6 +2993,7 @@ class PressGo_MCP_Tools {
 			}
 		}
 		self::write_elementor_data( $post_id, $elements );
+		return true;
 	}
 
 	private static function stamp_pressgo_meta( $post_id, $config ) {

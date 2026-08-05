@@ -11,6 +11,16 @@ PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="/tmp/${PLUGIN_SLUG}-build"
 ZIP_FILE="${PLUGIN_DIR}/${PLUGIN_SLUG}.zip"
 
+# These files are gitignored ("IP") but REQUIRED at runtime — a clean checkout
+# doesn't have them and would silently build a broken zip. Fail loudly instead.
+for req in brain.json config-schema.json includes/prompts/config-schema.json includes/prompts/system-prompt.txt; do
+    if [ ! -s "$PLUGIN_DIR/$req" ]; then
+        echo "FATAL: required runtime file missing or empty: $req" >&2
+        echo "This is a clean checkout problem — restore the gitignored runtime files before building." >&2
+        exit 1
+    fi
+done
+
 echo "Building ${PLUGIN_SLUG}.zip..."
 
 # Clean previous build.

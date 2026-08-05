@@ -115,6 +115,17 @@ class PressGo_MCP_OAuth {
 	/* ─── Dynamic Client Registration (RFC 7591) ───────────────────── */
 
 	public function handle_register( WP_REST_Request $request ) {
+		if ( ! get_option( 'pressgo_mcp_enabled', 1 ) ) {
+			return $this->oauth_error( 'access_denied', 'MCP is disabled on this site.' );
+		}
+		if ( $this->registration_rate_limited() ) {
+			$r = new WP_REST_Response( array( 'error' => 'invalid_client_metadata', 'error_description' => 'Too many registrations from this address. Try again later.' ), 429 );
+			return $this->cors( $r );
+		}
+		if ( PressGo_MCP_Storage::count_clients() >= 100 ) {
+			return $this->oauth_error( 'invalid_client_metadata', 'Client registry is full. Contact the site administrator.' );
+		}
+
 		$body = json_decode( $request->get_body(), true );
 		if ( ! is_array( $body ) ) {
 			return $this->oauth_error( 'invalid_request', 'Body must be JSON.' );
@@ -156,6 +167,17 @@ class PressGo_MCP_OAuth {
 		), 201 );
 		$this->cors( $response );
 		return $response;
+	}
+
+	private function registration_rate_limited() {
+		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+		$key = 'pressgo_mcp_reg_' . md5( $ip );
+		$count = (int) get_transient( $key );
+		if ( $count >= 5 ) {
+			return true;
+		}
+		set_transient( $key, $count + 1, HOUR_IN_SECONDS );
+		return false;
 	}
 
 	/* ─── /authorize (HTML) ────────────────────────────────────────── */

@@ -192,6 +192,13 @@ Sonnet 4.5 (default) gives the best balance of quality and cost. Haiku 4.5 is fa
 
 == Changelog ==
 
+= 2.5.11 =
+* Fixed: paid PressGo plans (Pro/Max/Ultra and legacy Plus/Agency) are now recognized by the MCP tools and daily build meter; previously some paid accounts were limited as free.
+* Security hardening for the MCP server: tool-call logs no longer store full arguments and are pruned after 30 days, OAuth client registration is rate-limited, and authorization codes and refresh tokens are strictly single-use
+* Security hardening: site-wide MCP tools (brand foundation, global header/footer) now require administrator capability, and page/media listings respect each connected user's WordPress permissions
+* Housekeeping and hardening: preview screenshots no longer run with elevated permissions, uninstall now removes every table, setting, and cached file the plugin created, and internal release tooling is stricter
+* Your manual Elementor edits are now protected: when you edit a PressGo page in Elementor, PressGo detects it and will pause its automatic re-renders (brand repaint, chat patches, global re-styles) instead of overwriting your changes
+
 = 2.5.10 =
 * Add your own content, your way: type your own answer to any setup question, paste in as much copy as you want, or drop in a text file and the builder builds from it. The prompt box is bigger and makes it obvious
 * Cleaner service and feature cards: when a card has a photo, the small icon no longer floats between the photo and the title

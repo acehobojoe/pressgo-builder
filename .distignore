@@ -1,4 +1,7 @@
 # Files to exclude from the distributed plugin zip.
+# Kept in sync with build-zip.sh's exclude list (the canonical one). Nothing in
+# this repo consumes .distignore today; it exists for wp-cli dist-archive
+# compatibility.
 .distignore
 .gitignore
 .git
@@ -7,8 +10,5 @@ test
 package.json
 package-lock.json
 CLAUDE.md
-brain.json
-config-schema.json
-includes/prompts/system-prompt.txt
-includes/prompts/config-schema.json
+brain-widget-schemas.json
 *.mjs

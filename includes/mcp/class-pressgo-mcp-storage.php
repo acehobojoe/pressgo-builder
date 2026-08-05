@@ -138,7 +138,7 @@ class PressGo_MCP_Storage {
 			'user_id'       => isset( $args['user_id'] ) ? (int) $args['user_id'] : null,
 			'client_id'     => isset( $args['client_id'] ) ? substr( (string) $args['client_id'], 0, 64 ) : null,
 			'summary'       => isset( $args['summary'] ) ? substr( (string) $args['summary'], 0, 1024 ) : null,
-			'args_json'     => isset( $args['args_json'] ) ? (string) $args['args_json'] : null,
+			'args_json'     => isset( $args['args_json'] ) ? substr( (string) $args['args_json'], 0, 2048 ) : null,
 			'result_status' => isset( $args['result_status'] ) ? substr( (string) $args['result_status'], 0, 16 ) : 'ok',
 			'duration_ms'   => isset( $args['duration_ms'] ) ? (int) $args['duration_ms'] : null,
 		) );
@@ -274,7 +274,7 @@ class PressGo_MCP_Storage {
 	}
 
 	/**
-	 * Rotate an OAuth refresh token. On success deletes the old record and
+	 * Rotate an OAuth refresh token. On success revokes the old record and
 	 * issues a new pair, returning it. Returns null on invalid/expired.
 	 */
 	public static function rotate_refresh_token( $refresh ) {
@@ -290,13 +290,15 @@ class PressGo_MCP_Storage {
 		if ( ! empty( $row['refresh_expires_at'] ) && strtotime( $row['refresh_expires_at'] . ' UTC' ) < time() ) {
 			return null;
 		}
-		// Issue a new pair, then revoke the old.
-		$new = self::create_oauth_token( $row['user_id'], $row['client_id'], $row['scope'] );
-		$wpdb->update( $tables['tokens'],
-			array( 'revoked_at' => self::now() ),
-			array( 'id' => $row['id'] )
-		);
-		return $new;
+		// Atomically claim the old token; only the winner mints a new pair.
+		$affected = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$tables['tokens']} SET revoked_at = %s WHERE id = %d AND revoked_at IS NULL",
+			self::now(), (int) $row['id']
+		) );
+		if ( 1 !== $affected ) {
+			return null;
+		}
+		return self::create_oauth_token( $row['user_id'], $row['client_id'], $row['scope'] );
 	}
 
 	public static function list_tokens( $user_id = null, $type = null ) {
@@ -395,6 +397,12 @@ class PressGo_MCP_Storage {
 		return $rows;
 	}
 
+	public static function count_clients() {
+		global $wpdb;
+		$tables = self::tables();
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tables['clients']}" );
+	}
+
 	public static function delete_client( $client_id ) {
 		global $wpdb;
 		$tables = self::tables();
@@ -443,10 +451,13 @@ class PressGo_MCP_Storage {
 		if ( strtotime( $row['expires_at'] . ' UTC' ) < time() ) {
 			return null;
 		}
-		$wpdb->update( $tables['codes'],
-			array( 'used_at' => self::now() ),
-			array( 'id' => $row['id'] )
-		);
+		$affected = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$tables['codes']} SET used_at = %s WHERE id = %d AND used_at IS NULL",
+			self::now(), (int) $row['id']
+		) );
+		if ( 1 !== $affected ) {
+			return null; // Lost the race: another request already consumed it.
+		}
 		return $row;
 	}
 
@@ -455,5 +466,26 @@ class PressGo_MCP_Storage {
 		$tables = self::tables();
 		$now    = self::now();
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['codes']} WHERE expires_at < %s OR used_at IS NOT NULL", $now ) );
+	}
+
+	/** Daily maintenance: expired codes, old events, abandoned OAuth clients. */
+	public static function prune() {
+		global $wpdb;
+		$tables = self::tables();
+		self::purge_expired(); // codes: expired or used
+		// Events: 30-day retention (ts is indexed).
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
+		$wpdb->query( $wpdb->prepare(
+			"DELETE FROM {$tables['events']} WHERE ts < %s LIMIT 5000", $cutoff
+		) );
+		// Clients >24h old that never obtained a token and have no live code.
+		$day_ago = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
+		$wpdb->query( $wpdb->prepare(
+			"DELETE c FROM {$tables['clients']} c
+			 LEFT JOIN {$tables['tokens']} t ON t.client_id = c.client_id
+			 LEFT JOIN {$tables['codes']}  d ON d.client_id = c.client_id
+			 WHERE c.created_at < %s AND t.id IS NULL AND d.id IS NULL",
+			$day_ago
+		) );
 	}
 }
