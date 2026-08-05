@@ -4398,7 +4398,20 @@ class PressGo_AI_Builder {
 				// of impersonating an administrator. Request-scoped: init-time add, never
 				// removed (the request serves one page and exits). Applies to the anonymous
 				// WP_User(0) the screenshot service runs as.
-				add_filter( 'user_has_cap', function ( $allcaps, $caps, $args ) use ( $post_id ) {
+				//
+				// Temporal scoping: the main preview query resolves before 'wp' fires;
+				// secondary template loops (widgets, related posts) run after it. A
+				// context-free read_private_posts/read_private_pages check carries no post
+				// ID, so once the main query is done we stop honoring those — otherwise a
+				// widget explicitly querying private status would surface OTHER authors'
+				// private post titles into the preview HTML. Per-post checks for our one
+				// post (map_meta_cap sets $args[2]) and the plain 'read' grant keep working
+				// throughout the render.
+				$pg_main_query_done = false;
+				add_action( 'wp', function () use ( &$pg_main_query_done ) {
+					$pg_main_query_done = true;
+				}, 0 );
+				add_filter( 'user_has_cap', function ( $allcaps, $caps, $args ) use ( $post_id, &$pg_main_query_done ) {
 					$grant = array( 'read', 'read_private_posts', 'read_private_pages' );
 					// Per-post meta caps (read_post/edit_post resolve to primitives via
 					// map_meta_cap; $args = [ requested_cap, user_id, post_id ]).
@@ -4406,9 +4419,17 @@ class PressGo_AI_Builder {
 						return $allcaps; // a different post — grant nothing extra
 					}
 					foreach ( $caps as $cap ) {
-						if ( in_array( $cap, $grant, true ) ) {
-							$allcaps[ $cap ] = true;
+						if ( ! in_array( $cap, $grant, true ) ) {
+							continue;
 						}
+						// Context-free private-read checks (WP_Query status gating carries no
+						// post ID) are honored only until the main preview query resolves at
+						// 'wp'; secondary loops (widgets, related posts) must not see other
+						// private content. Per-post checks for this one post keep working.
+						if ( $pg_main_query_done && ! isset( $args[2] ) && 'read' !== $cap ) {
+							continue;
+						}
+						$allcaps[ $cap ] = true;
 					}
 					return $allcaps;
 				}, 10, 3 );
