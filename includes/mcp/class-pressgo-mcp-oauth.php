@@ -29,6 +29,9 @@ class PressGo_MCP_OAuth {
 	const ACCESS_TTL     = 7776000;   // 90 days
 	const REFRESH_TTL    = 31536000;  // 365 days
 	const CODE_TTL       = 600;       // 10 minutes
+	const REGISTER_MAX_BYTES = 32768;
+	const REGISTER_MAX_REDIRECTS = 10;
+	const REGISTER_MAX_URI_BYTES = 2048;
 
 	public function init() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
@@ -126,7 +129,11 @@ class PressGo_MCP_OAuth {
 			return $this->oauth_error( 'invalid_client_metadata', 'Client registry is full. Contact the site administrator.' );
 		}
 
-		$body = json_decode( $request->get_body(), true );
+		$raw_body = (string) $request->get_body();
+		if ( strlen( $raw_body ) > self::REGISTER_MAX_BYTES ) {
+			return $this->oauth_error( 'invalid_client_metadata', 'Registration body is too large.' );
+		}
+		$body = json_decode( $raw_body, true );
 		if ( ! is_array( $body ) ) {
 			return $this->oauth_error( 'invalid_request', 'Body must be JSON.' );
 		}
@@ -135,14 +142,22 @@ class PressGo_MCP_OAuth {
 		if ( empty( $redirect_uris ) ) {
 			return $this->oauth_error( 'invalid_redirect_uri', 'redirect_uris is required.' );
 		}
+		if ( count( $redirect_uris ) > self::REGISTER_MAX_REDIRECTS ) {
+			return $this->oauth_error( 'invalid_redirect_uri', 'Too many redirect URIs.' );
+		}
 		// Sanity-check each redirect URI.
+		$clean_redirects = array();
 		foreach ( $redirect_uris as $uri ) {
-			if ( ! is_string( $uri ) || ! filter_var( $uri, FILTER_VALIDATE_URL ) ) {
+			$uri = is_string( $uri ) ? trim( $uri ) : '';
+			if ( '' === $uri || strlen( $uri ) > self::REGISTER_MAX_URI_BYTES || preg_match( '/[\x00-\x20\x7f]/', $uri ) || ! filter_var( $uri, FILTER_VALIDATE_URL ) ) {
 				return $this->oauth_error( 'invalid_redirect_uri', "Invalid redirect URI: {$uri}" );
 			}
+			$clean_redirects[] = $uri;
 		}
+		$redirect_uris = array_values( array_unique( $clean_redirects ) );
 
-		$name        = isset( $body['client_name'] ) ? (string) $body['client_name'] : 'MCP Client';
+		$name        = isset( $body['client_name'] ) ? sanitize_text_field( (string) $body['client_name'] ) : 'MCP Client';
+		$name        = substr( $name, 0, 191 );
 		$auth_method = isset( $body['token_endpoint_auth_method'] ) ? (string) $body['token_endpoint_auth_method'] : 'none';
 		if ( 'none' !== $auth_method ) {
 			// We only support public PKCE clients for now.
@@ -151,8 +166,8 @@ class PressGo_MCP_OAuth {
 
 		$client = PressGo_MCP_Storage::register_client( $name, $redirect_uris, array(
 			'token_endpoint_auth_method' => $auth_method,
-			'software_id'                => isset( $body['software_id'] ) ? $body['software_id'] : null,
-			'software_version'           => isset( $body['software_version'] ) ? $body['software_version'] : null,
+			'software_id'                => isset( $body['software_id'] ) ? substr( sanitize_text_field( (string) $body['software_id'] ), 0, 191 ) : null,
+			'software_version'           => isset( $body['software_version'] ) ? substr( sanitize_text_field( (string) $body['software_version'] ), 0, 64 ) : null,
 		) );
 
 		$response = new WP_REST_Response( array(

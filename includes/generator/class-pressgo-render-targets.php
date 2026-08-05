@@ -94,9 +94,28 @@ class PressGo_Render_Targets {
 				delete_post_meta( $post_id, $mk );
 			}
 		}
+		if ( 'elementor' !== $incoming ) {
+			delete_post_meta( $post_id, '_pressgo_data_hash' );
+		}
 		// Divi designs live in post_content as shortcodes; a Gutenberg or
 		// Elementor build replaces/ignores post_content itself, so nothing
 		// further needed there.
+	}
+
+	private static function meta_matches( $expected, $actual ) {
+		if ( is_array( $expected ) || is_object( $expected ) ) {
+			return wp_json_encode( $expected ) === wp_json_encode( $actual );
+		}
+		return (string) $expected === (string) $actual;
+	}
+
+	private static function restore_meta( $post_id, $key, $backup ) {
+		if ( empty( $backup['exists'] ) ) {
+			delete_post_meta( $post_id, $key );
+			return;
+		}
+		$value = $backup['value'];
+		update_post_meta( $post_id, $key, ( is_string( $value ) || is_array( $value ) ) ? wp_slash( $value ) : $value );
 	}
 
 	/** Render + persist for a non-Elementor target. */
@@ -114,6 +133,12 @@ class PressGo_Render_Targets {
 			return array( 'ok' => false, 'error' => "renderer '{$target}' returned empty content" );
 		}
 
+		$before_post = get_post( $post_id );
+		if ( ! $before_post ) {
+			return array( 'ok' => false, 'error' => 'post not found before render apply' );
+		}
+		$before_content = (string) $before_post->post_content;
+
 		// wp_update_post expects SLASHED data (it unslashes internally) — raw
 		// content would lose literal backslashes (JSON-escaped block attrs).
 		$updated = wp_update_post( wp_slash( array(
@@ -130,34 +155,75 @@ class PressGo_Render_Targets {
 		// apply_config_to_post): confirm the content actually landed.
 		clean_post_cache( $post_id );
 		$readback = get_post( $post_id );
-		if ( ! $readback || '' === trim( (string) $readback->post_content ) ) {
-			return array( 'ok' => false, 'error' => 'post content readback empty after update' );
+		if ( ! $readback || ! hash_equals(
+			hash( 'sha256', (string) $out['post_content'] ),
+			hash( 'sha256', (string) $readback->post_content )
+		) ) {
+			// Compensating restore: builder ownership has not changed yet.
+			wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $before_content ) ) );
+			return array( 'ok' => false, 'error' => 'post content readback did not match intended render' );
 		}
 
-		// Strip every OTHER builder's claim on this page (Elementor's
-		// the_content filter, Divi's use_builder flag, Bricks' editor mode all
-		// keep serving a stale build otherwise).
-		self::neutralize_other_targets( $post_id, $target );
-
-		// Stamp the page with its builder. resolve() can fall back to the site
-		// option, but the canvas template, edit links, and snapshots all need
-		// the page itself to know what it renders through.
-		update_post_meta( $post_id, '_pressgo_target_builder', $target );
-
+		// Stage and verify the incoming target's metadata before deleting any
+		// previous builder claims. If a write fails, compensate to the old state.
+		$meta_backups = array();
 		if ( ! empty( $out['meta'] ) && is_array( $out['meta'] ) ) {
 			foreach ( $out['meta'] as $k => $v ) {
+				$meta_backups[ $k ] = array(
+					'exists' => metadata_exists( 'post', $post_id, $k ),
+					'value'  => get_post_meta( $post_id, $k, true ),
+				);
 				// update_post_meta expects SLASHED data for strings AND arrays
 				// (wp_slash recurses, slashing only the strings inside). Passing
 				// raw would strip literal backslashes — same bug class as the
 				// · corruption fixed in 2.3.4.
 				update_post_meta( $post_id, $k, ( is_string( $v ) || is_array( $v ) ) ? wp_slash( $v ) : $v );
+				if ( ! self::meta_matches( $v, get_post_meta( $post_id, $k, true ) ) ) {
+					foreach ( $meta_backups as $restore_key => $backup ) {
+						self::restore_meta( $post_id, $restore_key, $backup );
+					}
+					wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $before_content ) ) );
+					return array( 'ok' => false, 'error' => "target meta write failed verification: {$k}" );
+				}
 			}
 		}
+		$template_backup = array(
+			'exists' => metadata_exists( 'post', $post_id, '_wp_page_template' ),
+			'value'  => get_post_meta( $post_id, '_wp_page_template', true ),
+		);
 		if ( ! empty( $out['page_template'] ) ) {
 			update_post_meta( $post_id, '_wp_page_template', $out['page_template'] );
+			$template_ok = self::meta_matches( $out['page_template'], get_post_meta( $post_id, '_wp_page_template', true ) );
 		} else {
 			delete_post_meta( $post_id, '_wp_page_template' );
+			$template_ok = ! metadata_exists( 'post', $post_id, '_wp_page_template' );
 		}
+		if ( ! $template_ok ) {
+			foreach ( $meta_backups as $restore_key => $backup ) {
+				self::restore_meta( $post_id, $restore_key, $backup );
+			}
+			self::restore_meta( $post_id, '_wp_page_template', $template_backup );
+			wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $before_content ) ) );
+			return array( 'ok' => false, 'error' => 'page template write failed verification' );
+		}
+
+		$target_backup = array(
+			'exists' => metadata_exists( 'post', $post_id, '_pressgo_target_builder' ),
+			'value'  => get_post_meta( $post_id, '_pressgo_target_builder', true ),
+		);
+		update_post_meta( $post_id, '_pressgo_target_builder', $target );
+		if ( ! self::meta_matches( $target, get_post_meta( $post_id, '_pressgo_target_builder', true ) ) ) {
+			foreach ( $meta_backups as $restore_key => $backup ) {
+				self::restore_meta( $post_id, $restore_key, $backup );
+			}
+			self::restore_meta( $post_id, '_wp_page_template', $template_backup );
+			self::restore_meta( $post_id, '_pressgo_target_builder', $target_backup );
+			wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $before_content ) ) );
+			return array( 'ok' => false, 'error' => 'target ownership write failed verification' );
+		}
+
+		// All incoming state is durable. Only now remove other builders' claims.
+		self::neutralize_other_targets( $post_id, $target );
 
 		clean_post_cache( $post_id );
 		if ( function_exists( 'rocket_clean_post' ) ) {

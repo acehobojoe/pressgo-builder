@@ -468,7 +468,27 @@ class PressGo_MCP_Storage {
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['codes']} WHERE expires_at < %s OR used_at IS NOT NULL", $now ) );
 	}
 
-	/** Daily maintenance: expired codes, old events, abandoned OAuth clients. */
+	/** Remove abandoned chunk uploads without touching unrelated upload files. */
+	private static function prune_upload_chunks() {
+		$uploads = wp_upload_dir();
+		$base    = isset( $uploads['basedir'] ) ? realpath( $uploads['basedir'] ) : false;
+		$dir     = $base ? realpath( trailingslashit( $base ) . '.pressgo-uploads' ) : false;
+		if ( ! $base || ! $dir || 0 !== strpos( $dir . DIRECTORY_SEPARATOR, rtrim( $base, DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR ) ) {
+			return;
+		}
+		$cutoff = time() - DAY_IN_SECONDS;
+		foreach ( array( $dir . '/pgupload_*.b64', $dir . '/pgupload_*.bin' ) as $pattern ) {
+			$files = glob( $pattern );
+			if ( ! is_array( $files ) ) { continue; }
+			foreach ( $files as $file ) {
+				if ( is_file( $file ) && filemtime( $file ) < $cutoff ) {
+					@unlink( $file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+				}
+			}
+		}
+	}
+
+	/** Daily maintenance: expired codes, old events, abandoned clients/uploads. */
 	public static function prune() {
 		global $wpdb;
 		$tables = self::tables();
@@ -487,5 +507,6 @@ class PressGo_MCP_Storage {
 			 WHERE c.created_at < %s AND t.id IS NULL AND d.id IS NULL",
 			$day_ago
 		) );
+		self::prune_upload_chunks();
 	}
 }
