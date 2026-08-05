@@ -4349,11 +4349,24 @@ class PressGo_AI_Builder {
 						$q->set( 'page_id', $post_id );
 					}
 				} );
-				// Authenticate as admin so Elementor + capability checks pass.
-				$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
-				if ( ! empty( $admins ) ) {
-					wp_set_current_user( (int) $admins[0] );
-				}
+				// Grant ONLY the caps needed to render this one post as a preview, instead
+				// of impersonating an administrator. Request-scoped: init-time add, never
+				// removed (the request serves one page and exits). Applies to the anonymous
+				// WP_User(0) the screenshot service runs as.
+				add_filter( 'user_has_cap', function ( $allcaps, $caps, $args ) use ( $post_id ) {
+					$grant = array( 'read', 'read_private_posts', 'read_private_pages' );
+					// Per-post meta caps (read_post/edit_post resolve to primitives via
+					// map_meta_cap; $args = [ requested_cap, user_id, post_id ]).
+					if ( isset( $args[2] ) && (int) $args[2] !== (int) $post_id ) {
+						return $allcaps; // a different post — grant nothing extra
+					}
+					foreach ( $caps as $cap ) {
+						if ( in_array( $cap, $grant, true ) ) {
+							$allcaps[ $cap ] = true;
+						}
+					}
+					return $allcaps;
+				}, 10, 3 );
 				// After query runs, WP may have flagged is_404=true because the
 				// post wasn't published. Force it back to a 200 + singular page.
 				add_action( 'wp', function ( $wp ) use ( $post_id ) {
