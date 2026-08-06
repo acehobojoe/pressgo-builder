@@ -1,6 +1,6 @@
 <?php
 /**
- * PressGo MCP — admin UI (PressGo > MCP Server submenu).
+ * PressGo MCP — admin UI (PressGo > Connect & license submenu, slug pressgo-mcp).
  *
  * Three things on one screen:
  *   1. The MCP server URL + setup snippets (Claude Code, Claude Desktop,
@@ -46,8 +46,8 @@ class PressGo_MCP_Admin {
 	public function register_menu() {
 		add_submenu_page(
 			'pressgo',
-			'PressGo MCP Server',
-			'MCP Server',
+			'PressGo Connect & license',
+			'Connect & license',
 			'manage_options',
 			'pressgo-mcp',
 			array( $this, 'render' )

@@ -5,7 +5,7 @@
  * Shown to administrators on every admin page until they click Allow or Skip.
  * Stores the decision in pressgo_telemetry_decision ('allowed' | 'skipped') and
  * sets the pressgo_share_telemetry flag accordingly. Users can change their
- * mind later from PressGo > MCP Server > Settings.
+ * mind later from PressGo > Connect & license > Settings.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,7 +48,7 @@ class PressGo_Telemetry_Optin {
 				Share anonymous usage data so we can ship better defaults — what section variants build successfully,
 				which installs are activating vs stalling. We collect a hashed site ID, plugin/WP version, and a
 				per-day count of pages created. <strong>We never collect your prompt text, page contents, or any
-				personal information.</strong> You can change your mind anytime in <em>PressGo &rarr; MCP Server</em>.
+				personal information.</strong> You can change your mind anytime in <em>PressGo &rarr; Connect &amp; license</em>.
 			</p>
 			<p style="margin:0;">
 				<button type="button" class="button button-primary" data-pressgo-optin="allow">Allow &amp; continue</button>

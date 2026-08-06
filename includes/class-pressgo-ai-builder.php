@@ -5017,7 +5017,7 @@ class PressGo_AI_Builder {
 					<?php if ( '' === (string) get_option( 'pressgo_openrouter_key', '' ) ) : ?>
 						<button type="button" class="pg-builder-ghost pg-usage-upgrade" id="pg-usage-upgrade" hidden>Upgrade</button>
 					<?php endif; ?>
-						<span class="pg-credits-pill" id="pg-credits" title="Extra credits — only spent after your daily included builds run out. Edits, reorders and palette changes are always free.">&mdash; credits</span>
+						<span class="pg-credits-pill" id="pg-credits" title="Extra builds — only spent after your daily included builds run out. Edits, reorders and palette changes are always free.">&mdash; builds</span>
 					<a class="pg-builder-link" href="<?php echo esc_url( $wp_edit_url ); ?>" target="_blank"><?php echo esc_html( $wp_edit_label ); ?></a>
 				</div>
 			</header>
@@ -5034,7 +5034,7 @@ class PressGo_AI_Builder {
 							<div class="pg-tier-name">Free</div>
 							<div class="pg-tier-price" data-monthly="$0" data-annual="$0">$0</div>
 							<div class="pg-tier-cap">1 full page a day</div>
-							<div class="pg-tier-blurb">8 section builds daily + 10 credits a month. Edits are always free.</div>
+							<div class="pg-tier-blurb">8 section builds daily + 10 bonus builds a month. Edits are always free.</div>
 						</div>
 						<div class="pg-tier-card" data-plan="pro">
 							<div class="pg-tier-name">Pro</div>

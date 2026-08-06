@@ -1076,7 +1076,7 @@ iframe#f{position:relative;z-index:0}
 			"`create_page` is capped on the free tier (3 pages per UTC day per WP install). If the " .
 			"user is already on Pro, the cap doesn't apply and you'll never see this. If you DO get " .
 			"`mcp_free_cap_exceeded` back, the error message lists the three options for the user " .
-			"(upgrade to Pro, wait until tomorrow, use the credit-based WP generator). Relay them in " .
+			"(upgrade to Pro, wait until tomorrow, use the built-in WP generator). Relay them in " .
 			"a friendly way and stop. Don't retry. Don't try to build the rest of the page on the " .
 			"already-existing draft from a previous turn.\n\n" .
 

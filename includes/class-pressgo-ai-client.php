@@ -335,7 +335,7 @@ class PressGo_AI_Client {
 				$credits = isset( $event['creditsRemaining'] ) ? $event['creditsRemaining'] : null;
 				$msg     = $complete_msg;
 				if ( null !== $credits ) {
-					$msg .= " ({$credits} credits remaining)";
+					$msg .= " ({$credits} builds remaining)";
 				}
 				$callback( 'thinking', array( 'text' => $msg ) );
 			}
@@ -412,7 +412,7 @@ class PressGo_AI_Client {
 			$error_msg = 'API error (HTTP ' . $http_code . ')';
 		}
 		if ( 402 === $http_code ) {
-			$error_msg = 'No credits remaining. Purchase more at pressgo.app/dashboard';
+			$error_msg = 'You have used all your builds for now. Get more at pressgo.app/dashboard';
 		} elseif ( 401 === $http_code ) {
 			$error_msg .= ' — Please check your API key in PressGo Settings.';
 		} elseif ( 429 === $http_code ) {

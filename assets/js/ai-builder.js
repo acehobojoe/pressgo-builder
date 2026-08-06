@@ -554,7 +554,7 @@
 		var credLine = document.getElementById('pg-tiers-credits');
 		if (credLine && typeof u.credits === 'number') {
 			credLine.textContent = u.credits > 0
-				? '+ ' + u.credits + ' bonus credit' + (u.credits === 1 ? '' : 's') + ', used automatically after your daily builds'
+				? '+ ' + u.credits + ' bonus build' + (u.credits === 1 ? '' : 's') + ', used automatically after your daily builds'
 				: '';
 		}
 		if (typeof u.credits === 'number') lastCreditValue = u.credits;
@@ -638,7 +638,7 @@
 	var publishHintShown = false;
 	function flashCredits(newTotal) {
 		if (typeof newTotal !== 'number') return;
-		credPill.textContent = newTotal + ' credits';
+		credPill.textContent = newTotal + (newTotal === 1 ? ' build' : ' builds') + ' left';
 		if (lastCreditValue !== null && newTotal !== lastCreditValue) {
 			credPill.classList.remove('is-flash');
 			// Force reflow so re-adding the class restarts the animation.
@@ -662,7 +662,7 @@
 				lowCreditNudged = true;
 				var nudge = el('pg-msg pg-msg-note');
 				nudge.appendChild(document.createTextNode(
-					newTotal + (newTotal === 1 ? ' credit' : ' credits') + ' left this month. A $15 pack adds 75 so you can keep building. '));
+					"You're almost out of included usage this month. A $15 pack adds 75 extra builds so you can keep going. "));
 				var a = document.createElement('a');
 				a.href = 'https://pressgo.app/dashboard?buy=credits';
 				a.target = '_blank';
@@ -1184,7 +1184,7 @@
 			.then(function (j) {
 				if (j && j.success && j.data && typeof j.data.total === 'number') {
 					// Set initial value without flashing (no previous value to diff).
-					credPill.textContent = j.data.total + ' credits';
+					credPill.textContent = j.data.total + (j.data.total === 1 ? ' build' : ' builds') + ' left';
 					lastCreditValue = j.data.total;
 				}
 			})
