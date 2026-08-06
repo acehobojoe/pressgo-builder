@@ -13,8 +13,8 @@ BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${PLUGIN_SLUG}-build.XXXXXX")"
 ZIP_FILE="${PLUGIN_DIR}/${PLUGIN_SLUG}.zip"
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
-# These files are gitignored ("IP") but REQUIRED at runtime — a clean checkout
-# doesn't have them and would silently build a broken zip. Fail loudly instead.
+# These files are tracked in git and REQUIRED at runtime — guard against an
+# empty or corrupted asset that would silently build a broken zip. Fail loudly.
 for req in brain.json config-schema.json includes/prompts/config-schema.json includes/prompts/system-prompt.txt; do
     if [ ! -s "$RUNTIME_DIR/$req" ]; then
         echo "FATAL: required runtime file missing or empty: $req" >&2

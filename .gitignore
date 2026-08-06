@@ -18,11 +18,11 @@ Thumbs.db
 test/screenshots/
 
 # Prompt engineering / IP
-brain.json
+# brain-widget-schemas.json is the only private asset (excluded from the shipped
+# zip by build-zip.sh). The shipped runtime assets (brain.json, config schemas,
+# system prompt) are tracked in git because they're public on WP.org SVN and
+# required at runtime — gitignoring them broke clean-checkout builds.
 brain-widget-schemas.json
-config-schema.json
-includes/prompts/system-prompt.txt
-includes/prompts/config-schema.json
 
 # Environment
 .env
