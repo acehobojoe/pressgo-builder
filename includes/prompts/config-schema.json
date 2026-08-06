@@ -1,0 +1,2102 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Complete config schema for PressGo page generation. This is the exact structure the AI must produce. The PHP generator consumes this config dict to build Elementor JSON.",
+    "generated": "2026-02-13",
+    "builders": 56,
+    "section_types": 19
+  },
+  "config_structure": {
+    "_note": "Top-level config is a flat dict. Required keys: colors, fonts, layout, sections. Each section listed in 'sections' array must have a matching top-level key with its config.",
+    "colors": {
+      "_required": true,
+      "_description": "Color palette for the entire page. The generator auto-derives primary_dark, primary_light, accent, text_light, gold, border if omitted.",
+      "primary": {
+        "type": "hex",
+        "required": true,
+        "example": "#4284CB",
+        "description": "Main brand color — buttons, accents, links, highlights"
+      },
+      "dark_bg": {
+        "type": "hex",
+        "required": true,
+        "example": "#0F172A",
+        "description": "Dark background — hero, results, dark sections"
+      },
+      "light_bg": {
+        "type": "hex",
+        "required": true,
+        "example": "#F8FAFC",
+        "description": "Light background — features, steps, faq sections"
+      },
+      "white": {
+        "type": "hex",
+        "required": true,
+        "example": "#FFFFFF",
+        "description": "White — cards, light text on dark"
+      },
+      "text_dark": {
+        "type": "hex",
+        "required": true,
+        "example": "#1E293B",
+        "description": "Primary text color"
+      },
+      "text_muted": {
+        "type": "hex",
+        "required": true,
+        "example": "#64748B",
+        "description": "Secondary/muted text color"
+      },
+      "accent": {
+        "type": "hex",
+        "required": false,
+        "default": "#00B418",
+        "description": "Secondary accent — checkmarks, success states"
+      },
+      "primary_dark": {
+        "type": "hex",
+        "required": false,
+        "default": "auto-darkened primary",
+        "description": "Darker shade of primary"
+      },
+      "primary_light": {
+        "type": "hex",
+        "required": false,
+        "default": "#E8F0FE",
+        "description": "Light tint of primary for backgrounds"
+      },
+      "accent_hover": {
+        "type": "hex",
+        "required": false,
+        "default": "#009E15",
+        "description": "Accent hover state"
+      },
+      "text_light": {
+        "type": "rgba",
+        "required": false,
+        "default": "rgba(255,255,255,0.75)",
+        "description": "Light text on dark backgrounds"
+      },
+      "gold": {
+        "type": "hex",
+        "required": false,
+        "default": "#F59E0B",
+        "description": "Star ratings, highlights"
+      },
+      "border": {
+        "type": "rgba",
+        "required": false,
+        "default": "rgba(0,0,0,0.06)",
+        "description": "Subtle borders and dividers"
+      },
+      "theme": {
+        "type": "string",
+        "required": false,
+        "description": "Set to 'dark' for a FULL-DARK page (premium gym/studio/luxury look): every section renders on dark surfaces, cards become frosted translucent panels, hardcoded light strips are auto-remapped. When using it ALSO set: light_bg = a dark tint (e.g. #15181D), text_dark = a light hex (#F2F2F2), text_muted = light rgba. Zero light strips — contrast comes from photos and frosted cards."
+      }
+    },
+    "fonts": {
+      "_required": true,
+      "_description": "Typography pairing (Google Font family names). Pick a distinct heading + body that fit the brand and vary across builds. NEVER use Inter for BOTH heading and body — that is the #1 generic-template tell. A characterful heading (serif or distinctive sans) over a clean body reads designed.",
+      "heading": {
+        "type": "string",
+        "required": false,
+        "description": "Font for all headings (h1-h6). e.g. Playfair Display, Poppins, DM Serif Display, Space Grotesk, Work Sans, Fraunces"
+      },
+      "body": {
+        "type": "string",
+        "required": false,
+        "description": "Font for body text. e.g. Source Sans Pro, Inter, Karla, Nunito Sans, Roboto, Mulish"
+      }
+    },
+    "layout": {
+      "_required": true,
+      "_description": "Global layout settings. All have sensible defaults.",
+      "boxed_width": {
+        "type": "integer",
+        "required": false,
+        "default": 1200,
+        "description": "Max content width in px"
+      },
+      "section_padding": {
+        "type": "integer",
+        "required": false,
+        "default": 100,
+        "description": "Vertical padding for sections in px"
+      },
+      "card_radius": {
+        "type": "integer",
+        "required": false,
+        "default": 16,
+        "description": "Border radius for cards in px"
+      },
+      "button_radius": {
+        "type": "integer",
+        "required": false,
+        "default": 10,
+        "description": "Border radius for buttons in px"
+      },
+      "card_shadow": {
+        "type": "object",
+        "required": false,
+        "default": {
+          "horizontal": 0,
+          "vertical": 4,
+          "blur": 24,
+          "spread": -2,
+          "color": "rgba(0,0,0,0.08)"
+        },
+        "description": "Box shadow for cards"
+      }
+    },
+    "sections": {
+      "_required": true,
+      "type": "array of strings",
+      "description": "Ordered list of section names to render. Determines page order.",
+      "valid_values": [
+        "hero",
+        "stats",
+        "social_proof",
+        "features",
+        "steps",
+        "results",
+        "competitive_edge",
+        "testimonials",
+        "faq",
+        "blog",
+        "pricing",
+        "logo_bar",
+        "team",
+        "gallery",
+        "newsletter",
+        "map",
+        "cta_final",
+        "footer",
+        "disclaimer"
+      ],
+      "example": [
+        "hero",
+        "social_proof",
+        "features",
+        "steps",
+        "testimonials",
+        "faq",
+        "cta_final",
+        "footer"
+      ]
+    }
+  },
+  "sections": {
+    "hero": {
+      "_description": "The first section visitors see. ALWAYS include a hero.",
+      "_variants": [
+        "default",
+        "split",
+        "image",
+        "video",
+        "gradient",
+        "minimal"
+      ],
+      "_config_key": "hero",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "description": "Layout variant. Omit for default (centered text on dark gradient).",
+        "options": {
+          "default": "Centered text on dark gradient background. Bold, impactful. Best for SaaS, tech, bold messaging.",
+          "split": "Text left + image right on light background. Professional, informative. Best for services, products, SaaS.",
+          "image": "Full background image with dark overlay. Dramatic, immersive. Best for hospitality, real estate, events.",
+          "video": "Centered text + video embed on light background. Engaging. Best for courses, demos, creative.",
+          "gradient": "Colorful gradient background with wave divider. Vibrant, playful. Best for creative, startups, apps.",
+          "minimal": "Clean white background, centered text, no gradient. Simple, elegant. Best for portfolio, professional services."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "",
+        "description": "Small uppercase text above headline. e.g. 'AI-POWERED', 'WELCOME TO', '#1 RATED'",
+        "example": "TRANSFORM YOUR BUSINESS"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "description": "Main hero headline. Keep under 10 words. High impact.",
+        "example": "Build Landing Pages in Seconds"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": true,
+        "description": "Supporting text under headline. 1-2 sentences. Expand on value prop.",
+        "example": "AI-powered page generation that converts visitors into customers."
+      },
+      "cta_primary": {
+        "type": "object",
+        "required": true,
+        "description": "Primary call-to-action button.",
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true,
+            "example": "Get Started Free"
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#",
+            "example": "#pricing"
+          },
+          "icon": {
+            "type": "string",
+            "required": false,
+            "description": "FontAwesome class, e.g. 'fas fa-arrow-right'"
+          }
+        }
+      },
+      "cta_secondary": {
+        "type": "object",
+        "required": false,
+        "description": "Secondary/ghost CTA button. Appears next to primary.",
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true,
+            "example": "Watch Demo"
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#"
+          },
+          "icon": {
+            "type": "string",
+            "required": false
+          }
+        }
+      },
+      "badge": {
+        "type": "string",
+        "required": false,
+        "description": "Small pill badge above eyebrow. e.g. 'NEW', '2026 Launch', 'Beta'",
+        "example": "NOW IN BETA"
+      },
+      "trust_line": {
+        "type": "string",
+        "required": false,
+        "description": "Small trust text below CTAs. e.g. 'No credit card required', 'Join 10,000+ users'",
+        "example": "Free 14-day trial — No credit card required"
+      },
+      "image": {
+        "type": "string (URL)",
+        "required": false,
+        "description": "Image URL. Required for 'split' and 'image' variants. Used as background for 'image' variant, right-side for 'split'.",
+        "variants_that_use_it": [
+          "split",
+          "image",
+          "video (as overlay)"
+        ]
+      },
+      "video": {
+        "type": "string (URL)",
+        "required": false,
+        "description": "YouTube or Vimeo URL. Only used by 'video' variant.",
+        "example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      },
+      "meta_items": {
+        "type": "array",
+        "required": false,
+        "description": "1-3 inline {icon, text} facts under the subheadline ('fas fa-calendar' + 'Sept 14 · Greer City Park', '4 BD · 3 BA'). For events, real estate, restaurants."
+      },
+      "topbar": {
+        "type": "object",
+        "required": false,
+        "description": "Slim header strip inside the hero: {brand: 'Arbor Nation', phone: '(864) 555-0101', cta: {text:'Free Estimate', url:'#'}}. Brand wordmark left, tap-to-call phone + small accent button right. STRONGLY recommended for local-business landers — every high-converting local page leads with one."
+      },
+      "panel": {
+        "type": "string",
+        "required": false,
+        "description": "'left' (image variant): anchors the copy stack in a left-aligned dark content panel over a lightly-scrimmed photo — the hand-built local-lander hero look. Pairs with bullets + topbar."
+      },
+      "bullets": {
+        "type": "array of strings",
+        "required": false,
+        "description": "3-5 short trust bullets under the subheadline ('ISA Certified & TCIA Member','Free written estimates first','24/7 storm response'). Renders as an accent checkmark list. Use on local-service heroes."
+      }
+    },
+    "stats": {
+      "_description": "Key metrics/numbers that build credibility. Usually 3-4 items.",
+      "_variants": [
+        "default",
+        "dark",
+        "inline"
+      ],
+      "_config_key": "stats",
+      "_note": "Config can be {items: [...]} or just a flat array of items. Both work.",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "White cards with icons, negative top margin overlapping hero. Best after dark hero.",
+          "dark": "Dark gradient background with colored counters. Best after light sections.",
+          "inline": "Minimal horizontal counter row with dividers. Compact, no cards. Best as accent strip."
+        }
+      },
+      "items": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 5,
+        "description": "Array of stat items. Ideal count: 3-4.",
+        "item_schema": {
+          "value": {
+            "type": "string",
+            "required": true,
+            "description": "The stat number as string. Parser auto-extracts prefix/number/suffix. Examples: '500+', '$2.5M', '99%', '3x', '10K+'",
+            "example": "500+"
+          },
+          "label": {
+            "type": "string",
+            "required": true,
+            "description": "Description under the number.",
+            "example": "Happy Customers"
+          },
+          "icon": {
+            "type": "string",
+            "required": true,
+            "description": "FontAwesome icon class.",
+            "example": "fas fa-users"
+          }
+        }
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "social_proof": {
+      "_description": "Industry trust indicators. Pill badges showing served industries.",
+      "_variants": [
+        "default",
+        "dark"
+      ],
+      "_config_key": "social_proof",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Light background with pill badges. Standard.",
+          "dark": "Dark background with light pill badges. Use after light hero."
+        }
+      },
+      "categories": {
+        "type": "array of strings",
+        "required": false,
+        "default": [],
+        "description": "Industry/category names shown as pill badges.",
+        "example": [
+          "SaaS",
+          "Healthcare",
+          "E-commerce",
+          "Finance",
+          "Education",
+          "Real Estate"
+        ]
+      },
+      "headline": {
+        "type": "string",
+        "required": false,
+        "default": "Trusted by businesses in 50+ industries",
+        "description": "Text displayed above the badges."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "features": {
+      "_description": "Core value proposition. What the product/service offers.",
+      "_variants": [
+        "default",
+        "alternating",
+        "minimal",
+        "image_cards",
+        "grid",
+        "bento"
+      ],
+      "_config_key": "features",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "3-column icon-box card grid with accent top borders. Classic, versatile. Best for 3 features.",
+          "alternating": "Alternating text/image rows (left-right zigzag). Best for 2-4 features with images.",
+          "minimal": "Clean icons with text, no card backgrounds. Elegant, modern. Best for 3-6 features.",
+          "image_cards": "Image on top of each card. Visual, product-focused. Best for 3 features with photos.",
+          "grid": "2-column card grid. Best for 4+ features (even numbers).",
+          "bento": "Asymmetric bento grid: one large accent-gradient hero tile beside smaller white tiles, overflow in a 3-up row. Modern SaaS look, no images needed. Best for 4-6 features; the FIRST item becomes the big tile, so make it your strongest. Falls back to the default 3-column card layout below 3 items."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "FEATURES",
+        "example": "WHAT WE OFFER"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Everything You Need to Succeed"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false,
+        "example": "Powerful tools designed for modern teams."
+      },
+      "items": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 6,
+        "description": "Feature items. Ideal: 3 for default/image_cards, 2-4 for alternating, 4-6 for grid.",
+        "item_schema": {
+          "icon": {
+            "type": "string",
+            "required": true,
+            "description": "FontAwesome class.",
+            "example": "fas fa-bolt"
+          },
+          "title": {
+            "type": "string",
+            "required": true,
+            "example": "Lightning Fast"
+          },
+          "desc": {
+            "type": "string",
+            "required": true,
+            "example": "Generate pages in under 30 seconds."
+          },
+          "image": {
+            "type": "string (URL)",
+            "required": false,
+            "description": "Image URL. Used by alternating and image_cards variants."
+          },
+          "accent": {
+            "type": "hex",
+            "required": false,
+            "description": "Custom accent color for this card's top border. Defaults to primary."
+          },
+          "price": {
+            "type": "string",
+            "required": false,
+            "description": "image_cards variant: bold price line above the title ('From $389,900', '$49'). Turns cards into listings/product cards."
+          },
+          "meta": {
+            "type": "string",
+            "required": false,
+            "description": "image_cards variant: small uppercase meta line under the title ('4 BD · 3 BA · 2,400 SQFT')."
+          },
+          "cta": {
+            "type": "object",
+            "required": false,
+            "description": "image_cards variant: per-card {text, url} outline button pinned to the card bottom."
+          }
+        }
+      },
+      "background": {
+        "type": "hex",
+        "required": false,
+        "description": "Section background override (default light_bg). Use to alternate dark/tinted strips."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Section-closing CTA button {text,url} — repeat the SAME label/tel: as the hero CTA for conversion rhythm on local-service landers."
+      }
+    },
+    "steps": {
+      "_description": "How-it-works process. Step-by-step guide. Usually 3 steps.",
+      "_variants": [
+        "default",
+        "compact",
+        "timeline"
+      ],
+      "_config_key": "steps",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Numbered circles on light background cards. Traditional, clear.",
+          "compact": "Numbered pill badges with connecting divider. Modern, space-efficient.",
+          "timeline": "Vertical timeline with connecting line. Sequential, narrative."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "HOW IT WORKS",
+        "example": "GET STARTED"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Three Simple Steps"
+      },
+      "anchor": {
+        "type": "string",
+        "required": false,
+        "default": "how-it-works",
+        "description": "HTML anchor ID for smooth scrolling."
+      },
+      "items": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 5,
+        "description": "Step items. Ideal count: 3.",
+        "item_schema": {
+          "num": {
+            "type": "string|integer",
+            "required": true,
+            "description": "Step number.",
+            "example": "1"
+          },
+          "title": {
+            "type": "string",
+            "required": true,
+            "example": "Describe Your Vision"
+          },
+          "desc": {
+            "type": "string",
+            "required": true,
+            "example": "Tell us about your business and what kind of page you need."
+          }
+        }
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "results": {
+      "_description": "Measurable outcomes and impact metrics. Dark background for contrast.",
+      "_variants": [
+        "default",
+        "bars"
+      ],
+      "_config_key": "results",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Dark gradient with animated counter cards. Dramatic, impactful.",
+          "bars": "Light background with bold metric cards (accent top border, animated counters). Clean, data-focused. Values keep their real shape ($2.5M, 340%, 4.9/5) — they are NOT converted to percentages."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "RESULTS",
+        "example": "PROVEN IMPACT"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Results That Speak for Themselves"
+      },
+      "description": {
+        "type": "string",
+        "required": true,
+        "example": "Our clients consistently achieve measurable improvements."
+      },
+      "metrics": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 4,
+        "item_schema": {
+          "value": {
+            "type": "string",
+            "required": true,
+            "description": "Metric value. Parser extracts prefix/number/suffix.",
+            "example": "340%"
+          },
+          "label": {
+            "type": "string",
+            "required": true,
+            "example": "Increase in Conversions"
+          },
+          "color": {
+            "type": "hex",
+            "required": true,
+            "description": "Accent color for this metric's counter.",
+            "example": "#10B981"
+          }
+        }
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional CTA button below metrics.",
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true,
+            "example": "See Case Studies"
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#"
+          },
+          "icon": {
+            "type": "string",
+            "required": false
+          }
+        }
+      }
+    },
+    "competitive_edge": {
+      "_description": "Why choose us / differentiators. Benefits checklist with CTA.",
+      "_variants": [
+        "default",
+        "image",
+        "cards",
+        "comparison"
+      ],
+      "_config_key": "competitive_edge",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Text + icon-list checklist on light background. Simple, effective.",
+          "image": "Text + checkmarks on left, image on right. Visual proof. Best when photo available.",
+          "cards": "Benefit cards with icons in 3-column grid. Feature-like presentation.",
+          "comparison": "Us-vs-them: muted card with X-marks (them_points + them_label) beside an accented checkmark card (benefits + us_label). The conversion centerpiece for SaaS/services/ecom. REQUIRES them_points; falls back to default checklist without it."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "WHY US",
+        "example": "THE DIFFERENCE"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Why Choose PressGo"
+      },
+      "description": {
+        "type": "string",
+        "required": true,
+        "example": "We combine AI intelligence with proven design patterns."
+      },
+      "benefits": {
+        "type": "array of strings",
+        "required": true,
+        "min_items": 3,
+        "max_items": 8,
+        "description": "Benefit statements shown as checkmark list.",
+        "example": [
+          "AI-powered page generation",
+          "48 layout variants",
+          "Mobile-first responsive design"
+        ]
+      },
+      "image": {
+        "type": "string (URL)",
+        "required": false,
+        "description": "Image URL. Only used by 'image' variant."
+      },
+      "cta": {
+        "type": "object",
+        "required": true,
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true,
+            "example": "Start Building"
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#"
+          },
+          "icon": {
+            "type": "string",
+            "required": false
+          }
+        }
+      },
+      "them_points": {
+        "type": "array of strings",
+        "required": false,
+        "description": "For 'comparison': 3-5 pains of the alternative ('Rushed 10-minute consults','Hidden fees'). Honest, not strawman."
+      },
+      "us_label": {
+        "type": "string",
+        "required": false,
+        "default": "With Us",
+        "description": "Comparison card label — use the business name."
+      },
+      "them_label": {
+        "type": "string",
+        "required": false,
+        "default": "The Usual Way",
+        "example": "Chain salons"
+      }
+    },
+    "testimonials": {
+      "_description": "Customer quotes and social proof from real people.",
+      "_variants": [
+        "default",
+        "featured",
+        "grid",
+        "minimal"
+      ],
+      "_config_key": "testimonials",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "3-column cards with star ratings. Balanced, comprehensive.",
+          "featured": "One large featured quote + smaller cards below. Best when one testimonial stands out.",
+          "grid": "2-column card grid with avatars. Best for 4+ testimonials.",
+          "minimal": "Editorial spotlight: the FIRST quote runs large with an accent rule, remaining quotes sit smaller in two columns. Elegant, card-free. Lead with your strongest quote."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "TESTIMONIALS",
+        "example": "WHAT PEOPLE SAY"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Trusted by Thousands"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false,
+        "example": "See what our customers have to say."
+      },
+      "items": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 6,
+        "description": "Testimonial items. 3 for default, 3+ for featured (first is featured), 4+ for grid.",
+        "item_schema": {
+          "quote": {
+            "type": "string",
+            "required": true,
+            "example": "PressGo cut our page creation time from days to minutes."
+          },
+          "name": {
+            "type": "string",
+            "required": true,
+            "example": "Sarah Johnson"
+          },
+          "role": {
+            "type": "string",
+            "required": true,
+            "example": "CEO, TechCorp"
+          },
+          "photo": {
+            "type": "string (URL)",
+            "required": false,
+            "description": "Avatar/headshot URL."
+          }
+        }
+      },
+      "aggregate": {
+        "type": "object",
+        "required": false,
+        "description": "Real aggregate rating shown under the header as stars + '4.9 — 217 Google reviews': {rating: 4.9, count: 217, source: 'Google'}. ONLY with real numbers from the user."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "faq": {
+      "_description": "Frequently asked questions. Uses toggle widget (FREE, not accordion).",
+      "_variants": [
+        "default",
+        "split"
+      ],
+      "_config_key": "faq",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Centered toggle accordion. Clean, focused.",
+          "split": "Header/description on left, accordion on right. Spacious, premium feel."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "FAQ",
+        "example": "COMMON QUESTIONS"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Frequently Asked Questions"
+      },
+      "description": {
+        "type": "string",
+        "required": false,
+        "description": "Description text. Only used by 'split' variant.",
+        "example": "Can't find what you're looking for? Contact our support team."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional CTA. Only used by 'split' variant.",
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#"
+          }
+        }
+      },
+      "items": {
+        "type": "array",
+        "required": true,
+        "min_items": 3,
+        "max_items": 8,
+        "description": "FAQ items. Ideal: 4-6.",
+        "item_schema": {
+          "q": {
+            "type": "string",
+            "required": true,
+            "example": "How does PressGo work?"
+          },
+          "a": {
+            "type": "string",
+            "required": true,
+            "example": "Describe your business and PressGo generates a complete landing page."
+          }
+        }
+      }
+    },
+    "blog": {
+      "_description": "Recent blog posts grid. REQUIRES Elementor Pro.",
+      "_variants": [
+        "default"
+      ],
+      "_config_key": "blog",
+      "_note": "Only include if the site has Elementor Pro installed.",
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "BLOG"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Latest from the Blog"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false
+      },
+      "posts_per_page": {
+        "type": "integer",
+        "required": false,
+        "default": 3
+      }
+    },
+    "pricing": {
+      "_description": "Pricing plans comparison. 2-4 plan cards.",
+      "_variants": [
+        "default",
+        "compact",
+        "list"
+      ],
+      "_config_key": "pricing",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Full-width plan cards with feature lists, highlighted plan prominent. Standard.",
+          "compact": "Left-aligned cards, smaller price text, bordered highlight. Modern, restrained.",
+          "list": "Editorial service/menu price list: name left, accent price right, optional desc, grouped by per-item category. THE layout for restaurant menus, salon/spa/barber services, trade rate cards. Uses `items`, not plans. Falls back to plan cards when items missing."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "PRICING",
+        "example": "SIMPLE PRICING"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Choose Your Plan"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false,
+        "example": "Start free, upgrade when ready."
+      },
+      "plans": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 4,
+        "description": "Plan cards. 2-3 plans recommended. One should be highlighted.",
+        "item_schema": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "example": "Starter"
+          },
+          "price": {
+            "type": "string",
+            "required": true,
+            "description": "Price as string for flexible formatting.",
+            "example": "$29"
+          },
+          "period": {
+            "type": "string",
+            "required": false,
+            "default": "/mo",
+            "example": "/month"
+          },
+          "description": {
+            "type": "string",
+            "required": false,
+            "example": "Perfect for small teams."
+          },
+          "badge": {
+            "type": "string",
+            "required": false,
+            "description": "Plan badge, e.g. 'POPULAR', 'BEST VALUE'"
+          },
+          "features": {
+            "type": "array of strings",
+            "required": false,
+            "description": "Feature list items.",
+            "example": [
+              "5 pages/month",
+              "Basic analytics",
+              "Email support"
+            ]
+          },
+          "cta": {
+            "type": "object",
+            "required": false,
+            "schema": {
+              "text": "string",
+              "url": "string"
+            }
+          },
+          "highlighted": {
+            "type": "boolean",
+            "required": false,
+            "default": false,
+            "description": "Set true for the recommended plan."
+          },
+          "compare_at": {
+            "type": "string",
+            "required": false,
+            "description": "Strikethrough original price above the real price ('$98'). Only when there is a genuine discount."
+          }
+        }
+      },
+      "items": {
+        "type": "array",
+        "required": false,
+        "description": "For the 'list' variant only: flat list of services/dishes. 4-18 items.",
+        "item_schema": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "example": "Precision Cut"
+          },
+          "price": {
+            "type": "string",
+            "required": true,
+            "example": "$65"
+          },
+          "desc": {
+            "type": "string",
+            "required": false,
+            "example": "Consultation, cut, wash and style."
+          },
+          "category": {
+            "type": "string",
+            "required": false,
+            "description": "Group label (e.g. Cuts / Color / Treatments). Items group by category in order of first appearance."
+          }
+        }
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Section-level CTA under the price list / plan cards {text,url}."
+      }
+    },
+    "logo_bar": {
+      "_description": "Trusted-by logo row. Shows partner/client logos.",
+      "_variants": [
+        "default",
+        "dark"
+      ],
+      "_config_key": "logo_bar",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Light background with grayscale logos. Standard.",
+          "dark": "Dark background with light logos. Use after light section."
+        }
+      },
+      "headline": {
+        "type": "string",
+        "required": false,
+        "default": "Trusted by leading companies",
+        "example": "Our Partners"
+      },
+      "logos": {
+        "type": "array",
+        "required": false,
+        "default": [],
+        "description": "Logo images. Rendered at fixed size with grayscale filter.",
+        "item_schema": {
+          "url": {
+            "type": "string (URL)",
+            "required": true,
+            "description": "Logo image URL."
+          },
+          "alt": {
+            "type": "string",
+            "required": false,
+            "description": "Alt text."
+          }
+        }
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "team": {
+      "_description": "Team member cards with photos, roles, and social links.",
+      "_variants": [
+        "default",
+        "compact",
+        "spotlight"
+      ],
+      "_config_key": "team",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Full cards with photo, name, role, bio, and social links. Comprehensive.",
+          "compact": "Small photos, name + role only, no bio or cards. Space-efficient.",
+          "spotlight": "Editorial single-person profile: photo (or initials circle) left; name, role, bio, credentials checklist, socials, CTA right. For the solo professional who IS the business. AUTO-USED whenever team has exactly 1 member."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false,
+        "default": "OUR TEAM",
+        "example": "MEET THE TEAM"
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "The People Behind PressGo"
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false
+      },
+      "members": {
+        "type": "array",
+        "required": true,
+        "min_items": 2,
+        "max_items": 6,
+        "description": "Team members. 3-4 for default, 4-6 for compact.",
+        "item_schema": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "example": "Alex Rivera"
+          },
+          "role": {
+            "type": "string",
+            "required": true,
+            "example": "Lead Developer"
+          },
+          "photo": {
+            "type": "string (URL)",
+            "required": false,
+            "description": "Headshot URL."
+          },
+          "bio": {
+            "type": "string",
+            "required": false,
+            "description": "Short bio. Used by default variant only."
+          },
+          "social": {
+            "type": "array",
+            "required": false,
+            "description": "Social media links.",
+            "item_schema": {
+              "social_icon": {
+                "type": "icon object",
+                "example": {
+                  "value": "fab fa-linkedin",
+                  "library": "fa-brands"
+                }
+              },
+              "link": {
+                "type": "link object",
+                "example": {
+                  "url": "https://linkedin.com/in/alex"
+                }
+              }
+            }
+          },
+          "credentials": {
+            "type": "array of strings",
+            "required": false,
+            "description": "Spotlight variant: 2-4 short credentials ('SC Bar 1998','Redken certified')."
+          },
+          "cta": {
+            "type": "object",
+            "required": false,
+            "description": "Spotlight variant: {text, url} booking button."
+          }
+        }
+      }
+    },
+    "gallery": {
+      "_description": "Image gallery with optional lightbox.",
+      "_variants": [
+        "default",
+        "cards",
+        "before_after",
+        "videos"
+      ],
+      "_config_key": "gallery",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Image grid with lightbox. Clean, simple. Configurable columns.",
+          "cards": "2-column image cards with optional captions. Curated, editorial.",
+          "before_after": "Labeled BEFORE/AFTER photo pairs with optional bold result line + caption. The proof section for transformation businesses (detailing, landscaping, dental, fitness, renovation). REQUIRES real image URLs for both sides of each pair.",
+          "videos": "2-up grid of video embeds with optional titles/captions. For videographers, musicians, course creators. YouTube/Vimeo URLs only."
+        }
+      },
+      "eyebrow": {
+        "type": "string",
+        "required": false
+      },
+      "headline": {
+        "type": "string",
+        "required": false
+      },
+      "subheadline": {
+        "type": "string",
+        "required": false
+      },
+      "images": {
+        "type": "array",
+        "required": false,
+        "default": [],
+        "description": "Can be simple URL strings or objects with url/alt/caption.",
+        "item_schema_simple": "string (URL)",
+        "item_schema_object": {
+          "url": {
+            "type": "string (URL)",
+            "required": true
+          },
+          "alt": {
+            "type": "string",
+            "required": false
+          },
+          "caption": {
+            "type": "string",
+            "required": false,
+            "description": "Only used by 'cards' variant."
+          }
+        }
+      },
+      "columns": {
+        "type": "integer",
+        "required": false,
+        "default": 3,
+        "description": "Number of columns. Only used by default variant."
+      },
+      "pairs": {
+        "type": "array",
+        "required": false,
+        "description": "For 'before_after': [{before: url, after: url, result?: '“Lost 32 lbs in 16 weeks”', caption?}]. Max 4 pairs. Pairs missing either real image are dropped."
+      },
+      "videos": {
+        "type": "array",
+        "required": false,
+        "description": "For 'videos': [{url, title?, caption?}] or plain YouTube/Vimeo URL strings. Max 6."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "Optional section-closing CTA {text,url}. On lead-gen landers repeat the SAME primary CTA (e.g. 'Get My Free Estimate' or tel:) after most sections — CTA rhythm converts."
+      }
+    },
+    "newsletter": {
+      "_description": "Email capture / newsletter signup section.",
+      "_variants": [
+        "default",
+        "inline"
+      ],
+      "_config_key": "newsletter",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Card-style with headline, description, CTA button, and privacy note. Full featured.",
+          "inline": "Gradient bar with headline + button side by side. Compact, eye-catching."
+        }
+      },
+      "headline": {
+        "type": "string",
+        "required": false,
+        "default": "Stay in the Loop"
+      },
+      "description": {
+        "type": "string",
+        "required": false,
+        "default": "Get the latest updates delivered to your inbox."
+      },
+      "cta_text": {
+        "type": "string",
+        "required": false,
+        "default": "Subscribe"
+      },
+      "cta_url": {
+        "type": "string",
+        "required": false,
+        "default": "#"
+      },
+      "note": {
+        "type": "string",
+        "required": false,
+        "description": "Privacy note below button. Only used by default variant.",
+        "example": "We respect your privacy. Unsubscribe anytime."
+      }
+    },
+    "map": {
+      "_description": "Google Maps embed. Good for local businesses, contact pages.",
+      "_variants": [
+        "default",
+        "contact"
+      ],
+      "_config_key": "map",
+      "eyebrow": {
+        "type": "string",
+        "required": false
+      },
+      "headline": {
+        "type": "string",
+        "required": false
+      },
+      "address": {
+        "type": "string",
+        "required": false,
+        "default": "",
+        "example": "123 Main St, San Francisco, CA"
+      },
+      "height": {
+        "type": "integer",
+        "required": false,
+        "default": 400,
+        "description": "Map height in px. Mobile auto-scales to 5/8."
+      },
+      "zoom": {
+        "type": "integer",
+        "required": false,
+        "default": 14,
+        "description": "Zoom level 1-20."
+      },
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Standard layout.",
+          "contact": "'Visit Us' block: contact card (address, tap-to-call phone, email, hours lines, note, CTA) beside the map. The standard local-business contact section. Needs at least one of phone/email/hours; falls back to bare map otherwise."
+        }
+      },
+      "phone": {
+        "type": "string",
+        "required": false,
+        "example": "(864) 555-0142",
+        "description": "Rendered as a tap-to-call tel: link."
+      },
+      "email": {
+        "type": "string",
+        "required": false,
+        "example": "hello@business.com"
+      },
+      "hours": {
+        "type": "array of strings",
+        "required": false,
+        "example": [
+          "Mon - Fri · 9am - 6pm",
+          "Sat · 10am - 4pm"
+        ],
+        "description": "One line per range; each gets a clock icon."
+      },
+      "note": {
+        "type": "string",
+        "required": false,
+        "example": "Street parking on Main, lot behind the building."
+      },
+      "cta": {
+        "type": "object",
+        "required": false,
+        "description": "{text, url}. Defaults to a Call Now tel: button when phone is set."
+      }
+    },
+    "cta_final": {
+      "_description": "Final call-to-action before footer. Strong closing push.",
+      "_variants": [
+        "default",
+        "card",
+        "image",
+        "split"
+      ],
+      "_config_key": "cta_final",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Gradient bar with centered text and button. Bold, high-contrast.",
+          "card": "White card on light background. Elegant, restrained.",
+          "image": "Full background image with dark overlay. Dramatic, immersive.",
+          "split": "Two-column closer: headline + CTA left, frosted checklist card of `bullets` right, on dark bg. Conversion-focused, modern. REQUIRES the bullets array (3-5 short reassurances); without bullets it falls back to default."
+        }
+      },
+      "headline": {
+        "type": "string",
+        "required": true,
+        "example": "Ready to Get Started?"
+      },
+      "description": {
+        "type": "string",
+        "required": true,
+        "example": "Join thousands of businesses already using PressGo."
+      },
+      "image": {
+        "type": "string (URL)",
+        "required": false,
+        "description": "Background image. Only used by 'image' variant."
+      },
+      "cta": {
+        "type": "object",
+        "required": true,
+        "schema": {
+          "text": {
+            "type": "string",
+            "required": true,
+            "example": "Start Free Trial"
+          },
+          "url": {
+            "type": "string",
+            "required": false,
+            "default": "#"
+          },
+          "icon": {
+            "type": "string",
+            "required": false
+          }
+        }
+      },
+      "trust_line": {
+        "type": "string",
+        "required": false,
+        "description": "Small text below CTA.",
+        "example": "No credit card required"
+      },
+      "bullets": {
+        "type": "array of strings",
+        "required": false,
+        "description": "Short reassurance bullets for the 'split' variant's checklist card (3-5 items, a few words each: guarantees, turnaround, what's included).",
+        "example": [
+          "Free 30-min consultation",
+          "Launch in 2 weeks",
+          "No long-term contract",
+          "100% money-back guarantee"
+        ]
+      },
+      "social_icons": {
+        "type": "array",
+        "required": false,
+        "description": "Social media icons below CTA. Same format as footer social_icons."
+      },
+      "cta_secondary": {
+        "type": "object",
+        "required": false,
+        "description": "Optional second (outline) button beside the primary — 'View menu' beside 'Book now'. {text, url, icon?}."
+      }
+    },
+    "footer": {
+      "_description": "Page footer with brand info, links, and contact details.",
+      "_variants": [
+        "default",
+        "light"
+      ],
+      "_config_key": "footer",
+      "variant": {
+        "type": "string",
+        "required": false,
+        "options": {
+          "default": "Multi-column dark footer with brand, link columns, and contact. Standard.",
+          "light": "White/light background footer with colored icons. Clean, modern."
+        }
+      },
+      "brand": {
+        "type": "object",
+        "required": false,
+        "schema": {
+          "name": {
+            "type": "string",
+            "required": false,
+            "example": "PressGo"
+          },
+          "description": {
+            "type": "string",
+            "required": false,
+            "example": "AI-powered landing page generation."
+          }
+        }
+      },
+      "social_icons": {
+        "type": "array",
+        "required": false,
+        "description": "Social media links for the brand.",
+        "item_schema": {
+          "social_icon": {
+            "type": "icon object",
+            "example": {
+              "value": "fab fa-twitter",
+              "library": "fa-brands"
+            }
+          },
+          "link": {
+            "type": "link object",
+            "example": {
+              "url": "https://twitter.com/pressgo"
+            }
+          }
+        }
+      },
+      "columns": {
+        "type": "array",
+        "required": false,
+        "description": "Link columns (e.g. Product, Company, Resources).",
+        "item_schema": {
+          "title": {
+            "type": "string",
+            "required": true,
+            "example": "Product"
+          },
+          "links": {
+            "type": "array",
+            "required": true,
+            "item_schema": {
+              "text": {
+                "type": "string",
+                "required": true,
+                "example": "Features"
+              },
+              "url": {
+                "type": "string",
+                "required": false,
+                "default": "#"
+              }
+            }
+          }
+        }
+      },
+      "contact": {
+        "type": "object",
+        "required": false,
+        "schema": {
+          "email": {
+            "type": "string",
+            "required": false,
+            "example": "hello@pressgo.app"
+          },
+          "phone": {
+            "type": "string",
+            "required": false,
+            "example": "(555) 123-4567"
+          },
+          "address": {
+            "type": "string",
+            "required": false,
+            "example": "123 Main St, San Francisco, CA"
+          }
+        }
+      },
+      "copyright": {
+        "type": "string",
+        "required": false,
+        "example": "© 2026 PressGo. All rights reserved."
+      }
+    },
+    "disclaimer": {
+      "_description": "Small disclaimer text at very bottom. Optional.",
+      "_variants": [
+        "default"
+      ],
+      "_config_key": "disclaimer",
+      "type": "string",
+      "description": "Disclaimer text. Also picks up top-level social_icons for a mini footer row.",
+      "example": "Results may vary. Past performance does not guarantee future results."
+    }
+  },
+  "variant_pairing_guide": {
+    "_description": "Recommended variant combinations for visual harmony and contrast.",
+    "dark_hero_flow": {
+      "description": "Bold, high-impact pages. Dark hero → light middle → dark CTA.",
+      "recommended": {
+        "hero": "default|gradient",
+        "stats": "default (overlaps dark hero)",
+        "social_proof": "default",
+        "features": "default|minimal|bento",
+        "steps": "default|compact",
+        "testimonials": "default|featured",
+        "results": "default (dark, for contrast)",
+        "cta_final": "default (gradient)|split (with bullets)",
+        "footer": "default (dark)"
+      }
+    },
+    "light_hero_flow": {
+      "description": "Clean, professional pages. Light hero → alternating contrast.",
+      "recommended": {
+        "hero": "split|minimal",
+        "stats": "dark (contrast with light hero)",
+        "social_proof": "dark",
+        "features": "alternating|image_cards",
+        "steps": "timeline",
+        "testimonials": "grid|minimal",
+        "results": "bars",
+        "cta_final": "card|image|split (with bullets)",
+        "footer": "light",
+        "map": "contact (local businesses)"
+      }
+    },
+    "visual_heavy_flow": {
+      "description": "Image-rich pages for visual industries (real estate, hospitality, portfolio).",
+      "recommended": {
+        "hero": "image|split",
+        "features": "alternating|image_cards",
+        "gallery": "default|cards|before_after (transformation proof)",
+        "testimonials": "featured",
+        "competitive_edge": "image",
+        "cta_final": "image",
+        "footer": "default"
+      }
+    },
+    "minimal_flow": {
+      "description": "Clean, text-focused pages for professional services.",
+      "recommended": {
+        "hero": "minimal",
+        "features": "minimal",
+        "steps": "compact",
+        "testimonials": "minimal",
+        "faq": "split",
+        "cta_final": "card",
+        "footer": "light"
+      }
+    }
+  },
+  "industry_recommendations": {
+    "saas_tech": {
+      "sections": [
+        "hero",
+        "social_proof",
+        "features",
+        "steps",
+        "results",
+        "testimonials",
+        "pricing",
+        "faq",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "default|split",
+        "features": "grid|bento",
+        "steps": "compact",
+        "testimonials": "default",
+        "pricing": "default",
+        "cta_final": "default|split"
+      },
+      "tips": "Lead with metrics. Use counter animations in stats/results. Include pricing. Gradient hero works well. Features bento makes a modern asymmetric showcase (first item = big tile). cta_final split (with a bullets array of 3-5 reassurances) converts better than a bare gradient bar."
+    },
+    "local_service": {
+      "sections": [
+        "hero",
+        "features",
+        "steps",
+        "testimonials",
+        "competitive_edge",
+        "faq",
+        "map",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "split|image",
+        "features": "default",
+        "testimonials": "featured",
+        "competitive_edge": "default|comparison",
+        "cta_final": "card|split",
+        "gallery": "before_after (with real photos)",
+        "map": "contact"
+      },
+      "tips": "Include map section. Use local imagery. Feature testimonials prominently. Add contact info in footer."
+    },
+    "ecommerce": {
+      "sections": [
+        "hero",
+        "logo_bar",
+        "features",
+        "gallery",
+        "testimonials",
+        "competitive_edge",
+        "pricing",
+        "faq",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "split|image",
+        "features": "image_cards (per-item price/cta = product cards)",
+        "gallery": "cards",
+        "testimonials": "grid"
+      },
+      "tips": "Product images are critical. Use image_cards features. Gallery for product showcase."
+    },
+    "portfolio_creative": {
+      "sections": [
+        "hero",
+        "features",
+        "gallery",
+        "testimonials",
+        "team",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "minimal|image",
+        "features": "minimal",
+        "gallery": "default|videos",
+        "team": "spotlight (the solo creator)",
+        "cta_final": "card"
+      },
+      "tips": "Let work speak. Minimal text, maximum imagery. Clean typography."
+    },
+    "healthcare_wellness": {
+      "sections": [
+        "hero",
+        "social_proof",
+        "features",
+        "steps",
+        "results",
+        "testimonials",
+        "team",
+        "faq",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "split",
+        "features": "alternating",
+        "results": "bars",
+        "testimonials": "featured",
+        "team": "default",
+        "pricing": "list (priced services)",
+        "map": "contact"
+      },
+      "tips": "Trust is paramount. Use team photos, testimonials, and credential badges. Calming colors."
+    },
+    "education_courses": {
+      "sections": [
+        "hero",
+        "features",
+        "steps",
+        "results",
+        "testimonials",
+        "pricing",
+        "faq",
+        "newsletter",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "video",
+        "features": "default",
+        "steps": "timeline",
+        "testimonials": "grid",
+        "pricing": "default"
+      },
+      "tips": "Video hero for course preview. Timeline steps for curriculum. Show student results."
+    },
+    "restaurant_hospitality": {
+      "sections": [
+        "hero",
+        "features",
+        "gallery",
+        "testimonials",
+        "map",
+        "newsletter",
+        "footer"
+      ],
+      "variants": {
+        "hero": "image",
+        "features": "image_cards",
+        "gallery": "default|cards",
+        "testimonials": "minimal",
+        "footer": "light",
+        "pricing": "list (the menu!)",
+        "map": "contact"
+      },
+      "tips": "Full-bleed hero image. Food/venue gallery. Map for location. Warm color palette."
+    },
+    "nonprofit": {
+      "sections": [
+        "hero",
+        "social_proof",
+        "features",
+        "results",
+        "testimonials",
+        "team",
+        "newsletter",
+        "cta_final",
+        "footer"
+      ],
+      "variants": {
+        "hero": "image",
+        "features": "alternating",
+        "results": "default",
+        "testimonials": "featured",
+        "cta_final": "image"
+      },
+      "tips": "Emotional imagery. Impact metrics in results. Strong mission statement in hero."
+    }
+  },
+  "common_fontawesome_icons": {
+    "_note": "Use these proven icons. Always format as 'fas fa-name' (solid) or 'fab fa-name' (brands).",
+    "general": [
+      "fas fa-check",
+      "fas fa-arrow-right",
+      "fas fa-star",
+      "fas fa-heart",
+      "fas fa-bolt",
+      "fas fa-shield-alt",
+      "fas fa-clock",
+      "fas fa-rocket",
+      "fas fa-chart-line",
+      "fas fa-cog"
+    ],
+    "business": [
+      "fas fa-briefcase",
+      "fas fa-handshake",
+      "fas fa-chart-bar",
+      "fas fa-users",
+      "fas fa-building",
+      "fas fa-globe",
+      "fas fa-award",
+      "fas fa-bullseye"
+    ],
+    "tech": [
+      "fas fa-laptop-code",
+      "fas fa-code",
+      "fas fa-cloud",
+      "fas fa-database",
+      "fas fa-microchip",
+      "fas fa-wifi",
+      "fas fa-lock",
+      "fas fa-mobile-alt"
+    ],
+    "communication": [
+      "fas fa-envelope",
+      "fas fa-phone",
+      "fas fa-comments",
+      "fas fa-paper-plane",
+      "fas fa-headset",
+      "fas fa-bell"
+    ],
+    "social_brands": [
+      "fab fa-twitter",
+      "fab fa-facebook-f",
+      "fab fa-instagram",
+      "fab fa-linkedin-in",
+      "fab fa-github",
+      "fab fa-youtube",
+      "fab fa-tiktok"
+    ],
+    "health_wellness": [
+      "fas fa-heartbeat",
+      "fas fa-medkit",
+      "fas fa-stethoscope",
+      "fas fa-leaf",
+      "fas fa-spa",
+      "fas fa-dumbbell"
+    ],
+    "food_hospitality": [
+      "fas fa-utensils",
+      "fas fa-coffee",
+      "fas fa-glass-cheers",
+      "fas fa-concierge-bell",
+      "fas fa-bed"
+    ],
+    "education": [
+      "fas fa-graduation-cap",
+      "fas fa-book",
+      "fas fa-chalkboard-teacher",
+      "fas fa-brain",
+      "fas fa-lightbulb"
+    ],
+    "finance": [
+      "fas fa-dollar-sign",
+      "fas fa-piggy-bank",
+      "fas fa-wallet",
+      "fas fa-coins",
+      "fas fa-chart-pie"
+    ]
+  },
+  "example_config": {
+    "_note": "Minimal valid config for a SaaS landing page. All colors, fonts, layout, sections, and section data provided.",
+    "colors": {
+      "primary": "#4284CB",
+      "dark_bg": "#0F172A",
+      "light_bg": "#F8FAFC",
+      "white": "#FFFFFF",
+      "text_dark": "#1E293B",
+      "text_muted": "#64748B"
+    },
+    "fonts": {
+      "heading": "Poppins",
+      "body": "Inter"
+    },
+    "layout": {
+      "card_radius": 16,
+      "button_radius": 10
+    },
+    "sections": [
+      "hero",
+      "social_proof",
+      "features",
+      "steps",
+      "testimonials",
+      "faq",
+      "cta_final",
+      "footer"
+    ],
+    "hero": {
+      "eyebrow": "AI-POWERED",
+      "headline": "Build Pages in Seconds",
+      "subheadline": "Generate professional landing pages with a single text prompt.",
+      "cta_primary": {
+        "text": "Get Started Free",
+        "url": "#pricing",
+        "icon": "fas fa-arrow-right"
+      },
+      "cta_secondary": {
+        "text": "See Examples",
+        "url": "#features"
+      },
+      "badge": "NEW",
+      "trust_line": "No credit card required — Free 14-day trial"
+    },
+    "social_proof": {
+      "headline": "Trusted across 50+ industries",
+      "categories": [
+        "SaaS",
+        "Healthcare",
+        "E-commerce",
+        "Finance",
+        "Education",
+        "Real Estate"
+      ]
+    },
+    "features": {
+      "eyebrow": "FEATURES",
+      "headline": "Everything You Need",
+      "subheadline": "Powerful tools for modern teams.",
+      "items": [
+        {
+          "icon": "fas fa-bolt",
+          "title": "Lightning Fast",
+          "desc": "Generate pages in under 30 seconds with AI."
+        },
+        {
+          "icon": "fas fa-palette",
+          "title": "Beautiful Design",
+          "desc": "48 layout variants based on 588 template kits."
+        },
+        {
+          "icon": "fas fa-mobile-alt",
+          "title": "Mobile First",
+          "desc": "Every page looks perfect on any device."
+        }
+      ]
+    },
+    "steps": {
+      "eyebrow": "HOW IT WORKS",
+      "headline": "Three Simple Steps",
+      "items": [
+        {
+          "num": "1",
+          "title": "Describe",
+          "desc": "Tell us about your business in plain English."
+        },
+        {
+          "num": "2",
+          "title": "Generate",
+          "desc": "AI creates your page with optimal layout and content."
+        },
+        {
+          "num": "3",
+          "title": "Publish",
+          "desc": "Review, customize if needed, and go live instantly."
+        }
+      ]
+    },
+    "testimonials": {
+      "eyebrow": "TESTIMONIALS",
+      "headline": "Loved by Thousands",
+      "items": [
+        {
+          "quote": "PressGo saved us weeks of work.",
+          "name": "Sarah Chen",
+          "role": "Marketing Director, TechCorp"
+        },
+        {
+          "quote": "The AI understands exactly what we needed.",
+          "name": "James Wilson",
+          "role": "Founder, StartupHQ"
+        },
+        {
+          "quote": "Best landing page tool we've ever used.",
+          "name": "Maria Santos",
+          "role": "CEO, GrowthLab"
+        }
+      ]
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "headline": "Common Questions",
+      "items": [
+        {
+          "q": "How does PressGo work?",
+          "a": "Describe your business in plain text and our AI generates a complete Elementor landing page."
+        },
+        {
+          "q": "Do I need Elementor Pro?",
+          "a": "No, PressGo works with Elementor Free. Some features like blog posts require Pro."
+        },
+        {
+          "q": "Can I customize the pages?",
+          "a": "Yes! Pages are standard Elementor pages. Edit anything in the visual editor."
+        },
+        {
+          "q": "How long does generation take?",
+          "a": "Most pages are generated in 15-30 seconds."
+        }
+      ]
+    },
+    "cta_final": {
+      "headline": "Ready to Build?",
+      "description": "Join thousands of businesses creating pages with AI.",
+      "cta": {
+        "text": "Start Free Trial",
+        "url": "#",
+        "icon": "fas fa-rocket"
+      },
+      "trust_line": "No credit card required"
+    },
+    "footer": {
+      "brand": {
+        "name": "PressGo",
+        "description": "AI-powered landing page generation for WordPress."
+      },
+      "social_icons": [
+        {
+          "social_icon": {
+            "value": "fab fa-twitter",
+            "library": "fa-brands"
+          },
+          "link": {
+            "url": "#"
+          }
+        },
+        {
+          "social_icon": {
+            "value": "fab fa-github",
+            "library": "fa-brands"
+          },
+          "link": {
+            "url": "#"
+          }
+        }
+      ],
+      "columns": [
+        {
+          "title": "Product",
+          "links": [
+            {
+              "text": "Features"
+            },
+            {
+              "text": "Pricing"
+            },
+            {
+              "text": "Templates"
+            }
+          ]
+        },
+        {
+          "title": "Company",
+          "links": [
+            {
+              "text": "About"
+            },
+            {
+              "text": "Blog"
+            },
+            {
+              "text": "Careers"
+            }
+          ]
+        }
+      ],
+      "contact": {
+        "email": "hello@pressgo.app"
+      },
+      "copyright": "© 2026 PressGo. All rights reserved."
+    }
+  }
+}

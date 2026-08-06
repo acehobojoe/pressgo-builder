@@ -1,0 +1,1881 @@
+{
+ "version": "3.2",
+ "source": "588 Elementor Template Kits — 254,465 widgets across 10,624 JSON files + real-world conversion learnings from client landing pages (Bodystyle Fitness, Hall Brothers, Hypnotherapy, AMWL)",
+ "generated": "2026-03-24",
+ "stats": "19 section types, 56 builder methods, 37 layout variants",
+ "widget_reference": {
+  "_note": "Every setting uses Elementor's standard value types: dimension({unit,size,sizes}), spacing({unit,top,right,bottom,left,isLinked}), media({url,id,alt}), icon({value,library}). Responsive overrides: append _mobile or _tablet to any setting key.",
+  "_value_types": {
+   "dimension": {
+    "unit": "px",
+    "size": 20,
+    "sizes": []
+   },
+   "spacing": {
+    "unit": "px",
+    "top": "10",
+    "right": "10",
+    "bottom": "10",
+    "left": "10",
+    "isLinked": true
+   },
+   "media": {
+    "url": "https://...",
+    "id": "",
+    "alt": "description"
+   },
+   "icon": {
+    "value": "fas fa-icon-name",
+    "library": "fa-solid"
+   },
+   "link": {
+    "url": "https://...",
+    "is_external": false,
+    "nofollow": false
+   }
+  },
+  "heading": {
+   "count": 73470,
+   "use_for": "Section titles, hero headlines, any text heading",
+   "key_settings": {
+    "title": "string — the heading text",
+    "header_size": "h1|h2|h3|h4|h5|h6|div|span|p",
+    "align": "left|center|right",
+    "title_color": "hex color",
+    "typography_typography": "'custom' to enable font settings",
+    "typography_font_family": "font name string",
+    "typography_font_weight": "100-900 string",
+    "typography_font_size": "dimension",
+    "typography_font_size_mobile": "dimension (responsive)",
+    "typography_letter_spacing": "dimension",
+    "typography_line_height": "dimension (unit: em)",
+    "typography_text_transform": "uppercase|lowercase|capitalize|none"
+   },
+   "helper": "heading_w($cfg, $text, $tag, $align, $color, $size, $weight, $letter_spacing, $line_height, $transform, $size_mobile)"
+  },
+  "text-editor": {
+   "count": 30517,
+   "use_for": "Body text, rich HTML content, inline-styled paragraphs",
+   "key_settings": {
+    "editor": "HTML string — supports <strong>, <em>, <span style=...>, etc.",
+    "align": "left|center|right|justify",
+    "align_mobile": "responsive alignment override",
+    "text_color": "hex color",
+    "typography_typography": "'custom'",
+    "typography_font_family": "font name",
+    "typography_font_size": "dimension",
+    "typography_font_weight": "string",
+    "typography_line_height": "dimension (unit: em)"
+   },
+   "helper": "text_w($cfg, $html, $align, $color, $size)"
+  },
+  "image": {
+   "count": 29416,
+   "use_for": "Photos, screenshots, illustrations, logos",
+   "key_settings": {
+    "image": "media object {url, id, alt, source: 'library'}",
+    "image_size": "full|custom|medium|large|thumbnail",
+    "image_custom_dimension": "{width, height} — only when image_size='custom'",
+    "align": "left|center|right",
+    "width": "dimension (% or px) — image display width",
+    "height": "dimension — image display height",
+    "object-fit": "cover|contain|fill",
+    "image_border_radius": "spacing — rounded corners",
+    "image_box_shadow_box_shadow_type": "'yes' to enable shadow",
+    "image_box_shadow_box_shadow": "{horizontal, vertical, blur, spread, color}",
+    "link": "link object — makes image clickable"
+   },
+   "helper": "image_w($url, $alt, $width, $radius, $shadow, $align)"
+  },
+  "button": {
+   "count": 16906,
+   "use_for": "CTAs, links, form submits",
+   "key_settings": {
+    "text": "button label string",
+    "link": "link object {url, is_external, nofollow}",
+    "align": "left|center|right",
+    "size": "xs|sm|md|lg|xl",
+    "selected_icon": "icon object — adds icon to button",
+    "icon_align": "left|right",
+    "icon_indent": "dimension — spacing between icon and text",
+    "background_color": "hex — button bg color",
+    "button_text_color": "hex — button text color",
+    "border_border": "solid|dashed|dotted|none",
+    "border_width": "spacing — border thickness",
+    "border_color": "hex — border color",
+    "border_radius": "spacing — rounded corners",
+    "text_padding": "spacing — inner padding",
+    "typography_typography": "'custom'",
+    "typography_font_family": "font name",
+    "typography_font_weight": "string",
+    "typography_font_size": "dimension"
+   },
+   "helper": "btn_w($cfg, $text, $url, $bg, $text_color, $border_color, $icon, $align)"
+  },
+  "icon-box": {
+   "count": 13674,
+   "use_for": "Feature cards, service lists, info boxes — REPLACES separate icon+heading+text combo",
+   "key_settings": {
+    "selected_icon": "icon object",
+    "title_text": "string — box title",
+    "description_text": "string — box description",
+    "position": "top|left|right — icon position relative to text",
+    "text_align": "left|center|right",
+    "view": "default|stacked|framed — icon display style",
+    "shape": "circle|square — when view is stacked/framed",
+    "primary_color": "hex — icon color (or bg color when stacked)",
+    "secondary_color": "hex — bg color (stacked) or border color (framed)",
+    "title_size": "h1-h6|div|p|span",
+    "icon_size": "dimension",
+    "icon_space": "dimension — gap between icon and text",
+    "title_bottom_space": "dimension — gap between title and description",
+    "title_color": "hex",
+    "description_color": "hex",
+    "title_typography_typography": "'custom'",
+    "title_typography_font_family": "font name",
+    "title_typography_font_weight": "string",
+    "title_typography_font_size": "dimension",
+    "description_typography_typography": "'custom'",
+    "description_typography_font_family": "font name",
+    "description_typography_font_size": "dimension",
+    "description_typography_line_height": "dimension"
+   },
+   "helper": "icon_box_w($cfg, $icon, $title, $desc, $icon_color, $position, $view, $shape, $secondary_color, $align)"
+  },
+  "icon-list": {
+   "count": 8940,
+   "use_for": "Bullet points with icons — checkmarks, X marks, feature lists, benefit lists",
+   "key_settings": {
+    "icon_list": "array of {text, selected_icon: {value, library}, _id}",
+    "space_between": "dimension — gap between items",
+    "icon_color": "hex — icon color for all items",
+    "icon_size": "dimension — icon pixel size",
+    "text_color": "hex — text color for all items",
+    "text_indent": "dimension — gap between icon and text",
+    "typography_typography": "'custom'",
+    "typography_font_family": "font name",
+    "typography_font_size": "dimension",
+    "typography_font_size_mobile": "dimension (responsive)",
+    "typography_line_height": "dimension (unit: em)"
+   },
+   "helper": "icon_list_w() — NEEDED, not yet built",
+   "patterns": {
+    "benefit_checklist": {
+     "icon": "fas fa-check",
+     "icon_color": "#4CAF50",
+     "text_color": "white or dark depending on bg",
+     "use": "Hero bullet points, competitive edge benefits"
+    },
+    "negative_checklist": {
+     "icon": "fas fa-times",
+     "icon_color": "#971B2F",
+     "text_color": "rgba(255,255,255,0.5) — faded to show these are the bad things",
+     "use": "Competitor negatives in comparison sections"
+    }
+   }
+  },
+  "icon": {
+   "count": 5883,
+   "use_for": "Standalone icons, decorative elements, small indicators",
+   "key_settings": {
+    "selected_icon": "icon object",
+    "view": "default|stacked|framed",
+    "shape": "circle|square",
+    "primary_color": "hex — icon color",
+    "secondary_color": "hex — background (stacked) or border (framed)",
+    "size": "dimension — icon size",
+    "align": "left|center|right"
+   },
+   "helper": "icon_w($icon_class, $color, $size, $view, $shape, $secondary_color)"
+  },
+  "image-box": {
+   "count": 5466,
+   "use_for": "Team members, service cards with photos, portfolio items",
+   "key_settings": {
+    "image": "media object {url, id, alt}",
+    "title_text": "string",
+    "description_text": "string",
+    "position": "top|left|right — image position",
+    "text_align": "left|center|right",
+    "title_size": "h1-h6|div|p",
+    "image_size": "dimension — image display size",
+    "image_space": "dimension — gap between image and text",
+    "image_border_radius": "dimension — rounded corners",
+    "title_bottom_space": "dimension",
+    "title_color": "hex",
+    "description_color": "hex"
+   },
+   "helper": "image_box_w($cfg, $img_url, $title, $desc, $align, $img_size, $position)"
+  },
+  "counter": {
+   "count": 3594,
+   "use_for": "Statistics, metrics, achievement numbers with animation",
+   "key_settings": {
+    "starting_number": "integer — animation start (usually 0)",
+    "ending_number": "integer — target number",
+    "prefix": "string — text before number (e.g. '$')",
+    "suffix": "string — text after number (e.g. '+')",
+    "duration": "integer — animation duration in ms",
+    "thousand_separator": "yes|no",
+    "thousand_separator_char": "','",
+    "title": "string — label below number",
+    "number_color": "hex",
+    "title_color": "hex",
+    "typography_typography": "'custom' — for number font",
+    "typography_font_family": "font name",
+    "typography_font_weight": "string",
+    "typography_font_size": "dimension",
+    "title_typography_typography": "'custom' — for label font",
+    "title_typography_font_family": "font name",
+    "title_typography_font_size": "dimension"
+   },
+   "helper": "Used directly via PressGo_Element_Factory::widget('counter', ...)"
+  },
+  "social-icons": {
+   "count": 3261,
+   "use_for": "Social media links in footer, about sections, team cards",
+   "key_settings": {
+    "social_icon_list": "array of {social_icon: icon_object, link: link_object, item_icon_color, _id}",
+    "icon_size": "dimension",
+    "icon_color": "custom|default",
+    "icon_primary_color": "hex — icon color when icon_color='custom'",
+    "shape": "circle|square|rounded",
+    "align": "left|center|right",
+    "icon_spacing": "dimension — gap between icons",
+    "icon_padding": "dimension — padding inside icon shape",
+    "hover_animation": "pop|shrink|grow",
+    "columns": "string number — for grid layout"
+   },
+   "helper": "social_icons_w($icons, $size, $color, $primary_color, $shape, $align, $spacing)"
+  },
+  "divider": {
+   "count": 7539,
+   "use_for": "Section separators, visual breaks between content",
+   "key_settings": {
+    "color": "hex or rgba — line color",
+    "weight": "dimension — line thickness",
+    "width": "dimension — line width",
+    "gap": "dimension — vertical space above/below",
+    "align": "center|left|right",
+    "text": "string — optional label text on the divider"
+   },
+   "helper": "divider_w()"
+  },
+  "spacer": {
+   "count": 6637,
+   "use_for": "Vertical spacing between elements",
+   "key_settings": {
+    "space": "dimension — height in px",
+    "space_mobile": "dimension — responsive height"
+   },
+   "helper": "spacer_w($px)"
+  },
+  "toggle": {
+   "count": 1043,
+   "use_for": "FAQ sections, expandable content (FREE — use instead of Pro accordion)",
+   "key_settings": {
+    "tabs": "array of {tab_title, tab_content}",
+    "border_color": "hex or rgba",
+    "title_color": "hex — closed state title color",
+    "tab_active_color": "hex — open state title color",
+    "title_typography_typography": "'custom'",
+    "title_typography_font_family": "font name",
+    "title_typography_font_weight": "string",
+    "title_typography_font_size": "dimension",
+    "content_typography_typography": "'custom'",
+    "content_typography_font_family": "font name",
+    "content_typography_font_size": "dimension",
+    "content_color": "hex",
+    "space_between": "integer — gap between items",
+    "toggle_icon_align": "left|right"
+   },
+   "helper": "Used directly via PressGo_Element_Factory::widget('toggle', ...)"
+  },
+  "star-rating": {
+   "count": 437,
+   "use_for": "Review ratings, quality indicators",
+   "key_settings": {
+    "rating": "number — 0 to 5 (supports decimals like 4.5)",
+    "star_style": "star_fontawesome|star_unicode",
+    "icon_size": "dimension — star size",
+    "icon_space": "dimension — gap between stars",
+    "stars_color": "hex — star color",
+    "align": "left|center|right",
+    "title": "string — optional label next to stars",
+    "title_gap": "dimension — gap between stars and title"
+   },
+   "helper": "star_rating_w($rating, $size, $color, $align)"
+  },
+  "testimonial": {
+   "count": 615,
+   "use_for": "Customer quotes with avatar, built-in testimonial layout",
+   "key_settings": {
+    "testimonial_content": "string — the quote text",
+    "testimonial_name": "string — person's name",
+    "testimonial_job": "string — role/title",
+    "testimonial_image": "media object — avatar image",
+    "testimonial_alignment": "left|center|right",
+    "image_size": "dimension — avatar size",
+    "image_border_radius": "spacing — avatar corner radius",
+    "content_content_color": "hex",
+    "name_text_color": "hex",
+    "job_text_color": "hex",
+    "content_typography_typography": "'custom'",
+    "content_typography_font_family": "font name",
+    "content_typography_font_size": "dimension",
+    "content_typography_font_style": "normal|italic",
+    "name_typography_typography": "'custom'",
+    "name_typography_font_family": "font name",
+    "name_typography_font_weight": "string"
+   },
+   "helper": "testimonial_w($cfg, $quote, $name, $role, $image_url, $align)"
+  },
+  "video": {
+   "count": 194,
+   "use_for": "YouTube/Vimeo embeds, product demos, explainer videos",
+   "key_settings": {
+    "youtube_url": "full YouTube URL",
+    "vimeo_url": "full Vimeo URL",
+    "show_image_overlay": "yes|'' — show poster image",
+    "image_overlay": "media object — poster image",
+    "aspect_ratio": "'169'|'219'|'43'|'32'|'11'",
+    "lightbox": "yes|'' — open in lightbox",
+    "_border_radius": "spacing — rounded corners"
+   },
+   "helper": "video_w($url, $overlay_img, $border_radius)"
+  },
+  "google_maps": {
+   "count": 594,
+   "use_for": "Location maps for businesses, contact pages",
+   "key_settings": {
+    "address": "string — full address or place name",
+    "height": "dimension — map height",
+    "zoom": "dimension — zoom level (1-20)",
+    "css_filters_css_filter": "'custom' — enable desaturation",
+    "css_filters_saturate": "dimension — 0 for grayscale"
+   },
+   "helper": "google_map_w($address, $height, $zoom)"
+  },
+  "progress-bar": {
+   "count": 326,
+   "use_for": "Skills display, completion indicators, loading bars",
+   "key_settings": {
+    "title": "string — bar label",
+    "percent": "dimension — fill percentage",
+    "display_percentage": "yes|''",
+    "bar_color": "hex — fill color",
+    "bar_bg_color": "hex — track background",
+    "bar_height": "dimension — bar thickness",
+    "bar_border_radius": "spacing — rounded corners",
+    "title_color": "hex",
+    "typography_typography": "'custom'"
+   },
+   "helper": "Used directly via PressGo_Element_Factory::widget('progress-bar', ...)"
+  },
+  "form": {
+   "count": 0,
+   "use_for": "Lead capture forms — Elementor Pro required",
+   "key_settings": {
+    "form_name": "string — internal form name",
+    "form_fields": "array of {custom_id, _id, field_type, field_label, placeholder, required, width}",
+    "field_types": "text, email, tel, textarea, select, date, time, number, url, hidden",
+    "field_width": "'50' = half row, '100' = full row",
+    "submit_actions": "['email'] — what happens on submit",
+    "email_to": "recipient email address",
+    "email_subject": "subject line",
+    "email_from": "sender email",
+    "email_from_name": "sender display name",
+    "email_reply_to": "'field_fld_email' — prefix 'field_' + the field's _id",
+    "email_content_type": "'html' for HTML emails",
+    "email_content": "HTML template with [field id='name'] shortcodes",
+    "success_message": "string shown after submit",
+    "button_text": "submit button text",
+    "button_background_color": "hex",
+    "button_color": "hex — button text color",
+    "button_width": "'100' for full width",
+    "field_border_radius": "number (no unit)",
+    "field_border_width": "number",
+    "field_border_color": "hex"
+   },
+   "helper": "form_w() — NEEDED, not yet built",
+   "patterns": {
+    "hero_lead_form": {
+     "fields": [
+      "name (text)",
+      "phone (tel)",
+      "email (email)",
+      "goal (select)",
+      "message (textarea, optional)"
+     ],
+     "button_text": "YES, BOOK MY INTRO SESSION",
+     "success_message": "Thank you! We'll be in touch within 24 hours.",
+     "note": "Keep to 4-5 fields max. Goal/interest dropdown helps qualify leads."
+    },
+    "simple_contact": {
+     "fields": [
+      "name (text)",
+      "email (email)",
+      "message (textarea)"
+     ],
+     "button_text": "SEND MESSAGE",
+     "note": "Minimum viable form for simple contact pages"
+    }
+   }
+  },
+  "self_hosted_video": {
+   "count": 0,
+   "use_for": "Video without YouTube branding — keeps visitors on page",
+   "implementation": "HTML widget with video tag + poster image + CSS play button overlay",
+   "key_pattern": {
+    "html": "<div style='position:relative;cursor:pointer;' onclick='...'><img src='POSTER' /><div class='play-btn'>▶</div><video style='display:none'>...</video></div>",
+    "play_button_css": "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72px; height:72px; background:rgba(accent,0.9); border-radius:50%;",
+    "onclick": "Hide poster + play button, show video, call .play()"
+   },
+   "note": "YouTube embeds add channel links, share buttons, and suggested videos that pull visitors off landing pages. Always prefer self-hosted or Bunny CDN for paid traffic pages."
+  }
+ },
+ "layout_patterns": {
+  "hero_variants": {
+   "split_text_image": {
+    "frequency": 0.36,
+    "description": "Text left + image right. Most common professional pattern."
+   },
+   "bg_image_overlay": {
+    "frequency": 0.22,
+    "description": "Full background image with dark overlay. Dramatic, immersive."
+   },
+   "centered_no_image": {
+    "frequency": 0.18,
+    "description": "Centered text on gradient. Clean, modern SaaS feel."
+   },
+   "creative_multi": {
+    "frequency": 0.24,
+    "description": "Multi-image grids, video, parallax. Complex layouts."
+   }
+  },
+  "sections_per_page": {
+   "average": 10,
+   "min": 6,
+   "max": 15,
+   "mode": 10
+  },
+  "common_section_order": [
+   "hero",
+   "social_proof/logos",
+   "features/services",
+   "about/stats",
+   "how_it_works/steps",
+   "results/case_study",
+   "testimonials",
+   "pricing",
+   "faq",
+   "cta_final",
+   "footer"
+  ]
+ },
+ "widget_frequency": {
+  "heading": 73470,
+  "text-editor": 30517,
+  "image": 29416,
+  "button": 16906,
+  "icon-box": 13674,
+  "icon-list": 12381,
+  "divider": 7539,
+  "spacer": 6637,
+  "icon": 5883,
+  "image-box": 5466,
+  "counter": 3594,
+  "social-icons": 3261,
+  "toggle": 1043,
+  "testimonial": 615,
+  "google_maps": 594,
+  "star-rating": 437,
+  "progress-bar": 326,
+  "video": 194
+ },
+ "typography": {
+  "popular_heading_fonts": [
+   "Plus Jakarta Sans",
+   "Fraunces",
+   "Space Grotesk",
+   "Sora",
+   "Instrument Serif",
+   "Geist",
+   "Libre Caslon Display",
+   "Manrope",
+   "Outfit",
+   "Inter"
+  ],
+  "popular_body_fonts": [
+   "Geist",
+   "Source Sans 3",
+   "Manrope",
+   "DM Sans",
+   "Nunito Sans",
+   "Lato",
+   "Urbanist",
+   "Inter"
+  ],
+  "proven_combinations": [
+   {
+    "heading": "Fraunces",
+    "body": "Inter",
+    "vibe": "premium editorial, warmth with a modern body"
+   },
+   {
+    "heading": "Plus Jakarta Sans",
+    "body": "Inter",
+    "vibe": "contemporary, refined SaaS"
+   },
+   {
+    "heading": "Instrument Serif",
+    "body": "Geist",
+    "vibe": "high-contrast luxury, fashion and studio"
+   },
+   {
+    "heading": "Space Grotesk",
+    "body": "Inter",
+    "vibe": "technical, AI and developer tools"
+   },
+   {
+    "heading": "Libre Caslon Display",
+    "body": "Source Sans 3",
+    "vibe": "classic, trusted, finance and legal"
+   },
+   {
+    "heading": "Geist",
+    "body": "Geist",
+    "vibe": "neutral, precise, product and dashboard"
+   },
+   {
+    "heading": "Sora",
+    "body": "Manrope",
+    "vibe": "geometric, confident, startup"
+   },
+   {
+    "heading": "Inter",
+    "body": "Inter",
+    "vibe": "clean, safe default, use when nothing else fits"
+   }
+  ]
+ },
+ "color_palettes": {
+  "popular_accent_colors": [
+   {
+    "hex": "#1E3A2F",
+    "usage": "deep forest green, premium, organic, wellness"
+   },
+   {
+    "hex": "#2563EB",
+    "usage": "confident blue, trust, SaaS and finance"
+   },
+   {
+    "hex": "#0D9488",
+    "usage": "deep teal, calm, health and tech"
+   },
+   {
+    "hex": "#C2410C",
+    "usage": "burnt terracotta, warm, hospitality and food"
+   },
+   {
+    "hex": "#7C3AED",
+    "usage": "violet, modern, AI and creative"
+   },
+   {
+    "hex": "#B45309",
+    "usage": "warm ochre, earthy, artisan and craft"
+   },
+   {
+    "hex": "#BE123C",
+    "usage": "deep rose, bold, beauty and editorial"
+   },
+   {
+    "hex": "#475569",
+    "usage": "slate, neutral, professional and corporate"
+   }
+  ],
+  "dark_bg_colors": [
+   "#0F172A",
+   "#1A1A2E",
+   "#1C1917",
+   "#030320",
+   "#222831"
+  ],
+  "light_bg_colors": [
+   "#F8FAFC",
+   "#FFF8F5",
+   "#FFFBEB",
+   "#F0F9FF",
+   "#F5F3FF"
+  ]
+ },
+ "image_guidelines": {
+  "hero_images": {
+   "min_width": 800,
+   "recommended_width": 1200,
+   "orientation": "landscape for bg, portrait/square for split"
+  },
+  "feature_images": {
+   "recommended_width": 600,
+   "aspect_ratio": "4:3 or 16:9"
+  },
+  "pexels_search_strategies": {
+   "hero": "{industry} professional {context}",
+   "features": "{specific_service} professional quality",
+   "about": "team professional people office",
+   "testimonials": "happy customer satisfied portrait"
+  },
+  "text_over_photo_overlay": {
+   "rule": "Choose the overlay by photo brightness. DARK photo -> a flat semi-transparent dark overlay is fine. BRIGHT / light / busy photo (overhead food, sunlit scenes, pale backgrounds) -> use a SCRIM GRADIENT overlay, NOT a flat one.",
+   "why": "A flat overlay forces a bad trade on bright images: dark enough to read the text muddies the photo; light enough to keep the photo leaves the text unreadable. A scrim gradient concentrates darkness where the text sits and fades to transparent where there is none, so text stays legible AND the photo stays vibrant.",
+   "scrim_gradient_settings": {
+    "background_overlay_background": "gradient",
+    "background_overlay_color": "#111110",
+    "background_overlay_color_stop": {
+     "unit": "%",
+     "size": 33,
+     "sizes": []
+    },
+    "background_overlay_color_b": "#FFFFFF00",
+    "background_overlay_color_b_stop": {
+     "unit": "%",
+     "size": 100,
+     "sizes": []
+    },
+    "background_overlay_gradient_type": "linear",
+    "background_overlay_gradient_angle": {
+     "unit": "deg",
+     "size": 180,
+     "sizes": []
+    },
+    "background_overlay_opacity": {
+     "unit": "px",
+     "size": 0.77,
+     "sizes": []
+    }
+   },
+   "tuning": [
+    "color (A) = near-black; color_b = transparent (#FFFFFF00 or rgba(0,0,0,0)).",
+    "angle 180deg = dark at top (label + H1), clear at bottom — text-at-top heroes.",
+    "flip angle to 0deg when the text sits at the BOTTOM of the hero.",
+    "raise the ~33% color_stop for longer headlines; lower it for a shorter scrim."
+   ],
+   "source": "Joe's fix on the Bodystyle nutrition hero (overhead produce photo), captured verbatim 2026-06-26."
+  }
+ },
+ "section_variants": {
+  "_note": "All 19 section types with all 56 builder methods. Set 'variant' key in section config to use non-default.",
+  "hero": {
+   "default": "Centered text on dark gradient. Bold, impactful. SaaS/tech.",
+   "split": "Text left + image right on light bg. Professional. Needs 'image' key.",
+   "image": "Full background image with dark overlay. Dramatic. Needs 'image' key.",
+   "video": "Centered text + video embed on light bg. Engaging. Needs 'video' key.",
+   "gradient": "Colorful gradient bg with wave shape divider. Vibrant, playful.",
+   "minimal": "Clean white bg, centered text, no gradient. Simple, elegant.",
+   "form": "PRO ONLY (auto-falls back): lead-gen hero — pitch left, lead form card right, above the fold. hero.form_fields/form_recipient; cta_primary.text = submit label.",
+   "mesh": "Layered mesh-gradient bg from the brand palette, no image needed. Premium SaaS/studio. Pairs with hero.headline_style 'gradient'.",
+   "split_screen": "Full-bleed 50/50: flat primary copy panel left, edge-to-edge photo right. Needs a real image (falls back to split). Supports parallax: true."
+  },
+  "stats": {
+   "default": "White cards with icons, negative margin overlaps hero. After dark hero.",
+   "dark": "Dark gradient bg with colored counters. After light sections.",
+   "inline": "Minimal horizontal counter row with dividers. Compact accent strip.",
+   "ticker": "Slim full-width band, 3-5 inline stats with hairline separators. REAL numbers only."
+  },
+  "social_proof": {
+   "default": "Industry pill badges on light bg.",
+   "dark": "Industry pill badges on dark bg. After light hero."
+  },
+  "features": {
+   "default": "3-column icon-box card grid with accent top borders. Classic. 3 items.",
+   "alternating": "Alternating text/image rows (zigzag). 2-4 items with images.",
+   "minimal": "Clean icons with text, no card backgrounds. Elegant. 3-6 items.",
+   "image_cards": "Image on top of each card. Visual, product-focused. 3 items with images.",
+   "grid": "2-column card grid with icons. Best for 4+ features (even count).",
+   "bento": "Asymmetric bento grid: big accent-gradient hero tile + smaller white tiles, overflow in a 3-up row. Modern SaaS, no images. 4-6 items; first item is the big tile. Below 3 items it falls back to the default 3-column layout.",
+   "tabs": "Tabbed services on native Elementor tabs (stacked accordion on mobile). 2-6 items; title=tab, desc(+details[])=content."
+  },
+  "steps": {
+   "default": "Numbered circles on light bg cards. Traditional, clear.",
+   "compact": "Numbered pill badges with connecting divider. Modern SaaS.",
+   "timeline": "Vertical timeline with connecting line. Sequential, narrative.",
+   "editorial": "Oversized ghost numerals (12% accent) beside title+desc, alternating sides. Editorial/studio look.",
+   "modules": "Course curriculum: numbered module cards with title, desc, optional per-item duration ('3 lessons · 45 min')."
+  },
+  "results": {
+   "default": "Dark gradient with animated counter cards. Dramatic.",
+   "bars": "Light bg with bold metric cards (accent top border, animated counters). Values keep their real shape ($2.5M, 340%) — never converted to percentages. Clean, data-focused."
+  },
+  "competitive_edge": {
+   "default": "Text + icon-list checklist on light bg. Simple. Takes a flat 'benefits' array of strings.",
+   "image": "Text + checkmarks left, image right. Visual proof. Needs 'image' key.",
+   "cards": "Benefit cards with icons in 3-column grid. Feature-like.",
+   "comparison": "Us-vs-them cards: muted X-list (them_points/them_label) beside accent check-list (benefits/us_label). Conversion centerpiece. Needs them_points."
+  },
+  "testimonials": {
+   "default": "3-column cards with star ratings. Balanced. 3 items.",
+   "featured": "One large featured quote + smaller cards below. 3+ items.",
+   "grid": "2-column card grid with avatars. 4+ items.",
+   "minimal": "Editorial spotlight: FIRST quote runs large with accent rule, rest smaller in 2 columns below. Card-free, elegant. Lead with your strongest quote.",
+   "wall": "Masonry quote wall, CSS columns 3/2/1. 4+ REAL quotes or falls back to grid."
+  },
+  "faq": {
+   "default": "Centered toggle accordion. Clean, focused.",
+   "split": "Header/description left, accordion right. Premium feel."
+  },
+  "blog": {
+   "default": "Posts grid. REQUIRES Elementor Pro."
+  },
+  "pricing": {
+   "default": "Full-width plan cards with feature lists. Standard.",
+   "compact": "Left-aligned cards, smaller price, bordered highlight. Modern.",
+   "list": "Editorial service/menu price list (items with name/price/desc/category, grouped). THE layout for restaurants, salons, barbers, trades. Falls back to plan cards without items.",
+   "donation": "Donation tiers: amount-first cards, impact line body, shared section-level give-link cta, optional badge/highlighted + trust_line (REAL info only). Nonprofits/churches."
+  },
+  "logo_bar": {
+   "default": "Light bg 'Trusted by' logo row with grayscale filter.",
+   "dark": "Dark bg logo row.",
+   "marquee": "Infinite CSS logo marquee (hover-pauses, reduced-motion safe). 4+ logos/names or falls back to static row."
+  },
+  "team": {
+   "default": "Full cards with photo, name, role, bio, social links.",
+   "compact": "Small photos, name + role only, no bio or cards.",
+   "spotlight": "Single-person editorial profile: photo/initials left, name+role+bio+credentials+CTA right. Auto-used when team has exactly 1 member."
+  },
+  "gallery": {
+   "default": "Image grid with lightbox. Configurable columns.",
+   "cards": "2-column image cards with optional captions.",
+   "before_after": "Labeled BEFORE/AFTER pairs + optional bold result line. Proof for transformation businesses. Needs real images both sides.",
+   "videos": "2-up video embed grid (YouTube/Vimeo) with titles/captions. Videographers, musicians, courses.",
+   "carousel": "Auto-playing native image carousel (swiper). 3+ real images or falls back to cards."
+  },
+  "newsletter": {
+   "default": "Card with headline, description, CTA, privacy note.",
+   "inline": "Gradient bar with headline + button side by side.",
+   "_note_pro": "Pro sites: dead-url newsletter buttons auto-upgrade to a working email-capture form."
+  },
+  "map": {
+   "default": "Google Maps embed with optional header. Mobile height auto-scales.",
+   "contact": "'Visit Us' split: contact card (address, tel: phone, email, hours, note, CTA) + map. Standard local-business contact section."
+  },
+  "cta_final": {
+   "default": "Gradient bar with centered text and button. Bold.",
+   "card": "White card on light background. Elegant.",
+   "image": "Full background image with dark overlay. Dramatic. Needs 'image' key.",
+   "split": "Two-column closer: headline+CTA left, frosted checklist card right on dark bg. REQUIRES bullets array (3-5 short reassurances). Conversion-focused.",
+   "form": "ELEMENTOR PRO ONLY (auto-falls back): native lead-capture form closer — pitch + bullets left, form card right. form_fields [{label,type,options?,required?,width?}] max 7; form_recipient only if user gave one."
+  },
+  "footer": {
+   "default": "Multi-column dark footer with brand, link columns, contact.",
+   "light": "White/light bg footer with colored icons."
+  },
+  "disclaimer": {
+   "default": "Small centered disclaimer text. Also renders top-level social_icons."
+  },
+  "schedule": {
+   "default": "Time-rail agenda: accent time left, session title + speaker/location/tag meta right, optional day-group headers (items[].day). Conferences, workshops, programs. REPEATABLE (schedule#2) for multi-day.",
+   "times": "Service-times clock-card grid. THE church 'when we meet' block; also class times, walk-in hours.",
+   "tabs": "One tab per distinct items[].day (2+ days), accordion on mobile."
+  },
+  "sticky_bar": {
+   "default": "Mobile-only sticky call-now bar fixed at the screen bottom: cta {text, url: tel:REAL} + optional cta_secondary. Place last before footer. THE local-lander conversion pattern."
+  }
+ },
+ "section_rules": {
+  "_note": "Guidance for all 19 section types. Sections render in order of the 'sections' array.",
+  "hero": "Always first. Match variant to industry: split for services/fitness/healthcare (NEEDS image URL), image for hospitality/events (NEEDS image URL), default for bold SaaS/tech, gradient for creative/startups, minimal for portfolio/consulting, video for courses/demos (NEEDS video URL). Split hero is the most common professional pattern (36% of templates). Optional meta_items (1-3 {icon,text} facts — event date/venue, beds/baths, hours) render inline under the subheadline. Optional topbar {brand, phone, cta} renders a slim header strip (wordmark + tap-to-call + button) inside the hero — lead with it on EVERY local-business lander.",
+  "stats": "Hard numbers build trust. Default overlaps hero (negative margin) — ONLY after dark hero. Dark variant after light sections. Inline for compact accent strips. 3-4 items ideal. Values auto-parsed: '2,500+' → prefix='', number=2500, suffix='+'. Use realistic numbers with commas for thousands.",
+  "social_proof": "Industry trust indicators. Place immediately after hero or stats. Dark variant after light hero. Categories are pill badges. Alternative: use logo_bar for client logos instead.",
+  "features": "Core value proposition. IMPORTANT: 3 items for default/image_cards, 2-3 for alternating (MUST have image URLs), 3-6 for minimal, 4-6 for grid (even numbers), 4-6 for bento. Each item needs icon, title, desc. NEVER use alternating or image_cards without image URLs — use default, minimal, or bento instead. bento is the modern no-image showcase: the FIRST item becomes a large gradient hero tile, so lead with your strongest feature.",
+  "steps": "How-it-works process. 3 steps is golden. Compact for modern SaaS, timeline for narrative flow. Each item needs num, title, desc.",
+  "results": "Measurable outcomes. Default (dark) for dramatic contrast, bars for light data-focused metric cards (values keep their real shape — $2.5M, 340%, 4.9/5 — never converted to percentages). Metrics need value, label, and individual color hex. CTA optional.",
+  "competitive_edge": "Differentiator section. 'default' = simple checklist (benefits is a flat string array, NOT objects). 'image' adds a photo on the right. 'cards' = 3-col grid with {icon, title, desc} items. 'comparison' = us-vs-them cards (benefits + them_points/us_label/them_label) — use it when contrasting against the alternative; it is NOT a table (tables clip on mobile).",
+  "testimonials": "Customer quotes. KEEP QUOTES SHORT (1-2 sentences max, ~30 words). Default 3-card for balanced coverage, featured when one quote stands out (first item is featured), grid for 4+, minimal for an elegant editorial spotlight (FIRST quote runs large with an accent rule, rest sit smaller below — lead with your strongest). Items need quote, name, role. Photos optional. Each quote should include one specific detail (a number, a result, a timeframe). Optional aggregate {rating,count,source} renders stars + '4.9 — 217 Google reviews' under the header (real numbers only).",
+  "faq": "Toggle widget (FREE). Never use accordion (Pro-only). 4-6 items ideal. Split variant adds description and CTA on left side. Items use q/a keys (not question/answer).",
+  "blog": "REQUIRES Elementor Pro. Check before including. Shows recent posts grid. Eyebrow, headline, posts_per_page.",
+  "pricing": "2-3 plans recommended. One plan should have highlighted:true. Each plan: name, price (string), period, features (string array), cta, badge. Compact variant for modern/restrained. For restaurants/salons/barbers/spas/trades use variant 'list' with items (name/price/desc/category) — NEVER fake a menu as plan cards.",
+  "logo_bar": "Client/partner logos. Alternative to social_proof. Logos render at fixed 120px width with grayscale filter. Dark variant after light sections.",
+  "team": "Team member cards. Default has full details (photo, name, role, bio, social). Compact is name+role+photo only. 3-4 members for default, 4-6 for compact. A single member auto-renders as the spotlight editorial profile (credentials + cta supported).",
+  "gallery": "Image showcase. Default uses Elementor gallery widget with lightbox. Cards variant shows 2-per-row with optional captions. Images can be URL strings or {url, alt, caption} objects. before_after variant for transformation proof (real images both sides); videos variant for YouTube/Vimeo reels.",
+  "newsletter": "Email capture. Default has card with headline, description, button, privacy note. Inline is a gradient bar. CTA points to signup URL.",
+  "map": "Google Maps embed. Good for local businesses. Height auto-scales to 5/8 on mobile (min 200px). Address, height, zoom configurable. Use variant 'contact' with phone/hours/email for the standard local-business Visit Us block.",
+  "cta_final": "Strong closing push before footer. Gradient (default) for bold, card for elegant, image for dramatic (needs image URL), split for conversion-focused (headline+CTA left, frosted checklist card right — REQUIRES bullets array of 3-5 short reassurances; great closer for services/SaaS). Always include trust_line for reassurance. Optional cta_secondary renders an outline button beside the primary.",
+  "footer": "Always last visible section — EVERY page should have a footer. Dark (default) or light variant. Include brand (name + short description), 2-3 link columns, contact info, copyright year, social icons.",
+  "disclaimer": "Optional. Very bottom after footer. Small centered text. Also picks up top-level social_icons array.",
+  "general_variant_selection": "Don't use 'default' for everything — pick variants that match the industry. Fitness: split hero, default features, default testimonials. SaaS: default hero, bento features, compact steps. Restaurant: image hero, pricing list (menu!), map contact, minimal testimonials. Portfolio: minimal hero, minimal features, minimal testimonials. Local services: comparison competitive_edge, before_after gallery, map contact. Solo professional: team spotlight. Local trade lead-gen → industry_recommendations.local_trade_lander (CTA rhythm!). Premium gym/studio/luxury → dark_premium_studio (full-dark, colors.theme dark)."
+ },
+ "content_quality_rules": {
+  "_note": "Derived from analysis of high-converting landing pages. Concise copy converts better.",
+  "max_word_counts": {
+   "hero_headline": 8,
+   "hero_subheadline": 25,
+   "feature_title": 4,
+   "feature_desc": 20,
+   "step_title": 4,
+   "step_desc": 20,
+   "testimonial_quote": 30,
+   "faq_answer": 50,
+   "cta_headline": 8,
+   "button_text": 4,
+   "pricing_description": 12
+  },
+  "content_patterns": {
+   "headlines": "Name the concrete outcome plus the specific audience. Bad: 'Welcome to', 'We are', 'Our company'. Good: 'Sell more cars to local buyers', 'Book 30 percent more weekend tables'. BANNED cliches (never use): Elevate, Unlock, Seamless, Empower, Unleash, Supercharge, Revolutionize, Game-changing, Cutting-edge.",
+   "testimonials": "Include ONE specific detail (a number, a timeframe, a concrete result). Bad: 'Great service!' Good: 'Cut our onboarding from 3 weeks to 2 days.'",
+   "features": "Lead with the benefit, not the feature. Bad: 'Advanced analytics dashboard.' Good: 'See what's working in real time.'",
+   "cta_buttons": "Action verb + outcome. Bad: 'Submit', 'Click Here'. Good: 'Start Free Trial', 'Book Your Class', 'Get Your Quote'"
+  },
+  "visual_rhythm": {
+   "rule": "Alternate light and dark backgrounds. Never place two same-bg sections adjacent.",
+   "typical_flow": [
+    "dark_hero",
+    "light_stats",
+    "light_features",
+    "dark_results",
+    "light_testimonials",
+    "light_faq",
+    "dark_cta",
+    "dark_footer"
+   ],
+   "section_count": "7-10 sections for a standard page. More than 12 feels bloated."
+  },
+  "no_fancy_punctuation": {
+   "rule": "Never use em dashes or en dashes. Write with periods and commas instead. Use straight quotes (\" and ') only, no curly/smart quotes, and no ellipsis characters. Em dashes read as AI-generated copy.",
+   "reason": "Team standing rule: landing copy must read human. Em/en dashes and curly quotes are the clearest AI tells."
+  },
+  "shorter_copy": {
+   "rule": "Landing page copy should be punchy and direct. Max word counts per element: hero headline 8 words, hero subheadline 15 words, bullet points 8 words each, card descriptions 25 words, section headlines 6 words.",
+   "reason": "AI-generated copy tends to be too long. Real client feedback consistently asks for shorter, clearer text.",
+   "learned_from": "Lindsay Allen (Bodystyle): 'the messaging has to be crystal clear'. Shorter won every time."
+  }
+ },
+ "config_schema_ref": "See config-schema.json for complete config structure with all field types, required/optional flags, examples, variant pairing guide, and industry recommendations.",
+ "elementor_technical": {
+  "layout": "Flexbox containers (Elementor 3.6+). All layout primitives are containers with flex properties.",
+  "hierarchy": "container(outer, direction:column, content_width:boxed) > widget | container(row, direction:row) > container(col, direction:column) > widget",
+  "nesting": "Unlimited — containers nest freely",
+  "icon_format": {
+   "value": "fas fa-icon-name",
+   "library": "fa-solid",
+   "_note": "Keep emitting standard FontAwesome solid names (fas fa-*). The plugin auto-remaps FA solid icons to their Phosphor equivalent at render time, so the actual rendered glyph is Phosphor even though you write FA names. No FA name changes needed on your end."
+  },
+  "icon_libraries": {
+   "fa-solid": "fas fa-* (auto-remapped to Phosphor at render)",
+   "fa-regular": "far fa-*",
+   "fa-brands": "fab fa-* (brand logos pass through, not remapped)",
+   "_remap_note": "Solid FA icons are converted to Phosphor on render. Brand icons (fab fa-*) are left as-is. Write FA names as usual."
+  },
+  "never_use": [
+   "_animation (causes elementor-invisible class, content disappears)",
+   "Legacy sections/columns (elType: section) — use containers only"
+  ],
+  "key_patterns": {
+   "outer": "Top-level container: flex column, boxed content, responsive padding (desktop → 3/4 tablet → 1/2 mobile)",
+   "row": "Horizontal container: flex row, auto-calculates child widths, stacks on mobile",
+   "col": "Vertical container: flex column, holds widgets, flex_gap: 0",
+   "spacing": "Via spacer widgets (not flex gap) — spacers auto-scale 2/3 on mobile"
+  },
+  "data_storage": "update_post_meta($id, '_elementor_data', wp_slash(wp_json_encode($elements)))"
+ },
+ "mobile_design_patterns": {
+  "_note": "Learned from iterative mobile QA on pressgodigital.com landing pages. These patterns prevent the most common mobile layout issues.",
+  "split_hero_mobile": {
+   "problem": "Split hero (text-left, image-right) stacks vertically on mobile. Text alignment and padding need overrides.",
+   "fixes": [
+    "Set align_mobile='center' on headings, subheadlines, and buttons in the text column",
+    "Reset padding_mobile to {0, 0, 20, 0} on the text column (removes desktop-only right padding)",
+    "Image column needs width_mobile=100% to prevent squeeze",
+    "Trust line row (stars + text) needs flex_justify_content_mobile='center' and flex_align_items='center'"
+   ]
+  },
+  "stats_inline_mobile": {
+   "problem": "Inline stats (horizontal counter row) can overflow on mobile with 4 items.",
+   "fixes": [
+    "Use flex_wrap='wrap' on the stats row",
+    "Set width_mobile='45%' on each stat column so they wrap to 2x2 grid",
+    "Counter font sizes: desktop 36px → mobile 28px",
+    "Label font sizes: desktop 13px → mobile 11px"
+   ]
+  },
+  "typography_scaling": {
+   "rule": "Any heading >= 28px needs explicit mobile size. Rough formula: mobile = desktop * 0.65, min 20px.",
+   "examples": {
+    "hero_headline": {
+     "desktop": 48,
+     "mobile": 32
+    },
+    "section_headline": {
+     "desktop": 36,
+     "mobile": 26
+    },
+    "card_title": {
+     "desktop": 20,
+     "mobile": 18
+    },
+    "eyebrow": {
+     "desktop": 12,
+     "mobile": 11
+    }
+   }
+  },
+  "section_padding_mobile": {
+   "rule": "Desktop section padding (80-100px) is too much on mobile. Use 40-50px top/bottom, 20px sides.",
+   "auto_calc": "outer() handles this: tablet = desktop * 3/4, mobile = desktop * 1/2 (min 40px)"
+  },
+  "button_alignment": {
+   "rule": "Buttons in split layouts should be left-aligned on desktop, centered on mobile.",
+   "pattern": "align='left', align_mobile='center'"
+  },
+  "image_sizing": {
+   "rule": "Hero images in split layouts need explicit mobile handling to prevent CLS.",
+   "pattern": "Set aspect-ratio on image container via custom CSS, use min-height on image columns"
+  },
+  "testing": {
+   "tool": "Puppeteer screenshots at 375x812 (2x DPR) — test/screenshot-sections.js",
+   "critical_checks": [
+    "Hero text + buttons centered on mobile",
+    "Stats don't overflow horizontally",
+    "Feature cards stack cleanly (no text truncation)",
+    "Pricing cards are full-width on mobile",
+    "FAQ toggle items have enough tap target size",
+    "Footer columns stack vertically"
+   ]
+  },
+  "content_width_full": {
+   "problem": "content_width: boxed adds max-width via .e-con-inner wrapper that clips content on mobile, especially in multi-column layouts.",
+   "fix": "Use content_width: full on ALL containers. Control max-width via custom CSS: selector.e-con { max-width: 1140px; margin: 0 auto; } @media(max-width:767px) { selector.e-con { max-width: 100%; } }",
+   "learned_from": "Bodystyle Fitness comparison table — boxed containers clipped text at 375px viewport"
+  },
+  "flex_direction_mobile_broken": {
+   "problem": "Elementor's flex_direction_mobile setting gets ignored in many cases. Containers revert to column stacking regardless of the setting.",
+   "fix": "Use custom_css with !important: @media(max-width:767px){selector.e-con{flex-direction:row!important;}}",
+   "learned_from": "Multiple client builds — this is a consistent Elementor bug"
+  },
+  "hide_mobile_no_override": {
+   "problem": "hide_mobile: hidden adds elementor-hidden class with display:none!important. This CANNOT be overridden with custom CSS.",
+   "fix": "Only use hide_mobile for elements you truly never want on mobile. For conditional display, use custom_css media queries instead. For sticky/fixed elements, use Code Snippets plugin instead of Elementor containers.",
+   "learned_from": "Bodystyle Fitness sticky mobile CTA bar — fixed positioning + hide_desktop broke on all devices"
+  },
+  "icon_text_centering": {
+   "problem": "Icon + text side-by-side in a flex row: the text widget stretches to 100% width by default, pushing the pair off-center.",
+   "fix": "Set _element_width: auto on BOTH the icon widget AND the text widget. Then use flex_justify_content: center on the parent container.",
+   "learned_from": "Bodystyle Fitness comparison table — icons and text wouldn't center until both had auto width"
+  },
+  "minimum_text_sizes": {
+   "rule": "Minimum readable mobile text: 13px for body/values, 11px for labels/categories. Never go below 11px.",
+   "context": "At 375px viewport minus padding (~340px usable), two 48% columns = ~163px each. Keep text short for side-by-side mobile layouts.",
+   "learned_from": "Bodystyle Fitness — 11px was barely readable, 13px was the sweet spot for comparison values"
+  },
+  "dual_layout_pattern": {
+   "problem": "Complex layouts (comparison tables, feature grids) that look great on desktop often can't be made responsive with a single Elementor container structure.",
+   "fix": "Build TWO versions of the section — one optimized for desktop (hide on mobile via Elementor responsive visibility), one optimized for mobile (hide on desktop/tablet). More markup but guaranteed to look good on both.",
+   "learned_from": "Bodystyle Fitness comparison table, Ardane Medical video embeds — the only reliable way to handle significantly different desktop vs mobile layouts"
+  }
+ },
+ "cta_popup_pattern": {
+  "_note": "For landing pages with a scheduling CTA (Calendly, etc), use this proven pattern.",
+  "approach": "Custom HTML modal with iframe — zero external JS dependencies. Survives WP Rocket, ad blockers, slow CDNs.",
+  "implementation": {
+   "step_1": "Add HTML widget (widgetType: 'html') to the hero section containing the modal div + script",
+   "step_2": "Set all CTA button URLs to '#schedule' (or any anchor)",
+   "step_3": "Script uses addEventListener (NOT inline onclick) to intercept #schedule clicks and open modal",
+   "step_4": "Iframe src set lazily on first open — doesn't slow page load"
+  },
+  "wp_rocket_compatibility": {
+   "problem": "WP Rocket's Delay JavaScript rewrites inline onclick to data-rocket-onclick, breaking handlers. Also wraps scripts in type='rocketlazyloadscript'.",
+   "solution": "Use ONLY addEventListener (no inline onclick/onmouseover). Add data-no-optimize='1' data-no-defer='1' data-no-minify='1' to the script tag. Also add 'pg-cal' (or your script identifier) to WP Rocket's delay_js_exclusions option.",
+   "code_pattern": "document.addEventListener('click', function(e) { var a = e.target.closest('a[href*=\"#schedule\"]'); if (a) { e.preventDefault(); open(); } });"
+  },
+  "modal_features": [
+   "Click overlay to close",
+   "X button to close",
+   "ESC key to close",
+   "Body scroll lock when open",
+   "Fade animation (200ms)",
+   "Responsive sizing: min(calc(100vw - 24px), 480px) width, min(calc(100dvh - 40px), 660px) height",
+   "border-radius: 16px for modern feel",
+   "backdrop-filter: blur(3px) on overlay"
+  ],
+  "calendly_url_params": {
+   "hide_event_type_details": "1 — hides event description sidebar",
+   "hide_gdpr_banner": "1 — hides GDPR cookie banner",
+   "primary_color": "hex without # — brand accent color (may require Calendly Pro)",
+   "text_color": "hex without # — heading text color (may require Calendly Pro)"
+  }
+ },
+ "landing_page_template": {
+  "_note": "Proven landing page pattern from pressgodigital.com/get-started. Use Elementor Canvas template for true landing page feel (no header/footer chrome).",
+  "page_setup": {
+   "template": "Elementor Canvas (elementor_canvas) — removes theme header/footer",
+   "set_via": "update_post_meta($id, '_wp_page_template', 'elementor_canvas')"
+  },
+  "recommended_section_flow": [
+   "hero",
+   "stats",
+   "features",
+   "testimonials",
+   "pricing",
+   "faq",
+   "cta_final",
+   "footer"
+  ],
+  "style_notes": {
+   "warm_paper": "Light bg #FAF8F5, dark text #2C2421, muted #7A6E66, gold accent #B8860B. DM Sans for both heading/body. Subtle card shadows. Elegant, not flashy.",
+   "boxed_width": "1100px keeps content readable without feeling cramped",
+   "section_padding": "100px desktop, auto-scales to 40px mobile"
+  },
+  "logo_placement": {
+   "approach": "Image widget at top of hero section, before headline. Left-aligned desktop, centered mobile.",
+   "settings": "width: 140px desktop, 120px mobile. margin_bottom: 8px."
+  }
+ },
+ "conversion_patterns": {
+  "_note": "Real-world conversion learnings from paid traffic landing pages. These override template-kit patterns when in conflict.",
+  "hero_with_form": {
+   "pattern": "Split hero: bullet points + phone CTA left, lead capture form right. Form in hero above fold converts better than CTA button that scrolls to a form below.",
+   "form_fields": "Name, Phone, Email, Goal/Interest (select dropdown), Message (optional). Keep it to 4-5 fields max.",
+   "mobile": "Form stacks below hero text. Reduce bullet points to 4 on mobile (hide desktop list, show shorter mobile list).",
+   "learned_from": "South Coast Hypnotherapy (highest converting hero), adapted for Bodystyle Fitness"
+  },
+  "comparison_over_features": {
+   "pattern": "For businesses competing against big brands (OrangeTheory, Planet Fitness, etc.), a comparison table converts better than a generic features section. People need to see WHY you're different, not just WHAT you offer.",
+   "implementation": "Red X + faded text for competitors, green check + bold text for client. Use generic competitor label ('Big Class Gyms') not specific brand names — avoids legal issues and broadens the comparison.",
+   "learned_from": "Bodystyle Fitness — Lindsay specifically asked for a comparison section; it became the centerpiece of the page"
+  },
+  "video_self_hosted": {
+   "pattern": "Self-hosted video (or Bunny CDN) instead of YouTube embeds. YouTube adds clickable channel links, share buttons, and suggested videos that pull visitors off the landing page.",
+   "implementation": "HTML5 video with poster image + CSS play button overlay. On click: hide poster + play button, show video, call .play(). Keeps visitors on page.",
+   "learned_from": "Bodystyle Fitness — YouTube Short converted to self-hosted to eliminate exit points"
+  },
+  "sticky_mobile_cta": {
+   "pattern": "Fixed bottom bar on mobile with phone number + book/form CTA. Visible at all scroll positions.",
+   "implementation": "Must use Code Snippets plugin, NOT Elementor fixed positioning with hide_desktop. CSS: position:fixed; bottom:0; display:none on desktop, display:flex on mobile via @media query.",
+   "learned_from": "Bodystyle Fitness, Hall Brothers Moving — Elementor's native fixed + responsive hide doesn't work"
+  },
+  "client_voice_over_ai_copy": {
+   "pattern": "Record client calls, transcribe with Whisper, extract selling points for landing page copy. Real client language converts better than AI-generated marketing speak.",
+   "examples": "Lindsay Allen: 'people plateau because there's a limit to what the same moves can do' → became comparison point. 'our trainers are good enough to customize it even in a group' → became semi-private selling point.",
+   "implementation": "Use mlx-whisper locally for transcription, extract key phrases, use in hero bullets and section copy."
+  },
+  "brand_guide_compliance": {
+   "pattern": "Always use the client's actual brand guide fonts and colors, not what their previous designer used. Kilo used Lexend Giga + Space Grotesk for Bodystyle — brand guide said Montserrat + Open Sans.",
+   "implementation": "Ask for brand guide PDF early. Extract: heading font, body font, primary color, accent color, dark/light backgrounds."
+  }
+ },
+ "code_snippet_patterns": {
+  "_note": "These are WordPress Code Snippets (plugin), not Elementor widgets. They handle functionality that Elementor can't do natively.",
+  "sticky_mobile_cta": {
+   "what": "Fixed bottom bar on mobile with phone + CTA button",
+   "why": "Elementor's _position:fixed + hide_desktop/hide_tablet doesn't work (elementor-hidden overrides everything)",
+   "implementation": "add_action('wp_footer', ...) with CSS: position:fixed; bottom:0; display:none; @media(max-width:767px){display:flex}"
+  },
+  "google_ads_tracking": {
+   "what": "3 snippets: gtag config (header), form conversion (footer), phone swap (header)",
+   "gtag": "add_action('wp_head', ...) with async gtag.js script + gtag('config', 'AW-ID')",
+   "form_conversion": "jQuery(document).on('submit_success', '.elementor-form', function(){ gtag('event', 'conversion', {...}) })",
+   "phone_swap": "gtag('config', 'AW-ID/LABEL', { phone_conversion_number: 'NUMBER' })"
+  }
+ },
+ "section_schemas": {
+  "_note": "Required vs optional fields per section type. 'item_shape' is the per-item object shape used in 'items' arrays. Aliases listed are accepted but the canonical key is listed first.",
+  "hero": {
+   "required": [
+    "headline"
+   ],
+   "optional": [
+    "eyebrow",
+    "subheadline",
+    "cta_primary",
+    "cta_secondary",
+    "image"
+   ],
+   "field_shapes": {
+    "cta_primary": "{ text: string, url: string }",
+    "cta_secondary": "{ text: string, url: string }",
+    "image": "{ url: string, alt?: string } — only used by variants 'split' and 'image'"
+   },
+   "fallback_behavior": "Missing cta_primary suppresses button; missing eyebrow suppresses the pill above headline. Headline alone is enough.",
+   "meta_items": "Optional meta_items: 1-3 {icon, text} inline facts under the subheadline ('fas fa-calendar' + 'Sept 14 · Greer City Park'). Events, real estate, restaurants.",
+   "topbar": "Optional topbar {brand, phone, cta{text,url}}: slim header strip inside the hero (brand left, tel: phone + small CTA right). Use on local-business landers."
+  },
+  "stats": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape": "{ value: string|number, label: string }",
+   "value_parsing": "Values are auto-split into prefix/number/suffix. '$2,500+' becomes prefix='$', number=2500, suffix='+'. Non-numeric strings ('many') currently render as 0 (TODO: fall back to plain heading).",
+   "min_items": 2,
+   "max_items": 4
+  },
+  "social_proof": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape": "{ text: string } OR plain string",
+   "note": "Both forms accepted."
+  },
+  "features": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape": "{ icon: { value: string, library: string }, title: string, desc: string }",
+   "field_aliases": "'description' is accepted as an alias for 'desc' for forgiveness.",
+   "variants_min_items": {
+    "default": 2,
+    "alternating": 2,
+    "minimal": 3,
+    "image_cards": 3,
+    "grid": 4
+   },
+   "variants_max_items": {
+    "default": 3,
+    "alternating": 4,
+    "minimal": 6,
+    "image_cards": 3,
+    "grid": 6
+   },
+   "auto_wrap_warning": "When variant='default' and items > 3, layout overflows. Use variant='grid' for 4+ items."
+  },
+  "steps": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape": "{ num: string, title: string, desc: string }",
+   "field_aliases": "'description' accepted as alias for 'desc'.",
+   "note": "'num' is a string ('01' not 1) so leading zeros are preserved."
+  },
+  "results": {
+   "required": [
+    "metrics"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow",
+    "cta"
+   ],
+   "item_shape_metrics": "{ value: string|number, label: string, color?: string (hex) }",
+   "color_validation": "Invalid hex strings fall back to the global accent color silently."
+  },
+  "competitive_edge": {
+   "default_variant": {
+    "required": [
+     "headline",
+     "benefits"
+    ],
+    "item_shape_benefits": "string (flat array of strings, NOT objects)",
+    "field_shapes": {
+     "cta": "{ text: string, url: string }"
+    }
+   },
+   "image_variant": {
+    "required": [
+     "headline",
+     "benefits",
+     "image"
+    ],
+    "field_shapes": {
+     "image": "{ url: string, alt?: string }"
+    }
+   },
+   "cards_variant": {
+    "required": [
+     "headline",
+     "items"
+    ],
+    "item_shape_items": "{ icon: { value, library }, title: string, desc: string }"
+   },
+   "comparison_variant": "variant='comparison': us-vs-them cards. REQUIRED: benefits (string array, your side) + them_points (string array, their side). Optional us_label (use the business name) / them_label ('Chain salons'). Falls back to the default checklist without them_points. It is CARDS, not a table."
+  },
+  "testimonials": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape": "{ quote: string, name: string, role?: string, image?: { url, alt } }",
+   "empty_item_behavior": "Items with empty 'quote' are skipped entirely. Items with empty 'name' suppress the name/role line.",
+   "aggregate": "Optional aggregate {rating: 4.9, count: 217, source: 'Google'} renders stars + '4.9 · from 217 Google reviews' under the header. Real numbers only."
+  },
+  "faq": {
+   "required": [
+    "items"
+   ],
+   "optional": [
+    "headline",
+    "subheadline",
+    "eyebrow",
+    "cta"
+   ],
+   "item_shape": "{ q: string, a: string }",
+   "min_items": 1,
+   "ideal_items": "4-6"
+  },
+  "pricing": {
+   "required": [
+    "plans"
+   ],
+   "optional": [
+    "headline",
+    "eyebrow"
+   ],
+   "item_shape_plans": "{ name: string, price: string, period: string, features: string[], cta: { text, url }, highlighted?: bool, badge?: string }",
+   "note": "Exactly one plan can have highlighted=true.",
+   "list_variant": "variant='list': items [{name (req), price (req), desc?, category?}] — editorial service/menu price list grouped by category. 4-18 items. Falls back to plan cards without items.",
+   "compare_at": "Per-plan compare_at: strikethrough original price above the real one. Only for genuine discounts."
+  },
+  "cta_final": {
+   "required": [
+    "headline"
+   ],
+   "optional": [
+    "description",
+    "eyebrow",
+    "cta",
+    "trust_line"
+   ],
+   "field_shapes": {
+    "cta": "{ text: string, url: string }"
+   },
+   "note": "If cta is missing the button is suppressed but the headline still renders.",
+   "cta_secondary": "Optional cta_secondary {text, url, icon?}: outline button beside the primary."
+  },
+  "footer": {
+   "required": [
+    "brand"
+   ],
+   "optional": [
+    "columns",
+    "social_icons",
+    "contact"
+   ],
+   "field_shapes": {
+    "brand": "{ name: string, description?: string }",
+    "columns": "[{ title: string, links: [{ text: string, url: string }] }]",
+    "social_icons": "[{ name: 'twitter'|'github'|'youtube'|'linkedin'|'facebook'|'instagram', url: string }]",
+    "contact": "{ email?: string, phone?: string, address?: string }"
+   },
+   "field_aliases": "Inside columns, 'items' is accepted as an alias for 'links'."
+  },
+  "team": {
+   "spotlight_variant": "variant='spotlight' (auto-used when members has exactly 1 entry): single-person editorial profile. Member fields: name (required), role, bio|description, photo, credentials (string array, 2-4 short items), cta {text,url}, social."
+  },
+  "gallery": {
+   "before_after_variant": "variant='before_after': pairs [{before: url, after: url, result?: 'Lost 32 lbs in 16 weeks', caption?}]. Max 4. BOTH images must be real URLs; incomplete pairs are dropped.",
+   "videos_variant": "variant='videos': videos [{url, title?, caption?}] or plain URL strings. YouTube watch/shorts/embed, youtu.be, or vimeo.com/<id> only. Max 6."
+  },
+  "map": {
+   "contact_variant": "variant='contact': adds phone (tel: link), email, hours (string array, one line each), note, cta {text,url} in a card beside the map. Needs at least one of phone/email/hours; falls back to bare map."
+  }
+ },
+ "validation_behavior": {
+  "hard_failures": [
+   "Section type not in known list — rejected.",
+   "Missing required field per section_schemas — rejected with field name.",
+   "Malformed JSON — rejected."
+  ],
+  "silent_fallbacks": [
+   "Unknown variant name — falls back to 'default' (TODO: emit warning).",
+   "Invalid icon class — icon omitted, no placeholder shown.",
+   "Invalid hex color — falls back to global accent.",
+   "Empty item in 'items' array — that single item is skipped, rest of section renders."
+  ],
+  "url_sanitization": "Only http(s)://, mailto:, tel:, relative paths starting with /, and #anchors are accepted in CTA url fields. Anything else (javascript:, data:, file:, etc.) is replaced with '#'.",
+  "string_escaping": "Headlines, button text, labels: sanitize_text_field. Rich content (descriptions, FAQ answers): wp_kses_post. Raw HTML in headline strings is stripped, not rendered.",
+  "value_coercion": {
+   "stat_values": "Numeric strings with prefix/suffix get parsed for counter animation. Non-numeric strings currently render as 0 (TODO).",
+   "booleans_as_strings": "highlighted: 'true'/'false' is coerced to bool.",
+   "numbers_as_strings": "price: '10' and price: 10 both accepted."
+  }
+ },
+ "quickstart_minimal_configs": {
+  "_note": "Smallest config that will render each section type cleanly. Use as templates and fill in real content.",
+  "hero": {
+   "type": "hero",
+   "data": {
+    "headline": "Your big promise here"
+   }
+  },
+  "stats": {
+   "type": "stats",
+   "data": {
+    "items": [
+     {
+      "value": "1,200+",
+      "label": "Happy customers"
+     },
+     {
+      "value": "98%",
+      "label": "Retention"
+     },
+     {
+      "value": "24/7",
+      "label": "Support"
+     }
+    ]
+   }
+  },
+  "features": {
+   "type": "features",
+   "data": {
+    "items": [
+     {
+      "title": "Fast",
+      "desc": "Built for speed.",
+      "icon": {
+       "value": "fas fa-bolt",
+       "library": "fa-solid"
+      }
+     },
+     {
+      "title": "Simple",
+      "desc": "No learning curve.",
+      "icon": {
+       "value": "fas fa-check",
+       "library": "fa-solid"
+      }
+     },
+     {
+      "title": "Solid",
+      "desc": "Built to last.",
+      "icon": {
+       "value": "fas fa-shield",
+       "library": "fa-solid"
+      }
+     }
+    ]
+   }
+  },
+  "steps": {
+   "type": "steps",
+   "data": {
+    "items": [
+     {
+      "num": "01",
+      "title": "Sign up",
+      "desc": "Create your account in 30 seconds."
+     },
+     {
+      "num": "02",
+      "title": "Connect",
+      "desc": "Link your tools."
+     },
+     {
+      "num": "03",
+      "title": "Go live",
+      "desc": "Launch your first campaign."
+     }
+    ]
+   }
+  },
+  "competitive_edge": {
+   "type": "competitive_edge",
+   "data": {
+    "eyebrow": "WHY US",
+    "headline": "Built different",
+    "description": "Three things our competitors won't.",
+    "benefits": [
+     "No long-term contracts",
+     "Real human support",
+     "Live in 5 minutes"
+    ],
+    "cta": {
+     "text": "Get Started",
+     "url": "/"
+    }
+   }
+  },
+  "testimonials": {
+   "type": "testimonials",
+   "data": {
+    "items": [
+     {
+      "quote": "Real quote here.",
+      "name": "Real Person",
+      "role": "Real Title"
+     }
+    ]
+   }
+  },
+  "faq": {
+   "type": "faq",
+   "data": {
+    "items": [
+     {
+      "q": "How does it work?",
+      "a": "It just works."
+     },
+     {
+      "q": "How much?",
+      "a": "It depends."
+     }
+    ]
+   }
+  },
+  "pricing": {
+   "type": "pricing",
+   "data": {
+    "plans": [
+     {
+      "name": "Free",
+      "price": "0",
+      "period": "forever",
+      "features": [
+       "Everything basic"
+      ],
+      "cta": {
+       "text": "Start",
+       "url": "/"
+      }
+     },
+     {
+      "name": "Pro",
+      "price": "29",
+      "period": "month",
+      "features": [
+       "Everything"
+      ],
+      "cta": {
+       "text": "Go Pro",
+       "url": "/pro"
+      },
+      "highlighted": true
+     }
+    ]
+   }
+  },
+  "cta_final": {
+   "type": "cta_final",
+   "data": {
+    "headline": "Ready to start?",
+    "description": "It takes 30 seconds.",
+    "cta": {
+     "text": "Get Started",
+     "url": "/"
+    }
+   }
+  },
+  "footer": {
+   "type": "footer",
+   "data": {
+    "brand": {
+     "name": "Your Brand",
+     "description": "Tagline here."
+    },
+    "columns": [
+     {
+      "title": "Product",
+      "links": [
+       {
+        "text": "Features",
+        "url": "/features"
+       },
+       {
+        "text": "Pricing",
+        "url": "/pricing"
+       }
+      ]
+     }
+    ],
+    "contact": {
+     "email": "hello@example.com"
+    }
+   }
+  }
+ },
+ "known_gotchas": [
+  {
+   "id": "hero_optionality",
+   "rule": "Hero only requires 'headline'. Build with just a headline if the user hasn't given you more — don't invent.",
+   "severity": "high"
+  },
+  {
+   "id": "no_invented_testimonials",
+   "rule": "Do NOT generate fake testimonials with first-name-last-initial attribution. If the user hasn't given real quotes, skip the testimonials section or use clearly-labeled placeholder ('TESTIMONIAL 1 — replace before publishing').",
+   "severity": "high"
+  },
+  {
+   "id": "stat_value_format",
+   "rule": "Stat values are auto-parsed: '$2,500+' becomes prefix='$', number=2500, suffix='+'. Non-numeric strings currently render as 0 (will be fixed; for now use numeric values).",
+   "severity": "low"
+  },
+  {
+   "id": "fontawesome_icons_auto_remapped",
+   "rule": "The plugin now auto-remaps FontAwesome solid icons (fas fa-*) to their Phosphor equivalent at render time, so you no longer need to worry about FA5 vs FA6 naming. Keep emitting normal FA solid names. Common safe names that map cleanly: fa-check, fa-check-circle, fa-star, fa-clock, fa-shield-alt, fa-bolt, fa-chart-line, fa-trophy, fa-rocket, fa-gem, fa-award, fa-handshake, fa-dollar-sign, fa-briefcase, fa-arrow-right, fa-wrench, fa-seedling, fa-home, fa-info-circle. Brand icons (fab fa-*) pass through unchanged.",
+   "severity": "low"
+  },
+  {
+   "id": "raw_unsplash_pexels_ids_unsafe",
+   "rule": "Don't pass raw Unsplash photo IDs (e.g. photo-1416879595882-...) hoping they match your topic — Unsplash sometimes serves a totally different photo for old IDs. Either: (a) ask the user to drop a real image into the watch URL or wp-admin/upload.php and call list_recent_media, (b) use upload_media({url}) with a verified Pexels search URL, or (c) skip the image and pick a no-image variant.",
+   "severity": "medium"
+  },
+  {
+   "id": "update_section_preserves_variant",
+   "rule": "update_section preserves the existing variant when you don't pass one. If you DO want to change variant, pass it explicitly. The data field is a full replace, not a merge — fields you omit will be cleared on rebuild.",
+   "severity": "high"
+  },
+  {
+   "id": "map_needs_full_address",
+   "rule": "Map widget needs a complete address with city/state or ZIP. A bare street address ('123 Johnson St') will render a 'Map unavailable' placeholder. Pass full addresses like '123 Johnson St, Austin, TX 78701' or '123 Johnson St, 78701'.",
+   "severity": "medium"
+  },
+  {
+   "id": "comparison_is_cards_not_table",
+   "rule": "competitive_edge has NO comparison_table variant. Use the default variant with a flat 'benefits' array of strings, OR variant='cards' for a 3-col icon-box layout.",
+   "severity": "high",
+   "gotcha": "A literal comparison TABLE does not exist (multi-column tables clip on mobile). For us-vs-them use competitive_edge variant='comparison' — two stacking cards driven by benefits + them_points (+ us_label/them_label)."
+  },
+  {
+   "id": "url_schemes",
+   "rule": "Only http(s)://, mailto:, tel:, relative paths starting with /, and #anchors are accepted in CTA url fields. Anything else gets stripped to '#'.",
+   "severity": "high"
+  },
+  {
+   "id": "footer_columns_links_alias",
+   "rule": "Footer columns use 'links' as the canonical key (preferred). 'items' also accepted as alias. Each link is { text, url }.",
+   "severity": "medium"
+  },
+  {
+   "id": "features_steps_desc_alias",
+   "rule": "Features and steps items use 'desc' as canonical (preferred). 'description' also accepted as alias. Missing desc renders as empty (no Lorem fallback).",
+   "severity": "medium"
+  },
+  {
+   "id": "items_count_per_variant",
+   "rule": "Each variant has documented min/max item counts (see section_schemas). Going outside the range overflows the layout. Pick the right variant for the count.",
+   "severity": "medium"
+  },
+  {
+   "id": "competitive_edge_cards_items_shape",
+   "rule": "competitive_edge variant='cards' accepts EITHER `items: [{icon, title, desc}]` (canonical, recommended) OR legacy `benefits: [\"string\", ...]`. Pass items when you want icon+title+desc per card; pass benefits for a flat checklist with auto-assigned icons.",
+   "severity": "medium"
+  },
+  {
+   "id": "team_default_bio_alias",
+   "rule": "team.default member items accept `bio` (canonical) or `description` (alias). When `photo` is missing, an initials-circle placeholder renders automatically — no more empty avatar slot.",
+   "severity": "low"
+  },
+  {
+   "id": "map_widget_lazy_iframe",
+   "rule": "The Google Maps embed iframe is lazy-loaded by Elementor. Headless screenshots that don't scroll past the section can capture an empty iframe. The screenshot service was updated to force-load lazy iframes; if you still see an empty map in a screenshot, the issue is screenshot-side, not config-side. The actual rendered page in a real browser will show the map.",
+   "severity": "medium"
+  },
+  {
+   "id": "card_text_is_always_dark",
+   "rule": "Builders that render content inside white card surfaces use a fixed near-black text color, regardless of the page's text_dark token. Dark-themed pages (text_dark set to a light value) used to render invisible text on white cards; that's now fixed across features.grid, features.minimal, competitive_edge.default, competitive_edge.cards, pricing both variants, results, faq.split, cta_final.card, hero.gradient CTA, testimonials.default, team.default. If you see invisible text on a card, report it.",
+   "severity": "medium"
+  },
+  {
+   "id": "primary_gradient_contrast_aware",
+   "rule": "cta_final.default, newsletter.inline, and similar sections that render text on a primary-color gradient now pick text+button colors based on primary luminance. Light primaries (electric yellow, blush, lime, clay) get dark text; dark primaries get white text. No more invisible white-on-yellow headlines.",
+   "severity": "low"
+  },
+  {
+   "id": "image_url_normalization",
+   "rule": "All image-bearing fields accept either a string URL or a media object {url, alt}. The brain's media type documents the object form; AI clients can pass either. image_w() normalizes both shapes. If a section silently shows no image, check that the URL is actually valid (curl it) — not the shape.",
+   "severity": "low"
+  },
+  {
+   "id": "disclaimer_requires_object_data",
+   "rule": "The disclaimer section is rendered from a flat string, but add_section requires data to be a non-empty object. Pass `data: {text: \"your disclaimer copy here\"}` (also accepts `content` or `disclaimer` as the inner key). Passing a bare string (`data: \"...\"`) triggers 'Missing or invalid data payload' from the validator. The section also accepts an optional top-level `social_icons` array on the page config.",
+   "severity": "medium"
+  }
+ ],
+ "agent_instructions": [
+  "Read section_schemas before building anything — don't guess field names.",
+  "Call inspect_page after add_sections, not screenshot_page (inspect is authoritative; screenshot lags by ~1-3s after multi-write).",
+  "Build the page in one add_sections call when possible to avoid cache lag on rapid multi-writes.",
+  "Don't generate fake testimonials. If the user hasn't given quotes, skip the section or use obvious placeholders.",
+  "Don't try variant names that aren't documented. If you want a layout that isn't listed, ask the user — don't invent variants.",
+  "For long sessions, prefer create_page → add_sections → screenshot over editing existing pages — less cache surface area.",
+  "For 'modern' style: hero.gradient (with a saturated mid-tone primary like emerald/violet/terracotta, NOT a light pastel) OR hero.split, button_radius 999 (pill), card_radius 16-24, Plus Jakarta Sans or Outfit heading.",
+  "For 'editorial / premium / elegant' style: hero.minimal, card_radius 0, button_radius 0, section_padding 140+, Cormorant Garamond or DM Serif Display heading, generous whitespace, off-white background.",
+  "For 'bold local service' style (auto detail, contractor, plumbing): hero.default OR hero.image (image overlay is now strong enough), stats.dark, Outfit heading, jet-black bg + electric primary (yellow/red/orange).",
+  "For 'calming wellness' style (yoga, spa, therapy): hero.minimal OR hero.gradient, soft warm earth palette (cream + clay + sage), Cormorant Garamond + Lato, generous padding, no card radius."
+ ],
+ "dark_mode_patterns": {
+  "_note": "Dark-themed pages (text_dark set to a light value, light_bg set to a dark value) used to expose color-inversion bugs across most builders. Those are now fixed via a card_text() helper that always returns near-black for content inside white card surfaces, plus contrast-aware text_on_color() for text on dynamic-color backgrounds. The lists below reflect post-fix reality.",
+  "safe_variants_on_dark": [
+   "hero.default",
+   "hero.gradient",
+   "hero.image",
+   "hero.minimal",
+   "hero.split",
+   "hero.video",
+   "social_proof.default",
+   "social_proof.dark",
+   "stats.default",
+   "stats.dark",
+   "stats.inline",
+   "logo_bar.default",
+   "logo_bar.dark",
+   "features.default",
+   "features.minimal",
+   "features.grid",
+   "features.image_cards",
+   "features.alternating",
+   "competitive_edge.default",
+   "competitive_edge.cards",
+   "competitive_edge.image",
+   "steps.default",
+   "steps.compact",
+   "steps.timeline",
+   "results.default",
+   "results.bars",
+   "testimonials.default",
+   "testimonials.featured",
+   "testimonials.grid",
+   "testimonials.minimal",
+   "faq.default",
+   "faq.split",
+   "pricing.default",
+   "pricing.compact",
+   "team.default",
+   "team.compact",
+   "newsletter.default",
+   "newsletter.inline",
+   "cta_final.default",
+   "cta_final.card",
+   "cta_final.image",
+   "footer.default",
+   "footer.light",
+   "features.bento",
+   "cta_final.split",
+   "pricing.list",
+   "map.contact",
+   "gallery.before_after",
+   "gallery.videos",
+   "competitive_edge.comparison",
+   "team.spotlight"
+  ],
+  "still_imperfect": [
+   "gallery.default — works but image binding requires the URL to be a known WP attachment (use upload_media first, not raw external URLs)",
+   "logo_bar.dark — image logos are lazy-loaded; a real-browser visit shows them, but a screenshot taken before the section scrolls into view may show empty slots"
+  ]
+ },
+ "industry_recommendations": {
+  "editorial_food_drink": {
+   "_note": "Coffee roastery, restaurant, wine bar, bakery — places where craft and provenance matter.",
+   "sections": [
+    "hero",
+    "stats.inline",
+    "features.alternating",
+    "steps.default",
+    "competitive_edge.default",
+    "faq.split",
+    "cta_final.card",
+    "footer.default"
+   ],
+   "typography": {
+    "heading": "DM Serif Display OR Playfair Display",
+    "body": "Inter OR Lato"
+   },
+   "palette": "warm: cream bg (#F5EDE0/#FAF6F0) + espresso text (#2A1810) + single warm accent (#C7522A terracotta)",
+   "layout": {
+    "card_radius": 0,
+    "button_radius": 0,
+    "section_padding": 130
+   }
+  },
+  "luxury_minimal_professional": {
+   "_note": "Architecture firm, law firm, designer studio, gallery — restraint as a value signal.",
+   "sections": [
+    "hero.minimal",
+    "features.minimal",
+    "competitive_edge.default",
+    "steps.timeline",
+    "faq.split",
+    "cta_final.card",
+    "footer.light"
+   ],
+   "typography": {
+    "heading": "Cormorant Garamond OR DM Serif Display",
+    "body": "Inter"
+   },
+   "palette": "monochrome: pure off-white (#FAFAF7) + near-black text (#1A1A1A) + single muted accent (#A89F87 stone)",
+   "layout": {
+    "card_radius": 0,
+    "button_radius": 0,
+    "section_padding": 160,
+    "boxed_width": 1280
+   }
+  },
+  "bold_local_service": {
+   "_note": "Auto detail, plumbing, HVAC, contractor, roofing — masculine, bold, action-forward.",
+   "sections": [
+    "hero.default OR hero.image",
+    "stats.dark",
+    "features.default",
+    "competitive_edge.default",
+    "pricing.compact",
+    "faq.default",
+    "cta_final.card",
+    "footer.default"
+   ],
+   "typography": {
+    "heading": "Outfit OR Plus Jakarta Sans",
+    "body": "Inter"
+   },
+   "palette": "high contrast: jet black bg (#0A0A0A) + electric primary (yellow/red/orange) + white text",
+   "layout": {
+    "card_radius": 4,
+    "button_radius": 4,
+    "section_padding": 110
+   }
+  },
+  "calming_wellness": {
+   "_note": "Yoga studio, spa, therapy practice, meditation — soft, breathable, intentional.",
+   "sections": [
+    "hero.minimal OR hero.gradient",
+    "features.minimal",
+    "steps.timeline",
+    "newsletter.default",
+    "faq.default",
+    "cta_final.card",
+    "footer.light"
+   ],
+   "typography": {
+    "heading": "Cormorant Garamond OR Playfair Display",
+    "body": "Lato"
+   },
+   "palette": "warm earth: cream (#FAF6F0) + clay text (#3F3024) + sage primary (#8A9D7A) + blush accent (#D9A299)",
+   "layout": {
+    "card_radius": 0,
+    "button_radius": 0,
+    "section_padding": 160,
+    "boxed_width": 1040
+   }
+  },
+  "modern_tech_saas": {
+   "_note": "AI/ML startup, dev tooling, fintech, B2B SaaS — confident, tech-forward, polished.",
+   "sections": [
+    "hero.gradient OR hero.default",
+    "logo_bar.dark",
+    "features.minimal OR features.grid",
+    "competitive_edge.cards",
+    "results.default",
+    "pricing.compact",
+    "faq.split",
+    "cta_final.card",
+    "footer.default"
+   ],
+   "typography": {
+    "heading": "Plus Jakarta Sans OR Sora OR Space Grotesk",
+    "body": "Inter OR DM Sans"
+   },
+   "palette": "dark base (#0A0118) + saturated mid-tone primary (violet/lime/electric blue), text_dark light (#F5F3FF) for sections + card_text helper auto-inverts on white cards",
+   "layout": {
+    "card_radius": 16,
+    "button_radius": 8,
+    "section_padding": 110
+   }
+  },
+  "local_trade_lander": {
+   "description": "High-converting local trade/urgent-service LEAD-GEN lander (tree service, roofing, HVAC, plumbing) — modeled on the strongest hand-built reference pages.",
+   "colors": {
+    "primary": "#B91C1C",
+    "accent": "#D10909",
+    "dark_bg": "#1F1F1F",
+    "light_bg": "#F5F5F5",
+    "text_dark": "#222222"
+   },
+   "fonts": "Jost + Inter (industrial grotesque) or Archivo + Inter",
+   "sections": [
+    "hero",
+    "social_proof",
+    "features",
+    "competitive_edge",
+    "steps",
+    "testimonials",
+    "map",
+    "faq",
+    "cta_final",
+    "footer"
+   ],
+   "variants": {
+    "hero": "image with panel:left + topbar{brand,phone,cta} + bullets[4]",
+    "social_proof": "dark (trust pills: 5.0 Rated / Licensed & Insured / 24/7 Emergency)",
+    "features": "image_cards with real job photos + section cta",
+    "competitive_edge": "comparison (us_label = business name, them_label = \"The Average <trade> Guy\") THEN a second competitive_edge as image (about/credentials)",
+    "steps": "default 3 steps + cta",
+    "testimonials": "default 3 local quotes + aggregate{rating,count,source} + cta",
+    "map": "contact (phone, hours, service-area note)",
+    "cta_final": "split with bullets"
+   },
+   "tips": "CTA RHYTHM IS THE PATTERN: the SAME accent button (Get My Free Estimate / tel:) after services, comparison, steps, and testimonials — identical label every time. Charcoal/white section alternation. Trust everywhere: certifications in hero bullets AND trust pills AND about. City names in testimonials (Name, City SC). Phone number visible in topbar, hero, and map.contact."
+  },
+  "dark_premium_studio": {
+   "description": "Full-dark premium studio/gym/boutique site (Bodystyle-class): zero light sections, single accent color, photo-led, empathy-first copy.",
+   "colors": {
+    "theme": "dark",
+    "dark_bg": "#252520",
+    "light_bg": "#33393E",
+    "primary": "#BE9748",
+    "accent": "#BE9748",
+    "text_dark": "#F4EFE6",
+    "text_muted": "rgba(255,255,255,0.7)"
+   },
+   "fonts": "Montserrat + Open Sans, or Fraunces/Playfair Display + Inter for luxury",
+   "sections": [
+    "hero",
+    "competitive_edge",
+    "features",
+    "team",
+    "steps",
+    "newsletter",
+    "testimonials",
+    "gallery",
+    "map",
+    "cta_final",
+    "footer"
+   ],
+   "variants": {
+    "hero": "image with panel:left + topbar (photo of the PEOPLE, not equipment)",
+    "competitive_edge": "image — the EMPATHY MIRROR: benefits = the visitor's pain statements (\"You've been eating well and the weight still won't budge\"), description closes with \"we hear these things every week\"",
+    "features": "default/image_cards — 3 offerings with photos + cta",
+    "team": "default 2-3 founders with real photos and warm bios",
+    "newsletter": "lead magnet — cta links to the guide page",
+    "testimonials": "default verbatim quotes + aggregate",
+    "gallery": "default 6 real photos (\"See what we're up to\")",
+    "map": "contact with hours",
+    "cta_final": "image (reuse the hero photo) — \"Ready to take the first step?\""
+   },
+   "tips": "EVERY section dark (colors.theme dark). Gold/accent used ONLY for eyebrows, numbers, buttons. Empathy-first voice: lead with how the visitor FEELS, never with the business. One repeated CTA (Request a Consultation). 2-3 word uppercase accent eyebrow on every section. Reuse the same real photo set everywhere; people > equipment."
+  }
+ },
+ "variant_reliability": {
+  "_note": "Quick reliability lookup. 'good' = verified working post-fix. 'caveat' = works with a constraint. Anything missing is also 'good'.",
+  "competitive_edge.cards": "good — accepts items[{icon,title,desc}] (canonical) or legacy benefits[string]",
+  "competitive_edge.image": "good — image renders as bg-cover on right column, fills any size",
+  "features.alternating": "good — image timing fixed via screenshot lazy-load wait",
+  "features.image_cards": "good — fixed-height bg-image bands keep cards equal height",
+  "cta_final.default": "good — contrast-aware text on primary gradient",
+  "cta_final.card": "good — card text uses card_text() (always near-black on white)",
+  "cta_final.image": "good — overlay reduced from 0.7 to 0.5 so photo reads through",
+  "newsletter.inline": "good — contrast-aware headline + button on primary gradient",
+  "team.default": "good — bio/description alias, initials placeholder when photo missing",
+  "team.compact": "good — initials placeholder when photo missing",
+  "gallery.default": "caveat — pass URLs that resolve to real WP attachments (use upload_media first)",
+  "gallery.cards": "caveat — same attachment-binding rule",
+  "map": "good — full address required (street + city OR ZIP), heuristic shows visible warning if address is too vague",
+  "hero.gradient": "good — primary CTA label uses card_text() instead of text_dark, won't render white-on-white even with light primaries",
+  "hero.image": "good — overlay strengthened from 0.65 to 0.78 for legibility on busy photos"
+ }
+}
