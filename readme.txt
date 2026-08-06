@@ -200,6 +200,7 @@ On a PressGo account key you don't pick a model. The agent runs on current Claud
 * **Renamed: "MCP Server" is now "Connect & license".** Same place in the PressGo menu, clearer name. Your bookmarks and existing links keep working.
 * **Clearer usage language.** The plugin now talks about builds ("12 builds left") instead of credits everywhere. Nothing about your allowance changed, only the words.
 * Friendlier low-usage notice and connection messages.
+* Under the hood: hardening follow-up (verified file writes, bounded inputs, more thorough cleanup).
 
 = 2.5.11 =
 * Fixed: paid PressGo plans (Pro/Max/Ultra and legacy Plus/Agency) are now recognized by the MCP tools and daily build meter; previously some paid accounts were limited as free.
