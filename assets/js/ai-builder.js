@@ -662,7 +662,7 @@
 				lowCreditNudged = true;
 				var nudge = el('pg-msg pg-msg-note');
 				nudge.appendChild(document.createTextNode(
-					newTotal + (newTotal === 1 ? ' build' : ' builds') + ' left this month. A $15 pack adds 75 more so you can keep building. '));
+					"You're almost out of included usage this month. A $15 pack adds 75 extra builds so you can keep going. "));
 				var a = document.createElement('a');
 				a.href = 'https://pressgo.app/dashboard?buy=credits';
 				a.target = '_blank';
