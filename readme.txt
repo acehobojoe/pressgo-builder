@@ -4,7 +4,7 @@ Tags: elementor, ai page builder, landing page, website builder, ai website buil
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.5.11
+Stable tag: 2.5.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -195,6 +195,11 @@ On a PressGo account key you don't pick a model. The agent runs on current Claud
 8. Chat-driven live editing — connect Claude, ChatGPT, Cursor, or any MCP client and watch sections appear in Elementor in real time, no reload
 
 == Changelog ==
+
+= 2.5.12 =
+* **Renamed: "MCP Server" is now "Connect & license".** Same place in the PressGo menu, clearer name. Your bookmarks and existing links keep working.
+* **Clearer usage language.** The plugin now talks about builds ("12 builds left") instead of credits everywhere. Nothing about your allowance changed, only the words.
+* Friendlier low-usage notice and connection messages.
 
 = 2.5.11 =
 * Fixed: paid PressGo plans (Pro/Max/Ultra and legacy Plus/Agency) are now recognized by the MCP tools and daily build meter; previously some paid accounts were limited as free.
