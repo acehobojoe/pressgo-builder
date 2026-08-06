@@ -1,6 +1,6 @@
 <?php
 /**
- * PressGo > MCP Server admin page.
+ * PressGo > Connect & license admin page (slug pressgo-mcp).
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
@@ -25,7 +25,7 @@ if ( $new_key ) { delete_transient( 'pressgo_mcp_new_key_' . $new_key_user ); }
 ?>
 <div class="wrap pressgo-mcp-wrap">
 	<h1>
-		PressGo MCP Server
+		Connect &amp; license
 		<?php if ( $is_pro ) : ?>
 			<span class="pressgo-tier pressgo-tier--pro">PRO</span>
 		<?php else : ?>
