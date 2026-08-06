@@ -177,7 +177,7 @@ class PressGo_Rest_API {
 				$saved_now = true;
 			}
 			wp_send_json_success( array(
-				'message' => "PressGo API connected! {$credits} credits available." . ( $saved_now ? ' Key saved ✓' : '' ),
+				'message' => "PressGo API connected! {$credits} builds available." . ( $saved_now ? ' Key saved ✓' : '' ),
 				'credits' => $credits,
 				'saved'   => $saved_now,
 			) );

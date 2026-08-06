@@ -161,13 +161,13 @@ class PressGo_Admin {
 	}
 
 	public function render_api_mode_section() {
-		echo '<p>Choose how PressGo connects to AI. Use a <strong>PressGo API key</strong> for the simplest setup (includes free credits), or bring your own Claude API key.</p>';
+		echo '<p>Choose how PressGo connects to AI. Use a <strong>PressGo API key</strong> for the simplest setup (includes free builds), or bring your own Claude API key.</p>';
 	}
 
 	public function render_api_mode_field() {
 		$value = get_option( 'pressgo_api_mode', 'pressgo' );
 		echo '<fieldset>';
-		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 10 free credits/month (a page costs 1&ndash;2), buy more as needed</label><br/>';
+		echo '<label><input type="radio" name="pressgo_api_mode" value="pressgo"' . checked( $value, 'pressgo', false ) . ' /> <strong>PressGo API</strong> &mdash; 10 free builds/month (a page usually takes 1&ndash;2), get more as needed</label><br/>';
 		echo '<label><input type="radio" name="pressgo_api_mode" value="direct"' . checked( $value, 'direct', false ) . ' /> <strong>Own API Key</strong> &mdash; use your Anthropic key directly</label>';
 		echo '<p class="description" style="margin-top:6px;">Heads up: the chat-based <strong>AI Builder</strong> runs on a PressGo key in either mode. "Own API Key" powers the legacy one-shot generator only.</p>';
 		echo '</fieldset>';

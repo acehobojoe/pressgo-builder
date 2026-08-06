@@ -1055,7 +1055,7 @@ class PressGo_MCP_Tools {
 		if ( ! self::globals_locked() ) { return null; }
 		return new WP_Error( 'mcp_globals_locked',
 			"This site's global styles (colors, fonts, layout) are LOCKED by the owner " .
-			"(PressGo > MCP Server > Lock global styles). I won't change them — I'll match the " .
+			"(PressGo > Connect & license > Lock global styles). I won't change them — I'll match the " .
 			"existing palette and fonts instead. If the user explicitly asks to change the site-wide " .
 			"design, call set_globals again with force: true."
 		);
@@ -1293,7 +1293,7 @@ class PressGo_MCP_Tools {
 			$upgrade_url = PressGo_License::upgrade_url();
 			return new WP_Error( 'mcp_pro_required',
 				"`{$name}` requires a paid PressGo plan (Pro $25/mo and up). The user can upgrade at {$upgrade_url} — " .
-				"once their pressgo.app account is on a paid plan (or they enter a license key in PressGo > MCP Server), this tool unlocks immediately."
+				"once their pressgo.app account is on a paid plan (or they enter a license key in PressGo > Connect & license), this tool unlocks immediately."
 			);
 		}
 		switch ( $name ) {

@@ -124,7 +124,7 @@ If you use the microphone button, your recording is sent for transcription to th
 
 **8. Anonymous Usage Telemetry (`pressgo.app/api/plugin/heartbeat` and `/api/plugin/telemetry`) — OPT-IN ONLY**
 
-On first install you'll see a notice asking whether you want to share anonymous usage data. Nothing is sent until you click "Allow & continue". If you click "Skip" or simply dismiss the notice, no telemetry data is ever transmitted. The opt-in choice can be changed anytime in PressGo &rarr; MCP Server.
+On first install you'll see a notice asking whether you want to share anonymous usage data. Nothing is sent until you click "Allow & continue". If you click "Skip" or simply dismiss the notice, no telemetry data is ever transmitted. The opt-in choice can be changed anytime in PressGo &rarr; Connect & license.
 
 When enabled, the plugin sends two kinds of anonymized events:
 
